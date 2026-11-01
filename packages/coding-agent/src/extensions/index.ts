@@ -13,6 +13,8 @@ import writerSearchExtension from "./writer-search/index.ts";
 import writerSkillsExtension from "./writer-skills/index.ts";
 // WriterAgent: read-only writing checks (style_check, word_count, readability_check).
 import writerToolsExtension from "./writer-tools/index.ts";
+// WriterAgent: /lang and the /wa configuration page.
+import writerUiExtension from "./writer-ui/index.ts";
 
 export const builtInExtensions: InlineExtension[] = [
 	// WriterAgent: registers the WA_* model and clamps its output limit.
@@ -25,6 +27,8 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-docs", factory: writerDocsExtension, builtin: true },
 	// WriterAgent: writing skills.
 	{ name: "writer-skills", factory: writerSkillsExtension, builtin: true },
+	// WriterAgent: interface language and configuration page.
+	{ name: "writer-ui", factory: writerUiExtension, builtin: true },
 	{ name: "llama.cpp", factory: llamaExtension, builtin: true },
 	// Replaceable: an extension that registers `codemode`, `tool_search`, or `/mcp` (such as a third-party
 	// MCP extension) takes over instead of running alongside the built-in one.

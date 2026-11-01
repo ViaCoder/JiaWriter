@@ -17,7 +17,7 @@ import { getAgentDir, getWriterSkillsDir } from "../../config.ts";
 // Extension API types.
 import type { ExtensionAPI, ExtensionCommandContext } from "../../core/extensions/types.ts";
 // Output messages.
-import { resolveLang, t, type WriterLang } from "../../writer/i18n/index.ts";
+import { currentLang, t, type WriterLang } from "../../writer/i18n/index.ts";
 // Skill files.
 import {
 	copyBuiltinForEdit,
@@ -131,7 +131,7 @@ async function skillActions(s: SkillEntry, ctx: ExtensionCommandContext, agentDi
 			name: s.name,
 			title: s.title,
 			description: s.description,
-			lang: resolveLang(process.env.WA_LANG),
+			lang: currentLang(),
 		});
 		if (draft === undefined) return;
 		const diff = diffSkill(`${s.name}/SKILL.md`, current, draft);
@@ -177,7 +177,7 @@ async function askMeta(
 export default function writerSkillsExtension(pi: ExtensionAPI): void {
 	// Built-in skills of the output language, minus turned-off and replaced ones.
 	pi.on("resources_discover", () => ({
-		skillPaths: enabledBuiltinDirs(getAgentDir(), builtinLangDir(resolveLang(process.env.WA_LANG))),
+		skillPaths: enabledBuiltinDirs(getAgentDir(), builtinLangDir(currentLang())),
 	}));
 
 	// /skills.
@@ -187,7 +187,7 @@ export default function writerSkillsExtension(pi: ExtensionAPI): void {
 			// Until the user leaves the list.
 			const agentDir = getAgentDir();
 			for (;;) {
-				const skills = listSkills(agentDir, builtinLangDir(resolveLang(process.env.WA_LANG)));
+				const skills = listSkills(agentDir, builtinLangDir(currentLang()));
 				const labels = skills.map((s) => skillLabel(s));
 				const choice = await ctx.ui.select(t("skills.title", { count: skills.length }), [
 					t("skills.new"),

@@ -1,7 +1,7 @@
 import { join, resolve } from "node:path";
 import { resetCapabilitiesCache, setCapabilities, Text, type TUI, type TuiMouseEvent } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { afterEach, beforeAll, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { getReadmePath } from "../src/config.ts";
 import type { ToolDefinition } from "../src/core/extensions/types.ts";
@@ -35,6 +35,12 @@ function createFakeTui(): TUI {
 		requestRender: () => {},
 	} as unknown as TUI;
 }
+
+// WriterAgent: these tests read the upstream English hint text; the interface defaults to Chinese
+// (vitest restores stubbed variables after each test, so the stub runs before each one).
+beforeEach(() => {
+	vi.stubEnv("WA_LANG", "en");
+});
 
 describe("ToolExecutionComponent parity", () => {
 	beforeAll(() => {

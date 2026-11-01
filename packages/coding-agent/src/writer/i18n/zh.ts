@@ -215,6 +215,32 @@ export const zh = {
 	// Blank body.
 	"skills.blankBody":
 		"## 动笔之前\n\n- \n\n## 结构\n\n- \n\n## 文风\n\n- \n\n## 收尾检查\n\n- 完稿后运行 style_check。",
+	// /wa page.
+	"wa.title": "WriterAgent 配置（只读，修改请设置环境变量）",
+	"wa.problem": "配置问题：",
+	"wa.groupModel": "模型",
+	"wa.groupOther": "界面与检索",
+	"wa.groupSetup": "设置命令（Linux / macOS；长期有效请写进 ~/.bashrc 或 ~/.zshrc）",
+	"wa.groupSetupWin": '设置命令（PowerShell，当前窗口有效；长期有效用 setx 变量名 "值"）',
+	"wa.src.env": "环境变量",
+	"wa.src.default": "默认值",
+	"wa.src.detect": "自动检测",
+	"wa.src.cache": "自动检测（缓存）",
+	"wa.src.manual": "手动指定（WA_API）",
+	"wa.src.lang": "/lang 设置",
+	"wa.set": "已设置",
+	"wa.unset": "未设置",
+	"wa.anonymous": "未设置（匿名调用）",
+	"wa.sfAuto": "未设置（在约定位置查找）",
+	"wa.reasoningLevels": "（可用：{levels}）",
+	"wa.keyPlaceholder": "<你的 API key>",
+	"wa.modelPlaceholder": "<模型名>",
+	"wa.close": "按任意键关闭",
+	// /lang.
+	"lang.choose": "界面语言",
+	"lang.saved": "界面语言已设为中文。命令说明和提示即时生效，内置 skill 在 /reload 后切换。",
+	"lang.envWins": "当前设置了 WA_LANG={value}，它优先于 /lang 的选择。",
+	"lang.bad": "可选语言：zh、en。",
 };
 
 /** Message keys shared by all languages. */

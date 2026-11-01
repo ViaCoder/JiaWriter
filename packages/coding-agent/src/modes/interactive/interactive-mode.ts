@@ -133,6 +133,8 @@ import { killTrackedDetachedChildren } from "../../utils/shell.ts";
 import { loadAllHighlightLanguages } from "../../utils/syntax-highlight.ts";
 import { ensureTool, type ToolStatus } from "../../utils/tools-manager.ts";
 import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-check.ts";
+// WriterAgent: interface text in the chosen language.
+import { uiText } from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
 import { AssistantMessageComponent } from "./components/assistant-message.ts";
@@ -726,7 +728,8 @@ export class InteractiveMode {
 		// Define commands for autocomplete
 		const slashCommands: SlashCommand[] = BUILTIN_SLASH_COMMANDS.map((command) => ({
 			name: command.name,
-			description: command.description,
+			// WriterAgent: descriptions in the interface language.
+			description: command.name === "quit" ? uiText("Quit {app}", { app: APP_NAME }) : uiText(command.description),
 			...(command.argumentHint && { argumentHint: command.argumentHint }),
 		}));
 
@@ -797,7 +800,8 @@ export class InteractiveMode {
 			.filter((cmd) => !builtinCommandNames.has(cmd.name))
 			.map((cmd) => ({
 				name: cmd.invocationName,
-				description: this.prefixAutocompleteDescription(cmd.description, cmd.sourceInfo),
+				// WriterAgent: extension command descriptions in the interface language.
+				description: this.prefixAutocompleteDescription(cmd.description && uiText(cmd.description), cmd.sourceInfo),
 				getArgumentCompletions: cmd.getArgumentCompletions,
 			}));
 
@@ -1054,13 +1058,22 @@ export class InteractiveMode {
 					rawKeyHint("!", "bash"),
 					hint("app.tools.expand", "more"),
 				].join(theme.fg("muted", " · "));
+			// WriterAgent: onboarding lines in the interface language.
 			const compactOnboarding = () =>
 				theme.fg(
 					"dim",
-					`Press ${keyText("app.tools.expand")} to show full startup help${showDetails ? " and loaded resources" : ""}.`,
+					uiText(
+						showDetails
+							? "Press {key} to show full startup help and loaded resources."
+							: "Press {key} to show full startup help.",
+						{ key: keyText("app.tools.expand") },
+					),
 				);
 			const onboarding = () =>
-				theme.fg("dim", `Pi can explain its own features and look up its docs. Ask it how to use or extend Pi.`);
+				theme.fg(
+					"dim",
+					uiText("Pi can explain its own features and look up its docs. Ask it how to use or extend Pi."),
+				);
 			const header = new BuiltInHeader(
 				() => `${withLogo(compactInstructions())}\n${compactOnboarding()}\n\n${onboarding()}`,
 				() => `${withLogo(expandedInstructions())}\n\n${onboarding()}`,

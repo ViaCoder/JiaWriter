@@ -1,0 +1,126 @@
+#!/usr/bin/env python3
+"""Hands-on check of WriterAgent's interactive interface in a pseudo-terminal (no tmux needed).
+
+Starts the source build (pi-test.sh --no-env) with a throwaway HOME and agent folder, types
+/wa, /skills, /lang en, /skills and /wa, and looks for the expected Chinese and English text in
+the screen output (ANSI codes removed). Nothing outside the temp folder is read or written, no
+key is set, and no model is called. Prints one line per check and exits 1 when any check fails.
+Usage: python3 -I scripts/writer-tui-check.py [--debug]
+"""
+
+# Pseudo-terminal, process control and timing.
+import os
+import pty
+import re
+import select
+import shutil
+import signal
+import sys
+import tempfile
+import time
+
+# Repository root (this file is in scripts/).
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# ANSI escape sequences (CSI, OSC and single-character escapes).
+ANSI = re.compile(r"\x1b\[[0-9;?<>=]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]")
+
+
+def read_for(fd, seconds):
+    """All output the terminal produces within `seconds`, ANSI codes removed."""
+    # Collected bytes.
+    out = b""
+    # Until the deadline.
+    end = time.monotonic() + seconds
+    while True:
+        # Time left.
+        left = end - time.monotonic()
+        if left <= 0:
+            break
+        # Wait for output.
+        ready, _, _ = select.select([fd], [], [], left)
+        if not ready:
+            break
+        try:
+            chunk = os.read(fd, 65536)
+        except OSError:
+            break
+        if not chunk:
+            break
+        out += chunk
+    # Plain text.
+    return ANSI.sub("", out.decode("utf-8", "replace"))
+
+
+def type_line(fd, text):
+    """Type text, then Enter, with a short pause like a person. A command with an argument gets a
+    second Enter: the first one accepts the argument completion, the second submits."""
+    # Characters, then the pause, then Enter.
+    os.write(fd, text.encode("utf-8"))
+    time.sleep(0.6)
+    os.write(fd, b"\r")
+    # Argument completion open: submit with a second Enter (an empty line does nothing).
+    if " " in text:
+        time.sleep(0.6)
+        os.write(fd, b"\r")
+
+
+def main():
+    """Run the checks and print the results."""
+    # Throwaway home and agent folder.
+    tmp = tempfile.mkdtemp(prefix="wa-tui-")
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("WA_", "PI_", "SF_"))}
+    env.update(HOME=tmp, WA_DIR=os.path.join(tmp, "agent"), TERM="xterm-256color", COLUMNS="120", LINES="40")
+    # Start the interface in a pseudo-terminal.
+    pid, fd = pty.fork()
+    if pid == 0:
+        # Child: the source launcher without provider keys.
+        os.chdir(tmp)
+        os.execvpe("bash", ["bash", os.path.join(ROOT, "pi-test.sh"), "--no-env"], env)
+    # Terminal size.
+    os.set_blocking(fd, False)
+    results = []
+    try:
+        # Each step: what to type, how long to read, what must appear.
+        steps = [
+            (None, 12, ["中断", "命令", "按 "]),
+            ("/wa", 3, ["WriterAgent 配置（只读", "WA_KEY", "未设置", "按任意键关闭"]),
+            ("q", 2, []),
+            ("/skills", 3, ["写作 skill（8 个）", "报告分析", "内置"]),
+            ("\x1b", 2, []),
+            ("/lang en", 3, ["Interface language set to English"]),
+            ("/skills", 3, ["Writing skills (8)", "Report and analysis", "built-in"]),
+            ("\x1b", 2, []),
+            ("/wa", 3, ["WriterAgent configuration (read-only", "not set", "Press any key to close"]),
+            ("q", 2, []),
+        ]
+        for keys, seconds, wanted in steps:
+            # Keys: Escape and single letters are sent raw, commands with Enter.
+            if keys is not None:
+                if keys.startswith("/"):
+                    type_line(fd, keys)
+                else:
+                    os.write(fd, keys.encode("utf-8"))
+            screen = read_for(fd, seconds)
+            # --debug: the end of each step's screen output.
+            if "--debug" in sys.argv:
+                print(f"--- after {keys!r}:\n{screen[-700:]}")
+            for w in wanted:
+                results.append((keys or "(startup)", w, w in screen))
+    finally:
+        # Stop the interface and remove the temp folder.
+        try:
+            os.kill(pid, signal.SIGTERM)
+            os.waitpid(pid, 0)
+        except (OSError, ChildProcessError):
+            pass
+        shutil.rmtree(tmp, ignore_errors=True)
+    # Report.
+    for step, text, ok in results:
+        print(f"{'PASS' if ok else 'FAIL'}  {step:<10} {text}")
+    failed = sum(1 for r in results if not r[2])
+    print(f"{len(results) - failed}/{len(results)} checks passed")
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

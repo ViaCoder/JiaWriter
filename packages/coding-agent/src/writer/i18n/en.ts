@@ -230,4 +230,31 @@ export const en: Record<MessageKey, string> = {
 	// Blank body.
 	"skills.blankBody":
 		"## Before writing\n\n- \n\n## Structure\n\n- \n\n## Style\n\n- \n\n## Final checks\n\n- Run style_check on the finished draft.",
+	// /wa page.
+	"wa.title": "WriterAgent configuration (read-only; set environment variables to change it)",
+	"wa.problem": "Configuration problem:",
+	"wa.groupModel": "Model",
+	"wa.groupOther": "Interface and search",
+	"wa.groupSetup": "Setup commands (Linux / macOS; add them to ~/.bashrc or ~/.zshrc to keep them)",
+	"wa.groupSetupWin": 'Setup commands (PowerShell, this window; use setx NAME "value" to keep them)',
+	"wa.src.env": "environment",
+	"wa.src.default": "default",
+	"wa.src.detect": "detected",
+	"wa.src.cache": "detected (cache)",
+	"wa.src.manual": "set by WA_API",
+	"wa.src.lang": "/lang",
+	"wa.set": "set",
+	"wa.unset": "not set",
+	"wa.anonymous": "not set (anonymous)",
+	"wa.sfAuto": "not set (standard places)",
+	"wa.reasoningLevels": " (available: {levels})",
+	"wa.keyPlaceholder": "<your API key>",
+	"wa.modelPlaceholder": "<model name>",
+	"wa.close": "Press any key to close",
+	// /lang.
+	"lang.choose": "Interface language",
+	"lang.saved":
+		"Interface language set to English. Command descriptions and hints change now; built-in skills switch after /reload.",
+	"lang.envWins": "WA_LANG={value} is set and takes precedence over /lang.",
+	"lang.bad": "Languages: zh, en.",
 };
