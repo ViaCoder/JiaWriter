@@ -1,6 +1,6 @@
 /**
  * Built-in WriterAgent extension: web_search and web_fetch over the configured backend
- * (WA_SEARCH = anysearch, the default, or sf = WriterSuite's search_fetch in the user's Chrome).
+ * (WA_SEARCH = anysearch, the default, or sf = search_fetch in the user's Chrome).
  * Page text is returned marked as untrusted data.
  */
 

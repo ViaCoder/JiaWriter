@@ -355,11 +355,13 @@ describe("WA_* end to end", () => {
 		expect(JSON.stringify(realRequest()?.body.system)).toContain(
 			"expert writing assistant operating inside WriterAgent",
 		);
-		// The default writing tools, the three checks and web search are offered, bash is not.
+		// The default writing tools, the three checks, web search, import and export are offered, bash is not.
 		expect(((realRequest()?.body.tools as { name: string }[]) ?? []).map((t) => t.name).sort()).toEqual([
 			"edit",
+			"export_document",
 			"find",
 			"grep",
+			"import_document",
 			"ls",
 			"read",
 			"readability_check",
