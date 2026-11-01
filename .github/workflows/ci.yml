@@ -1,10 +1,12 @@
 name: CI
 
+# WriterAgent: development happens on dev; workflow_dispatch allows a manual rerun.
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

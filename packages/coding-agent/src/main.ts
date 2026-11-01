@@ -33,7 +33,16 @@ import { listModels } from "./cli/list-models.ts";
 import { createProjectTrustContext } from "./cli/project-trust.ts";
 import { selectSession } from "./cli/session-picker.ts";
 import { shouldRunFirstTimeSetup, showFirstTimeSetup, showStartupSelector } from "./cli/startup-ui.ts";
-import { APP_NAME, ENV_SESSION_DIR, expandTildePath, getAgentDir, getPackageDir, VERSION } from "./config.ts";
+import {
+	APP_NAME,
+	ENV_SESSION_DIR,
+	expandTildePath,
+	getAgentDir,
+	getPackageDir,
+	LEGACY_ENV_SESSION_DIR,
+	readEnvDir,
+	VERSION,
+} from "./config.ts";
 import { type CreateAgentSessionRuntimeFactory, createAgentSessionRuntime } from "./core/agent-session-runtime.ts";
 import {
 	type AgentSessionRuntimeDiagnostic,
@@ -67,9 +76,16 @@ import { runMigrations, showDeprecationWarnings } from "./migrations.ts";
 import { InteractiveMode, runPrintMode, runRpcMode } from "./modes/index.ts";
 import { initTheme, setThemeJsonValidator, stopThemeWatcher } from "./modes/interactive/theme/theme.ts";
 import { validateThemeJson } from "./modes/interactive/theme/theme-schema.ts";
-import { cleanupManagedInstall, handleConfigCommand, handlePackageCommand } from "./package-manager-cli.ts";
+import {
+	cleanupManagedInstall,
+	handleConfigCommand,
+	handlePackageCommand,
+	isPackageCommandInvocation,
+} from "./package-manager-cli.ts";
 import { isLocalPath, normalizePath, resolvePath } from "./utils/paths.ts";
 import { cleanupWindowsSelfUpdateQuarantine } from "./utils/windows-self-update.ts";
+// WriterAgent: the "wa" model from WA_* environment variables.
+import { setupWriterModel } from "./writer/writer-model.ts";
 
 const EXTENSION_LOAD_FAILURE_HINT = `Hint: Start without extensions using "${APP_NAME} -ne".`;
 
@@ -576,11 +592,19 @@ export async function main(args: string[], options?: MainOptions) {
 	// Commands and startup selectors can load user-authored themes before runtime creation.
 	setThemeJsonValidator(validateThemeJson);
 	const extensionFactories = [...builtInExtensions, ...(options?.extensionFactories ?? [])];
-	const offlineMode = args.includes("--offline") || isTruthyEnvFlag(process.env.PI_OFFLINE);
+	// WriterAgent: startup network operations are off (version check, install report, model catalog
+	// refresh, automatic package installs, fd/rg downloads). Explicit package commands (install, remove,
+	// update, list) are user requests and may use the network unless --offline is given.
+	const offlineMode = args.includes("--offline") || !isPackageCommandInvocation(args);
+	// Turn the upstream offline switches on for every module that reads them.
 	if (offlineMode) {
+		// Read by version-check, model-runtime, package-manager, tools-manager and the install report.
 		process.env.PI_OFFLINE = "1";
+		// Read by the version check.
 		process.env.PI_SKIP_VERSION_CHECK = "1";
 	}
+	// WriterAgent: no install telemetry and no "pi" attribution headers unless PI_TELEMETRY is set.
+	if (process.env.PI_TELEMETRY === undefined) process.env.PI_TELEMETRY = "0";
 
 	if (await runAuthCommand(args)) {
 		return;
@@ -665,6 +689,27 @@ export async function main(args: string[], options?: MainOptions) {
 	validateForkFlags(parsed);
 	validateSessionIdFlags(parsed);
 
+	// WriterAgent: build the "wa" model from WA_* variables (no probing for --help).
+	const writerModel = await setupWriterModel({
+		// Variables of this process.
+		env: process.env,
+		// Holds the API detection cache.
+		agentDir,
+		// Selects the commands shown in the setup hint.
+		platform: process.platform,
+		// --help must not touch the network.
+		probe: !parsed.help,
+		// Real network access for the probes.
+		fetchFn: fetch,
+	});
+	// Missing or invalid variables, or a failed detection: explain in Chinese and stop (--help still prints).
+	if (writerModel.kind === "error" && !parsed.help) {
+		// The message names variables and status codes only, never the key.
+		console.error(writerModel.message);
+		// Configuration error.
+		process.exit(1);
+	}
+
 	// Run migrations (pass cwd for project-local migrations)
 	const { migratedAuthProviders: migratedProviders, deprecationWarnings } = runMigrations(cwd);
 	time("runMigrations");
@@ -688,7 +733,8 @@ export async function main(args: string[], options?: MainOptions) {
 	// settings, resources, provider registrations, and models must be resolved only after
 	// the target session cwd is known. The startup-cwd settings manager is used only for
 	// sessionDir lookup during session selection.
-	const envSessionDir = process.env[ENV_SESSION_DIR];
+	// WriterAgent: WA_SESSION_DIR first, then the upstream PI_CODING_AGENT_SESSION_DIR.
+	const envSessionDir = readEnvDir(ENV_SESSION_DIR, LEGACY_ENV_SESSION_DIR);
 	const sessionDir =
 		(parsed.sessionDir ? normalizePath(parsed.sessionDir) : undefined) ??
 		(envSessionDir ? expandTildePath(envSessionDir) : undefined) ??

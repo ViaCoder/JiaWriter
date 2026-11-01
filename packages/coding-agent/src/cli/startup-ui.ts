@@ -6,7 +6,16 @@ import {
 	TuiMainScreen,
 } from "@earendil-works/pi-tui";
 import { existsSync } from "fs";
-import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, getAgentDir, getSettingsPath, PACKAGE_NAME } from "../config.ts";
+import {
+	APP_NAME,
+	CONFIG_DIR_NAME,
+	ENV_AGENT_DIR,
+	getAgentDir,
+	getSettingsPath,
+	LEGACY_ENV_AGENT_DIR,
+	PACKAGE_NAME,
+	readEnvDir,
+} from "../config.ts";
 import { areExperimentalFeaturesEnabled } from "../core/experimental.ts";
 import { KeybindingsManager } from "../core/keybindings.ts";
 import { DefaultPackageManager, type ResolvedResource } from "../core/package-manager.ts";
@@ -141,7 +150,8 @@ export function shouldRunFirstTimeSetup(settingsPath: string = getSettingsPath()
 	if (!areExperimentalFeaturesEnabled()) {
 		return false;
 	}
-	if (process.env[ENV_AGENT_DIR]) {
+	// WriterAgent: a custom config directory can come from WA_DIR or the upstream name.
+	if (readEnvDir(ENV_AGENT_DIR, LEGACY_ENV_AGENT_DIR)) {
 		return false;
 	}
 	return !existsSync(settingsPath);

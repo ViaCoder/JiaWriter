@@ -25,6 +25,7 @@ import {
 	PACKAGE_NAME,
 	type SelfUpdateCommand,
 	type SelfUpdatePackageTarget,
+	selfUpdateSupported,
 	VERSION,
 } from "./config.ts";
 import type { InlineExtension } from "./core/extensions/types.ts";
@@ -596,7 +597,21 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined 
 }
 
 function updateTargetIncludesSelf(target: UpdateTarget): boolean {
+	// WriterAgent: release builds never replace themselves with upstream pi.
+	if (!selfUpdateSupported()) return false;
 	return target.type === "all" || target.type === "self";
+}
+
+/** WriterAgent: true when an update was meant to include the program itself. */
+export function updateTargetWantsSelf(target: UpdateTarget): boolean {
+	// "all" and "self" both cover the program.
+	return target.type === "all" || target.type === "self";
+}
+
+/** WriterAgent: true when args start a package command (install, remove, update, list). */
+export function isPackageCommandInvocation(args: string[]): boolean {
+	// parsePackageCommand returns undefined for anything else.
+	return parsePackageCommand(args) !== undefined;
 }
 
 function updateTargetIncludesExtensions(target: UpdateTarget): boolean {
@@ -1045,6 +1060,11 @@ export async function handlePackageCommand(
 					} else {
 						console.log(chalk.green("Updated packages"));
 					}
+				}
+				// WriterAgent: explain why the program itself is not updated.
+				if (!selfUpdateSupported() && updateTargetWantsSelf(target)) {
+					// Releases are published on GitHub.
+					console.log(chalk.yellow("WriterAgent 不支持自动更新程序本身，请从 GitHub Releases 下载新版本。"));
 				}
 				if (updateTargetIncludesSelf(target)) {
 					const managedInstallRoot = getActiveManagedInstallRoot();

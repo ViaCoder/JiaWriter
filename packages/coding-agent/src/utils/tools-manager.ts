@@ -4,7 +4,7 @@ import { arch, platform } from "os";
 import { join } from "path";
 import { Readable } from "stream";
 import { pipeline } from "stream/promises";
-import { getBinDir, VERSION } from "../config.ts";
+import { getBinDir, getPackageDir, VERSION } from "../config.ts";
 import { fetchWithRetry } from "./management-http.ts";
 import { getPiUserAgent } from "./pi-user-agent.ts";
 
@@ -80,10 +80,32 @@ function commandExists(cmd: string): boolean {
 	}
 }
 
+/**
+ * WriterAgent: path of a pinned fd/rg shipped in the package's bin/ directory, or null.
+ * Release packages carry these copies so no tool is ever downloaded at run time.
+ */
+export function getBundledToolPath(tool: "fd" | "rg", os: NodeJS.Platform = platform()): string | null {
+	// Look up the tool definition; unknown names have no bundled copy.
+	const config = TOOLS[tool];
+	// Unknown tool: nothing to return.
+	if (!config) return null;
+	// Windows executables carry the .exe suffix.
+	const fileName = config.binaryName + (os === "win32" ? ".exe" : "");
+	// The binary sits in <package dir>/bin, next to the WriterAgent executable.
+	const bundledPath = join(getPackageDir(), "bin", fileName);
+	// Return it only when the file is actually there.
+	return existsSync(bundledPath) ? bundledPath : null;
+}
+
 // Get the path to a tool (system-wide or in our tools dir)
 export function getToolPath(tool: "fd" | "rg"): string | null {
 	const config = TOOLS[tool];
 	if (!config) return null;
+
+	// WriterAgent: prefer the pinned copy shipped with the package.
+	const bundledPath = getBundledToolPath(tool);
+	// Use it when present; otherwise continue with the upstream lookup order.
+	if (bundledPath) return bundledPath;
 
 	// Check our tools directory first
 	const localPath = join(TOOLS_DIR, config.binaryName + (platform() === "win32" ? ".exe" : ""));

@@ -581,9 +581,31 @@ export const APP_TITLE: string = piConfigName ? APP_NAME : "π";
 export const CONFIG_DIR_NAME: string = pkg.piConfig?.configDir || ".pi";
 export const VERSION: string = pkg.version || "0.0.0";
 
-// e.g., PI_CODING_AGENT_DIR or TAU_CODING_AGENT_DIR
-export const ENV_AGENT_DIR = `${APP_NAME.toUpperCase()}_CODING_AGENT_DIR`;
-export const ENV_SESSION_DIR = `${APP_NAME.toUpperCase()}_CODING_AGENT_SESSION_DIR`;
+// WriterAgent: short public names for the config and session directory variables.
+// Name of the variable that overrides the config directory (default ~/.writeragent/agent).
+export const ENV_AGENT_DIR = "WA_DIR";
+// Name of the variable that overrides the session storage directory.
+export const ENV_SESSION_DIR = "WA_SESSION_DIR";
+// Upstream name for the config directory, still read so upstream tests stay isolated.
+export const LEGACY_ENV_AGENT_DIR = "PI_CODING_AGENT_DIR";
+// Upstream name for the session directory, read for the same reason.
+export const LEGACY_ENV_SESSION_DIR = "PI_CODING_AGENT_SESSION_DIR";
+
+/** WriterAgent: release builds (brand "writeragent") never self-update; upstream self-update installs pi from pi.dev. */
+export function selfUpdateSupported(appName: string = APP_NAME): boolean {
+	// Only the upstream brand keeps the self-update path.
+	return appName !== "writeragent";
+}
+
+/** Read a directory variable: the WriterAgent name first, then the upstream name. */
+export function readEnvDir(name: string, legacyName: string): string | undefined {
+	// Take the short WriterAgent variable when it holds a non-empty value.
+	const primary = process.env[name];
+	// A set, non-empty primary value wins.
+	if (primary) return primary;
+	// Otherwise fall back to the upstream variable (may be undefined).
+	return process.env[legacyName] || undefined;
+}
 
 export function expandTildePath(path: string): string {
 	return normalizePath(path);
@@ -603,7 +625,8 @@ export function getShareViewerUrl(gistId: string): string {
 
 /** Get the agent config directory (e.g., ~/.pi/agent/) */
 export function getAgentDir(): string {
-	const envDir = process.env[ENV_AGENT_DIR];
+	// WriterAgent: WA_DIR first, then the upstream PI_CODING_AGENT_DIR.
+	const envDir = readEnvDir(ENV_AGENT_DIR, LEGACY_ENV_AGENT_DIR);
 	if (envDir) {
 		return expandTildePath(envDir);
 	}

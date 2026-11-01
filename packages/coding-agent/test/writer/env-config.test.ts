@@ -1,0 +1,222 @@
+// Unit tests for src/writer/env-config.ts.
+
+// Test API.
+import { describe, expect, it } from "vitest";
+// Functions and constants under test.
+import {
+	applyOutputClamp,
+	clampMaxTokens,
+	DEFAULT_CONTEXT_WINDOW,
+	DEFAULT_MAX_OUTPUT,
+	estimatePayloadTokens,
+	formatSetupHint,
+	MIN_OUTPUT_TOKENS,
+	normalizeBaseUrl,
+	OUTPUT_SAFETY_MARGIN,
+	providerBaseUrl,
+	readWriterEnv,
+} from "../../src/writer/env-config.ts";
+
+// A complete, valid set of variables reused by several tests.
+const FULL = { WA_URL: "https://api.example.com/v1/", WA_KEY: "k", WA_MODEL: "m1" };
+
+describe("readWriterEnv", () => {
+	it("reports not present when no WA_* model variable is set", () => {
+		// Only unrelated variables.
+		const r = readWriterEnv({ HOME: "/home/x", WA_LANG: "zh" });
+		// The WA_* path is not in use and nothing is missing.
+		expect(r).toEqual({ present: false, missing: [], errors: [] });
+	});
+
+	it("lists missing required variables in a fixed order", () => {
+		// Only the URL is set.
+		const r = readWriterEnv({ WA_URL: "https://api.example.com" });
+		// Key and model are reported.
+		expect(r.missing).toEqual(["WA_KEY", "WA_MODEL"]);
+		// No configuration is produced.
+		expect(r.config).toBeUndefined();
+	});
+
+	it("treats blank values as unset", () => {
+		// Whitespace-only key.
+		const r = readWriterEnv({ ...FULL, WA_KEY: "   " });
+		// The key counts as missing.
+		expect(r.missing).toEqual(["WA_KEY"]);
+	});
+
+	it("uses 128000 for context and output by default and normalizes the URL", () => {
+		// Required variables only.
+		const r = readWriterEnv(FULL);
+		// Defaults applied; trailing /v1/ removed; no API means "detect".
+		expect(r.config).toEqual({
+			root: "https://api.example.com",
+			model: "m1",
+			api: undefined,
+			contextWindow: DEFAULT_CONTEXT_WINDOW,
+			maxTokens: DEFAULT_MAX_OUTPUT,
+		});
+		// The defaults are the requested 128k.
+		expect([DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_OUTPUT]).toEqual([128_000, 128_000]);
+	});
+
+	it("accepts WA_API, WA_CTX and WA_OUT", () => {
+		// All optional values set.
+		const r = readWriterEnv({ ...FULL, WA_API: "openai-responses", WA_CTX: "200000", WA_OUT: "32000" });
+		// They are carried into the configuration.
+		expect(r.config).toMatchObject({ api: "openai-responses", contextWindow: 200_000, maxTokens: 32_000 });
+	});
+
+	it("rejects a bad URL, an unknown API, non-numeric sizes and a bad language, all at once", () => {
+		// Every optional check fails.
+		const r = readWriterEnv({
+			...FULL,
+			WA_URL: "api.example.com",
+			WA_API: "gemini",
+			WA_CTX: "128k",
+			WA_OUT: "0",
+			WA_LANG: "fr",
+		});
+		// Five Chinese errors, one per variable.
+		expect(r.errors).toHaveLength(5);
+		// Each error names its variable.
+		for (const name of ["WA_URL", "WA_API", "WA_CTX", "WA_OUT", "WA_LANG"])
+			expect(r.errors.join("\n")).toContain(name);
+		// No configuration.
+		expect(r.config).toBeUndefined();
+	});
+});
+
+describe("normalizeBaseUrl and providerBaseUrl", () => {
+	it("strips trailing slashes and one /v1", () => {
+		// Several spellings of the same base.
+		for (const url of [
+			"https://h.example.com",
+			"https://h.example.com/",
+			"https://h.example.com/v1",
+			"https://h.example.com/V1//",
+		]) {
+			// All reduce to the root.
+			expect(normalizeBaseUrl(url)).toBe("https://h.example.com");
+		}
+		// A path before /v1 is kept.
+		expect(normalizeBaseUrl("https://h.example.com/api/v1")).toBe("https://h.example.com/api");
+	});
+
+	it("adds /v1 for OpenAI APIs and not for Anthropic", () => {
+		// Anthropic SDKs append /v1/messages themselves.
+		expect(providerBaseUrl("https://h.example.com", "anthropic-messages")).toBe("https://h.example.com");
+		// OpenAI SDKs expect the /v1 base.
+		expect(providerBaseUrl("https://h.example.com", "openai-responses")).toBe("https://h.example.com/v1");
+		expect(providerBaseUrl("https://h.example.com", "openai-completions")).toBe("https://h.example.com/v1");
+	});
+});
+
+describe("estimatePayloadTokens and clampMaxTokens", () => {
+	it("counts CJK characters one each and other characters four per token", () => {
+		// 4 CJK characters inside a JSON string: quotes add 2 other characters.
+		expect(estimatePayloadTokens("中文写作")).toBe(4 + Math.ceil(2 / 4));
+		// 40 ASCII letters plus 2 quotes.
+		expect(estimatePayloadTokens("a".repeat(40))).toBe(Math.ceil(42 / 4));
+	});
+
+	it("keeps the configured limit when it fits", () => {
+		// Plenty of room.
+		expect(clampMaxTokens(8_000, 128_000, 1_000)).toBe(8_000);
+	});
+
+	it("lowers the limit to what is left after input and margin", () => {
+		// 128k output next to 100k input in a 128k window.
+		expect(clampMaxTokens(128_000, 128_000, 100_000)).toBe(128_000 - 100_000 - OUTPUT_SAFETY_MARGIN);
+	});
+
+	it("never goes below the floor", () => {
+		// Input already larger than the window.
+		expect(clampMaxTokens(128_000, 128_000, 200_000)).toBe(MIN_OUTPUT_TOKENS);
+	});
+});
+
+describe("applyOutputClamp", () => {
+	it("lowers max_tokens for Anthropic", () => {
+		// Small window, large requested output.
+		const out = applyOutputClamp(
+			{ model: "m", max_tokens: 128_000, messages: [] },
+			"anthropic-messages",
+			4_000,
+			128_000,
+		) as Record<string, number>;
+		// Lowered below the window.
+		expect(out.max_tokens).toBeLessThan(4_000);
+	});
+
+	it("lowers max_output_tokens for Responses", () => {
+		// Same situation for the Responses field.
+		const out = applyOutputClamp(
+			{ model: "m", max_output_tokens: 128_000 },
+			"openai-responses",
+			4_000,
+			128_000,
+		) as Record<string, number>;
+		// Lowered.
+		expect(out.max_output_tokens).toBeLessThan(4_000);
+	});
+
+	it("lowers either Chat Completions field", () => {
+		// Both names present.
+		const out = applyOutputClamp(
+			{ model: "m", max_completion_tokens: 9e4, max_tokens: 9e4 },
+			"openai-completions",
+			4_000,
+			128_000,
+		) as Record<string, number>;
+		// Both lowered.
+		expect([out.max_completion_tokens < 4_000, out.max_tokens < 4_000]).toEqual([true, true]);
+	});
+
+	it("returns undefined when nothing changes, and for non-objects", () => {
+		// Already small enough.
+		expect(applyOutputClamp({ max_tokens: 100 }, "anthropic-messages", 128_000, 128_000)).toBeUndefined();
+		// Not an object.
+		expect(applyOutputClamp("text", "anthropic-messages", 128_000, 128_000)).toBeUndefined();
+		// Arrays are left alone.
+		expect(applyOutputClamp([1], "anthropic-messages", 128_000, 128_000)).toBeUndefined();
+	});
+
+	it("does not modify the original payload", () => {
+		// Original object.
+		const payload = { max_tokens: 128_000 };
+		// Clamp a copy.
+		applyOutputClamp(payload, "anthropic-messages", 4_000, 128_000);
+		// The original keeps its value.
+		expect(payload.max_tokens).toBe(128_000);
+	});
+});
+
+describe("formatSetupHint", () => {
+	it("gives export commands on Linux and macOS", () => {
+		// Missing key and model.
+		const hint = formatSetupHint(["WA_KEY", "WA_MODEL"], [], "linux");
+		// Chinese headline and the missing list.
+		expect(hint).toContain("缺少：WA_KEY、WA_MODEL");
+		// bash/zsh commands for exactly the missing variables.
+		expect(hint).toContain('export WA_KEY="<你的 API key>"');
+		expect(hint).not.toContain("export WA_URL");
+	});
+
+	it("gives PowerShell, setx and cmd commands on Windows", () => {
+		// Missing URL on Windows.
+		const hint = formatSetupHint(["WA_URL"], [], "win32");
+		// All three Windows forms.
+		expect(hint).toContain('$env:WA_URL="https://api.example.com"');
+		expect(hint).toContain('setx WA_URL "https://api.example.com"');
+		expect(hint).toContain("set WA_URL=https://api.example.com");
+	});
+
+	it("lists format errors and shows all required variables when none is missing", () => {
+		// One format error, nothing missing.
+		const hint = formatSetupHint([], ["WA_CTX 必须是正整数"], "darwin");
+		// The error is shown.
+		expect(hint).toContain("格式错误：WA_CTX 必须是正整数");
+		// All three required commands are listed.
+		for (const name of ["WA_URL", "WA_KEY", "WA_MODEL"]) expect(hint).toContain(`export ${name}=`);
+	});
+});
