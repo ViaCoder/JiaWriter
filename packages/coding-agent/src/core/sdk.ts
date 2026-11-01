@@ -5,6 +5,7 @@ import { clampThinkingLevel, type Message, type Model, streamSimple } from "@ear
 import { getAgentDir } from "../config.ts";
 import { resolvePath } from "../utils/paths.ts";
 // WriterAgent: default model from WA_* variables.
+import { WA_PROVIDER } from "../writer/env-config.ts";
 import { getWriterDefaultModel } from "../writer/writer-model.ts";
 import { AgentSession } from "./agent-session.ts";
 import { formatNoModelsAvailableMessage } from "./auth-guidance.ts";
@@ -271,7 +272,9 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		}
 	}
 	if (thinkingLevel === undefined) {
-		thinkingLevel = settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL;
+		// WriterAgent: for the WA_* model, WA_REASONING sets the level; clampThinkingLevel below picks the nearest supported one.
+		const writerLevel = model?.provider === WA_PROVIDER ? getWriterDefaultModel()?.thinkingLevel : undefined;
+		thinkingLevel = writerLevel ?? settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL;
 	}
 
 	// Clamp to model capabilities

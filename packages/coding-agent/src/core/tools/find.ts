@@ -25,7 +25,8 @@ export function relativizeFindResultPath(
 
 const findSchema = Type.Object({
 	pattern: Type.String({
-		description: "Glob pattern to match files, e.g. '*.ts', '**/*.json', or 'src/**/*.spec.ts'",
+		// WriterAgent: examples from writing projects.
+		description: "Glob pattern to match files, e.g. '*.md', '**/*.docx', or '参考资料/**/*.pdf'",
 	}),
 	path: Type.Optional(Type.String({ description: "Directory to search in (default: current directory)" })),
 	limit: Type.Optional(Type.Number({ description: "Maximum number of results (default: 1000)" })),

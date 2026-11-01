@@ -3,7 +3,16 @@
  */
 
 import { getSystemMessageText } from "@earendil-works/pi-ai";
-import { getDocsPath, getExamplesPath, getReadmePath } from "../config.ts";
+import { getDocsPath, getReadmePath } from "../config.ts";
+import {
+	WRITER_CHAT_RULE,
+	WRITER_PREAMBLE,
+	WRITER_RULES,
+	WRITER_TOOL_GUIDELINES,
+	WRITER_TOOL_SNIPPETS,
+	writerDocsSection,
+	writerLanguageRule,
+} from "../writer/prompt-text.ts";
 import { formatSkillsForPrompt, type Skill } from "./skills.ts";
 
 export interface BuildSystemPromptOptions {
@@ -61,7 +70,8 @@ export function normalizeBuildSystemPromptOptions(input: BuildSystemPromptOption
 	return {
 		customPrompt: input.customPrompt,
 		forceSystemPrompt: input.forceSystemPrompt,
-		selectedTools: [...(input.selectedTools ?? ["read", "bash", "edit", "write"])],
+		// WriterAgent: writing tools by default; bash stays off unless selected.
+		selectedTools: [...(input.selectedTools ?? ["read", "write", "edit", "ls", "find", "grep"])],
 		hiddenTools: [...(input.hiddenTools ?? [])],
 		toolSnippets: { ...(input.toolSnippets ?? {}) },
 		toolGuidelines: Object.fromEntries(
@@ -99,6 +109,9 @@ function buildRules(
 		rules.push(normalized);
 	};
 
+	// WriterAgent: the writing rules come first.
+	for (const rule of WRITER_RULES) addRule(rule);
+
 	const hasBash = selectedTools.includes("bash");
 	const hasPowerShell = selectedTools.includes("powershell");
 	const hasGrep = selectedTools.includes("grep");
@@ -116,10 +129,14 @@ function buildRules(
 	}
 
 	for (const name of selectedTools) {
-		for (const rule of toolGuidelines[name] ?? []) addRule(rule);
+		// WriterAgent: writing-oriented guidelines replace the upstream ones for built-in tools.
+		for (const rule of WRITER_TOOL_GUIDELINES[name] ?? toolGuidelines[name] ?? []) addRule(rule);
 	}
 	for (const rule of promptGuidelines) addRule(rule);
-	addRule("Be concise in your responses");
+	// WriterAgent: reply language from WA_LANG (Chinese by default).
+	addRule(writerLanguageRule(process.env.WA_LANG));
+	// WriterAgent: concise chat, full-length documents (replaces "Be concise in your responses").
+	addRule(WRITER_CHAT_RULE);
 	addRule("Show file paths clearly when working with files");
 	return rules.map((rule) => `- ${rule}`).join("\n");
 }
@@ -152,21 +169,18 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 	if (customPrompt) {
 		promptSections.preamble = customPrompt;
 	} else {
-		promptSections.preamble =
-			"You are an expert coding assistant operating inside pi, a coding agent harness. You help users by reading files, executing commands, editing code, and writing new files.";
-		const visibleTools = declaredTools.filter((name) => !!toolSnippets[name]);
+		// WriterAgent: writing assistant instead of coding assistant.
+		promptSections.preamble = WRITER_PREAMBLE;
+		// WriterAgent: writing-oriented summaries replace the upstream ones for built-in tools.
+		const snippetOf = (name: string): string | undefined =>
+			toolSnippets[name] ? (WRITER_TOOL_SNIPPETS[name] ?? toolSnippets[name]) : undefined;
+		const visibleTools = declaredTools.filter((name) => !!snippetOf(name));
 		const tools =
-			visibleTools.length > 0 ? visibleTools.map((name) => `- ${name}: ${toolSnippets[name]}`).join("\n") : "(none)";
+			visibleTools.length > 0 ? visibleTools.map((name) => `- ${name}: ${snippetOf(name)}`).join("\n") : "(none)";
 		promptSections.tools = `${tools}\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.`;
 		promptSections.rules = buildRules(declaredTools, toolGuidelines, promptGuidelines);
-		promptSections.docs = `Pi documentation (read only when the user asks about pi itself, its SDK, extensions, themes, skills, or TUI):
-- Main documentation: ${getReadmePath()}
-- Additional docs: ${getDocsPath()}
-- Examples: ${getExamplesPath()} (extensions, custom tools, SDK)
-- When reading pi docs or examples, resolve docs/... under Additional docs and examples/... under Examples, not the current working directory
-- When asked about: extensions (docs/extensions.md, examples/extensions/), themes (docs/themes.md), skills (docs/skills.md), prompt templates (docs/prompt-templates.md), TUI components (docs/tui.md), keybindings (docs/keybindings.md), SDK integrations (docs/sdk.md), custom providers (docs/custom-provider.md), adding models (docs/models.md), pi packages (docs/packages.md), environment variables (docs/environment-variables.md), MCP servers (docs/mcp.md), codemode scripts and non-LLM models such as classifiers and image models (docs/codemode.md)
-- When working on pi topics, read the docs and examples, and follow .md cross-references before implementing
-- Always read pi .md files completely and follow links to related docs (e.g., tui.md for TUI API details)`;
+		// WriterAgent: documentation pointers for WriterAgent itself.
+		promptSections.docs = writerDocsSection(getReadmePath(), getDocsPath());
 	}
 
 	if (appendSystemPrompt) promptSections.addendum = appendSystemPrompt;

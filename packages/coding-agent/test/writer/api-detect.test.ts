@@ -11,10 +11,14 @@ import { afterEach, describe, expect, it } from "vitest";
 // Functions under test.
 import {
 	buildProbe,
+	buildReasoningProbe,
 	classifyProbe,
+	classifyReasoningProbe,
 	detectApi,
 	detectCacheKey,
+	detectReasoning,
 	loadDetectCache,
+	markReasoningUnsupported,
 	probeEndpoint,
 	saveDetectCache,
 } from "../../src/writer/api-detect.ts";
@@ -102,8 +106,8 @@ describe("probeEndpoint", () => {
 		const fetchFn = mockFetch({ "/v1/messages": [400, "messages: field required"] }, calls);
 		// Send the probe.
 		const out = await probeEndpoint(fetchFn, buildProbe("https://h.example.com", "anthropic-messages", "k", "m"));
-		// Matched with one request.
-		expect([out.status, out.verdict, calls.length]).toEqual([400, "match", 1]);
+		// Matched with one request; the body is kept for comparisons.
+		expect([out.status, out.verdict, calls.length, out.body]).toEqual([400, "match", 1, "messages: field required"]);
 	});
 
 	it("turns a network failure into status 0 and next", async () => {
@@ -115,7 +119,7 @@ describe("probeEndpoint", () => {
 		// Send the probe.
 		const out = await probeEndpoint(failing, buildProbe("https://h.example.com", "openai-responses", "k", "m"));
 		// No response.
-		expect(out).toEqual({ api: "openai-responses", status: 0, verdict: "next" });
+		expect(out).toEqual({ api: "openai-responses", status: 0, verdict: "next", body: "" });
 	});
 });
 
@@ -194,8 +198,8 @@ describe("detection cache", () => {
 		const path = join(dir, "agent", "api-detect.json");
 		// Save one entry.
 		saveDetectCache(path, "key1", "openai-responses", new Date("2026-11-01T00:00:00Z"));
-		// It loads back.
-		expect(loadDetectCache(path, "key1")).toBe("openai-responses");
+		// It loads back as an entry.
+		expect(loadDetectCache(path, "key1")?.api).toBe("openai-responses");
 		// Unknown keys miss.
 		expect(loadDetectCache(path, "other")).toBeUndefined();
 		// No temp file is left behind.
@@ -217,5 +221,168 @@ describe("detection cache", () => {
 		// Unknown API name in an otherwise valid file.
 		writeFileSync(join(dir, "foreign.json"), JSON.stringify({ version: 1, entries: { k: { api: "gemini" } } }));
 		expect(loadDetectCache(join(dir, "foreign.json"), "k")).toBeUndefined();
+	});
+});
+
+/** fetch mock for reasoning probes: levels in `accepted` get the plain validation error, others a reasoning error. */
+function reasoningFetch(
+	accepted: string[],
+	calls: string[],
+	opts: { budget?: boolean; status?: number } = {},
+): typeof fetch {
+	// Implementation.
+	return (async (input: string | URL | Request, init?: RequestInit) => {
+		// Record the call.
+		calls.push(String(input));
+		// Fixed status override (for auth tests).
+		if (opts.status) return new Response("", { status: opts.status });
+		// Parsed request body.
+		const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+		// Requested level in any of the three forms.
+		const level =
+			(body.reasoning as { effort?: string } | undefined)?.effort ??
+			(body.output_config as { effort?: string } | undefined)?.effort ??
+			(body.reasoning_effort as string | undefined);
+		// Anthropic budget form.
+		const budget = (body.thinking as { type?: string } | undefined)?.type === "enabled";
+		// Supported setting: same answer as the plain probe.
+		if ((level && accepted.includes(level)) || (budget && opts.budget))
+			return new Response("max_tokens: must be >= 1", { status: 400 });
+		// Plain probe without any reasoning field.
+		if (!level && !budget) return new Response("max_tokens: must be >= 1", { status: 400 });
+		// Rejected setting names the parameter.
+		return new Response(`Unsupported value for reasoning effort: ${level ?? "budget"}`, { status: 400 });
+	}) as typeof fetch;
+}
+
+// Baseline answer of the plain probe.
+const BASELINE = { status: 400, body: "max_tokens: must be >= 1" };
+
+describe("buildReasoningProbe", () => {
+	it("adds the reasoning field each API expects", () => {
+		// Responses: reasoning.effort.
+		expect(
+			JSON.parse(
+				String(buildReasoningProbe("https://h.example.com", "openai-responses", "k", "m", "high").init.body),
+			).reasoning,
+		).toEqual({ effort: "high" });
+		// Chat: reasoning_effort.
+		expect(
+			JSON.parse(
+				String(buildReasoningProbe("https://h.example.com", "openai-completions", "k", "m", "low").init.body),
+			).reasoning_effort,
+		).toBe("low");
+		// Anthropic effort form: adaptive thinking plus output_config.effort.
+		const a = JSON.parse(
+			String(buildReasoningProbe("https://h.example.com", "anthropic-messages", "k", "m", "max").init.body),
+		);
+		expect([a.thinking, a.output_config, a.max_tokens]).toEqual([{ type: "adaptive" }, { effort: "max" }, 0]);
+		// Anthropic budget form.
+		expect(
+			JSON.parse(
+				String(
+					buildReasoningProbe("https://h.example.com", "anthropic-messages", "k", "m", "high", "budget").init.body,
+				),
+			).thinking,
+		).toEqual({ type: "enabled", budget_tokens: 1024 });
+	});
+});
+
+describe("classifyReasoningProbe", () => {
+	it("compares a reasoning probe with the plain probe", () => {
+		// Same rejection: the parameter passed validation.
+		expect(classifyReasoningProbe(BASELINE, BASELINE)).toBe("supported");
+		// Accepted outright.
+		expect(classifyReasoningProbe(BASELINE, { status: 200, body: "{}" })).toBe("supported");
+		// New error naming the parameter.
+		expect(classifyReasoningProbe(BASELINE, { status: 400, body: "Unsupported value for reasoning.effort" })).toBe(
+			"unsupported",
+		);
+		// Different status.
+		expect(classifyReasoningProbe(BASELINE, { status: 422, body: "x" })).toBe("unsupported");
+		// No response.
+		expect(classifyReasoningProbe(BASELINE, { status: 0, body: "" })).toBe("unsupported");
+		// Key problem.
+		expect(classifyReasoningProbe(BASELINE, { status: 401, body: "" })).toBe("auth");
+	});
+});
+
+describe("detectReasoning", () => {
+	it("lists the accepted levels in effort mode with one probe per level", async () => {
+		// Calls made.
+		const calls: string[] = [];
+		// Only low, medium and high work.
+		const r = await detectReasoning(
+			"https://h.example.com",
+			"openai-responses",
+			"k",
+			"m",
+			reasoningFetch(["low", "medium", "high"], calls),
+			BASELINE,
+		);
+		// Effort mode with three levels after five probes.
+		expect([r, calls.length]).toEqual([{ mode: "effort", levels: ["low", "medium", "high"] }, 5]);
+	});
+
+	it("falls back to the Anthropic budget form when no effort level works", async () => {
+		// Calls made.
+		const calls: string[] = [];
+		// No effort level, but budgets work.
+		const r = await detectReasoning(
+			"https://h.example.com",
+			"anthropic-messages",
+			"k",
+			"m",
+			reasoningFetch([], calls, { budget: true }),
+			BASELINE,
+		);
+		// Budget mode covers low..high after six probes.
+		expect([r, calls.length]).toEqual([{ mode: "budget", levels: ["low", "medium", "high"] }, 6]);
+	});
+
+	it("reports none when nothing works and auth on a key problem", async () => {
+		// Nothing accepted on Chat Completions (no budget form there).
+		expect(
+			await detectReasoning(
+				"https://h.example.com",
+				"openai-completions",
+				"k",
+				"m",
+				reasoningFetch([], []),
+				BASELINE,
+			),
+		).toEqual({ mode: "none", levels: [] });
+		// Key rejected.
+		expect(
+			await detectReasoning(
+				"https://h.example.com",
+				"openai-responses",
+				"k",
+				"m",
+				reasoningFetch([], [], { status: 401 }),
+				BASELINE,
+			),
+		).toBe("auth");
+	});
+});
+
+describe("markReasoningUnsupported", () => {
+	it("removes one level from the cache and turns reasoning off when none is left", () => {
+		// Temp directory.
+		const dir = mkdtempSync(join(tmpdir(), "wa-detect-"));
+		// Clean up later.
+		dirs.push(dir);
+		// Cache path.
+		const path = join(dir, "api-detect.json");
+		// Two levels known.
+		saveDetectCache(path, "k", "openai-responses", new Date(), { mode: "effort", levels: ["high", "max"] });
+		// Drop max.
+		expect(markReasoningUnsupported(path, "k", "max")).toEqual({ mode: "effort", levels: ["high"] });
+		// Persisted.
+		expect(loadDetectCache(path, "k")?.reasoning).toEqual({ mode: "effort", levels: ["high"] });
+		// Drop the last one.
+		expect(markReasoningUnsupported(path, "k", "high")).toEqual({ mode: "none", levels: [] });
+		// Unknown key: nothing to update.
+		expect(markReasoningUnsupported(path, "other", "high")).toBeUndefined();
 	});
 });

@@ -74,17 +74,18 @@ describe("documentation variant", () => {
 			cwd: "/workspace",
 			selectedTools: [...DOCUMENTATION_EVAL_TOOLS],
 		});
-		expect(prompt).toContain("\n<docs>\nPi documentation (read only");
+		// WriterAgent: the docs section now points at WriterAgent documentation.
+		expect(prompt).toContain("\n<docs>\nWriterAgent documentation");
 		expect(prompt).toContain("\n<rules>\n");
 		expect(prompt).toContain("\n<cwd>\n/workspace\n</cwd>");
-		expect(prompt).toContain("docs/models.md");
+		expect(prompt).toContain("docs/skills.md");
 
 		const stripped = excludePiDocumentation(prompt);
 		expect(stripped).toContain("\n<rules>\n");
 		expect(stripped).toContain("\n<cwd>\n/workspace\n</cwd>");
 		expect(stripped).not.toContain("<docs>");
-		expect(stripped).not.toContain("Pi documentation");
-		expect(stripped).not.toContain("docs/models.md");
+		expect(stripped).not.toContain("WriterAgent documentation");
+		expect(stripped).not.toContain("docs/skills.md");
 		expect(stripped).not.toContain(getReadmePath());
 		expect(stripped).not.toContain(getDocsPath());
 		expect(stripped).not.toContain(getExamplesPath());

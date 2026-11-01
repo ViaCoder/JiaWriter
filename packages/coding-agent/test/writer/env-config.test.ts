@@ -54,9 +54,23 @@ describe("readWriterEnv", () => {
 			api: undefined,
 			contextWindow: DEFAULT_CONTEXT_WINDOW,
 			maxTokens: DEFAULT_MAX_OUTPUT,
+			// pi's default reasoning level.
+			reasoning: "medium",
 		});
 		// The defaults are the requested 128k.
 		expect([DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_OUTPUT]).toEqual([128_000, 128_000]);
+	});
+
+	it("accepts every WA_REASONING choice and rejects others", () => {
+		// Each documented level.
+		for (const level of ["off", "low", "medium", "high", "xhigh", "max"]) {
+			// Carried into the configuration.
+			expect(readWriterEnv({ ...FULL, WA_REASONING: level }).config?.reasoning).toBe(level);
+		}
+		// An unknown level is a format error.
+		const bad = readWriterEnv({ ...FULL, WA_REASONING: "minimal" });
+		// Reported with the variable name, no configuration.
+		expect([bad.errors.join("").includes("WA_REASONING"), bad.config]).toEqual([true, undefined]);
 	});
 
 	it("accepts WA_API, WA_CTX and WA_OUT", () => {

@@ -8,23 +8,28 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 // Test API.
 import { afterEach, describe, expect, it } from "vitest";
-// Cache helpers to pre-fill a detection.
-import { detectCacheKey, saveDetectCache } from "../../src/writer/api-detect.ts";
+// Cache helpers to pre-fill or inspect a detection.
+import { detectCacheKey, loadDetectCache, saveDetectCache } from "../../src/writer/api-detect.ts";
 // Functions under test.
 import {
 	buildProviderConfig,
 	detectCachePath,
+	dropReasoningLevel,
 	formatDetectFailure,
 	getWriterDefaultModel,
 	getWriterModel,
 	setupWriterModel,
 	setWriterModel,
+	type WriterModelReady,
+	writerThinkingLevelMap,
 } from "../../src/writer/writer-model.ts";
 
 // A key that must never be written or printed.
 const SECRET = "sk-test-secret-123";
 // Valid variables for most tests.
 const ENV = { WA_URL: "https://h.example.com/v1", WA_KEY: SECRET, WA_MODEL: "m1" };
+// All levels the probes test.
+const ALL = ["low", "medium", "high", "xhigh", "max"];
 // Temp directories to clean.
 const dirs: string[] = [];
 // Reset shared state and files after each test.
@@ -45,7 +50,7 @@ function agentDir(): string {
 	return dir;
 }
 
-/** fetch mock: answers by path suffix and counts calls. */
+/** fetch mock: answers by path suffix with the same body for every request on a route; counts calls. */
 function mockFetch(routes: Record<string, number>, calls: string[]): typeof fetch {
 	// Implementation.
 	return (async (input: string | URL | Request) => {
@@ -53,9 +58,15 @@ function mockFetch(routes: Record<string, number>, calls: string[]): typeof fetc
 		calls.push(String(input));
 		// Status by path, 404 otherwise.
 		const status = Object.entries(routes).find(([path]) => String(input).endsWith(path))?.[1] ?? 404;
-		// Validation-style body for 400s.
+		// Validation-style body for 400s (identical with and without reasoning: every level passes).
 		return new Response(status === 400 ? "invalid request" : "", { status });
 	}) as typeof fetch;
+}
+
+/** Shorthand for setupWriterModel with defaults. */
+function setup(env: NodeJS.ProcessEnv, dir: string, fetchFn: typeof fetch, probe = true) {
+	// Linux hint, given probe flag.
+	return setupWriterModel({ env, agentDir: dir, platform: "linux", probe, fetchFn });
 }
 
 describe("setupWriterModel", () => {
@@ -63,106 +74,116 @@ describe("setupWriterModel", () => {
 		// Calls made.
 		const calls: string[] = [];
 		// Empty environment.
-		const s = await setupWriterModel({
-			env: {},
-			agentDir: agentDir(),
-			platform: "linux",
-			probe: true,
-			fetchFn: mockFetch({}, calls),
-		});
+		const s = await setup({}, agentDir(), mockFetch({}, calls));
 		// Nothing configured, nothing sent.
 		expect([s.kind, calls.length]).toEqual(["none", 0]);
 	});
 
 	it("returns a Chinese setup hint when variables are missing", async () => {
 		// Only the URL.
-		const s = await setupWriterModel({
-			env: { WA_URL: "https://h.example.com" },
-			agentDir: agentDir(),
-			platform: "linux",
-			probe: true,
-			fetchFn: fetch,
-		});
-		// Error with the hint.
-		expect(s.kind).toBe("error");
+		const s = await setup({ WA_URL: "https://h.example.com" }, agentDir(), fetch);
 		// It names what is missing.
 		expect(s.kind === "error" && s.message).toContain("缺少：WA_KEY、WA_MODEL");
 	});
 
-	it("uses WA_API without any request", async () => {
+	it("uses WA_API with reasoning off without any request", async () => {
 		// Calls made.
 		const calls: string[] = [];
-		// Explicit API.
-		const s = await setupWriterModel({
-			env: { ...ENV, WA_API: "openai-completions" },
-			agentDir: agentDir(),
-			platform: "linux",
-			probe: true,
-			fetchFn: mockFetch({}, calls),
-		});
-		// Ready from env, no probe sent.
-		expect([s.kind, s.kind === "ready" && s.source, calls.length]).toEqual(["ready", "env", 0]);
-	});
-
-	it("uses a cached detection without any request", async () => {
-		// Agent directory with a cached answer.
-		const dir = agentDir();
-		// Pre-fill the cache for this URL and model.
-		saveDetectCache(detectCachePath(dir), detectCacheKey("https://h.example.com", "m1"), "openai-responses");
-		// Calls made.
-		const calls: string[] = [];
-		// Start.
-		const s = await setupWriterModel({
-			env: ENV,
-			agentDir: dir,
-			platform: "linux",
-			probe: true,
-			fetchFn: mockFetch({}, calls),
-		});
-		// Ready from cache, nothing sent.
-		expect([s.kind === "ready" && s.api, s.kind === "ready" && s.source, calls.length]).toEqual([
-			"openai-responses",
-			"cache",
+		// Explicit API, reasoning off.
+		const s = await setup(
+			{ ...ENV, WA_API: "openai-completions", WA_REASONING: "off" },
+			agentDir(),
+			mockFetch({}, calls),
+		);
+		// Ready from env, no probe, no reasoning.
+		expect([s.kind, s.kind === "ready" && s.source, s.kind === "ready" && s.reasoning.mode, calls.length]).toEqual([
+			"ready",
+			"env",
+			"none",
 			0,
 		]);
 	});
 
-	it("detects, caches the result and never stores the key", async () => {
+	it("probes reasoning levels for WA_API with one baseline and one probe per level", async () => {
+		// Calls made.
+		const calls: string[] = [];
+		// Explicit Responses API, default reasoning.
+		const s = (await setup(
+			{ ...ENV, WA_API: "openai-responses" },
+			agentDir(),
+			mockFetch({ "/v1/responses": 400 }, calls),
+		)) as WriterModelReady;
+		// Baseline plus five levels; every level passes validation here.
+		expect([calls.length, s.reasoning]).toEqual([6, { mode: "effort", levels: ALL }]);
+		// The model is registered with reasoning and a full level map.
+		expect([s.provider.models[0].reasoning, s.provider.models[0].thinkingLevelMap?.max]).toEqual([true, "max"]);
+	});
+
+	it("uses a cached detection with reasoning without any request", async () => {
+		// Agent directory with a cached answer.
+		const dir = agentDir();
+		// Pre-fill API and reasoning for this URL and model.
+		saveDetectCache(
+			detectCachePath(dir),
+			detectCacheKey("https://h.example.com", "m1"),
+			"openai-responses",
+			new Date(),
+			{ mode: "effort", levels: ["low", "high"] },
+		);
+		// Calls made.
+		const calls: string[] = [];
+		// Start.
+		const s = (await setup(ENV, dir, mockFetch({}, calls))) as WriterModelReady;
+		// Everything from the cache.
+		expect([s.api, s.source, s.reasoning.levels, calls.length]).toEqual([
+			"openai-responses",
+			"cache",
+			["low", "high"],
+			0,
+		]);
+	});
+
+	it("detects the API and reasoning, caches both and never stores the key", async () => {
 		// Agent directory.
 		const dir = agentDir();
 		// Calls made.
 		const calls: string[] = [];
 		// Only Responses exists.
-		const s = await setupWriterModel({
-			env: ENV,
-			agentDir: dir,
-			platform: "linux",
-			probe: true,
-			fetchFn: mockFetch({ "/v1/responses": 400 }, calls),
-		});
-		// Detected after two probes.
-		expect([s.kind === "ready" && s.api, s.kind === "ready" && s.source, calls.length]).toEqual([
-			"openai-responses",
-			"detect",
-			2,
-		]);
-		// The cache file exists.
-		expect(existsSync(detectCachePath(dir))).toBe(true);
-		// The key is not in it.
+		const s = (await setup(ENV, dir, mockFetch({ "/v1/responses": 400 }, calls))) as WriterModelReady;
+		// Two detection probes and five reasoning probes.
+		expect([s.api, s.source, calls.length]).toEqual(["openai-responses", "detect", 7]);
+		// Cached with reasoning.
+		expect(
+			loadDetectCache(detectCachePath(dir), detectCacheKey("https://h.example.com", "m1"))?.reasoning?.levels,
+		).toEqual(ALL);
+		// The key is not in the cache.
 		expect(readFileSync(detectCachePath(dir), "utf-8")).not.toContain(SECRET);
 		// The shared state matches the returned one.
 		expect(getWriterModel()).toBe(s);
 	});
 
+	it("skips reasoning probes when WA_REASONING is off", async () => {
+		// Agent directory.
+		const dir = agentDir();
+		// Calls made.
+		const calls: string[] = [];
+		// Detection with reasoning off.
+		const s = (await setup(
+			{ ...ENV, WA_REASONING: "off" },
+			dir,
+			mockFetch({ "/v1/responses": 400 }, calls),
+		)) as WriterModelReady;
+		// Only the two detection probes; no reasoning.
+		expect([calls.length, s.reasoning.mode, s.provider.models[0].reasoning]).toEqual([2, "none", false]);
+		// The cache keeps no reasoning entry.
+		expect(
+			loadDetectCache(detectCachePath(dir), detectCacheKey("https://h.example.com", "m1"))?.reasoning,
+		).toBeUndefined();
+	});
+
 	it("explains a failed detection with status codes and without the key", async () => {
 		// Wrong key.
-		const s = await setupWriterModel({
-			env: ENV,
-			agentDir: agentDir(),
-			platform: "linux",
-			probe: true,
-			fetchFn: mockFetch({ "/v1/messages": 401 }, []),
-		});
+		const s = await setup(ENV, agentDir(), mockFetch({ "/v1/messages": 401 }, []));
 		// Error message.
 		const message = s.kind === "error" ? s.message : "";
 		// Names the problem and the status, not the key.
@@ -177,29 +198,83 @@ describe("setupWriterModel", () => {
 		// Calls made.
 		const calls: string[] = [];
 		// --help path.
-		const s = await setupWriterModel({
-			env: ENV,
-			agentDir: agentDir(),
-			platform: "linux",
-			probe: false,
-			fetchFn: mockFetch({}, calls),
-		});
+		const s = await setup(ENV, agentDir(), mockFetch({}, calls), false);
 		// Skipped, nothing sent.
-		expect([s.kind, calls.length]).toEqual(["skipped", 0]);
+		expect([s.kind, calls.length, existsSync(join(dirs[dirs.length - 1], "api-detect.json"))]).toEqual([
+			"skipped",
+			0,
+			false,
+		]);
+	});
+});
+
+describe("writerThinkingLevelMap and dropReasoningLevel", () => {
+	it("maps effort levels to their names and marks the rest null", () => {
+		// low and high supported.
+		expect(writerThinkingLevelMap({ mode: "effort", levels: ["low", "high"] })).toEqual({
+			minimal: null,
+			low: "low",
+			medium: null,
+			high: "high",
+			xhigh: null,
+			max: null,
+		});
+	});
+
+	it("leaves budget levels to pi and marks xhigh and max null", () => {
+		// Budget mode.
+		expect(writerThinkingLevelMap({ mode: "budget", levels: ["low", "medium", "high"] })).toEqual({
+			minimal: null,
+			xhigh: null,
+			max: null,
+		});
+	});
+
+	it("marks every level null without reasoning", () => {
+		// No reasoning.
+		expect(Object.values(writerThinkingLevelMap({ mode: "none", levels: [] }))).toEqual([
+			null,
+			null,
+			null,
+			null,
+			null,
+			null,
+		]);
+	});
+
+	it("drops one level and turns reasoning off with the last one", () => {
+		// Two levels.
+		expect(dropReasoningLevel({ mode: "effort", levels: ["high", "max"] }, "max")).toEqual({
+			mode: "effort",
+			levels: ["high"],
+		});
+		// Last level.
+		expect(dropReasoningLevel({ mode: "effort", levels: ["high"] }, "high")).toEqual({ mode: "none", levels: [] });
 	});
 });
 
 describe("buildProviderConfig, formatDetectFailure, getWriterDefaultModel", () => {
-	it("registers the key as an environment reference", () => {
-		// Anthropic provider.
+	it("registers the key as an environment reference and no reasoning by default", () => {
+		// Anthropic provider without reasoning.
 		const p = buildProviderConfig("https://h.example.com", "anthropic-messages", "m1", 128_000, 128_000);
-		// $WA_KEY reference, root base URL, limits on the model.
-		expect([p.apiKey, p.baseUrl, p.models[0].contextWindow, p.models[0].maxTokens]).toEqual([
+		// $WA_KEY reference, root base URL, limits, reasoning off.
+		expect([p.apiKey, p.baseUrl, p.models[0].contextWindow, p.models[0].maxTokens, p.models[0].reasoning]).toEqual([
 			"$WA_KEY",
 			"https://h.example.com",
 			128_000,
 			128_000,
+			false,
 		]);
+	});
+
+	it("uses adaptive thinking for Anthropic effort levels", () => {
+		// Anthropic with effort support.
+		const p = buildProviderConfig("https://h.example.com", "anthropic-messages", "m1", 1, 1, {
+			mode: "effort",
+			levels: ["high", "max"],
+		});
+		// Adaptive thinking forced; max mapped.
+		expect([p.models[0].compat, p.models[0].thinkingLevelMap?.max]).toEqual([{ forceAdaptiveThinking: true }, "max"]);
 	});
 
 	it("writes a 'none' failure with every status, using 无响应 for status 0", () => {
@@ -208,28 +283,24 @@ describe("buildProviderConfig, formatDetectFailure, getWriterDefaultModel", () =
 			ok: false,
 			reason: "none",
 			outcomes: [
-				{ api: "anthropic-messages", status: 0, verdict: "next" },
-				{ api: "openai-responses", status: 404, verdict: "next" },
+				{ api: "anthropic-messages", status: 0, verdict: "next", body: "" },
+				{ api: "openai-responses", status: 404, verdict: "next", body: "" },
 			],
 		});
 		// Both statuses and the WA_API advice are present.
 		expect([text.includes("无响应"), text.includes("HTTP 404"), text.includes("WA_API")]).toEqual([true, true, true]);
 	});
 
-	it("selects wa/<model> only when ready", () => {
+	it("selects wa/<model> with the requested level only when ready", async () => {
 		// Nothing ready.
 		expect(getWriterDefaultModel()).toBeUndefined();
-		// Ready state.
-		setWriterModel({
-			kind: "ready",
-			api: "openai-completions",
-			source: "env",
-			model: "m1",
-			contextWindow: 1,
-			maxTokens: 1,
-			provider: buildProviderConfig("https://h.example.com", "openai-completions", "m1", 1, 1),
-		});
-		// Default model is wa/m1.
-		expect(getWriterDefaultModel()).toEqual({ provider: "wa", modelId: "m1" });
+		// Ready via WA_API with reasoning off.
+		await setup(
+			{ ...ENV, WA_API: "openai-completions", WA_REASONING: "max" },
+			agentDir(),
+			mockFetch({ "/v1/chat/completions": 400 }, []),
+		);
+		// Default model is wa/m1 at level max (pi clamps it later).
+		expect(getWriterDefaultModel()).toEqual({ provider: "wa", modelId: "m1", thinkingLevel: "max" });
 	});
 });

@@ -281,7 +281,8 @@ export function printHelp(extensionFlags?: ExtensionFlag[]): void {
 					})
 					.join("\n")}\n`
 			: "";
-	console.log(`${chalk.bold(APP_NAME)} - AI coding assistant with read, bash, edit, write tools
+	// WriterAgent: writing assistant and its default tools.
+	console.log(`${chalk.bold(APP_NAME)} - AI writing assistant with read, write, edit, ls, find, grep tools
 
 ${chalk.bold("Usage:")}
   ${APP_NAME} [options] [--] [@files...] [messages...]

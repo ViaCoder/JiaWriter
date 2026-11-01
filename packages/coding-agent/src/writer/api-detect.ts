@@ -95,6 +95,8 @@ export interface ProbeOutcome {
 	status: number;
 	// Meaning of the response.
 	verdict: ProbeVerdict;
+	// First bytes of the response body, used only to compare probes (never logged or shown).
+	body: string;
 }
 
 /** Send one probe and classify the answer; network failures count as "next". */
@@ -109,10 +111,10 @@ export async function probeEndpoint(
 		// Read a short part of the body for classification only (never logged).
 		const body = (await response.text()).slice(0, PROBE_BODY_LIMIT);
 		// Classify.
-		return { api: probe.api, status: response.status, verdict: classifyProbe(response.status, body) };
+		return { api: probe.api, status: response.status, verdict: classifyProbe(response.status, body), body };
 	} catch {
 		// DNS, TLS, refused connection or timeout.
-		return { api: probe.api, status: 0, verdict: "next" };
+		return { api: probe.api, status: 0, verdict: "next", body: "" };
 	}
 }
 
@@ -147,18 +149,132 @@ export async function detectApi(
 	return { ok: false, reason: "none", outcomes };
 }
 
+/** How the endpoint accepts reasoning parameters. */
+export type ReasoningMode = "effort" | "budget" | "none";
+
+/** Reasoning support found for one endpoint and model. */
+export interface ReasoningSupport {
+	// "effort": a level name per request; "budget": Anthropic thinking budgets; "none": no reasoning.
+	mode: ReasoningMode;
+	// Supported levels among low, medium, high, xhigh, max.
+	levels: string[];
+}
+
+/** Levels tested for support, from lowest to highest. */
+export const REASONING_PROBE_LEVELS = ["low", "medium", "high", "xhigh", "max"] as const;
+
+/** Words that appear when a server rejects a reasoning parameter. */
+const REASONING_WORDS = /reasoning|effort|thinking|budget|output_config/i;
+
+/** Build a probe that carries one reasoning setting on top of the invalid base body. */
+export function buildReasoningProbe(
+	root: string,
+	api: WriterApi,
+	key: string,
+	model: string,
+	level: string,
+	mode: "effort" | "budget" = "effort",
+): Probe {
+	// Start from the ordinary detection probe (output limit 0, no messages).
+	const base = buildProbe(root, api, key, model);
+	// Its JSON body as an object.
+	const body = JSON.parse(String(base.init.body)) as Record<string, unknown>;
+	// Anthropic: adaptive thinking with an effort level, or a fixed thinking budget.
+	if (api === "anthropic-messages") {
+		// Budget-based thinking (older models).
+		if (mode === "budget") body.thinking = { type: "enabled", budget_tokens: 1024 };
+		// Adaptive thinking with an effort level (current models).
+		else Object.assign(body, { thinking: { type: "adaptive" }, output_config: { effort: level } });
+	} else if (api === "openai-responses") {
+		// Responses: reasoning.effort.
+		body.reasoning = { effort: level };
+	} else {
+		// Chat Completions: reasoning_effort.
+		body.reasoning_effort = level;
+	}
+	// Same URL and headers, new body.
+	return { ...base, init: { ...base.init, body: JSON.stringify(body) } };
+}
+
+/** Compare a reasoning probe with the plain probe: "unsupported" when the reasoning parameter caused a new error. */
+export function classifyReasoningProbe(
+	baseline: { status: number; body: string },
+	probe: { status: number; body: string },
+): "supported" | "unsupported" | "auth" {
+	// Key problems end everything.
+	if (probe.status === 401 || probe.status === 403) return "auth";
+	// Accepted outright.
+	if (probe.status >= 200 && probe.status < 300) return "supported";
+	// No response at all: treat the level as unavailable.
+	if (probe.status === 0) return "unsupported";
+	// A different status than the plain probe means the parameter changed the outcome.
+	if (probe.status !== baseline.status) return "unsupported";
+	// The error now names a reasoning parameter that the plain error did not.
+	if (REASONING_WORDS.test(probe.body) && !REASONING_WORDS.test(baseline.body)) return "unsupported";
+	// Same rejection as without reasoning: the parameter itself passed validation.
+	return "supported";
+}
+
+/** Probe which reasoning levels an endpoint accepts (zero-token requests, at most six). */
+export async function detectReasoning(
+	root: string,
+	api: WriterApi,
+	key: string,
+	model: string,
+	fetchFn: typeof fetch,
+	baseline: { status: number; body: string },
+): Promise<ReasoningSupport | "auth"> {
+	// Supported levels in effort mode.
+	const levels: string[] = [];
+	// One probe per level.
+	for (const level of REASONING_PROBE_LEVELS) {
+		// Send it.
+		const outcome = await probeEndpoint(fetchFn, buildReasoningProbe(root, api, key, model, level));
+		// Classify against the plain probe.
+		const verdict = classifyReasoningProbe(baseline, outcome);
+		// Stop on a key problem.
+		if (verdict === "auth") return "auth";
+		// Keep the supported ones.
+		if (verdict === "supported") levels.push(level);
+	}
+	// Any level works: effort mode.
+	if (levels.length > 0) return { mode: "effort", levels };
+	// Only Anthropic has a second, budget-based form.
+	if (api !== "anthropic-messages") return { mode: "none", levels: [] };
+	// One budget probe.
+	const outcome = await probeEndpoint(fetchFn, buildReasoningProbe(root, api, key, model, "high", "budget"));
+	// Classify.
+	const verdict = classifyReasoningProbe(baseline, outcome);
+	// Key problem.
+	if (verdict === "auth") return "auth";
+	// Budgets cover low, medium and high; xhigh and max fall back to high.
+	return verdict === "supported"
+		? { mode: "budget", levels: ["low", "medium", "high"] }
+		: { mode: "none", levels: [] };
+}
+
 /** Cache key: sha256 of URL and model name (the API key is never part of it). */
 export function detectCacheKey(root: string, model: string): string {
 	// Hash the two values separated by a newline.
 	return createHash("sha256").update(`${root}\n${model}`).digest("hex");
 }
 
+/** One cached detection. */
+export interface DetectCacheEntry {
+	// Detected API.
+	api: WriterApi;
+	// When it was detected.
+	detectedAt: string;
+	// Reasoning support, once it has been probed.
+	reasoning?: ReasoningSupport;
+}
+
 /** On-disk cache format. */
 interface DetectCacheFile {
 	// Format version.
 	version: 1;
-	// Detected API per cache key.
-	entries: Record<string, { api: WriterApi; detectedAt: string }>;
+	// Detection per cache key.
+	entries: Record<string, DetectCacheEntry>;
 }
 
 /** Read the whole cache file; a missing or broken file is an empty cache. */
@@ -178,20 +294,8 @@ function readCacheFile(path: string): DetectCacheFile {
 	return { version: 1, entries: {} };
 }
 
-/** Look up a cached API for a key. */
-export function loadDetectCache(path: string, key: string): WriterApi | undefined {
-	// Entry for this URL and model.
-	const entry = readCacheFile(path).entries[key];
-	// Only accept known API names.
-	return entry && (WRITER_APIS as readonly string[]).includes(entry.api) ? entry.api : undefined;
-}
-
-/** Store a detected API for a key (atomic write). */
-export function saveDetectCache(path: string, key: string, api: WriterApi, now: Date = new Date()): void {
-	// Start from the existing entries.
-	const cache = readCacheFile(path);
-	// Add or replace this entry.
-	cache.entries[key] = { api, detectedAt: now.toISOString() };
+/** Write the cache file atomically. */
+function writeCacheFile(path: string, cache: DetectCacheFile): void {
 	// Make sure the directory exists.
 	mkdirSync(dirname(path), { recursive: true });
 	// Write to a temp file first.
@@ -200,4 +304,48 @@ export function saveDetectCache(path: string, key: string, api: WriterApi, now: 
 	writeFileSync(tmp, `${JSON.stringify(cache, null, "\t")}\n`);
 	// Replace atomically.
 	renameSync(tmp, path);
+}
+
+/** Look up a cached detection for a key. */
+export function loadDetectCache(path: string, key: string): DetectCacheEntry | undefined {
+	// Entry for this URL and model.
+	const entry = readCacheFile(path).entries[key];
+	// Only accept known API names.
+	return entry && (WRITER_APIS as readonly string[]).includes(entry.api) ? entry : undefined;
+}
+
+/** Store a detection for a key (atomic write). */
+export function saveDetectCache(
+	path: string,
+	key: string,
+	api: WriterApi,
+	now: Date = new Date(),
+	reasoning?: ReasoningSupport,
+): void {
+	// Start from the existing entries.
+	const cache = readCacheFile(path);
+	// Add or replace this entry; reasoning only when known.
+	cache.entries[key] = reasoning
+		? { api, detectedAt: now.toISOString(), reasoning }
+		: { api, detectedAt: now.toISOString() };
+	// Persist.
+	writeCacheFile(path, cache);
+}
+
+/** Remove one reasoning level after the server rejected it; returns the updated support or undefined. */
+export function markReasoningUnsupported(path: string, key: string, level: string): ReasoningSupport | undefined {
+	// Current cache.
+	const cache = readCacheFile(path);
+	// Entry for this endpoint.
+	const entry = cache.entries[key];
+	// Nothing known: nothing to update.
+	if (!entry?.reasoning) return undefined;
+	// Drop the rejected level.
+	const levels = entry.reasoning.levels.filter((l) => l !== level);
+	// No level left means no reasoning.
+	entry.reasoning = levels.length > 0 ? { mode: entry.reasoning.mode, levels } : { mode: "none", levels: [] };
+	// Persist.
+	writeCacheFile(path, cache);
+	// Hand back the new support.
+	return entry.reasoning;
 }

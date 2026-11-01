@@ -55,6 +55,10 @@ let server: Server;
 let baseUrl = "";
 // APIs the mock currently supports.
 let supported: MockApi[] = [];
+// Reasoning levels the mock accepts (all by default).
+let acceptedLevels = ["low", "medium", "high", "xhigh", "max"];
+// When true, probes cannot see reasoning support (only real requests reject a level).
+let probeBlind = false;
 // Requests seen in the current test.
 let seen: SeenRequest[] = [];
 // Temp directories to clean.
@@ -64,6 +68,33 @@ const dirs: string[] = [];
 function isProbe(body: Record<string, unknown>): boolean {
 	// Any output limit of 0 marks the probe.
 	return body.max_tokens === 0 || body.max_output_tokens === 0;
+}
+
+/** Reasoning level carried by a request, in any of the three API forms. */
+function levelOf(body: Record<string, unknown>): string | undefined {
+	// Responses, Anthropic effort, Chat Completions.
+	return (
+		(body.reasoning as { effort?: string } | undefined)?.effort ??
+		(body.output_config as { effort?: string } | undefined)?.effort ??
+		(body.reasoning_effort as string | undefined)
+	);
+}
+
+/** Detection probes carry no reasoning field. */
+function detectionProbes(): SeenRequest[] {
+	// Probes without a level and without a thinking budget.
+	return seen.filter(
+		(s) =>
+			s.probe &&
+			levelOf(s.body) === undefined &&
+			(s.body.thinking as { type?: string } | undefined)?.type !== "enabled",
+	);
+}
+
+/** Reasoning probes carry a level or a budget. */
+function reasoningProbes(): SeenRequest[] {
+	// Every other probe.
+	return seen.filter((s) => s.probe && !detectionProbes().includes(s));
 }
 
 /** Write an SSE stream with the reply text in the format of the given API. */
@@ -180,6 +211,16 @@ function handle(req: IncomingMessage, res: ServerResponse): void {
 			res.writeHead(401).end('{"error":"unauthorized"}');
 			return;
 		}
+		// Level requested by this request, if any.
+		const level = levelOf(body);
+		// An unaccepted level is rejected by name (probes only when not blind).
+		if (level !== undefined && !acceptedLevels.includes(level) && (!isProbe(body) || !probeBlind)) {
+			// 400 naming the reasoning parameter.
+			res.writeHead(400, { "content-type": "application/json" }).end(
+				`{"error":{"message":"Unsupported value for reasoning effort: ${level}"}}`,
+			);
+			return;
+		}
 		// Probe: validation error like the real APIs.
 		if (isProbe(body)) {
 			// 400 with a validation message.
@@ -283,6 +324,10 @@ afterAll(() => server.close());
 afterEach(() => {
 	// Forget seen requests.
 	seen = [];
+	// Back to accepting every level.
+	acceptedLevels = ["low", "medium", "high", "xhigh", "max"];
+	// Probes see reasoning support again.
+	probeBlind = false;
 	// Delete temp directories.
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
@@ -297,10 +342,28 @@ describe("WA_* end to end", () => {
 		const r = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_CTX: String(CTX) }, dir);
 		// Success with the reply.
 		expect([r.code, r.stdout.includes(REPLY)]).toEqual([0, true]);
-		// One probe, then the real request.
-		expect(seen.filter((s) => s.probe).length).toBe(1);
+		// One detection probe and five reasoning probes, then the real request.
+		expect([detectionProbes().length, reasoningProbes().length]).toEqual([1, 5]);
+		// Adaptive thinking at the default level.
+		expect([realRequest()?.body.thinking, realRequest()?.body.output_config]).toMatchObject([
+			{ type: "adaptive" },
+			{ effort: "medium" },
+		]);
 		// Output limit lowered from 128000 to fit the 20000 window.
 		expect(realRequest()?.body.max_tokens).toBeLessThan(CTX);
+		// The request carries the writing system prompt.
+		expect(JSON.stringify(realRequest()?.body.system)).toContain(
+			"expert writing assistant operating inside WriterAgent",
+		);
+		// The default writing tools are offered, bash is not.
+		expect(((realRequest()?.body.tools as { name: string }[]) ?? []).map((t) => t.name).sort()).toEqual([
+			"edit",
+			"find",
+			"grep",
+			"ls",
+			"read",
+			"write",
+		]);
 		// The key appears nowhere.
 		expect([anyFileContains(dir, SECRET), r.stdout.includes(SECRET), r.stderr.includes(SECRET)]).toEqual([
 			false,
@@ -318,8 +381,8 @@ describe("WA_* end to end", () => {
 		const r = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_CTX: String(CTX) }, dir);
 		// Success with the reply.
 		expect([r.code, r.stdout.includes(REPLY)]).toEqual([0, true]);
-		// Two probes (Anthropic missed, Responses matched).
-		expect(seen.filter((s) => s.probe).map((s) => s.path)).toEqual(["/v1/messages", "/v1/responses"]);
+		// Two detection probes (Anthropic missed, Responses matched).
+		expect(detectionProbes().map((s) => s.path)).toEqual(["/v1/messages", "/v1/responses"]);
 		// Lowered output limit.
 		expect(realRequest()?.body.max_output_tokens).toBeLessThan(CTX);
 	}, 90_000);
@@ -334,8 +397,8 @@ describe("WA_* end to end", () => {
 			{ WA_URL: `${baseUrl}/v1/`, WA_KEY: SECRET, WA_MODEL: "m1", WA_CTX: String(CTX) },
 			dir,
 		);
-		// Success with the reply after three probes.
-		expect([first.code, first.stdout.includes(REPLY), seen.filter((s) => s.probe).length]).toEqual([0, true, 3]);
+		// Success with the reply after three detection probes.
+		expect([first.code, first.stdout.includes(REPLY), detectionProbes().length]).toEqual([0, true, 3]);
 		// The Chat request carries a lowered limit in one of its two field names.
 		const body = realRequest()?.body ?? {};
 		// Whichever field the client used.
@@ -349,6 +412,44 @@ describe("WA_* end to end", () => {
 		);
 		// Cached: no probe, just the real request.
 		expect([second.code, seen.filter((s) => s.probe).length, seen.length]).toEqual([0, 0, 1]);
+	}, 120_000);
+
+	it("uses the nearest supported reasoning level when WA_REASONING is unavailable", async () => {
+		// Responses that accepts low, medium and high only.
+		supported = ["openai-responses"];
+		acceptedLevels = ["low", "medium", "high"];
+		// Ask for max.
+		const r = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_REASONING: "max" }, newAgentDir());
+		// Success, and the request uses high, the nearest supported level.
+		expect([
+			r.code,
+			r.stdout.includes(REPLY),
+			(realRequest()?.body.reasoning as { effort?: string })?.effort,
+		]).toEqual([0, true, "high"]);
+	}, 90_000);
+
+	it("drops a level the server rejects at run time and uses the next one on the next start", async () => {
+		// Probes cannot tell; real requests reject max.
+		supported = ["openai-responses"];
+		acceptedLevels = ["low", "medium", "high", "xhigh"];
+		probeBlind = true;
+		// Shared agent directory.
+		const dir = newAgentDir();
+		// First run at max fails at the real request.
+		const first = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_REASONING: "max" }, dir);
+		// The real request carried max.
+		expect((realRequest()?.body.reasoning as { effort?: string })?.effort).toBe("max");
+		// Forget the first run.
+		seen = [];
+		// Second run in the same directory.
+		const second = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_REASONING: "max" }, dir);
+		// The cache dropped max, so the nearest level xhigh is used and the reply arrives.
+		expect([
+			first.code !== 0 || !first.stdout.includes(REPLY),
+			second.code,
+			(realRequest()?.body.reasoning as { effort?: string })?.effort,
+			second.stdout.includes(REPLY),
+		]).toEqual([true, 0, "xhigh", true]);
 	}, 120_000);
 
 	it("stops after one request when the key is wrong", async () => {

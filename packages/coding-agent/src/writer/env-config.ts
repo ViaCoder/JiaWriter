@@ -15,6 +15,13 @@ export const OUTPUT_SAFETY_MARGIN = 1_024;
 /** Smallest output budget ever requested, even when the input is very large. */
 export const MIN_OUTPUT_TOKENS = 256;
 
+/** Reasoning levels a user can choose with WA_REASONING; "off" turns reasoning off. */
+export const WRITER_REASONING_CHOICES = ["off", "low", "medium", "high", "xhigh", "max"] as const;
+/** One WA_REASONING value. */
+export type WriterReasoning = (typeof WRITER_REASONING_CHOICES)[number];
+/** Level used when WA_REASONING is not set (the same default pi uses). */
+export const DEFAULT_REASONING: WriterReasoning = "medium";
+
 /** The three APIs WriterAgent can talk to. */
 export type WriterApi = "anthropic-messages" | "openai-responses" | "openai-completions";
 /** All supported API names, in the order the detector tries them. */
@@ -32,6 +39,8 @@ export interface WriterEnvConfig {
 	contextWindow: number;
 	/** Maximum output tokens. */
 	maxTokens: number;
+	/** Requested reasoning level; the nearest supported level is used when this one is not available. */
+	reasoning: WriterReasoning;
 }
 
 /** Result of reading the WA_* variables. */
@@ -142,6 +151,18 @@ export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 	const lang = readVar(env, "WA_LANG");
 	// Report other values.
 	if (lang !== undefined && lang !== "zh" && lang !== "en") errors.push(`WA_LANG 只能是 zh 或 en，当前值：${lang}`);
+	// Reasoning level, when set, must be one of the choices.
+	const reasoningRaw = readVar(env, "WA_REASONING");
+	// Default, a known level, or undefined for an unknown value.
+	const reasoning =
+		reasoningRaw === undefined
+			? DEFAULT_REASONING
+			: (WRITER_REASONING_CHOICES as readonly string[]).includes(reasoningRaw)
+				? (reasoningRaw as WriterReasoning)
+				: undefined;
+	// Report an unknown level.
+	if (reasoning === undefined)
+		errors.push(`WA_REASONING 只能是 ${WRITER_REASONING_CHOICES.join(" / ")}，当前值：${reasoningRaw}`);
 	// Any problem: no configuration.
 	if (missing.length > 0 || errors.length > 0) return { present, missing, errors };
 	// Everything checked: build the configuration (url and model are set here).
@@ -155,6 +176,8 @@ export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 			api,
 			contextWindow,
 			maxTokens,
+			// Checked above: defined whenever there are no errors.
+			reasoning: reasoning as WriterReasoning,
 		},
 	};
 }
@@ -267,7 +290,9 @@ export function formatSetupHint(missing: string[], errors: string[], platform: N
 		lines.push("长期有效：把上面几行写进 ~/.bashrc 或 ~/.zshrc。fish 用 set -gx 变量名 值。");
 	}
 	// Optional variables.
-	lines.push("可选：WA_API（不设置则自动检测）、WA_CTX、WA_OUT（默认都是 128000）、WA_LANG（zh / en）。");
+	lines.push(
+		"可选：WA_API（不设置则自动检测）、WA_CTX、WA_OUT（默认都是 128000）、WA_REASONING（off / low / medium / high / xhigh / max，默认 medium，不支持时自动改用最接近的档位）、WA_LANG（zh / en）。",
+	);
 	// Join into one message.
 	return lines.join("\n");
 }
