@@ -32,8 +32,8 @@ describe("writerLanguageRule", () => {
 			"Reply to the user in Simplified Chinese",
 			"Reply to the user in Simplified Chinese",
 		]);
-		// English.
-		expect(writerLanguageRule(" en ")).toBe("Reply to the user in English");
+		// English, also with a region (same rule as the tool output).
+		for (const v of [" en ", "en-US"]) expect(writerLanguageRule(v)).toBe("Reply to the user in English");
 	});
 });
 

@@ -13,6 +13,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 // Entry-point check.
 import { fileURLToPath } from "node:url";
+// Readability check of WriterAgent (TypeScript source, run by Node's type stripping).
+import { readabilityCheck } from "../packages/coding-agent/src/writer/readability.ts";
+// AI-style check of WriterAgent, the same rules as the style_check tool.
+import { styleCheck } from "../packages/coding-agent/src/writer/style/check.ts";
+// Character and word counts.
+import { countText } from "../packages/coding-agent/src/writer/text-stats.ts";
 
 /** The fixed writing tasks (Chinese prompts, no cited cases until search exists). */
 export const TASKS = [
@@ -26,12 +32,6 @@ export const TASKS = [
 
 /** CJK ideographs. */
 const CJK = /[一-鿿]/;
-/** Contrast frames (6b). */
-const CONTRAST = [/不是[^。！？\n]{0,40}?而是/g, /(?:并非|不在于)[^。！？\n]{0,30}?而(?:是|在于)/g, /与其说[^。！？\n]{0,30}?不如说/g, /不(?:仅|只)[^。！？\n]{0,30}?更(?:是|要)/g];
-/** Negative assertions (6b); prohibitions such as 不得/严禁/禁止 are not counted. */
-const NEGATIVE = /并不意味着|不意味着|不代表|不等于|不足以|无法|难以|不能|未能|并不|并非/g;
-/** Common stock phrases. */
-const CLICHES = /综上所述|总而言之|总的来说|值得注意的是|值得一提的是|毋庸置疑|不难发现|由此可见|让我们|众所周知/g;
 /** Verification markers that must not appear. */
 const MARKERS = /待核实|需核实|\[citation needed\]/gi;
 
@@ -60,30 +60,38 @@ export function asciiPunctNearCjk(text) {
 	return count;
 }
 
-/** Compute the metrics of one draft. */
+/** Compute the metrics of one draft with the style_check and readability_check rules. */
 export function metrics(text) {
-	// Sentences end with Chinese or ASCII terminal punctuation.
-	const sentences = Math.max(1, text.split(/[。！？!?]+/).filter((s) => s.trim()).length);
-	// Lines that look like list items or markdown headings.
-	const structured = text.split("\n").filter((l) => /^\s*([-*•]|\d+[.、)]|#{1,6}\s)/.test(l)).length;
+	// AI-style report with the default packs.
+	const style = styleCheck(text);
+	// Readability report with the default sentence limit.
+	const read = readabilityCheck(text);
 	// The metrics.
 	return {
 		// Length.
-		cjkChars: [...text].filter((c) => CJK.test(c)).length,
-		// Paragraphs (non-empty blocks).
-		paragraphs: text.split(/\n\s*\n|\n/).filter((p) => p.trim()).length,
+		cjkChars: countText(text).cjk,
+		// Paragraphs (non-empty lines).
+		paragraphs: text.split("\n").filter((p) => p.trim()).length,
 		// Punctuation problems.
 		asciiPunct: asciiPunctNearCjk(text),
-		// Contrast frames.
-		contrast: countMatches(text, CONTRAST),
-		// Negative assertions per 10 sentences, one decimal.
-		negationPer10: Math.round((countMatches(text, NEGATIVE) / sentences) * 100) / 10,
-		// Stock phrases.
-		cliches: countMatches(text, CLICHES),
+		// All style_check pattern hits.
+		styleHits: style.hits.length,
+		// Contrast frames among them.
+		contrast: style.hits.filter((h) => h.zh.startsWith("对比框架")).length,
+		// Stock phrases among them.
+		cliches: style.hits.filter((h) => h.zh === "套话").length,
+		// Negative assertions per 10 sentences.
+		negationPer10: style.negation.per10,
 		// Verification markers.
 		markers: countMatches(text, MARKERS),
-		// List items and headings.
-		structuredLines: structured,
+		// List lines and bold spans.
+		listLines: style.structure.listLines,
+		// Bold spans.
+		bold: style.structure.bold,
+		// Characters outside level 1 of 通用规范汉字表.
+		rareChars: read.rare.reduce((sum, r) => sum + r.count, 0),
+		// Chinese sentences over the readability_check limit.
+		longSentences: read.long.length,
 	};
 }
 

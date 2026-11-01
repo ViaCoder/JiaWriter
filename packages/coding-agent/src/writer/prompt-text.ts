@@ -5,6 +5,9 @@
  * echo the phrasing of their prompt.
  */
 
+// Shared WA_LANG rule.
+import { resolveLang } from "./i18n/index.ts";
+
 /** Opening sentence (the untagged preamble). */
 export const WRITER_PREAMBLE =
 	"You are an expert writing assistant operating inside WriterAgent. You help users by reading reference materials, researching sources, drafting and revising documents, and exporting finished work.";
@@ -41,8 +44,8 @@ export const WRITER_RULES: readonly string[] = [
 
 /** Rule for the language of replies to the user (WA_LANG, Chinese by default). */
 export function writerLanguageRule(lang: string | undefined): string {
-	// English when the interface language is English.
-	if (lang?.trim() === "en") return "Reply to the user in English";
+	// English when the interface language is English (same rule as the tool output).
+	if (resolveLang(lang) === "en") return "Reply to the user in English";
 	// Chinese otherwise (the default).
 	return "Reply to the user in Simplified Chinese";
 }

@@ -1,0 +1,255 @@
+/**
+ * style_check: deterministic AI-style check. It reports positions and labels only and never
+ * changes the text; the model rewrites the flagged passages and runs the check again.
+ */
+
+// Output messages.
+import { t, type WriterLang } from "../i18n/index.ts";
+// Positions and sentences.
+import { lineColumn, splitSentences } from "../text-stats.ts";
+// Pattern packs and negation lists.
+import {
+	DEFAULT_NEGATION_THRESHOLD,
+	DEFAULT_PACKS,
+	NEGATION_EN,
+	NEGATION_ZH,
+	STYLE_PACKS,
+	type StylePattern,
+} from "./patterns.ts";
+
+/** One finding. */
+export interface StyleHit {
+	// Pattern id ("negation" for negative assertions).
+	id: string;
+	// Chinese label.
+	zh: string;
+	// English label.
+	en: string;
+	// Offset of the first character.
+	start: number;
+	// Offset after the last character.
+	end: number;
+	// 1-based line.
+	line: number;
+	// 1-based column.
+	column: number;
+	// Matched text.
+	matched: string;
+}
+
+/** Negative-assertion density. */
+export interface NegationStats {
+	// Sentences in the checked text.
+	sentences: number;
+	// Negative assertions found.
+	count: number;
+	// Count per 10 sentences, one decimal.
+	per10: number;
+	// Limit per 10 sentences.
+	threshold: number;
+	// True when per10 exceeds the threshold (and at least 2 were found).
+	over: boolean;
+	// Where they are.
+	hits: StyleHit[];
+}
+
+/** List and bold usage. */
+export interface StructureStats {
+	// Non-empty lines.
+	lines: number;
+	// Lines that are list items.
+	listLines: number;
+	// Bold spans.
+	bold: number;
+	// More than a third of at least 6 lines are list items.
+	listOver: boolean;
+	// More than BOLD_PER_1000 bold spans per 1,000 characters.
+	boldOver: boolean;
+}
+
+/** Full report. */
+export interface StyleReport {
+	// Packs that were applied.
+	packs: string[];
+	// Pattern hits in text order.
+	hits: StyleHit[];
+	// Negative-assertion density.
+	negation: NegationStats;
+	// Format usage.
+	structure: StructureStats;
+}
+
+/** Options of styleCheck. */
+export interface StyleOptions {
+	// Pack names (DEFAULT_PACKS when empty).
+	packs?: readonly string[];
+	// Negative assertions allowed per 10 sentences.
+	negationThreshold?: number;
+}
+
+/** Bold spans allowed per 1,000 characters. */
+export const BOLD_PER_1000 = 2;
+/** Most hits listed in a report. */
+export const MAX_LISTED = 60;
+
+/** Replace code, URLs and direct quotations with spaces of the same length (line breaks kept). */
+export function maskText(text: string): string {
+	// Blank out one match.
+	const blank = (m: string) => m.replace(/[^\n]/g, " ");
+	// Fenced code blocks, inline code, URLs, then quotations in “”, 「」 and "".
+	return text
+		.replace(/```[\s\S]*?```/g, blank)
+		.replace(/`[^`\n]*`/g, blank)
+		.replace(/\bhttps?:\/\/\S+/g, blank)
+		.replace(/“[^”\n]*”/g, blank)
+		.replace(/「[^」\n]*」/g, blank)
+		.replace(/"[^"\n]*"/g, blank);
+}
+
+/** Make a hit for match [start, end) of the original text. */
+function makeHit(text: string, id: string, zh: string, en: string, start: number, end: number): StyleHit {
+	// Position of the first character.
+	const pos = lineColumn(text, start);
+	// The finding with the original wording.
+	return { id, zh, en, start, end, line: pos.line, column: pos.column, matched: text.slice(start, end) };
+}
+
+/** All matches of re in masked, reported against text. */
+function matchAll(text: string, masked: string, re: RegExp, id: string, zh: string, en: string): StyleHit[] {
+	// One hit per match.
+	return [...masked.matchAll(re)].map((m) => makeHit(text, id, zh, en, m.index, m.index + m[0].length));
+}
+
+/** Pattern hits in text order; a hit inside an earlier, longer hit is dropped. */
+export function findHits(text: string, patterns: readonly StylePattern[]): StyleHit[] {
+	// Code, URLs and quotations are not the author's own prose.
+	const masked = maskText(text);
+	// Every match of every pattern.
+	const all = patterns.flatMap((p) => matchAll(text, masked, p.re, p.id, p.zh, p.en));
+	// By start, longer first at the same start.
+	all.sort((a, b) => a.start - b.start || b.end - a.end);
+	// Kept hits.
+	const kept: StyleHit[] = [];
+	// Drop nested hits (无疑 inside 毫无疑问, for example).
+	for (const hit of all) if (!kept.some((k) => k.start <= hit.start && hit.end <= k.end)) kept.push(hit);
+	// In text order.
+	return kept;
+}
+
+/** Negative assertions per 10 sentences, outside code and quotations. */
+export function negationDensity(text: string, threshold = DEFAULT_NEGATION_THRESHOLD): NegationStats {
+	// Code and quotations are masked.
+	const masked = maskText(text);
+	// Chinese and English matches, in text order.
+	const hits = [
+		...matchAll(text, masked, NEGATION_ZH, "negation", "否定式", "negation"),
+		...matchAll(text, masked, NEGATION_EN, "negation", "否定式", "negation"),
+	].sort((a, b) => a.start - b.start);
+	// Sentences of the masked text.
+	const sentences = splitSentences(masked).length;
+	// Density with one decimal (0 for empty text).
+	const per10 = sentences > 0 ? Math.round((hits.length * 100) / sentences) / 10 : 0;
+	// Over only with at least two hits, so one sentence never fails a short text.
+	return { sentences, count: hits.length, per10, threshold, over: hits.length >= 2 && per10 > threshold, hits };
+}
+
+/** List-line and bold usage. */
+export function structureStats(text: string): StructureStats {
+	// Non-empty lines outside code blocks.
+	const lines = maskText(text)
+		.split("\n")
+		.filter((l) => l.trim() !== "");
+	// Bullet or numbered list items (1、 needs no space after it).
+	const listLines = lines.filter((l) => /^\s*(?:[-*+•]\s+|\d+[.)．]\s+|\d+、)/.test(l)).length;
+	// **bold** spans.
+	const bold = text.match(/\*\*[^*\n]+\*\*/g)?.length ?? 0;
+	// Visible characters.
+	const chars = text.replace(/\s/g, "").length;
+	// The usage and its two limits.
+	return {
+		lines: lines.length,
+		listLines,
+		bold,
+		listOver: lines.length >= 6 && listLines * 3 > lines.length,
+		boldOver: chars > 0 && (bold * 1000) / chars > BOLD_PER_1000,
+	};
+}
+
+/** Run every check; throws on an unknown pack name. */
+export function styleCheck(text: string, options: StyleOptions = {}): StyleReport {
+	// Requested packs, or the defaults.
+	const packs = options.packs && options.packs.length > 0 ? [...options.packs] : [...DEFAULT_PACKS];
+	// Reject unknown names with the list of valid ones.
+	for (const pack of packs)
+		if (!(pack in STYLE_PACKS))
+			throw new Error(t("style.badPack", { pack, packs: Object.keys(STYLE_PACKS).join(", ") }));
+	// Patterns of all packs.
+	const patterns = packs.flatMap((p) => STYLE_PACKS[p]);
+	// The three checks.
+	return {
+		packs,
+		hits: findHits(text, patterns),
+		negation: negationDensity(text, options.negationThreshold),
+		structure: structureStats(text),
+	};
+}
+
+/** True when the report has nothing to fix. */
+export function styleClean(report: StyleReport): boolean {
+	// No hits, density and format inside their limits.
+	return report.hits.length === 0 && !report.negation.over && !report.structure.listOver && !report.structure.boldOver;
+}
+
+/** Report text in lang. */
+export function formatStyleReport(report: StyleReport, lang?: WriterLang): string {
+	// Output lines.
+	const out = [t("style.title", { packs: report.packs.join(", ") }, lang)];
+	// Pattern hits.
+	if (report.hits.length > 0) {
+		// Heading with the count.
+		out.push(t("style.hits", { count: report.hits.length }, lang));
+		// Listed hits.
+		for (const h of report.hits.slice(0, MAX_LISTED))
+			out.push(
+				t(
+					"style.hit",
+					{ line: h.line, column: h.column, label: lang === "en" ? h.en : h.zh, matched: h.matched },
+					lang,
+				),
+			);
+		// Hits left out.
+		if (report.hits.length > MAX_LISTED) out.push(t("style.more", { count: report.hits.length - MAX_LISTED }, lang));
+	}
+	// Negation density.
+	const n = report.negation;
+	// Summary line.
+	out.push(
+		t(
+			"style.negation",
+			{
+				count: n.count,
+				sentences: n.sentences,
+				per10: n.per10,
+				threshold: n.threshold,
+				status: t(n.over ? "style.negationOver" : "style.negationOk", {}, lang),
+			},
+			lang,
+		),
+	);
+	// Positions only when over the threshold.
+	if (n.over)
+		for (const h of n.hits.slice(0, MAX_LISTED))
+			out.push(t("style.negationHit", { line: h.line, column: h.column, matched: h.matched }, lang));
+	// Format usage.
+	const s = report.structure;
+	// Summary line.
+	out.push(t("style.structure", { listLines: s.listLines, lines: s.lines, bold: s.bold }, lang));
+	// Too many list lines.
+	if (s.listOver) out.push(t("style.listOver", {}, lang));
+	// Too much bold.
+	if (s.boldOver) out.push(t("style.boldOver", { limit: BOLD_PER_1000 }, lang));
+	// Closing line.
+	out.push(t(styleClean(report) ? "style.clean" : "style.advice", {}, lang));
+	// One block of text.
+	return out.join("\n");
+}

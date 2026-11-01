@@ -22,10 +22,10 @@ test("asciiPunctNearCjk counts ASCII marks next to Chinese and skips decimals", 
 });
 
 test("metrics reports contrast frames, negations, cliches, markers and structure", () => {
-	// A draft with every problem once.
-	const m = metrics("这不是问题，而是机会。我们无法回避。综上所述，待核实。\n- 第一点");
+	// A draft with every problem once, plus a level-2 character.
+	const m = metrics("这不是问题，而是机会。我们无法回避。综上所述，待核实。\n- 第一点**耄**");
 	// Each counter sees its pattern.
-	assert.deepEqual([m.contrast, m.cliches, m.markers, m.structuredLines], [1, 1, 1, 1]);
+	assert.deepEqual([m.styleHits, m.contrast, m.cliches, m.markers, m.listLines, m.bold, m.rareChars], [2, 1, 1, 1, 1, 1, 1]);
 	// One negative assertion in four sentences: 2.5 per 10.
 	assert.equal(m.negationPer10, 2.5);
 	// Prohibitions are not counted as negative assertions.
