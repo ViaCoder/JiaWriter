@@ -241,6 +241,10 @@ export const zh = {
 	"lang.saved": "界面语言已设为中文。命令说明和提示即时生效，内置 skill 在 /reload 后切换。",
 	"lang.envWins": "当前设置了 WA_LANG={value}，它优先于 /lang 的选择。",
 	"lang.bad": "可选语言：zh、en。",
+	// /sf.
+	"sf.cmdUsage": "用法：/sf status 查看 Chrome 扩展是否连接，/sf install 安装扩展桥接。",
+	"sf.installNext":
+		"下一步：在 Chrome 打开 chrome://extensions，打开“开发者模式”，点“加载已解压的扩展程序”，选择上面的扩展目录；保持 Chrome 开着，再运行 /sf status 确认 connected 为 true。sf 第一次运行会下载约 1 GB 的依赖，需要几分钟。",
 };
 
 /** Message keys shared by all languages. */

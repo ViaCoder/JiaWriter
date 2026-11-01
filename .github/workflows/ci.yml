@@ -46,6 +46,38 @@ jobs:
       - name: Test
         run: npm test
 
+  # WriterAgent: its own tests on all six platforms (the upstream suite runs on Linux above).
+  writer-platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, macos-15-intel, windows-latest, windows-11-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: WriterAgent tests
+        shell: bash
+        working-directory: packages/coding-agent
+        run: node ../../node_modules/vitest/dist/cli.js --run test/writer
+
+      - name: WriterAgent script tests
+        shell: bash
+        run: node --test scripts/writer-*.test.mjs
+
   mcp-conformance:
     runs-on: ubuntu-latest
     steps:

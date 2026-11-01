@@ -105,6 +105,8 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 		"新建写作 skill：从当前会话生成、空白模板，或由 skill-creator 引导",
 	"Switch the interface language: /lang zh or /lang en": "切换界面语言：/lang zh 或 /lang en",
 	"Show the WriterAgent model and search configuration (read-only)": "查看 WriterAgent 的模型和检索配置（只读）",
+	"search_fetch Chrome bridge: /sf status, or /sf install to set up the extension":
+		"search_fetch 的 Chrome 桥接：/sf status 查看状态，/sf install 安装扩展",
 };
 
 /** text in the interface language: the Chinese entry of UI_ZH when the language is Chinese, else text; {name} filled from vars. */

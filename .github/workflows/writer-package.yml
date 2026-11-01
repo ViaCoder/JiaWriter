@@ -1,0 +1,184 @@
+name: WriterAgent packages
+
+# WriterAgent: builds the six release packages and tests each on its own platform. The packages
+# are kept as this run's artifacts for download; nothing is tagged, released or published.
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: writer-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # search_fetch as a PyApp binary, built natively per platform (no Windows build).
+  build-sf:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, name: linux-amd64 }
+          - { runner: ubuntu-24.04-arm, name: linux-arm64 }
+          - { runner: macos-latest, name: macos-arm64 }
+          - { runner: macos-15-intel, name: macos-amd64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Build sf
+        run: bash search_fetch/build_binary.sh --out sf-dist
+
+      - name: Upload sf
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sf-${{ matrix.name }}
+          path: sf-dist
+          if-no-files-found: error
+          retention-days: 3
+
+  build:
+    needs: build-sf
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.3.14
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Hydrate model data
+        run: npm run hydrate:model-data
+
+      - name: Download sf binaries
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: sf-*
+          path: sf-dist
+          merge-multiple: true
+
+      # Six packages with pinned fd and rg (SHA256-checked), the writing skills, the license texts,
+      # and search_fetch in the Linux and macOS packages.
+      - name: Build packages
+        run: ./scripts/build-binaries.sh --skip-install --offline-model-data --sf-dir sf-dist --out "${GITHUB_WORKSPACE}/packages/coding-agent/binaries"
+
+      - name: Checksums
+        run: |
+          set -euo pipefail
+          cd packages/coding-agent/binaries
+          sha256sum writeragent-*.tar.gz writeragent-*.zip > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: writeragent-packages
+          path: |
+            packages/coding-agent/binaries/writeragent-*.tar.gz
+            packages/coding-agent/binaries/writeragent-*.zip
+            packages/coding-agent/binaries/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 14
+
+  test-packages:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, platform: linux-x64 }
+          - { runner: ubuntu-24.04-arm, platform: linux-arm64 }
+          - { runner: macos-latest, platform: darwin-arm64 }
+          - { runner: macos-15-intel, platform: darwin-x64 }
+          - { runner: windows-latest, platform: windows-x64 }
+          - { runner: windows-11-arm, platform: windows-arm64 }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Checkout test scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+
+      - name: Download packages
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: writeragent-packages
+          path: packages
+
+      - name: Verify checksums and extract this platform's package
+        id: pkg
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd packages
+          if command -v sha256sum >/dev/null; then sha256sum -c SHA256SUMS; else shasum -a 256 -c SHA256SUMS; fi
+          mkdir -p ../extracted
+          if [[ "${{ matrix.platform }}" == windows-* ]]; then
+            export ARCHIVE_PATH="$(cygpath -w "writeragent-${{ matrix.platform }}.zip")"
+            export DESTINATION_PATH="$(cygpath -w ../extracted)"
+            powershell.exe -NoProfile -NonInteractive -Command 'Expand-Archive -LiteralPath $env:ARCHIVE_PATH -DestinationPath $env:DESTINATION_PATH -Force'
+            echo "binary=extracted/writeragent.exe" >> "${GITHUB_OUTPUT}"
+          else
+            tar -xzf "writeragent-${{ matrix.platform }}.tar.gz" -C ../extracted
+            echo "binary=extracted/writeragent/writeragent" >> "${GITHUB_OUTPUT}"
+          fi
+
+      - name: Bundled tools run
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(dirname "${{ steps.pkg.outputs.binary }}")"
+          "${root}/bin/fd" --version
+          "${root}/bin/rg" --version
+
+      # --version, --help, a print run against a local mock model, and an import/export round.
+      - name: Offline smoke test
+        timeout-minutes: 10
+        shell: bash
+        run: node scripts/writer-smoke.mjs "${{ steps.pkg.outputs.binary }}"
+
+      # The bundled sf runs once in a throwaway state folder (the first run installs its packages).
+      - name: Bundled sf runs
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(dirname "${{ steps.pkg.outputs.binary }}")"
+          sf="$(ls "${root}"/search_fetch/*/*/sf)"
+          state="${RUNNER_TEMP}/sf-state"
+          PYAPP_INSTALL_DIR_SEARCH_FETCH="${state}/install" PYAPP_CACHE_DIR="${state}/cache" PIP_CACHE_DIR="${state}/pip" SEARCH_FETCH_HOME="${state}/home" "${sf}" --help
+
+      # The interactive interface in a pseudo-terminal (/wa, /skills, /lang in both languages).
+      - name: Interface check
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: python3 -I scripts/writer-tui-check.py "${{ steps.pkg.outputs.binary }}"

@@ -46,9 +46,10 @@ export function backendOps(backend, cfg, env, cwd) {
 		};
 	}
 	// sf as a child process.
-	const bin = locateSf(cfg, process.platform, process.arch, dirname(process.execPath), join(env.HOME ?? "", ".writeragent", "agent"));
+	const agentDir = join(env.HOME ?? "", ".writeragent", "agent");
+	const bin = locateSf(cfg, process.platform, process.arch, dirname(process.execPath), agentDir);
 	// No driver model (as in the tool) and no human waits: nobody watches an evaluation.
-	const opts = { cwd, env: sfChildEnv(env, false), timeoutMs: cfg.timeoutMs };
+	const opts = { cwd, env: sfChildEnv(env, false, agentDir), timeoutMs: cfg.timeoutMs };
 	// Run one sf command and return its stdout, or throw sf's error.
 	const sf = async (args) => {
 		const run = await runSf(bin, args, opts);

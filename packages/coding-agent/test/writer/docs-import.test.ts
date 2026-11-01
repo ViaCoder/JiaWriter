@@ -26,6 +26,9 @@ import {
 // Fixtures.
 import { makeDocx, makePdf, wp } from "./doc-fixtures.ts";
 
+// sf has no Windows build and these cases run fake sf shell scripts: Linux and macOS only.
+const UNIX_ONLY = process.platform === "win32";
+
 // Working folder of each test.
 let cwd = "";
 beforeEach(() => {
@@ -140,7 +143,7 @@ describe("importFile", () => {
 		const bad = await importFile(put("参考资料/bad.docx", "not a zip"), cwd);
 		expect([bad.status, bad.out, (bad.error ?? "").length > 0]).toEqual(["failed", "", true]);
 	});
-	it("reads a scan through sf's OCR (ingest, then tasks wait)", async () => {
+	it.skipIf(UNIX_ONLY)("reads a scan through sf's OCR (ingest, then tasks wait)", async () => {
 		// Deferred OCR finished by the task.
 		const sf = fakeSf("deferred");
 		const r = await importFile(put("参考资料/scan.pdf", makePdf([""])), cwd, sf);
@@ -161,7 +164,7 @@ describe("importFile", () => {
 	});
 });
 
-describe("ocrWithSf", () => {
+describe.skipIf(UNIX_ONLY)("ocrWithSf", () => {
 	it("returns sf's text layer, or reports a failed task", async () => {
 		// sf found text after all.
 		const file = put("a.pdf", makePdf([""]));

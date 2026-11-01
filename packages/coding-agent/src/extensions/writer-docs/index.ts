@@ -34,7 +34,7 @@ export function findSfOcr(env: NodeJS.ProcessEnv): SfOcr | undefined {
 	try {
 		// The binary in the standard places; nobody waits for a captcha during OCR.
 		const bin = locateSf(config, process.platform, process.arch, dirname(process.execPath), getAgentDir());
-		return { bin, env: sfChildEnv(env, false), timeoutMs: config.timeoutMs };
+		return { bin, env: sfChildEnv(env, false, getAgentDir()), timeoutMs: config.timeoutMs };
 	} catch {
 		// No sf: scans are reported as needing OCR.
 		return undefined;

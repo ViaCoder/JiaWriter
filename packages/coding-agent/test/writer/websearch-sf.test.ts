@@ -1,7 +1,7 @@
 // Unit tests for src/writer/websearch/sf.ts (a fake sf script stands in for search_fetch).
 
 // Temp files for the fake sf.
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
@@ -22,13 +22,18 @@ import {
 	sfModelOff,
 	sfPlatform,
 	sfSearchArgs,
+	sfStateEnv,
 } from "../../src/writer/websearch/sf.ts";
+
+// sf has no Windows build and these cases run fake sf shell scripts: Linux and macOS only.
+const UNIX_ONLY = process.platform === "win32";
 
 // Directory of the fake sf.
 let dir = "";
 // Fresh directory and Chinese messages.
 beforeEach(() => {
-	dir = mkdtempSync(join(tmpdir(), "wa-sf-"));
+	// Real path: macOS temp folders are symlinks (/var → /private/var), and sf reports the real cwd.
+	dir = realpathSync(mkdtempSync(join(tmpdir(), "wa-sf-")));
 	vi.stubEnv("WA_LANG", "zh");
 });
 // Clean up.
@@ -73,23 +78,38 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 	});
 });
 
-describe("sfModelOff / sfChildEnv", () => {
-	it("clears every driver-model variable, even ones the user set", () => {
+describe("sfModelOff / sfStateEnv / sfChildEnv", () => {
+	it("keeps sf's state under the agent folder", () => {
+		// PyApp runtime, caches and search_fetch's home.
+		expect(sfStateEnv("/a")).toEqual({
+			PYAPP_INSTALL_DIR_SEARCH_FETCH: join("/a", "sf", "runtime", "install"),
+			PYAPP_CACHE_DIR: join("/a", "sf", "runtime", "cache"),
+			PIP_CACHE_DIR: join("/a", "sf", "pip-cache"),
+			SEARCH_FETCH_HOME: join("/a", "sf", "home"),
+		});
+	});
+	it("clears every driver-model variable, even ones the user set, and lets the parent choose the folders", () => {
 		// The four names, empty.
 		expect(sfModelOff()).toEqual({ SF_URL: "", SF_KEY: "", SF_MODEL: "", SF_API: "" });
 		// A parent key never reaches sf; print mode disables human waits.
-		expect(sfChildEnv({ A: "1", SF_KEY: "sk-user", WA_KEY: "w" }, false)).toEqual({
+		expect(sfChildEnv({ A: "1", SF_KEY: "sk-user", WA_KEY: "w" }, false, "/a")).toEqual({
+			...sfStateEnv("/a"),
 			A: "1",
 			WA_KEY: "w",
 			...sfModelOff(),
 			SEARCH_FETCH_NO_HUMAN: "1",
 		});
-		// Interactive.
-		expect(sfChildEnv({ A: "1" }, true)).toEqual({ A: "1", ...sfModelOff() });
+		// Interactive; the parent's SEARCH_FETCH_HOME wins.
+		expect(sfChildEnv({ A: "1", SEARCH_FETCH_HOME: "/mine" }, true, "/a")).toEqual({
+			...sfStateEnv("/a"),
+			A: "1",
+			SEARCH_FETCH_HOME: "/mine",
+			...sfModelOff(),
+		});
 	});
 });
 
-describe("runSf / sfError", () => {
+describe.skipIf(UNIX_ONLY)("runSf / sfError", () => {
 	it("passes arguments and environment without a shell", async () => {
 		// Echo argv and two variables.
 		const bin = script(

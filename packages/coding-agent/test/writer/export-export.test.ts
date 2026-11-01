@@ -28,9 +28,10 @@ const DRAFT = '# 报告\n\n## 一、背景\n\n支持 5G, Wi-Fi 和 NB-IoT.\n\n�
 describe("defaultOutput", () => {
 	it("names the output after the draft", () => {
 		// .docx and .export.md.
-		expect([defaultOutput("/w/稿件.md", "docx"), defaultOutput("/w/稿件.md", "md")]).toEqual([
-			"/w/稿件.docx",
-			"/w/稿件.export.md",
+		const draft = join("/w", "稿件.md");
+		expect([defaultOutput(draft, "docx"), defaultOutput(draft, "md")]).toEqual([
+			join("/w", "稿件.docx"),
+			join("/w", "稿件.export.md"),
 		]);
 	});
 });

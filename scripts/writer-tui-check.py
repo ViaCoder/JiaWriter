@@ -5,7 +5,8 @@ Starts the source build (pi-test.sh --no-env) with a throwaway HOME and agent fo
 /wa, /skills, /lang en, /skills and /wa, and looks for the expected Chinese and English text in
 the screen output (ANSI codes removed). Nothing outside the temp folder is read or written, no
 key is set, and no model is called. Prints one line per check and exits 1 when any check fails.
-Usage: python3 -I scripts/writer-tui-check.py [--debug]
+Usage: python3 -I scripts/writer-tui-check.py [--debug] [program]
+  program: a built writeragent executable (default: the source build through pi-test.sh)
 """
 
 # Pseudo-terminal, process control and timing.
@@ -64,18 +65,54 @@ def type_line(fd, text):
         os.write(fd, b"\r")
 
 
+def stop(pid):
+    """End the child: SIGTERM, wait up to 5 seconds, then SIGKILL; never blocks longer."""
+    # Ask first.
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except OSError:
+        return
+    # Wait in short steps.
+    end = time.monotonic() + 5
+    while time.monotonic() < end:
+        try:
+            done, _ = os.waitpid(pid, os.WNOHANG)
+        except ChildProcessError:
+            return
+        if done:
+            return
+        time.sleep(0.2)
+    # Force it.
+    try:
+        os.kill(pid, signal.SIGKILL)
+        os.waitpid(pid, 0)
+    except (OSError, ChildProcessError):
+        pass
+
+
 def main():
     """Run the checks and print the results."""
     # Throwaway home and agent folder.
     tmp = tempfile.mkdtemp(prefix="wa-tui-")
     env = {k: v for k, v in os.environ.items() if not k.startswith(("WA_", "PI_", "SF_"))}
     env.update(HOME=tmp, WA_DIR=os.path.join(tmp, "agent"), TERM="xterm-256color", COLUMNS="120", LINES="40")
+    # The program to run, made absolute before the child changes folder.
+    program = [a for a in sys.argv[1:] if a != "--debug"]
+    if program and os.sep in program[0]:
+        program[0] = os.path.abspath(program[0])
     # Start the interface in a pseudo-terminal.
     pid, fd = pty.fork()
     if pid == 0:
-        # Child: the source launcher without provider keys.
+        # Child: the given executable, or the source launcher without provider keys.
         os.chdir(tmp)
-        os.execvpe("bash", ["bash", os.path.join(ROOT, "pi-test.sh"), "--no-env"], env)
+        try:
+            if program:
+                os.execvpe(program[0], program, env)
+            os.execvpe("bash", ["bash", os.path.join(ROOT, "pi-test.sh"), "--no-env"], env)
+        except OSError as e:
+            # The parent sees this on the terminal and the checks fail.
+            print(f"cannot start {program[0] if program else 'pi-test.sh'}: {e}", flush=True)
+            os._exit(127)
     # Terminal size.
     os.set_blocking(fd, False)
     results = []
@@ -95,24 +132,24 @@ def main():
         ]
         for keys, seconds, wanted in steps:
             # Keys: Escape and single letters are sent raw, commands with Enter.
-            if keys is not None:
-                if keys.startswith("/"):
-                    type_line(fd, keys)
-                else:
-                    os.write(fd, keys.encode("utf-8"))
-            screen = read_for(fd, seconds)
+            try:
+                if keys is not None:
+                    if keys.startswith("/"):
+                        type_line(fd, keys)
+                    else:
+                        os.write(fd, keys.encode("utf-8"))
+                screen = read_for(fd, seconds)
+            except OSError:
+                # The interface is gone (closed terminal): this and later checks fail.
+                screen = ""
             # --debug: the end of each step's screen output.
             if "--debug" in sys.argv:
                 print(f"--- after {keys!r}:\n{screen[-700:]}")
             for w in wanted:
                 results.append((keys or "(startup)", w, w in screen))
     finally:
-        # Stop the interface and remove the temp folder.
-        try:
-            os.kill(pid, signal.SIGTERM)
-            os.waitpid(pid, 0)
-        except (OSError, ChildProcessError):
-            pass
+        # Stop the interface (SIGTERM, then SIGKILL after 5 s: a terminal UI may ignore SIGTERM) and remove the temp folder.
+        stop(pid)
         shutil.rmtree(tmp, ignore_errors=True)
     # Report.
     for step, text, ok in results:

@@ -53,7 +53,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		// The binary.
 		const bin = locateSf(config, process.platform, process.arch, dirname(process.execPath), getAgentDir());
 		// Everything a run needs.
-		return { bin, env: sfChildEnv(process.env, interactive) };
+		return { bin, env: sfChildEnv(process.env, interactive, getAgentDir()) };
 	}
 
 	// web_search.
@@ -181,6 +181,34 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 					chars: page.content.length,
 				},
 			};
+		},
+	});
+
+	// /sf [status|install]: the Chrome bridge of sf with WriterAgent's own state folders, so the
+	// extension, the native host and the sf runs of the tools share one socket.
+	pi.registerCommand("sf", {
+		description: "search_fetch Chrome bridge: /sf status, or /sf install to set up the extension",
+		getArgumentCompletions: (prefix) =>
+			["status", "install"].filter((a) => a.startsWith(prefix)).map((a) => ({ value: a, label: a })),
+		handler: async (args, ctx) => {
+			// The subcommand (status by default).
+			const op = args.trim() || "status";
+			if (op !== "status" && op !== "install") {
+				ctx.ui.notify(t("sf.cmdUsage"), "error");
+				return;
+			}
+			try {
+				// sf with the tools' environment; the bridge answers quickly.
+				const sf = sfContext(false);
+				const run = await runSf(sf.bin, ["bridge", op], { cwd: ctx.cwd, env: sf.env, timeoutMs: config.timeoutMs });
+				const out = `${run.stdout}${run.stderr}`.trim();
+				ctx.ui.notify(
+					op === "install" && run.code === 0 ? `${out}\n\n${t("sf.installNext")}` : out,
+					run.code === 0 ? "info" : "warning",
+				);
+			} catch (e) {
+				ctx.ui.notify(e instanceof Error ? e.message : String(e), "error");
+			}
 		},
 	});
 }

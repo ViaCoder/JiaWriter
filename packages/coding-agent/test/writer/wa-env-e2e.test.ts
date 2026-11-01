@@ -479,7 +479,9 @@ describe("WA_* end to end", () => {
 		// Only the URL is set.
 		const r = await runCli({ WA_URL: baseUrl }, newAgentDir());
 		// Configuration error with the hint.
-		expect([r.code, r.stderr.includes("缺少：WA_KEY、WA_MODEL"), r.stderr.includes("export WA_KEY=")]).toEqual([
+		// The commands follow the platform (PowerShell on Windows).
+		const command = process.platform === "win32" ? "$env:WA_KEY=" : "export WA_KEY=";
+		expect([r.code, r.stderr.includes("缺少：WA_KEY、WA_MODEL"), r.stderr.includes(command)]).toEqual([
 			1,
 			true,
 			true,

@@ -1,206 +1,117 @@
-<p align="center">
-  <a href="https://pi.dev">
-    <img alt="pi logo" src="https://pi.dev/logo-auto.svg" width="128">
-  </a>
-</p>
-<p align="center">
-  <a href="https://discord.com/invite/3cU7Bz4UPx"><img alt="Discord" src="https://img.shields.io/badge/discord-community-5865F2?style=flat-square&logo=discord&logoColor=white" /></a>
-  <a href="https://www.npmjs.com/package/@earendil-works/pi-coding-agent"><img alt="npm" src="https://img.shields.io/npm/v/@earendil-works/pi-coding-agent?style=flat-square" /></a>
-</p>
+# WriterAgent
 
-> New issues and PRs from new contributors are auto-closed by default. Maintainers review auto-closed issues daily. See [CONTRIBUTING.md](CONTRIBUTING.md).
+English | [中文](README.zh.md)
 
-# Pi
+WriterAgent is a general-purpose writing agent for the terminal. It reads reference material, searches the web, drafts and revises documents, checks drafts for AI-style writing, and exports Word documents. It is built on [pi](https://github.com/earendil-works/pi) v1.4.0 and released under the MIT license.
 
-Pi is a minimal, extensible agent harness that you can make your own.
+- Finished drafts are mainly Chinese, with English terms where needed, and use Chinese full-width punctuation throughout; the interface and tool output are Chinese by default and can switch to English.
+- The writing is objective, neutral and clear; cited cases come only from the reference files or search results, with date and source in the text.
+- Packages exist for Windows, macOS and Linux, each on amd64 and arm64.
 
-Adapt Pi to your workflows, not the other way around. Customize Pi with [extensions](packages/coding-agent/docs/extensions.md), [skills](packages/coding-agent/docs/skills.md), [prompt templates](packages/coding-agent/docs/prompt-templates.md), and [themes](packages/coding-agent/docs/themes.md). Bundle them as [Pi packages](packages/coding-agent/docs/packages.md) and share via npm or git.
+## Install
 
-Pi ships with powerful defaults but skips features like sub-agents and plan mode. Ask Pi to build what you want, or install a package that does it your way.
+1. Download the package for your platform: `writeragent-<platform>.tar.gz` (Linux, macOS) or `writeragent-<platform>.zip` (Windows), where the platform is `linux-x64`, `linux-arm64`, `darwin-arm64`, `darwin-x64`, `windows-x64` or `windows-arm64`. The packages and `SHA256SUMS` are attached to the runs of the "WriterAgent packages" GitHub Actions workflow.
+2. Check the digests: `sha256sum -c SHA256SUMS` (on macOS `shasum -a 256 -c SHA256SUMS`).
+3. Extract the package and run `writeragent` (`writeragent.exe` on Windows). Each package carries pinned fd and ripgrep, so nothing is downloaded at run time.
 
-Use Pi [interactively](packages/coding-agent/docs/usage.md), automate it in [print or JSON mode](packages/coding-agent/docs/cli.md), control it over [RPC](packages/coding-agent/docs/rpc.md), or build apps with the [Pi TypeScript SDK](packages/coding-agent/docs/sdk.md). See [OpenClaw](https://github.com/OpenClaw/OpenClaw) for a real-world integration.
+## Model configuration
 
-## Getting started
+The model is configured with environment variables. OpenAI Responses, OpenAI Chat Completions and Anthropic Messages are supported.
 
-Install the command-line interface:
+| Variable | Meaning | Default |
+|---|---|---|
+| `WA_URL` | API base URL | required |
+| `WA_KEY` | API key | required |
+| `WA_MODEL` | Model name | required |
+| `WA_API` | API type: `anthropic-messages`, `openai-responses`, `openai-completions` | detected |
+| `WA_CTX` | Context window (tokens) | 128000 |
+| `WA_OUT` | Maximum output (tokens) | 128000 |
+| `WA_REASONING` | Reasoning level: `off`, `low`, `medium`, `high`, `xhigh`, `max` | `medium` |
+| `WA_LANG` | Interface and tool-output language: `zh`, `en` | `zh` |
+| `WA_SEARCH` | Search backend: `anysearch`, `sf` | `anysearch` |
+| `WA_SEARCH_KEY` | AnySearch key | anonymous when unset |
+| `WA_SF` | Path of the search_fetch program | standard places |
 
-```bash
-curl -fsSL https://pi.dev/install.sh | sh
-```
+Setting them (replace the example values):
 
-On Windows:
+- Linux, macOS (bash, zsh): `export WA_URL="https://api.example.com"`, `export WA_KEY="<your API key>"`, `export WA_MODEL="<model name>"`; add the lines to `~/.bashrc` or `~/.zshrc` to keep them.
+- fish: `set -gx WA_URL https://api.example.com`, and the same for the others.
+- Windows PowerShell: `$env:WA_URL="https://api.example.com"` for the current window; `setx WA_URL "https://api.example.com"` to keep it, then open a new terminal.
+- Windows cmd: `set WA_URL=https://api.example.com`.
 
-```shell
-powershell -c "irm https://pi.dev/install.ps1 | iex"
-```
+To detect the API type, WriterAgent sends one invalid request to each of three endpoints (an output limit of 0); servers reject it during validation, so nothing is generated and no tokens are used. The result is cached in `~/.writeragent/agent/api-detect.json` without the key. The key is read only from the environment and is written to no file.
 
-The installer pins all dependencies and updates Pi with `pi update`. Alternatively, install directly with npm, which does not pin transitive dependencies:
+Run `/wa` inside WriterAgent to see each variable's value in effect, where it comes from, and the setup commands for your platform.
 
-```bash
-npm install -g --ignore-scripts @earendil-works/pi-coding-agent
-```
+## Writing tools
 
-Pi requires Node.js 22.19 or newer. The macOS, Linux, and Windows installers can install it if needed. Pi does not require dependency lifecycle scripts for a normal npm installation.
+| Tool | Purpose |
+|---|---|
+| `read`, `write`, `edit`, `ls`, `find`, `grep` | Read, write and find files (`bash` is off by default and can be turned on in the settings) |
+| `style_check` | AI-style writing: contrast frames such as "not just X but Y", stock phrases, negation density, list and bold usage |
+| `word_count` | Chinese characters, English words and numbers, per section and against a target length |
+| `readability_check` | Characters outside level 1 of the General Standard Chinese Characters table, long sentences, Flesch reading ease for English |
+| `web_search`, `web_fetch` | Web search and page text |
+| `import_document` | Import reference files: PDF, Word (.docx), HTML, txt, md |
+| `export_document` | Export a Markdown draft to docx or md |
 
-Start Pi in the directory where you want it to work:
+## Commands
 
-```bash
-cd /path/to/project
-pi
-```
+| Command | Purpose |
+|---|---|
+| `/wa` | Read-only configuration page |
+| `/lang zh`, `/lang en` | Interface language (`WA_LANG`, when set, takes precedence) |
+| `/skills` | Manage writing skills: turn on or off, edit, update from this session, delete (after a backup) |
+| `/skill-new` | New skill: from this session, from a blank template, or written by the model with skill-creator |
+| `/import-doc [file]` | Import reference files |
+| `/export-doc <draft.md> [md\|docx] [--profile=name] [--out=path]` | Export a draft |
+| `/sf status`, `/sf install` | Chrome extension bridge of search_fetch |
 
-For a built-in AI provider, run `/login` inside Pi to connect a subscription or API key. Then give Pi a task.
+## Reference material
 
-See the [documentation](https://pi.dev/docs/latest) for full setup and usage instructions, or [visit pi.dev](https://pi.dev) for demos.
+Put reference files in `参考资料/` (or `sources/`) in the writing folder. At startup WriterAgent imports new and changed files in the background into Markdown with page markers under `参考资料/.parsed/`, where `read` and `grep` find them, so citations can name a page. Imported text is treated as untrusted data, and instructions in it are not followed.
 
-## Run with Nix
+A scan without a text layer needs OCR. With search_fetch configured (`WA_SF`, or the sf in the release package), `import_document` uses its OCR, which uploads the page images to a public Hugging Face Space; the background import at startup does no OCR.
 
-```bash
-nix run github:earendil-works/pi/stable
-```
+## Export
 
-`stable` points at the latest release. Install it with `nix profile add github:earendil-works/pi/stable` and update with `nix profile upgrade pi`. Use a release tag such as `github:earendil-works/pi/v1.0.0` to pin a version, or `github:earendil-works/pi` for unreleased changes on `main`. Nix builds Pi from source.
+`export_document` and `/export-doc` first convert punctuation to Chinese full-width marks: ASCII marks become Chinese ones, and a `-`, `–` or `--` between Chinese characters becomes `—`; numbers, times, versions, URLs, e-mail addresses, code, links, abbreviations and word-internal hyphens keep their form. Quotes are paired per paragraph, and an unpaired quote is reported for its paragraph only.
 
-Supports ARM64 and x86-64 on Linux and macOS. Use `nix build .` or `nix run .` to build or run your checkout.
+The default profile `default-zh`:
 
-Nix builds are offline, so the bundled model data comes from a pi.dev model catalog revision pinned in `nix/model-catalog.json`. At runtime, Pi still overlays newer catalog data from pi.dev as usual. The Nix workflow replaces the pin on `main` when it no longer matches the checkout, for example after a provider is added or gains a new model type. To refresh it by hand:
+| Level | Chinese font | Size |
+|---|---|---|
+| Title (`#`) | 方正小标宋简体 | 二号 (22 pt) |
+| Heading 1 (`##`) | 黑体 | 小二 (18 pt) |
+| Heading 2 (`###`) | 楷体_GB2312 | 小二 |
+| Heading 3 (`####`) | 黑体 | 小二 |
+| Body | 方正仿宋_GBK | 小二 |
 
-```bash
-npm run update:model-catalog-pin
-```
+Latin text and digits use Times New Roman, line spacing is exactly 32 pt, the page is A4 with GB/T 9704-2012 margins (37, 35, 28 and 26 mm), and the footer carries centred page numbers. Fonts are referenced by name with no fallback; install and license them on your own computer. A custom profile is a JSON file with only the fields to change, for example `{"lineSpacingPt": 28}`, given with `--profile=file.json` or saved as `~/.writeragent/agent/profiles/<name>.json` and given by name.
 
-## Packages
+After writing the docx, the export checks its XML: every run with Chinese text carries `w:hint="eastAsia"` and a Chinese font; it counts ASCII punctuation next to Chinese characters and unpaired quotes, lists the sizes and line spacing in use, and reports any 待核实 mark left in the draft.
 
-This monorepo contains the Pi CLI and its supporting libraries.
+## Writing skills
 
-| Package | Description |
-|---------|-------------|
-| **[@earendil-works/chord](packages/chord)** | Typed host runtime for hot-reloadable plugins, contracts, replicated state, and RPC over JSON links |
-| **[@earendil-works/pi-telemetry](packages/telemetry)** | Vendor-neutral telemetry contracts, reference adapter, conformance tests, and typed schemas |
-| **[@earendil-works/pi-ai](packages/ai)** | Unified multi-provider LLM API (OpenAI, Anthropic, Google, etc.) |
-| **[@earendil-works/pi-durable](packages/durable)** | Durable conversation, task, and document runtime |
-| **[@earendil-works/pi-agent-core](packages/agent)** | Agent runtime with tool calling and state management |
-| **[@earendil-works/pi-coding-agent](packages/coding-agent)** | Interactive coding agent CLI |
-| **[@earendil-works/pi-tui](packages/tui)** | Terminal UI library with differential rendering |
+Eight built-in skills ship in Chinese and English and follow the interface language: general article, report and analysis, news and features, academic writing, business email and memos, marketing copy, narrative fiction, and skill-creator. Your own skills go in `~/.writeragent/agent/skills/<name>/SKILL.md` and take the place of a built-in skill with the same name.
 
-For Slack/chat automation and workflows see [earendil-works/pi-chat](https://github.com/earendil-works/pi-chat).
+A skill made from a session collects only what you wrote in the current session and the reasons you gave for refused tool calls, never model replies; keys, tokens and passwords are removed first, and for a repeated topic the latest request is kept. You review the draft before anything is written.
 
-## Permissions & Containerization
+## Search
 
-Pi does not include a built-in permission system for restricting filesystem, process, network, or credential access. By default, it runs with the permissions of the user and process that launched it.
+- `anysearch` (default): the AnySearch API, anonymously when no key is set.
+- `sf`: search_fetch opens pages in your own Chrome through an extension and a local bridge, with paced requests. The Linux and macOS packages include sf; Windows is not supported yet. Before the first use, run `/sf install`, load the extension in Chrome's extensions page as shown, and check with `/sf status`. The first sf run installs its dependencies (about 1.1 GB, a few minutes), all under `~/.writeragent/agent/sf/`.
 
-If you need stronger boundaries, containerize or sandbox Pi. See [packages/coding-agent/docs/containerization.md](packages/coding-agent/docs/containerization.md) for three patterns:
+## Network and privacy
 
-- **Gondolin extension**: keep `pi` and provider auth on the host while routing built-in tools and `!` commands into a local Linux micro-VM.
-- **Plain Docker**: run the whole `pi` process in a local container for simple isolation.
-- **OpenShell**: run the whole `pi` process in a policy-controlled sandbox.
+WriterAgent sends no network request at startup or while idle, and has no telemetry, version check or upload. It goes online only for your configured model API, the search backend, and URLs you ask it to import; OCR of scans sends page images to a public Hugging Face Space. All configuration and sessions live under `~/.writeragent/`.
 
-## Contributing
+## Platforms and testing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines and [AGENTS.md](AGENTS.md) for project-specific rules (for both humans and agents).  Longer term plans for Pi can also be found in [RFCs](https://rfc.earendil.com/keyword/pi/).
+On every push to dev, GitHub Actions runs WriterAgent's own tests on all six platforms, builds the six packages, and checks each package on its own platform: fd and ripgrep run, `--version`, `--help`, one writing run against a local mock model server, and one round of PDF import and docx export (no key, no real model). On Linux and macOS it also checks the interactive interface in both languages and the bundled sf. The full upstream pi test suite runs on Linux.
 
-## Development
-
-```bash
-npm install --ignore-scripts  # Install all dependencies without running lifecycle scripts
-npm run build         # Refresh model data, then build all packages
-npm run build:offline # Rebuild using existing model data without network access
-npm run check         # Lint, format, and type check
-./test.sh            # Run tests (skips LLM-dependent tests without API keys)
-./pi-test.sh         # Run pi from sources (can be run from any directory)
-```
-
-### Using local packages outside the monorepo
-
-Build every public package into one coherent local artifact set:
-
-```bash
-npm run pack:packages -- --out .artifacts/pi-packages
-```
-
-This refreshes model data before building `pi-ai`. To avoid network access when
-model data is already hydrated, pass `--offline-model-data`.
-
-Then configure an external project to consume one package and resolve all of
-its Pi dependencies from the same artifact set. npm is the default:
-
-```bash
-node scripts/use-local-packages.mjs \
-  --manifest .artifacts/pi-packages/manifest.json \
-  --consumer ../my-project \
-  --package @earendil-works/pi-durable \
-  --package @earendil-works/pi-agent-core
-cd ../my-project
-npm install --ignore-scripts
-```
-
-For a pnpm project, point `--consumer` at the workspace root:
-
-```bash
-node scripts/use-local-packages.mjs \
-  --manifest .artifacts/pi-packages/manifest.json \
-  --consumer ../my-project \
-  --package @earendil-works/pi-agent-core \
-  --package-manager pnpm
-cd ../my-project
-pnpm install --ignore-scripts
-```
-
-Repeat `--package` for each direct dependency. The command updates the
-consumer's `package.json` with content-addressed local `file:` references. It
-writes transitive overrides to `package.json` for npm or `pnpm-workspace.yaml`
-for pnpm. Keep the artifact directory available while installing or updating
-the consumer. Re-run both commands after changing Pi source.
-
-## Building standalone binaries from release source
-
-GitHub releases include a versioned source archive covered by the release's `SHA256SUMS` file. Extract it and run the same build script used for the official standalone binaries:
-
-```bash
-VERSION="<release-version>"
-tar -xzf "pi-${VERSION}-source.tar.gz"
-cd "pi-${VERSION}"
-./scripts/build-binaries.sh --offline-model-data --platform linux-x64 --out "$PWD/out"
-```
-
-The archive includes release model data and native prebuilds. `--offline-model-data` uses that model data without refreshing provider catalogs. The script installs dependencies and builds the executable with its runtime assets; pass `--skip-install` if dependencies are already provided.
-
-## Supply-chain hardening
-
-We treat npm dependency changes as reviewed code changes.
-
-- Direct external dependencies are pinned to exact versions. Internal workspace packages remain version-ranged.
-- `.npmrc` sets `save-exact=true` and `min-release-age=2` to avoid same-day dependency releases during npm resolution.
-- `package-lock.json` is the dependency ground truth. Pre-commit blocks accidental lockfile commits unless `PI_ALLOW_LOCKFILE_CHANGE=1` is set.
-- `npm run check` verifies pinned direct deps, native TypeScript import compatibility, and the generated coding-agent install lock.
-- The pi.dev installer installs from `packages/coding-agent/install-lock/`, generated from the root lockfile, to pin transitive deps. The npm package does not pin transitive deps.
-- Local release smoke tests and npm publication use the same tarball packer; npm publishes the validated tarballs rather than repacking workspace directories.
-- Local release installs, documented npm installs, and `pi update --self` use `--ignore-scripts` where supported.
-- CI installs with `npm ci --ignore-scripts`, and a scheduled GitHub workflow runs `npm audit --omit=dev` plus `npm audit signatures --omit=dev`.
-- Install lock generation has an explicit allowlist for dependency lifecycle scripts; new lifecycle-script deps fail checks until reviewed.
-
-## Share your OSS coding agent sessions
-
-If you use Pi or other coding agents for open source work, please share your sessions.
-
-Public OSS session data helps improve coding agents with real-world tasks, tool use, failures, and fixes instead of toy benchmarks.
-
-For the full explanation, see [this post on X](https://x.com/badlogicgames/status/2037811643774652911).
-
-To publish sessions, use [`badlogic/pi-share-hf`](https://github.com/badlogic/pi-share-hf). Read its README.md for setup instructions. All you need is a Hugging Face account, the Hugging Face CLI, and `pi-share-hf`.
-
-You can also watch [this video](https://x.com/badlogicgames/status/2041151967695634619), where I show how I publish my `pi-mono` sessions.
-
-I regularly publish my own `pi-mono` work sessions here:
-
-- [badlogicgames/pi-mono on Hugging Face](https://huggingface.co/datasets/badlogicgames/pi-mono)
+The development machine is Linux x64, where the Linux setup commands were run; the macOS and Windows commands follow each shell's syntax, and the Windows `setx` and cmd forms have not been run on a real machine.
 
 ## License
 
-MIT
-
-<p align="center">
-  <a href="https://pi.dev">pi.dev</a> domain graciously donated by
-  <br /><br />
-  <a href="https://exe.dev"><img src="packages/coding-agent/docs/images/exy.png" alt="Exy mascot" width="48" /><br />exe.dev</a>
-</p>
+MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The `THIRD_PARTY/` folder of each package holds the licenses of fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate and the Unicode data.

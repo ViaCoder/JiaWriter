@@ -257,4 +257,8 @@ export const en: Record<MessageKey, string> = {
 		"Interface language set to English. Command descriptions and hints change now; built-in skills switch after /reload.",
 	"lang.envWins": "WA_LANG={value} is set and takes precedence over /lang.",
 	"lang.bad": "Languages: zh, en.",
+	// /sf.
+	"sf.cmdUsage": "Usage: /sf status shows whether the Chrome extension is connected; /sf install sets up the bridge.",
+	"sf.installNext":
+		"Next: open chrome://extensions in Chrome, turn on Developer mode, click Load unpacked and choose the extension folder above; keep Chrome open and run /sf status until connected is true. The first sf run downloads about 1 GB of dependencies and takes a few minutes.",
 };

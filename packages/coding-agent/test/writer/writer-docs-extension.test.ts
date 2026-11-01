@@ -16,6 +16,9 @@ import writerDocsExtension, { findSfOcr, parseExportArgs } from "../../src/exten
 // Fixtures.
 import { makePdf } from "./doc-fixtures.ts";
 
+// sf has no Windows build and these cases run fake sf shell scripts: Linux and macOS only.
+const UNIX_ONLY = process.platform === "win32";
+
 // Working folder.
 let cwd = "";
 beforeEach(() => {
@@ -59,7 +62,7 @@ function text(r: { content: { type: string; text?: string }[] }): string {
 }
 
 describe("findSfOcr / parseExportArgs", () => {
-	it("finds sf only where it exists, and parses /export arguments", () => {
+	it.skipIf(UNIX_ONLY)("finds sf only where it exists", () => {
 		// No sf anywhere.
 		expect(findSfOcr({ HOME: cwd, WA_SF: join(cwd, "none") })).toBeUndefined();
 		// A WA_SF that exists.
@@ -70,6 +73,8 @@ describe("findSfOcr / parseExportArgs", () => {
 			bin: sf,
 			timeoutMs: 60_000,
 		});
+	});
+	it("parses /export-doc arguments", () => {
 		// Arguments.
 		expect(parseExportArgs(" 稿件.md md --profile=apa --out=x/y.md extra ")).toEqual({
 			path: "稿件.md",

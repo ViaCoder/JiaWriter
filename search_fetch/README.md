@@ -78,6 +78,13 @@ $PY sf.py selftest            # 各引擎 SERP 契约自检
 $PY sf.py tasks wait --json   # 后台 OCR/ASR 汇合
 ```
 
+## 发布包里的 sf
+
+- WriterAgent 的 Linux 和 macOS 发布包带有 `search_fetch/<os>/<arch>/sf`（PyApp 单文件，内嵌本包 wheel 和 CPython 3.12），`WA_SEARCH=sf` 时不设 `WA_SF` 也能找到；Windows 没有 sf。
+- WriterAgent 运行 sf 时，把它的全部状态放在 `~/.writeragent/agent/sf/`：`runtime/`（PyApp 的 Python 和依赖）、`pip-cache/`、`home/`（扩展副本、桥接 socket、节流记录）。第一次运行会从 PyPI 安装依赖，约 1.1 GB，需要两三分钟。
+- 在 WriterAgent 里运行 `/sf install` 安装扩展桥接（使用和工具相同的状态目录），按提示在 Chrome 加载扩展后，用 `/sf status` 确认 `connected` 为 true。
+- 打包：`bash build_binary.sh [--out <目录>]` 在本机原生构建，产物为 `<目录>/<os>/<arch>/sf`。PyApp 固定为 v0.31.0 源码（校验 SHA256），用 `pyapp/Cargo.toml` 与 `pyapp/Cargo.lock` 替换上游的依赖清单：zip 升到 9、zstd 升到 0.14，bytes、quinn-proto、rustls、tar、time 升到修复版本，`cargo audit` 为 0 个漏洞（2026-11-01）。
+
 ## 产物（`./.search_fetchres/`）
 
 - `search-*.md` / `search-*.ops.jsonl`：各引擎 SERP markdown / 每步动作与耗时。

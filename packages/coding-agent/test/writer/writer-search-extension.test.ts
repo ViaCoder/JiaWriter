@@ -2,7 +2,7 @@
 // both tools end to end over a fake sf script and a fake AnySearch fetch. No network.
 
 // Temp files.
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
@@ -18,11 +18,15 @@ import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
 // Main-model state store.
 import { setWriterModel, type WriterModelState } from "../../src/writer/writer-model.ts";
 
+// sf has no Windows build and these cases run fake sf shell scripts: Linux and macOS only.
+const UNIX_ONLY = process.platform === "win32";
+
 // Working directory of each test (also holds the fake sf and its log).
 let cwd = "";
 // Fresh directory, Chinese output, a ready main model.
 beforeEach(() => {
-	cwd = mkdtempSync(join(tmpdir(), "wa-search-"));
+	// Real path: macOS temp folders are symlinks (/var → /private/var), and sf reports the real cwd.
+	cwd = realpathSync(mkdtempSync(join(tmpdir(), "wa-search-")));
 	vi.stubEnv("WA_LANG", "zh");
 	vi.stubEnv("WA_KEY", "sk-main-test-1");
 	for (const k of ["WA_SEARCH", "WA_SF", "WA_SEARCH_KEY", "WA_SEARCH_BLOCK", "SF_URL", "SF_KEY", "SF_MODEL", "SF_API"])
@@ -54,7 +58,10 @@ const fs = require("node:fs");
 const e = process.env;
 fs.appendFileSync(${JSON.stringify(join(cwd, "sf-log.jsonl"))}, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd(),
   url: e.SF_URL, model: e.SF_MODEL, api: e.SF_API, key: e.SF_KEY ? "set" : "", noHuman: e.SEARCH_FETCH_NO_HUMAN || "" }) + "\\n");
-if (process.argv[2] === "search") console.log(JSON.stringify({ query: "q", blocks: [{ results: [
+if (process.argv[2] === "bridge") {
+  if (process.argv[3] === "install") console.log("extension folder: /x/extension");
+  else { console.log(JSON.stringify({ connected: false })); process.exit(1); }
+} else if (process.argv[2] === "search") console.log(JSON.stringify({ query: "q", blocks: [{ results: [
   { u: "https://news.example.com/a", t: "温州 2026-10-31 消息" }, { u: "https://news.example.com/a#x", t: "dup" }] }] }));
 else console.log(JSON.stringify({ final_url: "https://news.example.com/a", markdown: "（发布时间：2026-10-31）\\n正文内容" }));
 `,
@@ -67,9 +74,26 @@ else console.log(JSON.stringify({ final_url: "https://news.example.com/a", markd
 function tools(): Map<string, ToolDefinition> {
 	// Collected tools.
 	const map = new Map<string, ToolDefinition>();
-	// Fake API with only registerTool.
-	writerSearchExtension({ registerTool: (t: ToolDefinition) => map.set(t.name, t) } as unknown as ExtensionAPI);
+	// Fake API with registerTool (commands are ignored here).
+	writerSearchExtension({
+		registerTool: (t: ToolDefinition) => map.set(t.name, t),
+		registerCommand: () => undefined,
+	} as unknown as ExtensionAPI);
 	return map;
+}
+
+/** The /sf command of a fresh extension instance. */
+function sfCommand(): (args: string, ctx: unknown) => Promise<void> {
+	// Collected command handlers.
+	const cmds = new Map<string, (args: string, ctx: unknown) => Promise<void>>();
+	writerSearchExtension({
+		registerTool: () => undefined,
+		registerCommand: (name: string, o: { handler: (args: string, ctx: unknown) => Promise<void> }) =>
+			cmds.set(name, o.handler),
+	} as unknown as ExtensionAPI);
+	const h = cmds.get("sf");
+	if (!h) throw new Error("missing /sf");
+	return h;
 }
 
 /** Run one tool; hasUI chooses interactive or print mode. */
@@ -94,7 +118,7 @@ function sfLog(): Record<string, unknown>[] {
 		.map((l) => JSON.parse(l));
 }
 
-describe("writer-search over sf", () => {
+describe.skipIf(UNIX_ONLY)("writer-search over sf", () => {
 	it("searches and fetches through sf without a driver model, even with a ready main model", async () => {
 		// sf backend with the fake binary.
 		vi.stubEnv("WA_SEARCH", "sf");
@@ -135,6 +159,34 @@ describe("writer-search over sf", () => {
 		await run(tools(), "web_search", { query: "q" });
 		// sf saw all four cleared.
 		expect(sfLog()[0]).toMatchObject({ url: "", key: "", model: "", api: "" });
+	});
+});
+
+describe.skipIf(UNIX_ONLY)("/sf", () => {
+	it("runs sf bridge status or install with the tools' environment and refuses other arguments", async () => {
+		// The fake sf as WA_SF.
+		vi.stubEnv("WA_SF", fakeSf());
+		vi.stubEnv("WA_DIR", join(cwd, "agent"));
+		const notes: { text: string; type: string }[] = [];
+		const ctx = { cwd, ui: { notify: (text: string, type: string) => notes.push({ text, type }) } };
+		// Status (default), install, a bad argument.
+		await sfCommand()("", ctx);
+		await sfCommand()("install", ctx);
+		await sfCommand()("rm -rf", ctx);
+		expect(notes[0]).toEqual({ text: '{"connected":false}', type: "warning" });
+		expect(
+			notes[1].text.startsWith("extension folder: /x/extension\n\n下一步：在 Chrome 打开 chrome://extensions"),
+		).toBe(true);
+		expect(notes[2]).toEqual({
+			text: "用法：/sf status 查看 Chrome 扩展是否连接，/sf install 安装扩展桥接。",
+			type: "error",
+		});
+		// sf got the bridge arguments, no model and no human waits.
+		expect(sfLog().map((l) => l.argv)).toEqual([
+			["bridge", "status"],
+			["bridge", "install"],
+		]);
+		expect(sfLog().every((l) => l.key === "" && l.noHuman === "1")).toBe(true);
 	});
 });
 

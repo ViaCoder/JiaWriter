@@ -88,10 +88,24 @@ export function sfModelOff(): Record<string, string> {
 	return { SF_URL: "", SF_KEY: "", SF_MODEL: "", SF_API: "" };
 }
 
-/** Environment of the sf child: the parent's without a driver model, and no human waits when nobody watches. */
-export function sfChildEnv(base: NodeJS.ProcessEnv, interactive: boolean): NodeJS.ProcessEnv {
-	// Copy with the model variables cleared.
-	const env: NodeJS.ProcessEnv = { ...base, ...sfModelOff() };
+/** Where a release sf keeps its state, all under <agentDir>/sf: PyApp's Python and packages, its download
+ * cache, pip's cache, and search_fetch's own state (bridge, pacing, extension copy). */
+export function sfStateEnv(agentDir: string): Record<string, string> {
+	// One folder for everything sf writes.
+	const root = join(agentDir, "sf");
+	return {
+		PYAPP_INSTALL_DIR_SEARCH_FETCH: join(root, "runtime", "install"),
+		PYAPP_CACHE_DIR: join(root, "runtime", "cache"),
+		PIP_CACHE_DIR: join(root, "pip-cache"),
+		SEARCH_FETCH_HOME: join(root, "home"),
+	};
+}
+
+/** Environment of the sf child: state under agentDir unless the parent sets it, no driver model, and
+ * no human waits when nobody watches. */
+export function sfChildEnv(base: NodeJS.ProcessEnv, interactive: boolean, agentDir: string): NodeJS.ProcessEnv {
+	// State folders first (the parent's values win), then the model variables cleared.
+	const env: NodeJS.ProcessEnv = { ...sfStateEnv(agentDir), ...base, ...sfModelOff() };
 	// Print mode: a captcha must not wait for a person.
 	if (!interactive) env.SEARCH_FETCH_NO_HUMAN = "1";
 	// The environment.
