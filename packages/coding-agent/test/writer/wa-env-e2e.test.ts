@@ -355,6 +355,9 @@ describe("WA_* end to end", () => {
 		expect(JSON.stringify(realRequest()?.body.system)).toContain(
 			"expert writing assistant operating inside WriterAgent",
 		);
+		// The built-in Chinese writing skills are offered (WA_LANG unset: zh).
+		expect(JSON.stringify(realRequest()?.body.system)).toContain("<name>report-analysis</name>");
+		expect(JSON.stringify(realRequest()?.body.system)).toContain("写调研报告、情况分析、对策建议和工作总结");
 		// The default writing tools, the three checks, web search, import and export are offered, bash is not.
 		expect(((realRequest()?.body.tools as { name: string }[]) ?? []).map((t) => t.name).sort()).toEqual([
 			"edit",

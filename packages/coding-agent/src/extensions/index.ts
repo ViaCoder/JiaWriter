@@ -9,6 +9,8 @@ import writerDocsExtension from "./writer-docs/index.ts";
 import writerEnvExtension from "./writer-env/index.ts";
 // WriterAgent: web_search and web_fetch (AnySearch or search_fetch in the user's Chrome).
 import writerSearchExtension from "./writer-search/index.ts";
+// WriterAgent: built-in writing skills, /skills and /skill-new.
+import writerSkillsExtension from "./writer-skills/index.ts";
 // WriterAgent: read-only writing checks (style_check, word_count, readability_check).
 import writerToolsExtension from "./writer-tools/index.ts";
 
@@ -21,6 +23,8 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-search", factory: writerSearchExtension, builtin: true },
 	// WriterAgent: reference import and draft export.
 	{ name: "writer-docs", factory: writerDocsExtension, builtin: true },
+	// WriterAgent: writing skills.
+	{ name: "writer-skills", factory: writerSkillsExtension, builtin: true },
 	{ name: "llama.cpp", factory: llamaExtension, builtin: true },
 	// Replaceable: an extension that registers `codemode`, `tool_search`, or `/mcp` (such as a third-party
 	// MCP extension) takes over instead of running alongside the built-in one.

@@ -1,0 +1,38 @@
+---
+name: report-analysis
+description: Write research reports, situation analyses, recommendations and work summaries. Use when the user asks for a report, an analysis, recommendations or a summary.
+metadata:
+  title: Report and analysis
+  style_packs: core-en
+  negation_threshold: 2
+---
+
+# Report and analysis
+
+## Before writing
+
+- Confirm the readers (management, a supervising body, the team), the purpose and the length.
+- Import all reference files, list the questions the report must answer, and find evidence for each in the files and search results.
+
+## Structure
+
+- The title names the subject and the topic.
+- A common structure: background, main findings, causes, recommendations. Each finding has a matching recommendation.
+- Each section opens with its conclusion, followed by data and examples.
+
+## Content
+
+- Give every figure with its definition, period and source, for example "according to the city statistics bureau, September 2026".
+- Describe each problem by its concrete effects and scope; trace causes to a level where action is possible.
+- Each recommendation states what, who and by when, with target values where they can be measured.
+- Take cases only from the reference files or search results, with date and source.
+
+## Style
+
+- Use plain, precise prose, complete sentences, one point per sentence.
+- Show degree with data and facts rather than adjectives and adverbs.
+
+## Final checks
+
+- Run style_check, rewrite the flagged sentences, and check again.
+- Export a .docx with export_document.

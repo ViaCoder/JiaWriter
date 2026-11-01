@@ -158,6 +158,63 @@ export const zh = {
 	"export.unpaired": "- 引号未配对：{start}……",
 	// 待核实 marks.
 	"export.pending": "稿件中有 {count} 处“待核实”，成稿里应删去或补上来源。",
+	// Skills list heading.
+	"skills.title": "写作 skill（{count} 个）：方向键选择，回车确认，Esc 返回",
+	// New skill entry.
+	"skills.new": "＋ 新建 skill",
+	// Bulk on.
+	"skills.enableAll": "全部启用",
+	// Bulk off.
+	"skills.disableAll": "全部停用",
+	// One list line.
+	"skills.item": "{mark} {title}（{name}，{origin}）",
+	// Built-in origin.
+	"skills.builtin": "内置",
+	// User origin.
+	"skills.user": "我的",
+	// Action menu heading.
+	"skills.actions": "{title}：选择操作",
+	// Actions.
+	"skills.enable": "启用",
+	"skills.disable": "停用",
+	"skills.edit": "编辑",
+	"skills.updateFromSession": "用当前会话更新",
+	"skills.delete": "删除（先备份）",
+	"skills.stateOn": "启用",
+	"skills.stateOff": "停用",
+	"skills.back": "返回",
+	// Results.
+	"skills.toggled": "{name} 已{state}。运行 /reload 生效。",
+	"skills.toggledAll": "{count} 个 skill 已{state}。运行 /reload 生效。",
+	"skills.saved": "已保存：{path}{backup}。运行 /reload 生效。",
+	"skills.backupNote": "（原文件已备份到 {backup}）",
+	"skills.deleted": "已删除 {name}，备份在 {backup}。运行 /reload 生效。",
+	"skills.builtinOff": "内置 skill 保留在程序中，已改为停用：{name}。",
+	"skills.unchanged": "内容没有变化，未保存。",
+	"skills.noRequests": "当前会话里没有可以整理的用户要求。",
+	// Dialogs.
+	"skills.confirmDelete": "删除 skill {name}？",
+	"skills.confirmDeleteBody": "删除前会把整个文件夹备份到 skills-backup/。",
+	"skills.confirmWrite": "写入 {path}？",
+	"skills.diffTitle": "用当前会话更新 {name}，确认写入以下改动？",
+	"skills.editTitle": "编辑 {name}（保存后写入，原文件先备份）",
+	"skills.newTitle": "新建 skill：选择方式",
+	"skills.newFromSession": "从当前会话生成",
+	"skills.newBlank": "空白模板",
+	"skills.newGuided": "由模型按 skill-creator 引导编写",
+	"skills.askName": "skill 名称（小写字母、数字和连字符，例如 my-report）",
+	"skills.badName":
+		"名称「{name}」不符合规则：只用小写字母、数字和连字符，最长 64 个字符，首尾各是字母或数字，连字符单个出现。",
+	"skills.askTitle": "标题（例如 调研报告）",
+	"skills.askDescription": "用途：这个 skill 做什么、什么时候使用",
+	"skills.askLang": "skill 语言",
+	"skills.langZh": "中文",
+	"skills.langEn": "English",
+	"skills.guided": "/skill:skill-creator 请新建一个写作 skill：{description}",
+	"skills.dropped": "（同一主题以最后一次为准，已略去 {count} 条较早的要求）",
+	// Blank body.
+	"skills.blankBody":
+		"## 动笔之前\n\n- \n\n## 结构\n\n- \n\n## 文风\n\n- \n\n## 收尾检查\n\n- 完稿后运行 style_check。",
 };
 
 /** Message keys shared by all languages. */

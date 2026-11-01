@@ -120,7 +120,7 @@ describe("import_document and export_document", () => {
 	});
 });
 
-describe("/import, /export and the startup scan", () => {
+describe("/import-doc, /export-doc and the startup scan", () => {
 	it("runs both commands, reports errors as notes, and imports new references at startup only", async () => {
 		// Files.
 		mkdirSync(join(cwd, "参考资料"));
@@ -129,9 +129,9 @@ describe("/import, /export and the startup scan", () => {
 		const { commands, handlers } = load();
 		const notes: string[] = [];
 		// /import and /export.
-		await commands.get("import")?.handler("", ctx(notes));
-		await commands.get("export")?.handler("d.md md", ctx(notes));
-		await commands.get("export")?.handler("", ctx(notes));
+		await commands.get("import-doc")?.handler("", ctx(notes));
+		await commands.get("export-doc")?.handler("d.md md", ctx(notes));
+		await commands.get("export-doc")?.handler("", ctx(notes));
 		expect(notes[0].startsWith("参考资料导入：1 个文件")).toBe(true);
 		expect(notes[1].startsWith(`已导出：d.export.md（md`)).toBe(true);
 		expect(readFileSync(join(cwd, "d.export.md"), "utf-8")).toBe("# 题\n\n文字。\n");

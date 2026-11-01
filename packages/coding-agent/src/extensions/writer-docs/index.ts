@@ -1,9 +1,9 @@
 /**
  * Built-in WriterAgent extension: reference import and draft export.
- * - import_document / /import: PDF, Word, HTML and text → Markdown with page markers in 参考资料/.parsed/.
+ * - import_document / /import-doc: PDF, Word, HTML and text → Markdown with page markers in 参考资料/.parsed/.
  *   The reference folder is also scanned once in the background when a session starts (without OCR,
  *   which uploads page images; explicit imports use sf's OCR when sf is available).
- * - export_document / /export: Markdown draft → .docx with an export profile (default-zh) or Markdown,
+ * - export_document / /export-doc: Markdown draft → .docx with an export profile (default-zh) or Markdown,
  *   after the Chinese punctuation pass, with a check of the written file.
  */
 
@@ -41,7 +41,7 @@ export function findSfOcr(env: NodeJS.ProcessEnv): SfOcr | undefined {
 	}
 }
 
-/** Arguments of /export: [path] [md|docx] [--profile=name] [--out=path]. */
+/** Arguments of /export-doc: [path] [md|docx] [--profile=name] [--out=path]. */
 export function parseExportArgs(args: string): {
 	path: string;
 	format?: "docx" | "md";
@@ -147,8 +147,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	// /import [file].
-	pi.registerCommand("import", {
+	// /import-doc [file] (/import is the upstream session import).
+	pi.registerCommand("import-doc", {
 		description: "Import reference files (参考资料/ or one file) as Markdown with page markers",
 		handler: async (args, ctx) => {
 			// Import and show the report.
@@ -160,9 +160,9 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	// /export <draft.md> [md|docx] [--profile=name] [--out=path].
-	pi.registerCommand("export", {
-		description: "Export a Markdown draft: /export <draft.md> [md|docx] [--profile=name] [--out=path]",
+	// /export-doc <draft.md> [md|docx] [--profile=name] [--out=path] (/export is the upstream session export).
+	pi.registerCommand("export-doc", {
+		description: "Export a Markdown draft: /export-doc <draft.md> [md|docx] [--profile=name] [--out=path]",
 		handler: async (args, ctx) => {
 			// Parse, export, show the report.
 			try {

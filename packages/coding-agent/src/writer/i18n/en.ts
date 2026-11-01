@@ -173,4 +173,61 @@ export const en: Record<MessageKey, string> = {
 	"export.unpaired": "- Unpaired quote: {start}…",
 	// 待核实 marks.
 	"export.pending": 'The draft has {count} "待核实" mark(s); remove them or add the source in the finished draft.',
+	// Skills list heading.
+	"skills.title": "Writing skills ({count}): arrows to choose, Enter to confirm, Esc to go back",
+	// New skill entry.
+	"skills.new": "+ New skill",
+	// Bulk on.
+	"skills.enableAll": "Turn all on",
+	// Bulk off.
+	"skills.disableAll": "Turn all off",
+	// One list line.
+	"skills.item": "{mark} {title} ({name}, {origin})",
+	// Built-in origin.
+	"skills.builtin": "built-in",
+	// User origin.
+	"skills.user": "mine",
+	// Action menu heading.
+	"skills.actions": "{title}: choose an action",
+	// Actions.
+	"skills.enable": "Turn on",
+	"skills.disable": "Turn off",
+	"skills.edit": "Edit",
+	"skills.updateFromSession": "Update from this session",
+	"skills.delete": "Delete (backed up first)",
+	"skills.stateOn": "on",
+	"skills.stateOff": "off",
+	"skills.back": "Back",
+	// Results.
+	"skills.toggled": "{name} turned {state}. Run /reload to apply.",
+	"skills.toggledAll": "{count} skill(s) turned {state}. Run /reload to apply.",
+	"skills.saved": "Saved: {path}{backup}. Run /reload to apply.",
+	"skills.backupNote": " (previous file backed up to {backup})",
+	"skills.deleted": "Deleted {name}; backup at {backup}. Run /reload to apply.",
+	"skills.builtinOff": "Built-in skills stay installed; {name} is turned off instead.",
+	"skills.unchanged": "Nothing changed; not saved.",
+	"skills.noRequests": "This session has no user requests to collect.",
+	// Dialogs.
+	"skills.confirmDelete": "Delete skill {name}?",
+	"skills.confirmDeleteBody": "The whole folder is copied to skills-backup/ first.",
+	"skills.confirmWrite": "Write {path}?",
+	"skills.diffTitle": "Update {name} from this session with these changes?",
+	"skills.editTitle": "Edit {name} (saving writes it after a backup)",
+	"skills.newTitle": "New skill: choose how",
+	"skills.newFromSession": "From this session",
+	"skills.newBlank": "Blank template",
+	"skills.newGuided": "Written by the model with skill-creator",
+	"skills.askName": "Skill name (lowercase letters, digits and hyphens, e.g. my-report)",
+	"skills.badName":
+		'The name "{name}" breaks the rules: lowercase letters, digits and single hyphens, at most 64 characters, starting and ending with a letter or digit.',
+	"skills.askTitle": "Title (e.g. Research report)",
+	"skills.askDescription": "Purpose: what the skill does and when to use it",
+	"skills.askLang": "Skill language",
+	"skills.langZh": "中文",
+	"skills.langEn": "English",
+	"skills.guided": "/skill:skill-creator Create a writing skill: {description}",
+	"skills.dropped": " ({count} earlier request(s) left out: the latest request on a topic is kept)",
+	// Blank body.
+	"skills.blankBody":
+		"## Before writing\n\n- \n\n## Structure\n\n- \n\n## Style\n\n- \n\n## Final checks\n\n- Run style_check on the finished draft.",
 };

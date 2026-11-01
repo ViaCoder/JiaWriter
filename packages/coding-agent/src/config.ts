@@ -435,6 +435,18 @@ export function getExportTemplateDir(): string {
 	return join(packageDir, srcOrDist, "core", "export-html");
 }
 
+/**
+ * WriterAgent: built-in writing skills (one folder per language: zh/, en/).
+ * - For Bun binary: writer-skills/ next to executable
+ * - For Node.js and source: skills/writer/ in the package
+ */
+export function getWriterSkillsDir(): string {
+	if (isBunBinary) {
+		return join(getPackageDir(), "writer-skills");
+	}
+	return join(getPackageDir(), "skills", "writer");
+}
+
 /** Get path to package.json */
 export function getPackageJsonPath(): string {
 	return join(getPackageDir(), "package.json");
