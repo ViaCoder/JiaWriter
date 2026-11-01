@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Test Article — Local Fixture</title>
+  <meta name="description" content="A benign local article fixture for search_fetch tests.">
+  <meta property="article:published_time" content="2026-06-17">
+</head>
+<body>
+  <nav><a href="/">Home</a> <a href="/about">About</a></nav>
+  <main>
+    <h1>SearchFetch Fixture Article</h1>
+    <p>This is a benign local fixture page used to verify that web_fetch renders a
+    normal content page to clean markdown quickly, with no local-LLM call on the
+    fast path. It contains several paragraphs of real text so that the pruning and
+    BM25 filters have meaningful content to work on.</p>
+    <h2>Section One</h2>
+    <p>The quick brown fox jumps over the lazy dog. Pangrams are sentences that use
+    every letter of the alphabet at least once and make a good filler for testing
+    text extraction and markdown conversion pipelines.</p>
+    <h2>Section Two: Pricing and Launch</h2>
+    <p>The product launches in June 2026 and is priced at 42 credits per month.
+    This sentence exists so a BM25 query like "pricing and launch date" has an
+    obvious relevant chunk to rank highly.</p>
+    <footer>© 2026 Fixture Co. All rights reserved. Cookie policy. Privacy.</footer>
+  </main>
+</body>
+</html>

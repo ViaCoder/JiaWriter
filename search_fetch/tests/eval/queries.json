@@ -1,0 +1,22 @@
+[
+  {"id": "zh-news-1", "group": "中文新闻", "query": "国务院常务会议 最新"},
+  {"id": "zh-news-2", "group": "中文新闻", "query": "中国人民银行 货币政策 最新消息"},
+  {"id": "zh-news-3", "group": "中文新闻", "query": "神舟飞船 发射 最新"},
+  {"id": "zh-news-4", "group": "中文新闻", "query": "全国铁路 旅客发送量"},
+  {"id": "zh-news-5", "group": "中文新闻", "query": "教育部 新闻发布会"},
+  {"id": "intl-1", "group": "国际新闻", "query": "Reuters world news", "fresh": "day"},
+  {"id": "intl-2", "group": "国际新闻", "query": "BBC news Ukraine", "fresh": "day"},
+  {"id": "intl-3", "group": "国际新闻", "query": "AP news Middle East", "fresh": "day"},
+  {"id": "intl-4", "group": "国际新闻", "query": "Federal Reserve interest rates", "fresh": "day"},
+  {"id": "intl-5", "group": "国际新闻", "query": "European Union summit news", "fresh": "day"},
+  {"id": "event-1", "group": "具体事件", "query": "2024年巴黎奥运会 闭幕式"},
+  {"id": "event-2", "group": "具体事件", "query": "2025年政府工作报告 全文"},
+  {"id": "event-3", "group": "具体事件", "query": "COP29 Baku climate finance agreement"},
+  {"id": "event-4", "group": "具体事件", "query": "SpaceX Starship flight test results"},
+  {"id": "event-5", "group": "具体事件", "query": "2020年 长江流域 洪水"},
+  {"id": "pro-1", "group": "专业资料", "query": "通用规范汉字表 一级字表"},
+  {"id": "pro-2", "group": "专业资料", "query": "GB/T 9704-2012 党政机关公文格式"},
+  {"id": "pro-3", "group": "专业资料", "query": "Attention Is All You Need paper"},
+  {"id": "pro-4", "group": "专业资料", "query": "WHO global tuberculosis report"},
+  {"id": "pro-5", "group": "专业资料", "query": "城市更新 政策 研究报告 pdf"}
+]

@@ -5,6 +5,8 @@ import mcpExtension from "./mcp/index.ts";
 import toolSearchExtension from "./tool-search/index.ts";
 // WriterAgent: the "wa" provider from WA_* environment variables.
 import writerEnvExtension from "./writer-env/index.ts";
+// WriterAgent: web_search and web_fetch (AnySearch or WriterSuite's search_fetch).
+import writerSearchExtension from "./writer-search/index.ts";
 // WriterAgent: read-only writing checks (style_check, word_count, readability_check).
 import writerToolsExtension from "./writer-tools/index.ts";
 
@@ -13,6 +15,8 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-env", factory: writerEnvExtension, builtin: true },
 	// WriterAgent: the writing checks.
 	{ name: "writer-tools", factory: writerToolsExtension, builtin: true },
+	// WriterAgent: web search.
+	{ name: "writer-search", factory: writerSearchExtension, builtin: true },
 	{ name: "llama.cpp", factory: llamaExtension, builtin: true },
 	// Replaceable: an extension that registers `codemode`, `tool_search`, or `/mcp` (such as a third-party
 	// MCP extension) takes over instead of running alongside the built-in one.

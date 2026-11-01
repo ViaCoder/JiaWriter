@@ -1,0 +1,45 @@
+# search_fetch — WriterAgent's subprocess search/fetch backend, packaged as a wheel so a
+# release can embed it in a PyApp binary (search_fetch/<os>/<arch>/sf).
+# Dependency pins are THE validated set (single source of truth — setup.sh and
+# release install used to duplicate this list; they now read the same wheel).
+# kb.py's direct imports (numpy / requests / tiktoken) are pinned explicitly, not
+# left to arrive transitively via crawl4ai.
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "search-fetch"
+version = "1.1.0"
+description = "WriterAgent search backend: search/fetch through the user's own Chrome (extension bridge), docparse, media, background tasks, vector KB"
+requires-python = ">=3.10"
+dependencies = [
+    "crawl4ai==0.9.0",
+    "pypdf==6.14.2",
+    "openpyxl==3.1.5",
+    "markitdown[pptx,docx,xlsx]==0.1.6",
+    "gradio_client==2.5.0",
+    "yt-dlp==2026.6.9",
+    "numpy==2.5.0",
+    "requests==2.34.2",
+    "tiktoken==0.13.0",
+]
+
+[project.scripts]
+sf = "search_fetch.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# The Chrome extension ships inside the package; `sf bridge install` copies it to <HOME>/extension.
+[tool.setuptools.package-data]
+search_fetch = ["extension/*.json", "extension/*.js", "extension/ops/*.js"]
+
+# Lint: pyflakes + pycodestyle errors, bugbear, import order and pyupgrade.
+# Broad `except` in best-effort paths is deliberate (each one is commented), so BLE/S rules are not selected.
+[tool.ruff]
+line-length = 130
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "B", "I", "UP"]

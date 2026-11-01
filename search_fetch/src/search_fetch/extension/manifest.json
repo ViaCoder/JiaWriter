@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "search_fetch bridge",
+  "description": "Opens pages for WriterAgent's search_fetch in a dedicated window of this Chrome and returns their content to the local sf process.",
+  "version": "1.0.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA5mJhNCF/RAqCb6da3mzAvq2TWc0T5Vez3zg1NzgrLdoN3XDyvSRo6NGUvsHBjqu5+7kS/PSqrx8ZYoTuNKj+Ah1ABctrwMrEN0FjcB63bZ1a54Rr/FgbJP3/IcrVbl5Ml1kubAxQAFCEKsKwxjduOtXLfWQOm9y5Cg5lfg6VKh2NSAEKX00KxSc7/qiTqvf+R3u0sagfUIANQi8ReR9H6TL7Na/AX5qvRC72QlK8jhQrhNTKkRZ9LdJUotAn1sefy9usfRMbxK3n4wa+FePkDsKQ5Xn22FgbybuLduRSncEauNdnGpxkWH8uPko0i0ipKOwHYCT9KfL0sXHoOnGXhQIDAQAB",
+  "minimum_chrome_version": "116",
+  "permissions": [
+    "nativeMessaging",
+    "tabs",
+    "scripting",
+    "alarms",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

@@ -1,0 +1,18 @@
+# secrets — never commit the local operation-AI config
+rag.env
+
+# runtime artifacts
+# home/ = $SEARCH_FETCH_HOME (venv, extension copy, bridge socket, pacing slots, caches; all inside the repo)
+home/
+tests/tmp/
+.search_fetchres/
+__pycache__/
+*.pyc
+
+# macOS
+.DS_Store
+
+# packaging artifacts (pip wheel)
+dist/
+build/
+*.egg-info/

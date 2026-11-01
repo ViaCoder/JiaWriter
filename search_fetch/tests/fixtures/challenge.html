@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Just a moment...</title>
+</head>
+<body>
+  <h1>Verifying you are human. This may take a few seconds.</h1>
+  <p>needs to review the security of your connection before proceeding.</p>
+  <!-- A bot-challenge marker the deterministic pre-check + page_state classifier detect
+       (iframe[src*="turnstile"]); LOCAL src so the suite never contacts a real site -->
+  <iframe src="/turnstile/v0/test" title="Widget containing a Cloudflare security challenge"></iframe>
+</body>
+</html>
