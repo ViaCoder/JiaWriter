@@ -114,7 +114,7 @@ WriterAgent 不做文字识别（OCR）：没有文字层的扫描件会列在�
   - 同一引擎两次检索至少间隔 20 秒，同一网站两次访问至少间隔 6 秒，都另加随机抖动；不打开内网和本机地址。遇到人机验证时，交互模式下 Chrome 窗口会跳到前台，等你完成（最多 90 秒）。
   - 第一次使用前在 Chrome 加载扩展：打开 `chrome://extensions`，打开“开发者模式”，点“加载未打包的扩展程序”，选择包里的 `chrome-extension` 文件夹。用 `/browser` 确认已连接。
 - `anysearch`：调用 AnySearch API，不设 key 时匿名调用。
-- `sf`：search_fetch，网页同样经这个扩展打开。它读取文档的文字层、视频的元数据和字幕，不做文字识别，也不做语音转写。6 个发布包都自带 sf（Windows 上是 `sf.exe`，经回环端口加令牌连接本机通信程序）。Windows ARM 版的包带的是 x64 版 sf，由 Windows 11 的 x64 仿真运行，因为 sf 的两个依赖（crawl4ai 需要的 lxml 5.x，以及 tiktoken）没有 Windows ARM 版。sf 第一次运行会安装依赖，约 1.1 GB，需要几分钟，全部放在 `~/.writeragent/agent/sf/`。
+- `sf`：search_fetch，网页同样经这个扩展打开。它读取文档的文字层、视频的元数据和字幕，不做文字识别，也不做语音转写。6 个发布包都自带 sf（Windows 上是 `sf.exe`，经回环端口加令牌连接本机通信程序）。sf 是一个自带全部依赖的单文件程序：Python 和它用到的包都已打包在里面。第一次运行只在本机把这份内容解开一次，放在 `~/.writeragent/agent/sf/`，不下载、不安装任何东西。
 
 ## 联网与隐私
 
@@ -128,6 +128,6 @@ WriterAgent 启动和空闲时不发任何网络请求，没有遥测、版本�
 
 ## 许可证
 
-MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包的 `THIRD_PARTY/` 目录包含 fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate、Readability、Unicode 数据和 lieflat-gongwen 的许可证。
+MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包的 `THIRD_PARTY/` 目录包含 fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate、Readability、Unicode 数据和 lieflat-gongwen 的许可证。摘录到 `search_fetch/src/search_fetch/vendor/crawl4ai/` 的 crawl4ai 部分，许可证放在仓库的这个目录里（crawl4ai 和 rank_bm25 为 Apache-2.0）。
 
-例外：`skills/writer/*/lieflat-gongwen/`、`src/writer/gongwen/` 和 `src/extensions/writer-gongwen/` 按 [PolyForm Noncommercial 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE) 提供，只限非商业用途。商业使用前要删除这三处，或者向原作者取得授权。
+例外：`skills/writer/*/lieflat-gongwen/`、`src/writer/gongwen/` 和 `src/extensions/writer-gongwen/` 按 [PolyForm Noncommercial 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE) 提供，只限非商业用途。商业使用前要删除这三处，或者向原作者取得授权。sf 里的 `search_fetch/src/search_fetch/vendor/crawl4ai/html2text/` 按 GPL-3.0 提供（见其中的 COPYING）。

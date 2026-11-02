@@ -61,7 +61,7 @@ esac
   || echo "    chrome: not found — install Google Chrome (search/fetch run in YOUR Chrome via the extension)"
 
 # ── 3. venv + packages (under $SEARCH_FETCH_HOME, inside the repo) ──────────
-#   crawl4ai  — rendered HTML → markdown (_raw + pruned/BM25 _fit).
+#   bs4 + lxml + snowballstemmer — crawl4ai's renderer and filters (copied into vendor/crawl4ai): HTML → markdown (_raw + pruned/BM25 _fit).
 step "Python venv + dependencies"
 # venv creation takes ONE path everywhere: `--without-pip` (never needs the system
 # ensurepip, which Debian/Ubuntu split into python3-venv) + get-pip.py bootstrap.
@@ -86,11 +86,10 @@ fi
 # Fast path: if the deps already import cleanly, skip the (slow) pip step entirely.
 # Force a reinstall with SEARCH_FETCH_REINSTALL=1.
 deps_ok(){ "$PYBIN" - <<'PYCHK' >/dev/null 2>&1
-from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator  # noqa
-from crawl4ai.content_filter_strategy import PruningContentFilter, BM25ContentFilter  # noqa
-import pypdf, openpyxl, markitdown  # noqa  (docparse parsing)
+import bs4, lxml, snowballstemmer, idna  # noqa  (vendor/crawl4ai renderer and filters, url_guard)
+import pypdf, openpyxl  # noqa  (docparse parsing)
 import yt_dlp  # noqa  (media: metadata + YouTube subtitles)
-import numpy, requests, tiktoken  # noqa  (kb.py: embeddings index + retrieval)
+import numpy, requests, tiktoken  # noqa  (kb.py, the "kb" extra: embeddings index + retrieval)
 PYCHK
 }
 if [ "${SEARCH_FETCH_REINSTALL:-0}" != "1" ] && deps_ok; then
@@ -101,11 +100,11 @@ else
   "$VENV/bin/pip" install -q --upgrade pip || true
   # --prefer-binary avoids slow source builds (lxml, pydantic-core, …); cache kept for re-runs.
   # Installing the package itself pulls the SAME pinned set the release wheel embeds.
-  if ! heartbeat "$VENV/bin/pip" install -q --prefer-binary "$DIR"; then
+  if ! heartbeat "$VENV/bin/pip" install -q --prefer-binary "$DIR[kb]"; then
     echo "✗ pip install failed (see output above). Common fix: ensure build tools / network access."
     exit 1
   fi
-  deps_ok && echo "    ✓ imports OK (crawl4ai, docparse/media/kb deps)" \
+  deps_ok && echo "    ✓ imports OK (renderer, docparse/media/kb deps)" \
           || { echo "✗ deps installed but import check failed."; exit 1; }
 fi
 

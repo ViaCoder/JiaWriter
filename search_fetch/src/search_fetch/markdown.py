@@ -10,17 +10,17 @@ from . import config
 # Shared stderr logger.
 from .config import _log
 
-# ── crawl4ai render → markdown ──────────────────────────────────────
+# ── crawl4ai's renderer (vendor/crawl4ai) → markdown ────────────────
 
 def _html_to_markdown(html: str, url: str, content_filter=None) -> dict:
     """Rendered HTML → {'raw': full md, 'fit': filtered md, 'url': url}. When no
     filter is given (None), 'fit' is the de-noised (pruned) page. Pass
     content_filter=False to render RAW ONLY (no fit pass) — used by filters.py to
     get the full-page raw without recomputing a fit it discards."""
-    # crawl4ai is imported lazily: the stdlib-only paths never load it.
-    # The default de-noising filter.
-    from crawl4ai.content_filter_strategy import PruningContentFilter
-    from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator
+    # Imported lazily: the stdlib-only paths never load bs4 and lxml.
+    # The default de-noising filter and the renderer (crawl4ai's code, copied into vendor/crawl4ai).
+    from .vendor.crawl4ai.content_filter import PruningContentFilter
+    from .vendor.crawl4ai.markdown_generator import DefaultMarkdownGenerator
     # No filter given: prune boilerplate for the 'fit' version.
     if content_filter is None:
         content_filter = PruningContentFilter(

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Direct unit tests for the docparse parsers and CLI — real files generated on the fly
 (text PDF, image PDF via Pillow, docx, xlsx, GBK CSV); there is no OCR.
-Needs the venv (pypdf, markitdown, openpyxl, Pillow). No network.
+Needs the venv (pypdf, openpyxl, Pillow). No network.
 Run: python3 tests/test_docparse_units.py
 """
 # Output capture.
@@ -45,6 +45,44 @@ def text_pdf(text: str) -> bytes:
     return bytes(out)
 
 
+W_NS = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+P_NS = ('xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" '
+        'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+        'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"')
+REL_NS = 'xmlns="http://schemas.openxmlformats.org/package/2006/relationships"'
+
+
+def zip_parts(parts: dict) -> bytes:
+    """A zip with the given part names and XML texts."""
+    # In-memory zip.
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for name, text in parts.items():
+            z.writestr(name, text)
+    return buf.getvalue()
+
+
+def word_doc(body: str, styles: str = "") -> bytes:
+    """A docx with this body XML and, optionally, these style elements."""
+    # document.xml and styles.xml only: all the reader looks at.
+    parts = {"word/document.xml": f'<?xml version="1.0"?><w:document {W_NS}><w:body>{body}</w:body></w:document>'}
+    if styles:
+        parts["word/styles.xml"] = f'<?xml version="1.0"?><w:styles {W_NS}>{styles}</w:styles>'
+    return zip_parts(parts)
+
+
+def slide(shapes: str) -> str:
+    """One slide XML with these shapes."""
+    return f'<?xml version="1.0"?><p:sld {P_NS}><p:cSld><p:spTree>{shapes}</p:spTree></p:cSld></p:sld>'
+
+
+def shape(text: str, ph: str = "") -> str:
+    """A text shape, optionally a placeholder of this type."""
+    nv = f'<p:nvSpPr><p:nvPr><p:ph type="{ph}"/></p:nvPr></p:nvSpPr>' if ph else "<p:nvSpPr><p:nvPr/></p:nvSpPr>"
+    paras = "".join(f"<a:p><a:r><a:t>{t}</a:t></a:r></a:p>" for t in text.split("|"))
+    return f"<p:sp>{nv}<p:txBody>{paras}</p:txBody></p:sp>"
+
+
 def docx_bytes(text: str) -> bytes:
     """A minimal docx with one paragraph."""
     # In-memory zip.
@@ -74,14 +112,11 @@ class DocparseUnitsTest(unittest.TestCase):
         self.patch.stop()
         shutil.rmtree(self.home, ignore_errors=True)
 
-    def test_log_and_scratch(self):
-        # Prefixed stderr line; scratch lives under HOME/tmp, None standalone.
+    def test_log(self):
+        # Prefixed stderr line.
         with contextlib.redirect_stderr(io.StringIO()) as err:
             docparse._log("x")
         self.assertEqual(err.getvalue(), "[docparse] x\n")
-        self.assertEqual(docparse._scratch(), str(self.home / "tmp"))
-        with mock.patch.object(docparse, "config", None):
-            self.assertIsNone(docparse._scratch())
 
     def test_host_is(self):
         # Label-aligned domain match.
@@ -108,15 +143,88 @@ class DocparseUnitsTest(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(docparse._parse_pdf_text(b"%PDF-broken"), "")
 
-    def test_parse_markitdown_docx_and_cleanup(self):
-        # Paragraph text through markitdown; the temp copy is removed from HOME/tmp.
-        self.assertIn("报告正文", docparse._parse_markitdown(docx_bytes("报告正文"), ".docx"))
-        self.assertEqual(list((self.home / "tmp").iterdir()), [])
-        # A converter failure gives "" (markitdown itself falls back to plain text for junk input).
-        with mock.patch("markitdown.MarkItDown.convert", side_effect=ValueError("bad file")), \
-                contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(docparse._parse_markitdown(b"junk", ".docx"), "")
-        self.assertEqual(list((self.home / "tmp").iterdir()), [])
+    def test_ooxml_part(self):
+        # A part as a tree; a missing part is None; a DOCTYPE is refused.
+        with zipfile.ZipFile(io.BytesIO(zip_parts({"a.xml": "<r><x/></r>", "b.xml": '<!DOCTYPE r [<!ENTITY e "x">]><r>&e;</r>'}))) as z:
+            self.assertEqual(docparse._ooxml_part(z, "a.xml").find("x").tag, "x")
+            self.assertIsNone(docparse._ooxml_part(z, "none.xml"))
+            with self.assertRaisesRegex(ValueError, "DOCTYPE"):
+                docparse._ooxml_part(z, "b.xml")
+
+    def test_docx_text_and_blocks(self):
+        # Runs, tab and break; paragraphs of a cell joined by a space; blocks inside a content control.
+        import xml.etree.ElementTree as ET
+        body = ET.fromstring(f'<w:body {W_NS}><w:p><w:r><w:t>甲</w:t><w:tab/><w:t>乙</w:t><w:br/><w:t>丙</w:t></w:r></w:p>'
+                             '<w:sdt><w:sdtContent><w:p><w:r><w:t>目录</w:t></w:r></w:p></w:sdtContent></w:sdt>'
+                             '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>一</w:t></w:r></w:p><w:p><w:r><w:t>二</w:t></w:r></w:p></w:tc></w:tr></w:tbl>'
+                             '<w:sectPr/></w:body>')
+        blocks = list(docparse._docx_blocks(body))
+        self.assertEqual([b.tag.split("}")[1] for b in blocks], ["p", "p", "tbl"])
+        self.assertEqual(docparse._docx_text(blocks[0]), "甲\t乙\n丙")
+        self.assertEqual(docparse._docx_text(blocks[2]), "一 二")
+
+    def test_md_table(self):
+        # Short rows are padded; the first row is the header.
+        self.assertEqual(docparse._md_table([["a", "b"], ["c"]]), "| a | b |\n| --- | --- |\n| c |  |")
+
+    def test_parse_docx(self):
+        # Headings from style names (any style id, e.g. Chinese Word's "1"), a numbered item, a table, plain text.
+        styles = ('<w:style w:styleId="1"><w:name w:val="heading 1"/></w:style>'
+                  '<w:style w:styleId="Title"><w:name w:val="Title"/></w:style>')
+        body = ('<w:p><w:pPr><w:pStyle w:val="Title"/></w:pPr><w:r><w:t>报告</w:t></w:r></w:p>'
+                '<w:p><w:pPr><w:pStyle w:val="1"/></w:pPr><w:r><w:t>一、背景</w:t></w:r></w:p>'
+                '<w:p><w:pPr><w:numPr/></w:pPr><w:r><w:t>第一项</w:t></w:r></w:p>'
+                '<w:p><w:r><w:t>正文</w:t></w:r></w:p><w:p/>'
+                '<w:tbl><w:tr><w:tc><w:p><w:r><w:t>地区</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>数量</w:t></w:r></w:p></w:tc></w:tr>'
+                '<w:tr><w:tc><w:p><w:r><w:t>温州</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>12</w:t></w:r></w:p></w:tc></w:tr></w:tbl>')
+        self.assertEqual(docparse._parse_docx(word_doc(body, styles)),
+                         "# 报告\n\n# 一、背景\n\n- 第一项\n\n正文\n\n| 地区 | 数量 |\n| --- | --- |\n| 温州 | 12 |")
+        # The one-paragraph fixture; junk and a DOCTYPE give "".
+        self.assertEqual(docparse._parse_docx(docx_bytes("报告正文")), "报告正文")
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(docparse._parse_docx(b"junk"), "")
+            self.assertEqual(docparse._parse_docx(zip_parts({"word/document.xml": "<!DOCTYPE x><x/>"})), "")
+        self.assertEqual(docparse._parse_docx(zip_parts({"other.xml": "<x/>"})), "")
+
+    def pptx(self) -> bytes:
+        """A deck whose presentation order (slide2 first) differs from the file names, with a table and notes."""
+        table = ('<p:graphicFrame><a:graphic><a:graphicData><a:tbl><a:tr><a:tc><a:txBody><a:p><a:r><a:t>项目</a:t></a:r></a:p></a:txBody></a:tc>'
+                 '<a:tc><a:txBody><a:p><a:r><a:t>金额</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl></a:graphicData></a:graphic></p:graphicFrame>')
+        return zip_parts({
+            "ppt/presentation.xml": f'<?xml version="1.0"?><p:presentation {P_NS}><p:sldIdLst>'
+                                    '<p:sldId id="256" r:id="rId9"/><p:sldId id="257" r:id="rId8"/></p:sldIdLst></p:presentation>',
+            "ppt/_rels/presentation.xml.rels": f'<Relationships {REL_NS}><Relationship Id="rId8" Type="x/slide" Target="slides/slide1.xml"/>'
+                                               '<Relationship Id="rId9" Type="x/slide" Target="/ppt/slides/slide2.xml"/></Relationships>',
+            "ppt/slides/slide2.xml": slide(shape("开场", "ctrTitle") + shape("第一行|第二行")),
+            "ppt/slides/slide1.xml": slide(shape("数据", "title") + table),
+            "ppt/slides/_rels/slide1.xml.rels": f'<Relationships {REL_NS}><Relationship Id="rId2" '
+                                                'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide" '
+                                                'Target="../notesSlides/notesSlide1.xml"/></Relationships>',
+            "ppt/notesSlides/notesSlide1.xml": slide(shape("讲到这里停一下", "body") + shape("2", "sldNum")),
+        })
+
+    def test_pptx_shapes_and_part_rels(self):
+        # Blocks of a slide in order; relationships resolved relative to the part, "/" targets absolute.
+        import xml.etree.ElementTree as ET
+        blocks = docparse._pptx_shapes(ET.fromstring(slide(shape("题", "title") + shape("  ") + shape("文"))))
+        self.assertEqual(blocks, [("title", "题"), ("text", "文")])
+        with zipfile.ZipFile(io.BytesIO(self.pptx())) as z:
+            self.assertEqual(docparse._part_rels(z, "ppt/presentation.xml"),
+                             {"rId8": ("x/slide", "ppt/slides/slide1.xml"), "rId9": ("x/slide", "ppt/slides/slide2.xml")})
+            self.assertEqual(docparse._part_rels(z, "ppt/slides/slide2.xml"), {})
+
+    def test_parse_pptx(self):
+        # Presentation order, titles, text, table and notes (the slide-number placeholder left out).
+        self.assertEqual(docparse._parse_pptx(self.pptx()),
+                         "<!-- Slide number: 1 -->\n\n# 开场\n\n第一行\n第二行\n\n"
+                         "<!-- Slide number: 2 -->\n\n# 数据\n\n| 项目 | 金额 |\n| --- | --- |\n\n### Notes:\n讲到这里停一下")
+        # Junk and a deck without presentation.xml give "".
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(docparse._parse_pptx(b"junk"), "")
+        self.assertEqual(docparse._parse_pptx(zip_parts({"ppt/x.xml": "<x/>"})), "")
+        # parse_bytes routes both kinds.
+        self.assertEqual(docparse.parse_bytes(self.pptx(), "pptx")["kind"], "pptx")
+        self.assertEqual(docparse.parse_bytes(docx_bytes("字"), "docx")["text"], "字")
 
     def test_parse_xlsx(self):
         # Every sheet with its non-empty rows.

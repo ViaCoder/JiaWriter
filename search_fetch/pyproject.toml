@@ -2,23 +2,32 @@
 # release can embed it in a PyApp binary (search_fetch/<os>/<arch>/sf).
 # Dependency pins are THE validated set (single source of truth — setup.sh and
 # release install used to duplicate this list; they now read the same wheel).
-# kb.py's direct imports (numpy / requests / tiktoken) are pinned explicitly, not
-# left to arrive transitively via crawl4ai.
+# The parts of crawl4ai that render and filter pages are copied into search_fetch/vendor/crawl4ai, so
+# the package itself (Playwright, Patchright, litellm, scipy, ...) is not a dependency; the copy needs
+# bs4, lxml and snowballstemmer (2.2.0 as crawl4ai 0.9.0 pins it). Word and PowerPoint are read with
+# the standard library. kb.py's imports (numpy / requests / tiktoken) are the optional "kb" extra.
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "search-fetch"
-version = "1.2.0"
-description = "WriterAgent search backend: search/fetch through the user's own Chrome (extension bridge), docparse (text layers), media metadata and subtitles, vector KB"
+version = "1.3.0"
+description = "WriterAgent search backend: search/fetch through the user's own Chrome (extension bridge), docparse (text layers), media metadata and subtitles, optional vector KB"
 requires-python = ">=3.10"
 dependencies = [
-    "crawl4ai==0.9.0",
+    "beautifulsoup4==4.15.0",
+    "lxml==6.1.3",
+    "snowballstemmer==2.2.0",
+    "idna==3.20",
     "pypdf==6.14.2",
     "openpyxl==3.1.5",
-    "markitdown[pptx,docx,xlsx]==0.1.6",
     "yt-dlp==2026.6.9",
+]
+
+# The knowledge-base sidecar (`sf kb`); WriterAgent does not use it, and the release binary leaves it out.
+[project.optional-dependencies]
+kb = [
     "numpy==2.5.0",
     "requests==2.34.2",
     "tiktoken==0.13.0",
@@ -39,6 +48,8 @@ search_fetch = ["extension/*.json", "extension/*.js", "extension/ops/*.js", "ext
 [tool.ruff]
 line-length = 130
 target-version = "py310"
+# Third-party code copied as it is.
+extend-exclude = ["src/search_fetch/vendor"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "B", "I", "UP"]

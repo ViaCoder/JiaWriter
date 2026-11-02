@@ -280,6 +280,19 @@ class CliHelpersTest(Scratch):
                     mock.patch("search_fetch.search.search", search), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(cli._cmd_selftest(SimpleNamespace(engine="bing", json=False)), want)
 
+    def test_kb_without_its_extra(self):
+        # The release binary has no kb packages: a clear message and exit 2 instead of a traceback.
+        # A None entry in sys.modules makes the import fail; the package attribute is hidden for the test.
+        import search_fetch
+        saved = search_fetch.__dict__.pop("kb", None)
+        try:
+            with mock.patch.dict(sys.modules, {"search_fetch.kb": None}), contextlib.redirect_stderr(io.StringIO()) as err:
+                self.assertEqual(cli.main(["kb", "query"]), 2)
+        finally:
+            if saved is not None:
+                search_fetch.kb = saved
+        self.assertIn("pip install 'search-fetch[kb]'", err.getvalue())
+
     def test_cmd_browser_status_and_stop(self):
         # status reports the bridge; stop reports the closed tabs and always exits 0.
         with mock.patch("search_fetch.bridge.status", return_value={"connected": False, "error": "x"}), \

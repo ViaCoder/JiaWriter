@@ -71,7 +71,9 @@ def _test_chrome() -> str:
 
 
 try:
-    import crawl4ai  # noqa: F401
+    # The renderer's packages.
+    import bs4  # noqa: F401
+    import lxml  # noqa: F401
 
     from search_fetch import bridge, browser
     from search_fetch import search as search_mod

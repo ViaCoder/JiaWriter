@@ -5,7 +5,7 @@ There is intentionally NO model call in this module (sf uses no model at all); a
 WriterAgent's writing model, which receives these results and, for large pages, reads the
 saved file. This module only makes what WriterAgent receives small and relevant:
 
-  * bm25_fit — query-relevance filtering via crawl4ai's BM25ContentFilter
+  * bm25_fit — query-relevance filtering via crawl4ai's BM25ContentFilter (copied into vendor/crawl4ai)
 Length bounding lives in markdown._clamp_chars.
 """
 
@@ -33,8 +33,8 @@ def bm25_fit(html: str, url: str, query: str, threshold: float = 1.0) -> dict:
     If BM25 matches nothing, 'fit' falls back to the de-noised (pruned) page and
     'matched' is False, so the caller can say so instead of silently returning raw.
     """
-    # crawl4ai is imported lazily: the stdlib-only paths never load it.
-    from crawl4ai.content_filter_strategy import BM25ContentFilter, PruningContentFilter
+    # Imported lazily: the stdlib-only paths never load bs4 and lxml.
+    from .vendor.crawl4ai.content_filter import BM25ContentFilter, PruningContentFilter
 
     # Pass 1: de-noise (prune boilerplate to a list of content chunks).
     pruner = PruningContentFilter(

@@ -21,9 +21,7 @@ def _default_home() -> Path:
 
 HOME = Path(os.environ.get("SEARCH_FETCH_HOME") or _default_home())
 # Third-party caches follow HOME so nothing lands outside the package:
-# crawl4ai's base dir (it creates one on import), yt-dlp's cache (media.py) and
-# tiktoken's BPE download (kb.py — defaults to /tmp/data-gym-cache).
-os.environ.setdefault("CRAWL4AI_BASE_DIRECTORY", str(HOME))
+# yt-dlp's cache (media.py) and tiktoken's BPE download (kb.py — defaults to /tmp/data-gym-cache).
 os.environ.setdefault("TIKTOKEN_CACHE_DIR", str(HOME / "tiktoken-cache"))
 _RUN_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _TRUE = ("1", "true", "yes", "on")

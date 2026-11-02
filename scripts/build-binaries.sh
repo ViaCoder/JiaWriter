@@ -199,9 +199,6 @@ for platform in "${PLATFORMS[@]}"; do
         sf_os="${platform%-*}"; sf_os="${sf_os/darwin/macos}"
         sf_arch="${platform#*-}"; sf_arch="${sf_arch/x64/amd64}"
         sf_name=sf; [[ "$platform" == windows-* ]] && sf_name=sf.exe
-        # Windows on Arm gets the x64 sf (run by Windows 11's x64 emulation): crawl4ai's lxml 5.x and
-        # tiktoken have no Windows Arm wheels, so a native sf could not install its packages.
-        [[ "$platform" == windows-arm64 ]] && sf_arch=amd64
         if [[ ! -f "$SF_DIR/$sf_os/$sf_arch/$sf_name" ]]; then
             echo "error: missing $SF_DIR/$sf_os/$sf_arch/$sf_name" >&2
             exit 1

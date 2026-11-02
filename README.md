@@ -114,7 +114,7 @@ A skill made from a session collects only what you wrote in the current session 
   - Two queries to the same engine are at least 20 seconds apart, two visits to the same site at least 6 seconds, both with random jitter; local and private network addresses are refused. On a human check, interactive mode brings the Chrome window to the front and waits up to 90 seconds for you.
   - Before the first use, load the extension: open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and choose the package's `chrome-extension` folder. Check with `/browser`.
 - `anysearch`: the AnySearch API, anonymously when no key is set.
-- `sf`: search_fetch, whose pages go through the same extension. It reads the text layer of documents and the metadata and subtitles of videos; it does no OCR and no speech recognition. All six packages include sf (`sf.exe` on Windows, where it reaches the browser host through its loopback port and token). The Windows on Arm package carries the x64 sf, which Windows 11 runs through its x64 emulation, because two of sf's dependencies (lxml 5.x for crawl4ai, and tiktoken) have no Windows Arm build. The first sf run installs its dependencies (about 1.1 GB, a few minutes), all under `~/.writeragent/agent/sf/`.
+- `sf`: search_fetch, whose pages go through the same extension. It reads the text layer of documents and the metadata and subtitles of videos; it does no OCR and no speech recognition. All six packages include sf (`sf.exe` on Windows, where it reaches the browser host through its loopback port and token). sf is one self-contained file: Python and every package it needs are built into it. The first run unpacks that copy once into `~/.writeragent/agent/sf/` on your computer; it downloads nothing and installs nothing.
 
 ## Network and privacy
 
@@ -128,6 +128,6 @@ The development machine is Linux x64, where the Linux setup commands were run; t
 
 ## License
 
-MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The `THIRD_PARTY/` folder of each package holds the licenses of fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate, Readability, the Unicode data and lieflat-gongwen.
+MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The `THIRD_PARTY/` folder of each package holds the licenses of fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate, Readability, the Unicode data and lieflat-gongwen. The parts of crawl4ai copied into `search_fetch/src/search_fetch/vendor/crawl4ai/` keep their licenses in that folder of the repository (crawl4ai and rank_bm25 Apache-2.0).
 
-Exception: `skills/writer/*/lieflat-gongwen/`, `src/writer/gongwen/` and `src/extensions/writer-gongwen/` are under the [PolyForm Noncommercial License 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE), for noncommercial use only. Remove these three before commercial use, or get a license from the original author.
+Exception: `skills/writer/*/lieflat-gongwen/`, `src/writer/gongwen/` and `src/extensions/writer-gongwen/` are under the [PolyForm Noncommercial License 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE), for noncommercial use only. Remove these three before commercial use, or get a license from the original author. `search_fetch/src/search_fetch/vendor/crawl4ai/html2text/` (inside sf) is under the GPL-3.0 (its COPYING file).

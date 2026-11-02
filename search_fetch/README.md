@@ -81,10 +81,10 @@ $PY sf.py selftest            # 各引擎 SERP 契约自检
 
 ## 发布包里的 sf
 
-- WriterAgent 的 6 个发布包都带有 `search_fetch/<os>/<arch>/sf`（Windows 上是 `search_fetch/windows/<arch>/sf.exe`；PyApp 单文件，内嵌本包 wheel 和 CPython 3.12），`WA_SEARCH=sf` 时不设 `WA_SF` 也能找到。Windows ARM 的包用 x64 版 `sf.exe`（Windows 11 的 x64 仿真运行）：crawl4ai 0.9.0 需要的 lxml 5.x 和 tiktoken 都没有 win_arm64 安装包（2026-11-02 查 PyPI）。
-- WriterAgent 运行 sf 时，把它的全部状态放在 `~/.writeragent/agent/sf/`：`runtime/`（PyApp 的 Python 和依赖）、`pip-cache/`、`home/`（扩展副本、桥接 socket、节流记录）。第一次运行会从 PyPI 安装依赖，约 1.1 GB，需要两三分钟。
+- WriterAgent 的 6 个发布包都带有 `search_fetch/<os>/<arch>/sf`（Windows 上是 `search_fetch/windows/<arch>/sf.exe`；PyApp 单文件，内嵌已经装好本包和全部依赖的 CPython 3.12），`WA_SEARCH=sf` 时不设 `WA_SF` 也能找到。
+- WriterAgent 运行 sf 时，把它的全部状态放在 `~/.writeragent/agent/sf/`：`runtime/`（第一次运行时从程序里解开的 Python 和依赖）、`home/`（扩展副本、桥接 socket、节流记录）。第一次运行不联网、不调用 pip，只在本机解开一次。
 - 在 WriterAgent 里，扩展的本机通信程序是 writeragent 本身（主机名 `com.writeragent.browser`，发布版启动时自动向 Chrome 注册）；sf 由 `SEARCH_FETCH_BRIDGE_SOCKET` 指向它的 socket（`~/.writeragent/agent/browser/bridge.sock`），Windows 上由 `SEARCH_FETCH_BRIDGE_FILE` 指向它写的端口文件（`bridge.json`，内含回环端口和令牌），不再自己注册；Windows 上 `sf bridge install` 和 `sf bridge-host` 只提示改用 WriterAgent。按包里的「使用说明.html」在 Chrome 加载 `chrome-extension` 文件夹后，用 `/browser` 确认已连接。
-- 打包：`bash build_binary.sh [--out <目录>]` 在本机原生构建（Windows 上在 Git Bash 里运行），产物为 `<目录>/<os>/<arch>/sf`，Windows 上是 `sf.exe`。PyApp 固定为 v0.31.0 源码（校验 SHA256），用 `pyapp/Cargo.toml` 与 `pyapp/Cargo.lock` 替换上游的依赖清单：zip 升到 9、zstd 升到 0.14，bytes、quinn-proto、rustls、tar、time 升到修复版本，`cargo audit` 为 0 个漏洞（2026-11-01）。
+- 打包：`bash build_binary.sh [--out <目录>]` 在本机原生构建（Windows 上在 Git Bash 里运行），产物为 `<目录>/<os>/<arch>/sf`，Windows 上是 `sf.exe`。构建时下载固定版本的 python-build-standalone CPython 3.12.16（20261026，校验 SHA256），用隔离模式（`python -I -m pip install --isolated`）把本包和全部依赖装进去，删掉用不到的 Playwright/Patchright Node 驱动，逐个导入 sf 用到的模块做自检，再整体嵌入程序（`PYAPP_DISTRIBUTION_PATH`、`PYAPP_FULL_ISOLATION=1`、`PYAPP_SKIP_INSTALL=1`）。PyApp 固定为 v0.31.0 源码（校验 SHA256），用 `pyapp/Cargo.toml` 与 `pyapp/Cargo.lock` 替换上游的依赖清单：zip 升到 9、zstd 升到 0.14，bytes、quinn-proto、rustls、tar、time 升到修复版本，`cargo audit` 为 0 个漏洞（2026-11-01）。
 
 ## 产物（`./.search_fetchres/`）
 

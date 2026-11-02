@@ -5,10 +5,11 @@ Ships next to engine.py (sibling, like kb.py/filters.py). engine.py's `fetch` co
 routes document URLs here instead of the headed browser, which returns empty markdown for
 binaries (the earlier `[research] fetch FAIL/empty: …report.pdf` cases).
 
-Text extraction uses the SAME libraries the vendored MiniMax skills use:
-    pdf        -> pypdf.extract_text()      (vendor/skills/minimax-pdf)
-    xlsx/xlsm  -> openpyxl                   (vendor/skills/minimax-xlsx)
-    pptx/docx  -> markitdown                 (vendor/skills/pptx-generator)
+Text extraction:
+    pdf        -> pypdf.extract_text()
+    xlsx/xlsm  -> openpyxl
+    docx       -> the OOXML parts read with the standard library (headings, lists, tables)
+    pptx       -> the same, slide by slide in presentation order (titles, text, tables, notes)
     csv/tsv    -> plain decode
 
 There is no OCR: images and scanned (image-only) PDFs carry no text layer, so they
@@ -22,11 +23,13 @@ import html as _htmllib
 import io
 import json
 import os
+import posixpath
 import re
 import sys
-import tempfile
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as ET
+import zipfile
 
 try:
     # Per-host request pacing shared by all sf processes, and the package home.
@@ -85,20 +88,6 @@ def _log(msg: str):
 
 
 # ── url helpers ─────────────────────────────────────────────────────
-def _scratch():
-    """Directory for temp files that hold document contents: <HOME>/tmp in package mode
-    (all state stays inside the package), None (the system temp dir) when run standalone."""
-    # Standalone script.
-    if config is None:
-        return None
-    # Inside the package home.
-    d = config.HOME / "tmp"
-    # Create it once.
-    d.mkdir(parents=True, exist_ok=True)
-    # As a string for tempfile.
-    return str(d)
-
-
 def _host_is(host: str, domain: str) -> bool:
     """`host` is `domain` itself or one of its subdomains (label-aligned match)."""
     return host == domain or host.endswith("." + domain)
@@ -249,7 +238,6 @@ def _http_get(url: str):
 
 def _zip_kind(data: bytes) -> str:
     """OOXML documents are zips — the top-level folder tells them apart."""
-    import zipfile
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as z:
             names = z.namelist()
@@ -366,25 +354,196 @@ def _parse_pdf_text(data: bytes) -> str:
     return "\n\n".join(parts).strip()
 
 
-def _parse_markitdown(data: bytes, suffix: str) -> str:
+# OOXML namespaces of Word, DrawingML (PowerPoint text), PresentationML and package relationships.
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+_P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+_R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+_REL = "{http://schemas.openxmlformats.org/package/2006/relationships}"
+
+
+def _ooxml_part(z, name: str):
+    """One XML part of an open OOXML zip as an element tree root (None when the part is missing).
+    Office XML never declares a DTD, so a DOCTYPE is refused: no entity expansion can happen."""
+    # A missing part.
+    if name not in z.namelist():
+        return None
+    # The part's bytes.
+    raw = z.read(name)
+    # No DTD, no entities.
+    if b"<!DOCTYPE" in raw:
+        raise ValueError(f"{name}: DOCTYPE refused")
+    # Parsed.
+    return ET.fromstring(raw)
+
+
+def _docx_text(el) -> str:
+    """Text of a Word element: its runs joined, tabs and line breaks kept, paragraphs separated by spaces."""
+    # Pieces in document order.
+    parts = []
+    for node in el.iter():
+        # Run text.
+        if node.tag == _W + "t":
+            parts.append(node.text or "")
+        # Tab.
+        elif node.tag == _W + "tab":
+            parts.append("\t")
+        # Line break.
+        elif node.tag in (_W + "br", _W + "cr"):
+            parts.append("\n")
+        # A new paragraph inside a table cell.
+        elif node.tag == _W + "p" and node is not el and parts:
+            parts.append(" ")
+    # The text.
+    return "".join(parts)
+
+
+def _docx_blocks(parent):
+    """Paragraphs and tables of a Word body in order, including those inside content controls (w:sdt)."""
+    for el in parent:
+        # Content control: its content is part of the body.
+        if el.tag == _W + "sdt":
+            content = el.find(_W + "sdtContent")
+            if content is not None:
+                yield from _docx_blocks(content)
+        # Paragraph or table.
+        elif el.tag in (_W + "p", _W + "tbl"):
+            yield el
+
+
+def _md_table(rows: list) -> str:
+    """Rows of cell texts as a Markdown table (the first row is the header)."""
+    # Every row as many cells as the widest one.
+    width = max(len(r) for r in rows)
+    rows = [r + [""] * (width - len(r)) for r in rows]
+    # Header, separator, body.
+    lines = ["| " + " | ".join(r) + " |" for r in rows]
+    lines.insert(1, "| " + " | ".join("---" for _ in range(width)) + " |")
+    return "\n".join(lines)
+
+
+def _parse_docx(data: bytes) -> str:
+    """Word text in document order: headings as #, numbered paragraphs as -, tables as rows; '' when unreadable."""
+    # The body and the styles.
     try:
-        from markitdown import MarkItDown
-    except Exception as e:
-        _log(f"markitdown unavailable: {e}")
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            doc = _ooxml_part(z, "word/document.xml")
+            styles = _ooxml_part(z, "word/styles.xml")
+    except (zipfile.BadZipFile, ValueError, ET.ParseError) as e:
+        _log(f"docx read failed: {e}")
         return ""
-    path = None
+    # No body, no text.
+    body = doc.find(_W + "body") if doc is not None else None
+    if body is None:
+        return ""
+    # Heading level of each style id, from the style names Word writes in every language ("heading 1", "Title").
+    levels = {}
+    for st in (styles.iter(_W + "style") if styles is not None else []):
+        name = st.find(_W + "name")
+        n = (name.get(_W + "val") or "").lower() if name is not None else ""
+        m = re.fullmatch(r"heading ([1-6])", n)
+        if m or n == "title":
+            levels[st.get(_W + "styleId")] = int(m.group(1)) if m else 1
+    # Blocks in order.
+    out = []
+    for el in _docx_blocks(body):
+        # A table: one row per line.
+        if el.tag == _W + "tbl":
+            rows = [[_docx_text(tc).strip().replace("\n", " ") for tc in tr.findall(_W + "tc")] for tr in el.findall(_W + "tr")]
+            rows = [r for r in rows if any(r)]
+            if rows:
+                out.append(_md_table(rows))
+            continue
+        # A paragraph with text.
+        text = _docx_text(el).strip()
+        if not text:
+            continue
+        # Its style and numbering.
+        ppr = el.find(_W + "pPr")
+        style = ppr.find(_W + "pStyle") if ppr is not None else None
+        sid = style.get(_W + "val") if style is not None else ""
+        # Heading, list item or plain paragraph.
+        if sid in levels:
+            out.append("#" * levels[sid] + " " + text.replace("\n", " "))
+        elif ppr is not None and ppr.find(_W + "numPr") is not None:
+            out.append("- " + text)
+        else:
+            out.append(text)
+    # Paragraphs separated by blank lines.
+    return "\n\n".join(out).strip()
+
+
+def _pptx_shapes(slide) -> list:
+    """Text blocks of a slide in document order: ('title', text), ('text', text) or ('table', rows)."""
+    # Collected blocks.
+    blocks = []
+    for el in slide.iter():
+        # A shape with text (also inside groups, which iter() visits).
+        if el.tag == _P + "sp":
+            paras = ["".join(t.text or "" for t in p.iter(_A + "t")) for p in el.iter(_A + "p")]
+            text = "\n".join(x for x in paras if x.strip()).strip()
+            if not text:
+                continue
+            ph = el.find(f"{_P}nvSpPr/{_P}nvPr/{_P}ph")
+            kind = "title" if ph is not None and ph.get("type") in ("title", "ctrTitle") else "text"
+            blocks.append((kind, text))
+        # A table.
+        elif el.tag == _P + "graphicFrame":
+            rows = [["".join(t.text or "" for t in tc.iter(_A + "t")).strip() for tc in tr.findall(_A + "tc")]
+                    for tr in el.iter(_A + "tr")]
+            rows = [r for r in rows if any(r)]
+            if rows:
+                blocks.append(("table", rows))
+    # The blocks.
+    return blocks
+
+
+def _part_rels(z, part: str) -> dict:
+    """Relationships of an OOXML part: id -> (type, absolute part name)."""
+    # The part's .rels file sits in _rels next to it.
+    folder, name = posixpath.split(part)
+    rels = _ooxml_part(z, posixpath.join(folder, "_rels", name + ".rels"))
+    out = {}
+    for r in (rels.iter(_REL + "Relationship") if rels is not None else []):
+        target = r.get("Target") or ""
+        # Targets are relative to the part's folder unless they start with "/".
+        full = target.lstrip("/") if target.startswith("/") else posixpath.normpath(posixpath.join(folder, target))
+        out[r.get("Id")] = (r.get("Type") or "", full)
+    return out
+
+
+def _parse_pptx(data: bytes) -> str:
+    """PowerPoint text slide by slide in presentation order: a slide marker, the title as #, the other text and
+    tables, then the speaker notes; '' when unreadable."""
     try:
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False, dir=_scratch()) as f:
-            f.write(data)
-            path = f.name
-        res = MarkItDown().convert(path)
-        return (getattr(res, "markdown", None) or getattr(res, "text_content", "") or "").strip()
-    except Exception as e:
-        _log(f"markitdown convert failed ({suffix}): {e}")
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            # Slide order from presentation.xml, slide files from its relationships.
+            pres = _ooxml_part(z, "ppt/presentation.xml")
+            if pres is None:
+                return ""
+            rels = _part_rels(z, "ppt/presentation.xml")
+            out = []
+            for n, sid in enumerate(pres.iter(_P + "sldId"), 1):
+                path = rels.get(sid.get(_R + "id"), ("", ""))[1]
+                slide = _ooxml_part(z, path) if path else None
+                if slide is None:
+                    continue
+                # Marker, title, text and tables.
+                out.append(f"<!-- Slide number: {n} -->")
+                for kind, value in _pptx_shapes(slide):
+                    out.append(_md_table(value) if kind == "table" else ("# " + value.replace("\n", " ") if kind == "title" else value))
+                # Speaker notes: the body placeholder of the notes slide.
+                notes = [p for t, p in _part_rels(z, path).values() if t.endswith("/notesSlide")]
+                note_root = _ooxml_part(z, notes[0]) if notes else None
+                if note_root is not None:
+                    note_text = "\n".join(v for k, v in _pptx_shapes(note_root) if k == "text" and not v.isdigit())
+                    if note_text:
+                        out.append("### Notes:\n" + note_text)
+    except (zipfile.BadZipFile, ValueError, ET.ParseError) as e:
+        _log(f"pptx read failed: {e}")
         return ""
-    finally:
-        if path and os.path.exists(path):
-            os.unlink(path)
+    # Blocks separated by blank lines.
+    return "\n\n".join(out).strip()
 
 
 def _parse_xlsx(data: bytes) -> str:
@@ -439,9 +598,12 @@ def parse_bytes(data: bytes, kind: str) -> dict:
     # PDF text layer.
     if kind == "pdf":
         text = _parse_pdf_text(data)
-    # Word and PowerPoint.
-    elif kind in ("docx", "pptx"):
-        text = _parse_markitdown(data, "." + kind)
+    # Word.
+    elif kind == "docx":
+        text = _parse_docx(data)
+    # PowerPoint.
+    elif kind == "pptx":
+        text = _parse_pptx(data)
     elif kind == "xlsx":
         text = _parse_xlsx(data)
     elif kind in ("csv", "tsv"):

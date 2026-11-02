@@ -286,8 +286,12 @@ def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     # kb keeps its own argparse, so its flags never collide with ours.
     if argv and argv[0] == "kb":
-        # Knowledge-base sidecar.
-        from . import kb
+        # Knowledge-base sidecar; its packages are the optional "kb" extra (not in the release binary).
+        try:
+            from . import kb
+        except ImportError as ex:
+            sys.stderr.write(f"sf kb needs the kb extra ({ex.name}): pip install 'search-fetch[kb]'\n")
+            return 2
         # Same failure contract as the other commands.
         return _guarded(kb.main, argv[1:])
     # The native messaging host, started by Chrome with the caller's origin as its argument.
