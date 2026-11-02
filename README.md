@@ -100,7 +100,7 @@ After writing the docx, the export checks its XML: every run with Chinese text c
 
 ## Writing skills
 
-Eight built-in skills ship in Chinese and English and follow the interface language: general article, report and analysis, news and features, academic writing, business email and memos, marketing copy, narrative fiction, and skill-creator. Your own skills go in `~/.writeragent/agent/skills/<name>/SKILL.md` and take the place of a built-in skill with the same name.
+Nine built-in skills ship in Chinese and English and follow the interface language: general article, report and analysis, news and features, academic writing, business email and memos, marketing copy, narrative fiction, skill-creator, and the Chinese official-document skill [lieflat-gongwen](https://github.com/larashero3-dotcom/lieflat-gongwen). lieflat-gongwen covers 调研报告, 领导讲话, 工作意见, 经验材料, 工作方案, 经验总结 and short 党建 pieces with parameters from a corpus of official documents, and checks drafts with the `gongwen_check` tool; its material is Chinese only, so the English entry reads the Chinese folder. Your own skills go in `~/.writeragent/agent/skills/<name>/SKILL.md` and take the place of a built-in skill with the same name.
 
 A skill made from a session collects only what you wrote in the current session and the reasons you gave for refused tool calls, never model replies; keys, tokens and passwords are removed first, and for a repeated topic the latest request is kept. You review the draft before anything is written.
 
@@ -128,4 +128,6 @@ The development machine is Linux x64, where the Linux setup commands were run; t
 
 ## License
 
-MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The `THIRD_PARTY/` folder of each package holds the licenses of fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate, Readability and the Unicode data.
+MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The `THIRD_PARTY/` folder of each package holds the licenses of fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate, Readability, the Unicode data and lieflat-gongwen.
+
+Exception: `skills/writer/*/lieflat-gongwen/`, `src/writer/gongwen/` and `src/extensions/writer-gongwen/` are under the [PolyForm Noncommercial License 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE), for noncommercial use only. Remove these three before commercial use, or get a license from the original author.

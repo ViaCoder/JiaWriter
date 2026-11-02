@@ -183,6 +183,9 @@ for platform in "${PLATFORMS[@]}"; do
     cp ../../node_modules/docx/LICENSE "$OUTPUT_DIR/$platform/THIRD_PARTY/docx/"
     cp ../../node_modules/fflate/LICENSE "$OUTPUT_DIR/$platform/THIRD_PARTY/fflate/"
     cp src/writer/data/UNICODE-LICENSE.txt "$OUTPUT_DIR/$platform/THIRD_PARTY/unicode/"
+    # WriterAgent: lieflat-gongwen (PolyForm Noncommercial) covers its skill folder and the gongwen_check port.
+    mkdir -p "$OUTPUT_DIR/$platform/THIRD_PARTY/lieflat-gongwen"
+    cp skills/writer/zh/lieflat-gongwen/LICENSE "$OUTPUT_DIR/$platform/THIRD_PARTY/lieflat-gongwen/LICENSE"
     # WriterAgent: the Chrome extension (loaded once in chrome://extensions), Readability's license,
     # the Chinese guide with screenshots for this system, and an empty reference folder.
     cp -R ../../search_fetch/src/search_fetch/extension "$OUTPUT_DIR/$platform/chrome-extension"

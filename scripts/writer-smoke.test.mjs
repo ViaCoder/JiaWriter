@@ -58,9 +58,10 @@ else if (a[1] === "导入并导出") {
   fs.writeFileSync("参考资料/.parsed/a.pdf.md", "Smoke reference text");
   fs.writeFileSync("d.docx", "PK fake");
   fs.writeFileSync("稿件.docx", "PK auto");
+  await fetch(process.env.WA_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.WA_KEY }, body: JSON.stringify({ max_tokens: 100, messages: [{ role: "tool", content: "✗ 领导讲话不用三级标题" }] }) });
   console.log(${JSON.stringify(REPLY)});
 } else {
-  const body = { max_tokens: 100, messages: [{ role: "system", content: "You are an expert writing assistant. <name>report-analysis</name>" }],
+  const body = { max_tokens: 100, messages: [{ role: "system", content: "You are an expert writing assistant. <name>report-analysis</name> <name>lieflat-gongwen</name>" }],
     tools: ${JSON.stringify(TOOLS)}.map((name) => ({ type: "function", function: { name } })) };
   const res = await fetch(process.env.WA_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.WA_KEY }, body: JSON.stringify(body) });
   const text = await res.text();
@@ -110,6 +111,7 @@ test("smoke passes a well-behaved program and fails one that leaks the key", asy
 		["import pdf", true],
 		["export docx", true],
 		["auto export", true],
+		["gongwen check", true],
 		["host listens", true],
 		["host round trip", true],
 		["host exits", true],

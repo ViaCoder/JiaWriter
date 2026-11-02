@@ -1,6 +1,6 @@
 ---
 name: report-analysis
-description: Write research reports, situation analyses, recommendations and work summaries. Use when the user asks for a report, an analysis, recommendations or a summary.
+description: Write research reports, situation analyses, recommendations and work summaries. Use when the user asks for a report, an analysis, recommendations or a summary; for Chinese government documents (公文 such as 调研报告, 领导讲话, 工作意见, 经验材料, 工作方案, 经验总结, 党建材料) use lieflat-gongwen instead.
 metadata:
   title: Report and analysis
   style_packs: core-en

@@ -100,7 +100,7 @@ WriterAgent 是一个通用写作 agent，在终端里运行。它读取参考�
 
 ## 写作 skill
 
-内置 8 个 skill，中英文各一套，按界面语言提供：通用文章、报告分析、新闻特稿、学术写作、商务邮件和备忘录、营销文案、叙事小说、skill-creator。自己的 skill 放在 `~/.writeragent/agent/skills/<名称>/SKILL.md`，同名时优先于内置版本。
+内置 9 个 skill，中英文各一套，按界面语言提供：通用文章、报告分析、新闻特稿、学术写作、商务邮件和备忘录、营销文案、叙事小说、skill-creator，以及公文写作 [lieflat-gongwen](https://github.com/larashero3-dotcom/lieflat-gongwen)。lieflat-gongwen 覆盖调研报告、领导讲话、工作意见、经验材料、工作方案、经验总结和千字级党建材料，参数来自公文语料统计，写完用 `gongwen_check` 工具自检；它的材料只有中文，英文界面也读中文目录。自己的 skill 放在 `~/.writeragent/agent/skills/<名称>/SKILL.md`，同名时优先于内置版本。
 
 从会话生成 skill 时，只收集你在当前会话里发出的内容和否决工具调用时附带的意见，模型回复不收集；key、令牌、密码一类内容先去掉；同一主题以最后一次要求为准。草稿先显示给你确认，确认后才写入。
 
@@ -128,4 +128,6 @@ WriterAgent 启动和空闲时不发任何网络请求，没有遥测、版本�
 
 ## 许可证
 
-MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包的 `THIRD_PARTY/` 目录包含 fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate、Readability 和 Unicode 数据的许可证。
+MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包的 `THIRD_PARTY/` 目录包含 fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate、Readability、Unicode 数据和 lieflat-gongwen 的许可证。
+
+例外：`skills/writer/*/lieflat-gongwen/`、`src/writer/gongwen/` 和 `src/extensions/writer-gongwen/` 按 [PolyForm Noncommercial 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE) 提供，只限非商业用途。商业使用前要删除这三处，或者向原作者取得授权。

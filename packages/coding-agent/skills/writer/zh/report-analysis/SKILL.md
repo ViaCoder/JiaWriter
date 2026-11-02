@@ -1,6 +1,6 @@
 ---
 name: report-analysis
-description: 写调研报告、情况分析、对策建议和工作总结。用户要求写报告、分析材料、建议或总结时使用。
+description: 写调研报告、情况分析、对策建议和工作总结。用户要求写报告、分析材料、建议或总结时使用；党政机关的公文类材料（调研报告、领导讲话、工作意见、经验材料、工作方案、经验总结、党建材料）改用 lieflat-gongwen。
 metadata:
   title: 报告分析
   style_packs: core-zh, gongwen-zh

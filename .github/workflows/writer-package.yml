@@ -172,6 +172,9 @@ jobs:
           test -d "${root}/参考资料"
           grep -q '"name": "WriterAgent"' "${root}/chrome-extension/manifest.json"
           grep -q "加载未打包的扩展程序" "${root}/使用说明.html"
+          test -f "${root}/writer-skills/zh/lieflat-gongwen/参数卡.md"
+          test -f "${root}/writer-skills/en/lieflat-gongwen/SKILL.md"
+          grep -q "PolyForm Noncommercial" "${root}/THIRD_PARTY/lieflat-gongwen/LICENSE"
 
       # The guide's Windows step: setx stores a user variable that a new process can read.
       - name: setx as in the guide

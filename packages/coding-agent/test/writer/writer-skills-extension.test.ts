@@ -91,13 +91,14 @@ function ctx(ui: unknown, messages: string[] = []) {
 const pick = (text: string) => (options: string[]) => options.find((o) => o.includes(text)) ?? "";
 
 describe("shipped skills", () => {
-	it("has the same eight valid skills in zh and en, each free of style_check hits", () => {
+	it("has the same nine valid skills in zh and en, each of our own free of style_check hits", () => {
 		// Names per language.
 		const names = (lang: string) => readdirSync(join(getWriterSkillsDir(), lang)).sort();
 		expect(names("zh")).toEqual([
 			"academic-writing",
 			"business-email",
 			"general-article",
+			"lieflat-gongwen",
 			"marketing-copy",
 			"narrative-fiction",
 			"news-feature",
@@ -108,9 +109,9 @@ describe("shipped skills", () => {
 		for (const lang of ["zh", "en"]) {
 			// Loader accepts all of them.
 			const r = loadSkillsFromDir({ dir: join(getWriterSkillsDir(), lang), source: "path" });
-			expect([r.skills.length, r.diagnostics]).toEqual([8, []]);
-			// No AI-style hits and no negation over the threshold.
-			for (const s of r.skills) {
+			expect([r.skills.length, r.diagnostics]).toEqual([9, []]);
+			// No AI-style hits and no negation over the threshold (lieflat-gongwen is third-party text, kept as written).
+			for (const s of r.skills.filter((x) => x.name !== "lieflat-gongwen")) {
 				const body = readFileSync(s.filePath, "utf-8").replace(/^---[\s\S]*?---\n/, "");
 				const rep = styleCheck(body, { packs: [lang === "zh" ? "core-zh" : "core-en"] });
 				expect([s.name, rep.hits.length, rep.negation.over]).toEqual([s.name, 0, false]);
@@ -121,9 +122,9 @@ describe("shipped skills", () => {
 
 describe("resources_discover", () => {
 	it("offers the built-ins of WA_LANG that are turned on", () => {
-		// All eight in Chinese.
+		// All nine in Chinese.
 		const { handlers } = load();
-		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(8);
+		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(9);
 		expect(handlers.get("resources_discover")?.().skillPaths[0]).toBe(
 			join(getWriterSkillsDir(), "zh", "academic-writing"),
 		);
@@ -141,13 +142,13 @@ describe("/skills", () => {
 		// Off for one built-in, then leave.
 		let s = scriptedUi([pick("报告分析"), pick("停用"), undefined]);
 		await commands.get("skills")?.("", ctx(s.ui));
-		expect(s.shown[0]).toBe("写作 skill（8 个）：方向键选择，回车确认，Esc 返回");
+		expect(s.shown[0]).toBe("写作 skill（9 个）：方向键选择，回车确认，Esc 返回");
 		expect(s.notes).toEqual(["report-analysis 已停用。运行 /reload 生效。"]);
-		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(7);
+		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(8);
 		// All off, all on.
 		s = scriptedUi(["全部停用", "全部启用", undefined]);
 		await commands.get("skills")?.("", ctx(s.ui));
-		expect(s.notes).toEqual(["7 个 skill 已停用。运行 /reload 生效。", "8 个 skill 已启用。运行 /reload 生效。"]);
+		expect(s.notes).toEqual(["8 个 skill 已停用。运行 /reload 生效。", "9 个 skill 已启用。运行 /reload 生效。"]);
 		// Edit a built-in: unchanged first, then a change.
 		s = scriptedUi([
 			pick("新闻特稿"),

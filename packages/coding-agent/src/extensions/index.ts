@@ -7,6 +7,8 @@ import toolSearchExtension from "./tool-search/index.ts";
 import writerDocsExtension from "./writer-docs/index.ts";
 // WriterAgent: the "wa" provider from WA_* environment variables.
 import writerEnvExtension from "./writer-env/index.ts";
+// WriterAgent: gongwen_check for the lieflat-gongwen skill (PolyForm Noncommercial, see its LICENSE).
+import writerGongwenExtension from "./writer-gongwen/index.ts";
 // WriterAgent: web_search and web_fetch (AnySearch or search_fetch in the user's Chrome).
 import writerSearchExtension from "./writer-search/index.ts";
 // WriterAgent: built-in writing skills, /skills and /skill-new.
@@ -21,6 +23,8 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-env", factory: writerEnvExtension, builtin: true },
 	// WriterAgent: the writing checks.
 	{ name: "writer-tools", factory: writerToolsExtension, builtin: true },
+	// WriterAgent: the 公文 self-check.
+	{ name: "writer-gongwen", factory: writerGongwenExtension, builtin: true },
 	// WriterAgent: web search.
 	{ name: "writer-search", factory: writerSearchExtension, builtin: true },
 	// WriterAgent: reference import and draft export.
