@@ -128,6 +128,9 @@ WriterAgent 启动和空闲时不发任何网络请求，没有遥测、版本�
 
 ## 许可证
 
-MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包的 `THIRD_PARTY/` 目录包含 fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate、Readability、Unicode 数据和 lieflat-gongwen 的许可证。摘录到 `search_fetch/src/search_fetch/vendor/crawl4ai/` 的 crawl4ai 部分，许可证放在仓库的这个目录里（crawl4ai 和 rank_bm25 为 Apache-2.0）。
+MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包里不带许可证文件，各组件的许可证在本仓库或上游项目里：
+
+- 本仓库：Readability（`search_fetch/src/search_fetch/extension/vendor/Readability-LICENSE.md`）、Unicode 数据（`packages/coding-agent/src/writer/data/UNICODE-LICENSE.txt`）、lieflat-gongwen（见下文），以及摘录到 `search_fetch/src/search_fetch/vendor/crawl4ai/` 的 crawl4ai 部分（crawl4ai 和 rank_bm25 为 Apache-2.0，html2text 为 GPL-3.0）；
+- 上游项目：fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate、Python，以及 sf 内置的 Python 包（版本见 `search_fetch/pyproject.toml`）。
 
 例外：`skills/writer/*/lieflat-gongwen/`、`src/writer/gongwen/` 和 `src/extensions/writer-gongwen/` 按 [PolyForm Noncommercial 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE) 提供，只限非商业用途。商业使用前要删除这三处，或者向原作者取得授权。sf 里的 `search_fetch/src/search_fetch/vendor/crawl4ai/html2text/` 按 GPL-3.0 提供（见其中的 COPYING）。

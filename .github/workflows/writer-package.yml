@@ -180,7 +180,9 @@ jobs:
           grep -q "加载未打包的扩展程序" "${root}/使用说明.html"
           test -f "${root}/writer-skills/zh/lieflat-gongwen/参数卡.md"
           test -f "${root}/writer-skills/en/lieflat-gongwen/SKILL.md"
-          grep -q "PolyForm Noncommercial" "${root}/THIRD_PARTY/lieflat-gongwen/LICENSE"
+          # License texts stay in the repository: none in the package.
+          test ! -e "${root}/THIRD_PARTY"
+          test -z "$(find "${root}" -type f \( -iname 'LICENSE*' -o -iname 'LICENCE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' -o -iname '*-LICENSE*' \) -print -quit)"
 
       # The guide's Windows step: setx stores a user variable that a new process can read.
       - name: setx as in the guide
@@ -216,6 +218,9 @@ jobs:
           test -n "${sf}"
           state="${RUNNER_TEMP}/sf-state"
           PYAPP_INSTALL_DIR_SEARCH_FETCH="${state}/install" PYAPP_CACHE_DIR="${state}/cache" SEARCH_FETCH_HOME="${state}/home" "${sf}" --help
+          # The unpacked bundle carries no license files either.
+          test -d "${state}/install"
+          test -z "$(find "${state}/install" -type f \( -iname 'LICENSE*' -o -iname 'LICENCE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' -o -iname '*-LICENSE*' \) ! -name '*.py' -print -quit)"
 
       # The interactive interface in a pseudo-terminal (/wa, /skills, /lang in both languages).
       - name: Interface check

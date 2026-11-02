@@ -1,6 +1,6 @@
 // WriterAgent release packages carry pinned copies of fd and ripgrep (the user, 2026-11-01: latest
 // releases, SHA256-checked, no download at run time). This script puts the binary of one platform
-// into <package>/bin and its license files into <package>/THIRD_PARTY/<tool>/. Archives are cached
+// into <package>/bin; license texts stay in the repository (the user, 2026-11-02). Archives are cached
 // in .tmp/tools-cache and checked against the pinned SHA256 on every use; a mismatch stops the build.
 // Usage: node scripts/writer-tools.mjs <platform> <package dir>
 //   platform: darwin-arm64 darwin-x64 linux-x64 linux-arm64 windows-x64 windows-arm64
@@ -92,7 +92,7 @@ function walk(dir) {
 	});
 }
 
-/** Put the binary of tool into <pkgDir>/bin and its license files into <pkgDir>/THIRD_PARTY/<tool>; returns the binary path. */
+/** Put the binary of tool into <pkgDir>/bin; returns the binary path. */
 export function installTool(tool, platform, archive, pkgDir) {
 	// Unpack into a fresh temp folder.
 	const tmp = mkdtempSync(join(tmpdir(), `wa-${tool}-`));
@@ -108,10 +108,6 @@ export function installTool(tool, platform, archive, pkgDir) {
 		mkdirSync(dirname(target), { recursive: true });
 		copyFileSync(binary, target);
 		chmodSync(target, 0o755);
-		// License files.
-		const lic = join(pkgDir, "THIRD_PARTY", tool);
-		mkdirSync(lic, { recursive: true });
-		for (const f of files.filter((p) => /^(LICENSE|COPYING|UNLICENSE)/i.test(basename(p)))) copyFileSync(f, join(lic, basename(f)));
 		return target;
 	} finally {
 		rmSync(tmp, { recursive: true, force: true });

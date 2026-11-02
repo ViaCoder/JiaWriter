@@ -83,14 +83,14 @@ test("cachedArchive downloads once, reuses the cache, and refuses a wrong digest
 	await assert.rejects(cachedArchive("fd", "solaris-x64", cache, fetchFn), /no pinned fd/);
 });
 
-test("installTool puts the executable in bin/ and the licenses in THIRD_PARTY/, for tar.gz and zip", { skip: NO_ZIP }, () => {
+test("installTool puts only the executable in the package (bin/), for tar.gz and zip", { skip: NO_ZIP }, () => {
 	// Unix archive.
 	const pkg = join(dir, "pkg");
 	const fd = installTool("fd", "linux-x64", archive("fd.tar.gz", "fd").path, pkg);
 	assert.equal(fd, join(pkg, "bin", "fd"));
 	assert.equal(statSync(fd).mode & 0o777, 0o755);
-	assert.equal(readFileSync(join(pkg, "THIRD_PARTY", "fd", "LICENSE-MIT"), "utf-8"), "MIT");
-	assert.equal(existsSync(join(pkg, "THIRD_PARTY", "fd", "README.md")), false);
+	// The archive's license file stays out of the package.
+	assert.equal(existsSync(join(pkg, "THIRD_PARTY")), false);
 	// Windows archive.
 	const rg = installTool("rg", "windows-x64", archive("rg.zip", "rg.exe", true).path, pkg);
 	assert.equal(rg, join(pkg, "bin", "rg.exe"));

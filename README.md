@@ -128,6 +128,9 @@ The development machine is Linux x64, where the Linux setup commands were run; t
 
 ## License
 
-MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The `THIRD_PARTY/` folder of each package holds the licenses of fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate, Readability, the Unicode data and lieflat-gongwen. The parts of crawl4ai copied into `search_fetch/src/search_fetch/vendor/crawl4ai/` keep their licenses in that folder of the repository (crawl4ai and rank_bm25 Apache-2.0).
+MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The release packages carry no license files; the licenses are in this repository or with the upstream projects:
+
+- in this repository: Readability (`search_fetch/src/search_fetch/extension/vendor/Readability-LICENSE.md`), the Unicode data (`packages/coding-agent/src/writer/data/UNICODE-LICENSE.txt`), lieflat-gongwen (see below), and the parts of crawl4ai copied into `search_fetch/src/search_fetch/vendor/crawl4ai/` (crawl4ai and rank_bm25 Apache-2.0, html2text GPL-3.0);
+- with the upstream projects: fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate, Python and the Python packages inside sf (pinned in `search_fetch/pyproject.toml`).
 
 Exception: `skills/writer/*/lieflat-gongwen/`, `src/writer/gongwen/` and `src/extensions/writer-gongwen/` are under the [PolyForm Noncommercial License 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE), for noncommercial use only. Remove these three before commercial use, or get a license from the original author. `search_fetch/src/search_fetch/vendor/crawl4ai/html2text/` (inside sf) is under the GPL-3.0 (its COPYING file).

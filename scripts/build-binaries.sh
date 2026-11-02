@@ -23,8 +23,8 @@
 #     writeragent-linux-arm64.tar.gz
 #     writeragent-windows-x64.zip
 #     writeragent-windows-arm64.zip
-#   Each package also carries pinned fd and rg (bin/), the built-in writing skills (writer-skills/)
-#   and third-party license texts (THIRD_PARTY/).
+#   Each package also carries pinned fd and rg (bin/) and the built-in writing skills (writer-skills/).
+#   License texts stay in the repository, not in the packages (the user, 2026-11-02).
 
 set -euo pipefail
 
@@ -175,23 +175,14 @@ for platform in "${PLATFORMS[@]}"; do
     # WriterAgent: built-in writing skills, one folder per language (getWriterSkillsDir).
     mkdir -p "$OUTPUT_DIR/$platform/writer-skills"
     cp -R skills/writer/zh skills/writer/en "$OUTPUT_DIR/$platform/writer-skills/"
-    # WriterAgent: pinned fd and rg with SHA256 checks (bin/), and their licenses.
+    # WriterAgent: pinned fd and rg with SHA256 checks (bin/).
     node ../../scripts/writer-tools.mjs "$platform" "$OUTPUT_DIR/$platform"
-    # WriterAgent: license texts of bundled third-party code.
-    mkdir -p "$OUTPUT_DIR/$platform/THIRD_PARTY/unpdf" "$OUTPUT_DIR/$platform/THIRD_PARTY/docx" "$OUTPUT_DIR/$platform/THIRD_PARTY/fflate" "$OUTPUT_DIR/$platform/THIRD_PARTY/unicode"
-    cp ../../node_modules/unpdf/LICENSE ../../node_modules/unpdf/dist/licenses/* "$OUTPUT_DIR/$platform/THIRD_PARTY/unpdf/"
-    cp ../../node_modules/docx/LICENSE "$OUTPUT_DIR/$platform/THIRD_PARTY/docx/"
-    cp ../../node_modules/fflate/LICENSE "$OUTPUT_DIR/$platform/THIRD_PARTY/fflate/"
-    cp src/writer/data/UNICODE-LICENSE.txt "$OUTPUT_DIR/$platform/THIRD_PARTY/unicode/"
-    # WriterAgent: lieflat-gongwen (PolyForm Noncommercial) covers its skill folder and the gongwen_check port.
-    mkdir -p "$OUTPUT_DIR/$platform/THIRD_PARTY/lieflat-gongwen"
-    cp skills/writer/zh/lieflat-gongwen/LICENSE "$OUTPUT_DIR/$platform/THIRD_PARTY/lieflat-gongwen/LICENSE"
-    # WriterAgent: the Chrome extension (loaded once in chrome://extensions), Readability's license,
-    # the Chinese guide with screenshots for this system, and an empty reference folder.
+    # WriterAgent: the Chrome extension (loaded once in chrome://extensions), the Chinese guide with
+    # screenshots for this system, and an empty reference folder.
     cp -R ../../search_fetch/src/search_fetch/extension "$OUTPUT_DIR/$platform/chrome-extension"
-    mkdir -p "$OUTPUT_DIR/$platform/THIRD_PARTY/readability"
-    cp ../../search_fetch/src/search_fetch/extension/vendor/Readability-LICENSE.md "$OUTPUT_DIR/$platform/THIRD_PARTY/readability/LICENSE.md"
     node ../../scripts/writer-guide.mjs "$platform" "$OUTPUT_DIR/$platform/使用说明.html"
+    # WriterAgent: the license files that came along with the copied folders stay in the repository only.
+    rm -f "$OUTPUT_DIR/$platform/writer-skills/zh/lieflat-gongwen/LICENSE" "$OUTPUT_DIR/$platform/chrome-extension/vendor/Readability-LICENSE.md"
     mkdir -p "$OUTPUT_DIR/$platform/参考资料"
 
     # WriterAgent: the search_fetch binary of this platform, where locateSf looks.

@@ -99,6 +99,14 @@ rm -rf "$DIST"/python/{include,share,libs,tcl} "$DIST"/python/lib/{tcl,tk,itcl,t
   "$DIST/$STD"/{tkinter,idlelib,turtledemo,ensurepip} "$DIST/$STD"/lib-dynload/_tkinter* \
   "$DIST"/python/DLLs/{_tkinter.pyd,tcl86t.dll,tk86t.dll} "$DIST"/python/DLLs/_test*.pyd
 if [ "$os" = linux ]; then rm -f "$DIST"/python/lib/libpython3*.so*; fi
+# License texts (Python's, the dependencies' dist-info ones, the vendored crawl4ai and Readability ones) stay
+# in the repository and upstream, not in the bundle (the user, 2026-11-02). Source files are never matched.
+LICENSE_FILES=(-iname 'LICENSE*' -o -iname 'LICENCE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' -o -iname '*-LICENSE*')
+find "$DIST/python" -type f \( "${LICENSE_FILES[@]}" \) ! -name '*.py' -delete
+if [ -n "$(find "$DIST/python" -type f \( "${LICENSE_FILES[@]}" \) ! -name '*.py' -print -quit)" ]; then
+  echo "error: license files left in the bundle" >&2
+  exit 1
+fi
 # Every module the CLI uses must import from the bundle (a scratch home keeps the check out of $HOME).
 SEARCH_FETCH_HOME="$(native_path "$WORK/check-home")" "$DIST/$PY_REL" -I -c "import search_fetch.cli, search_fetch.fetch, search_fetch.search, search_fetch.ingest, search_fetch.docparse, search_fetch.media, search_fetch.bridge, search_fetch.vendor.crawl4ai.markdown_generator, search_fetch.vendor.crawl4ai.content_filter, pypdf, openpyxl, yt_dlp, idna; from search_fetch.markdown import _html_to_markdown; assert _html_to_markdown('<h1>t</h1><p>body text here</p>', 'https://example.com/')['raw']; print('==> imports ok')"
 rm -rf "$WORK/check-home"
