@@ -55,13 +55,17 @@ tar -xzf "$TARBALL" -C "$WORK"
 # The audited manifest and lockfile.
 cp -f "$DIR/pyapp/Cargo.toml" "$DIR/pyapp/Cargo.lock" "$SRC/"
 
-# 3. Two source patches, each checked: the cache folder follows PYAPP_CACHE_DIR (upstream always uses
-#    ~/.cache/pyapp), and the install-folder variable uses underscores (PYAPP_INSTALL_DIR_SEARCH_FETCH;
-#    PEP 503 turns the project name into search-fetch, and a hyphen cannot be exported in a shell).
+# 3. Three source patches, each checked: the cache folder follows PYAPP_CACHE_DIR (upstream always uses
+#    ~/.cache/pyapp), the install-folder variable uses underscores (PYAPP_INSTALL_DIR_SEARCH_FETCH;
+#    PEP 503 turns the project name into search-fetch, and a hyphen cannot be exported in a shell), and
+#    the wheel's METADATA is found on Windows too (upstream compares a path string that has backslashes
+#    there with ".dist-info/METADATA", so the build stops with "Unable to find project metadata").
 perl -0pi -e 's/pub fn cache_dir\(\) -> PathBuf \{\n    platform_dirs\(\)\.cache_dir\(\)\.to_path_buf\(\)\n\}/pub fn cache_dir() -> PathBuf {\n    match env::var("PYAPP_CACHE_DIR") {\n        Ok(dir) if !dir.is_empty() => PathBuf::from(dir),\n        _ => platform_dirs().cache_dir().to_path_buf(),\n    }\n}/s' "$SRC/src/app.rs"
 grep -q "PYAPP_CACHE_DIR" "$SRC/src/app.rs" || { echo "error: cache_dir patch did not apply" >&2; exit 1; }
 perl -0pi -e 's/"PYAPP_INSTALL_DIR_\{\}",\n        project_name\(\)\.to_uppercase\(\)/"PYAPP_INSTALL_DIR_{}",\n        project_name().to_uppercase().replace('"'"'-'"'"', "_")/s' "$SRC/src/app.rs"
 grep -q "replace('-', \"_\")" "$SRC/src/app.rs" || { echo "error: install-dir patch did not apply" >&2; exit 1; }
+perl -0pi -e 's/let entry_path = file\.enclosed_name\(\)\.unwrap\(\)\.to_string_lossy\(\)\.to_string\(\);/let entry_path = file.enclosed_name().unwrap().to_string_lossy().replace('"'"'\\\\'"'"', "\/");/' "$SRC/build.rs"
+grep -qF "to_string_lossy().replace('\\\\', \"/\")" "$SRC/build.rs" || { echo "error: wheel-metadata patch did not apply" >&2; exit 1; }
 
 # 4. Build-time configuration burnt into the binary.
 export PYAPP_PROJECT_NAME="search_fetch"
