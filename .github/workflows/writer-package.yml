@@ -15,7 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # search_fetch as a PyApp binary, built natively per platform (Windows under Git Bash, sf.exe).
+  # search_fetch as a PyApp binary, built natively per platform (Windows under Git Bash, sf.exe). The Windows
+  # Arm package uses the x64 sf through emulation (lxml 5.x and tiktoken have no Windows Arm wheels).
   build-sf:
     strategy:
       fail-fast: false
@@ -26,7 +27,6 @@ jobs:
           - { runner: macos-latest, name: macos-arm64 }
           - { runner: macos-15-intel, name: macos-amd64 }
           - { runner: windows-latest, name: windows-amd64 }
-          - { runner: windows-11-arm, name: windows-arm64 }
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
@@ -200,9 +200,12 @@ jobs:
         shell: bash
         run: node scripts/writer-smoke.mjs "${{ steps.pkg.outputs.binary }}"
 
-      # The bundled sf runs once in a throwaway state folder (the first run installs its packages).
+      # The bundled sf runs once in a throwaway state folder (the first run installs its packages),
+      # with PYTHONUTF8=1 as WriterAgent starts it.
       - name: Bundled sf runs
         shell: bash
+        env:
+          PYTHONUTF8: "1"
         run: |
           set -euo pipefail
           root="$(dirname "${{ steps.pkg.outputs.binary }}")"

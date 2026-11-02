@@ -114,7 +114,7 @@ WriterAgent 不做文字识别（OCR）：没有文字层的扫描件会列在�
   - 同一引擎两次检索至少间隔 20 秒，同一网站两次访问至少间隔 6 秒，都另加随机抖动；不打开内网和本机地址。遇到人机验证时，交互模式下 Chrome 窗口会跳到前台，等你完成（最多 90 秒）。
   - 第一次使用前在 Chrome 加载扩展：打开 `chrome://extensions`，打开“开发者模式”，点“加载未打包的扩展程序”，选择包里的 `chrome-extension` 文件夹。用 `/browser` 确认已连接。
 - `anysearch`：调用 AnySearch API，不设 key 时匿名调用。
-- `sf`：search_fetch，网页同样经这个扩展打开。它读取文档的文字层、视频的元数据和字幕，不做文字识别，也不做语音转写。6 个发布包都自带 sf（Windows 上是 `sf.exe`，经回环端口加令牌连接本机通信程序）。sf 第一次运行会安装依赖，约 1.1 GB，需要几分钟，全部放在 `~/.writeragent/agent/sf/`。
+- `sf`：search_fetch，网页同样经这个扩展打开。它读取文档的文字层、视频的元数据和字幕，不做文字识别，也不做语音转写。6 个发布包都自带 sf（Windows 上是 `sf.exe`，经回环端口加令牌连接本机通信程序）。Windows ARM 版的包带的是 x64 版 sf，由 Windows 11 的 x64 仿真运行，因为 sf 的两个依赖（crawl4ai 需要的 lxml 5.x，以及 tiktoken）没有 Windows ARM 版。sf 第一次运行会安装依赖，约 1.1 GB，需要几分钟，全部放在 `~/.writeragent/agent/sf/`。
 
 ## 联网与隐私
 

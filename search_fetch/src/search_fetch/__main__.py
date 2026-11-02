@@ -6,7 +6,8 @@ Seeds the environment from rag.env before importing search_fetch.cli (config.py
 freezes its knobs from the environment at import time). Real env always wins;
 rag.env only fills gaps. The driver-model names SF_URL / SF_KEY / SF_MODEL are
 reserved (old SEARCH_FETCH_LLM_* names are refused) for when a model is added back.
-Stdlib-only until the CLI runs.
+Standard output and error are UTF-8 on every system (Windows pipes default to the ANSI
+code page, which cannot hold Chinese text or "→"). Stdlib-only until the CLI runs.
 """
 # Process environment and exit codes.
 import os
@@ -95,7 +96,18 @@ def _load_env() -> None:
         os.environ.setdefault(k, v)
 
 
+def _utf8_stdio(streams=None) -> None:
+    """Switch the text streams (default stdout and stderr) to UTF-8; binary use through .buffer is unchanged."""
+    # Both standard text streams.
+    for stream in streams if streams is not None else (sys.stdout, sys.stderr):
+        # Only real text streams can be reconfigured (a test may replace them).
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
+
+
 def main(argv=None) -> int:
+    # UTF-8 output whatever the console or pipe code page is.
+    _utf8_stdio()
     # rag.env of this run.
     path = _env_file()
     # Old driver-model names anywhere stop the run with a clear message.

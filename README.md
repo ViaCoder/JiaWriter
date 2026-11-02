@@ -114,7 +114,7 @@ A skill made from a session collects only what you wrote in the current session 
   - Two queries to the same engine are at least 20 seconds apart, two visits to the same site at least 6 seconds, both with random jitter; local and private network addresses are refused. On a human check, interactive mode brings the Chrome window to the front and waits up to 90 seconds for you.
   - Before the first use, load the extension: open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and choose the package's `chrome-extension` folder. Check with `/browser`.
 - `anysearch`: the AnySearch API, anonymously when no key is set.
-- `sf`: search_fetch, whose pages go through the same extension. It reads the text layer of documents and the metadata and subtitles of videos; it does no OCR and no speech recognition. All six packages include sf (`sf.exe` on Windows, where it reaches the browser host through its loopback port and token). The first sf run installs its dependencies (about 1.1 GB, a few minutes), all under `~/.writeragent/agent/sf/`.
+- `sf`: search_fetch, whose pages go through the same extension. It reads the text layer of documents and the metadata and subtitles of videos; it does no OCR and no speech recognition. All six packages include sf (`sf.exe` on Windows, where it reaches the browser host through its loopback port and token). The Windows on Arm package carries the x64 sf, which Windows 11 runs through its x64 emulation, because two of sf's dependencies (lxml 5.x for crawl4ai, and tiktoken) have no Windows Arm build. The first sf run installs its dependencies (about 1.1 GB, a few minutes), all under `~/.writeragent/agent/sf/`.
 
 ## Network and privacy
 

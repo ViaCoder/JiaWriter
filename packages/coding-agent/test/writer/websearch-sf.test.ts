@@ -57,7 +57,8 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 		// Known and unknown systems.
 		expect(sfPlatform("darwin", "arm64")).toEqual({ os: "macos", arch: "arm64" });
 		expect(sfPlatform("linux", "x64")).toEqual({ os: "linux", arch: "amd64" });
-		expect(sfPlatform("win32", "arm64")).toEqual({ os: "windows", arch: "arm64" });
+		// Windows on Arm runs the x64 sf (emulation).
+		expect(sfPlatform("win32", "arm64")).toEqual({ os: "windows", arch: "amd64" });
 		expect([sfPlatform("freebsd", "x64"), sfPlatform("linux", "ia32")]).toEqual([null, null]);
 		// WA_SF first, then the release layout, then the agent dir.
 		const cfg = readSearchEnv({ WA_SF: "/opt/sf" }).config;
@@ -79,7 +80,7 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 		const want = join("/a", "sf", "macos", "amd64", "sf");
 		expect(locateSf(cfg, "darwin", "x64", "/x", "/a", (p) => p === want)).toBe(want);
 		// Windows finds sf.exe; nothing found.
-		const exe = join("/x", "search_fetch", "windows", "arm64", "sf.exe");
+		const exe = join("/x", "search_fetch", "windows", "amd64", "sf.exe");
 		expect(locateSf(cfg, "win32", "arm64", "/x", "/a", (p) => p === exe)).toBe(exe);
 		expect(() => locateSf(cfg, "linux", "x64", "/x", "/a", () => false)).toThrow("找不到 search_fetch");
 	});
@@ -93,6 +94,7 @@ describe("sfModelOff / sfStateEnv / sfChildEnv", () => {
 			PYAPP_CACHE_DIR: join("/a", "sf", "runtime", "cache"),
 			PIP_CACHE_DIR: join("/a", "sf", "pip-cache"),
 			SEARCH_FETCH_HOME: join("/a", "sf", "home"),
+			PYTHONUTF8: "1",
 		};
 		// Linux and macOS: the host's socket.
 		expect(sfStateEnv("/a", "linux")).toEqual({

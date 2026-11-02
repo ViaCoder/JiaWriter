@@ -99,6 +99,15 @@ class EntryAndConfigTest(Scratch):
             entry._load_env()
             self.assertEqual((os.environ["SF_URL"], os.environ["SF_MODEL"]), ("http://file/v1", "m-env"))
 
+    def test_utf8_stdio(self):
+        # A cp1252 stream (a Windows pipe) becomes UTF-8, so "→" and Chinese can be written; others are skipped.
+        raw = io.BytesIO()
+        cp = io.TextIOWrapper(raw, encoding="cp1252")
+        entry._utf8_stdio([cp, object()])
+        cp.write("→ 中文")
+        cp.flush()
+        self.assertEqual((cp.encoding, raw.getvalue().decode("utf-8")), ("utf-8", "→ 中文"))
+
     def test_config_log(self):
         # One prefixed line on stderr.
         err = io.StringIO()

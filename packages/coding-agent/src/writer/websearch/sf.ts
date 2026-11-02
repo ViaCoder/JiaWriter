@@ -30,12 +30,14 @@ export interface SfRun {
 	timedOut: boolean;
 }
 
-/** sf's platform folder names: linux|macos|windows and amd64|arm64 (null on other systems). */
+/** sf's platform folder names: linux|macos|windows and amd64|arm64 (null on other systems). Windows on Arm uses
+ * the x64 sf through Windows 11's x64 emulation: crawl4ai 0.9.0 needs lxml 5.x and the KB needs tiktoken, and
+ * neither has a Windows Arm wheel on PyPI (checked 2026-11-02). */
 export function sfPlatform(platform: NodeJS.Platform, arch: string): { os: string; arch: string } | null {
 	// Operating system.
 	const os = platform === "linux" ? "linux" : platform === "darwin" ? "macos" : platform === "win32" ? "windows" : "";
-	// CPU.
-	const cpu = arch === "x64" ? "amd64" : arch === "arm64" ? "arm64" : "";
+	// CPU (Windows on Arm: the x64 build).
+	const cpu = arch === "x64" || (arch === "arm64" && platform === "win32") ? "amd64" : arch === "arm64" ? "arm64" : "";
 	// Both must be known.
 	return os && cpu ? { os, arch: cpu } : null;
 }
@@ -92,7 +94,8 @@ export function sfModelOff(): Record<string, string> {
 
 /** Where a release sf keeps its state, all under <agentDir>/sf: PyApp's Python and packages, its download
  * cache, pip's cache, and search_fetch's own state (pacing, caches); its pages go through WriterAgent's
- * browser host: the socket on Linux and macOS, the port file (port and token) on Windows. */
+ * browser host: the socket on Linux and macOS, the port file (port and token) on Windows. PYTHONUTF8=1
+ * makes sf and the pip run of its first start read, write and print UTF-8 (Windows defaults to the ANSI code page). */
 export function sfStateEnv(agentDir: string, platform: NodeJS.Platform = process.platform): Record<string, string> {
 	// One folder for everything sf writes.
 	const root = join(agentDir, "sf");
@@ -103,6 +106,7 @@ export function sfStateEnv(agentDir: string, platform: NodeJS.Platform = process
 		PYAPP_CACHE_DIR: join(root, "runtime", "cache"),
 		PIP_CACHE_DIR: join(root, "pip-cache"),
 		SEARCH_FETCH_HOME: join(root, "home"),
+		PYTHONUTF8: "1",
 		...(addr.kind === "unix" ? { SEARCH_FETCH_BRIDGE_SOCKET: addr.path } : { SEARCH_FETCH_BRIDGE_FILE: addr.file }),
 	};
 }
