@@ -5,6 +5,7 @@ Covers the extension id derivation, paths, host-manifest locations per OS, the i
 (files, modes, manifest fields, launcher), native-messaging framing, the host's routing,
 and a protocol run end to end: the real host serves a real Unix socket, a thread plays the
 extension on the pipes Chrome would own, and sf clients (sync and async) get their replies.
+Also the loopback client of WriterAgent's Windows host (port file plus token).
 Run: python3 tests/test_bridge.py
 """
 # Async host and client.
@@ -171,6 +172,75 @@ class BridgeTest(unittest.TestCase):
         with self.assertRaisesRegex(bridge.BridgeError, "nope"):
             bridge._reply_result(b'{"ok":false,"error":"nope"}')
         self.assertEqual(json.loads(bridge._request_line("open", {"url": "u"}, 5)), {"op": "open", "args": {"url": "u"}, "timeout": 5})
+
+    def test_address(self):
+        # Unix socket by default; a port file when SEARCH_FETCH_BRIDGE_FILE is set or on Windows.
+        with mock.patch.dict(os.environ, {"SEARCH_FETCH_BRIDGE_FILE": "", "SEARCH_FETCH_BRIDGE_SOCKET": ""}):
+            self.assertEqual(bridge.address(), ("unix", self.home / "bridge" / "bridge.sock"))
+            with mock.patch.object(bridge.sys, "platform", "win32"):
+                self.assertEqual(bridge.address(), ("tcp", self.home / "bridge" / "bridge.json"))
+        with mock.patch.dict(os.environ, {"SEARCH_FETCH_BRIDGE_FILE": str(self.home / "p.json")}):
+            self.assertEqual(bridge.address(), ("tcp", self.home / "p.json"))
+
+    def test_tcp_info(self):
+        # Missing file and bad port: not connected; a good file gives port and token.
+        p = self.home / "p.json"
+        with self.assertRaises(bridge.BridgeUnavailable):
+            bridge._tcp_info(p)
+        p.write_text(json.dumps({"port": 0, "token": "t"}), encoding="utf-8")
+        with self.assertRaises(bridge.BridgeUnavailable):
+            bridge._tcp_info(p)
+        p.write_text(json.dumps({"port": 4321, "token": "ab"}), encoding="utf-8")
+        self.assertEqual(bridge._tcp_info(p), (4321, "ab"))
+
+    def test_request_line_with_token(self):
+        # The loopback host's token rides in the request; none without it.
+        self.assertEqual(json.loads(bridge._request_line("status", {}, 3, "tok"))["token"], "tok")
+        self.assertNotIn("token", json.loads(bridge._request_line("status", {}, 3)))
+
+    def test_tcp_client_end_to_end(self):
+        # A loopback host like WriterAgent's on Windows: one JSON line in, one out, token checked.
+        import socketserver
+        token = "f" * 64
+
+        class Handler(socketserver.StreamRequestHandler):
+            def handle(self):
+                req = json.loads(self.rfile.readline())
+                ok = req.get("token") == token
+                reply = {"ok": True, "result": {"op": req["op"], **req["args"]}} if ok else {"ok": False, "error": "bad token"}
+                self.wfile.write(json.dumps(reply).encode() + b"\n")
+
+        srv = socketserver.ThreadingTCPServer(("127.0.0.1", 0), Handler)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        port_file = self.home / "bridge.json"
+        try:
+            port_file.write_text(json.dumps({"port": srv.server_address[1], "token": token}), encoding="utf-8")
+            with mock.patch.dict(os.environ, {"SEARCH_FETCH_BRIDGE_FILE": str(port_file)}):
+                # Sync and async clients.
+                self.assertEqual(bridge.call("open", url="u"), {"op": "open", "url": "u"})
+                self.assertEqual(asyncio.run(bridge.acall("status")), {"op": "status"})
+                # A wrong token is refused by the host.
+                port_file.write_text(json.dumps({"port": srv.server_address[1], "token": "bad"}), encoding="utf-8")
+                with self.assertRaisesRegex(bridge.BridgeError, "bad token"):
+                    bridge.call("status")
+        finally:
+            srv.shutdown()
+            srv.server_close()
+        # Nobody listens on the port any more: not connected.
+        with mock.patch.dict(os.environ, {"SEARCH_FETCH_BRIDGE_FILE": str(port_file)}):
+            with self.assertRaises(bridge.BridgeUnavailable):
+                bridge.call("status")
+            with self.assertRaises(bridge.BridgeUnavailable):
+                asyncio.run(bridge.acall("status"))
+
+    def test_windows_has_no_own_host(self):
+        # On Windows WriterAgent is the host: install refuses, bridge-host explains and exits 2.
+        with self.assertRaisesRegex(RuntimeError, "WriterAgent"):
+            bridge.install("win32", self.home / "u")
+        with mock.patch.object(bridge.sys, "platform", "win32"), contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(bridge.host_main([f"chrome-extension://{bridge.extension_id()}/"]), 2)
+        self.assertIn("/browser", err.getvalue())
+        self.assertFalse((self.home / "u").exists())
 
     def test_protocol_end_to_end(self):
         # Pipes Chrome would own: host reads ext→host, writes host→ext.

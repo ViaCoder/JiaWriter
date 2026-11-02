@@ -22,9 +22,7 @@ PYBIN="$VENV/bin/python3"
 # The pinned, validated dependency set lives in ONE place — pyproject.toml
 # [project.dependencies] — shared by this dev setup, the wheel, and the PyApp
 # release packaging. Bump pins there, deliberately.
-# Document parsing (docparse.py): pypdf→pdf text, openpyxl→xlsx, markitdown→pptx/docx;
-# gradio_client drives the PaddleOCR-VL HF Space for image/scanned-PDF OCR (PDF pages are
-# rasterized with the system `pdftoppm` from poppler-utils — install that for PDF OCR).
+# Document parsing (docparse.py): pypdf→pdf text, openpyxl→xlsx, markitdown→pptx/docx (text layers, no OCR).
 
 # ── tiny progress helpers (phase counter + elapsed seconds) ──────────
 STEP=0; TOTAL=5
@@ -90,8 +88,8 @@ fi
 deps_ok(){ "$PYBIN" - <<'PYCHK' >/dev/null 2>&1
 from crawl4ai.markdown_generation_strategy import DefaultMarkdownGenerator  # noqa
 from crawl4ai.content_filter_strategy import PruningContentFilter, BM25ContentFilter  # noqa
-import pypdf, openpyxl, markitdown, gradio_client  # noqa  (docparse parsing + OCR)
-import yt_dlp  # noqa  (media: YouTube subtitles + short-media download for ASR)
+import pypdf, openpyxl, markitdown  # noqa  (docparse parsing)
+import yt_dlp  # noqa  (media: metadata + YouTube subtitles)
 import numpy, requests, tiktoken  # noqa  (kb.py: embeddings index + retrieval)
 PYCHK
 }
@@ -128,7 +126,7 @@ SEARCH_FETCH_HOME="$SEARCH_FETCH_HOME" exec "$PYBIN" "$DIR/sf.py" "\$@"
 LAUNCH
 chmod 700 "$SEARCH_FETCH_HOME/sf"
 step "Verify: sf.py imports + runs under the venv"
-if SEARCH_FETCH_HOME="$SEARCH_FETCH_HOME" "$PYBIN" "$DIR/sf.py" tasks list --json >/dev/null 2>&1; then
+if SEARCH_FETCH_HOME="$SEARCH_FETCH_HOME" "$PYBIN" "$DIR/sf.py" browser status --json >/dev/null 2>&1; then
   echo "    ✓ sf.py OK under $PYBIN"
 else
   echo "✗ sf.py failed under the venv — re-run after fixing:  SEARCH_FETCH_REINSTALL=1 bash setup.sh"

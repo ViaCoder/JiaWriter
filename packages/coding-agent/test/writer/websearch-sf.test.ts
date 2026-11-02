@@ -25,7 +25,7 @@ import {
 	sfStateEnv,
 } from "../../src/writer/websearch/sf.ts";
 
-// sf has no Windows build and these cases run fake sf shell scripts: Linux and macOS only.
+// These cases run fake sf scripts with a shebang line: Linux and macOS only.
 const UNIX_ONLY = process.platform === "win32";
 
 // Directory of the fake sf.
@@ -57,7 +57,8 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 		// Known and unknown systems.
 		expect(sfPlatform("darwin", "arm64")).toEqual({ os: "macos", arch: "arm64" });
 		expect(sfPlatform("linux", "x64")).toEqual({ os: "linux", arch: "amd64" });
-		expect([sfPlatform("win32", "x64"), sfPlatform("linux", "ia32")]).toEqual([null, null]);
+		expect(sfPlatform("win32", "arm64")).toEqual({ os: "windows", arch: "arm64" });
+		expect([sfPlatform("freebsd", "x64"), sfPlatform("linux", "ia32")]).toEqual([null, null]);
 		// WA_SF first, then the release layout, then the agent dir.
 		const cfg = readSearchEnv({ WA_SF: "/opt/sf" }).config;
 		expect(sfCandidates(cfg, "linux", "arm64", "/app", "/home/u/.writeragent/agent")).toEqual([
@@ -65,15 +66,21 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 			join("/app", "search_fetch", "linux", "arm64", "sf"),
 			join("/home/u/.writeragent/agent", "sf", "linux", "arm64", "sf"),
 		]);
+		// Windows: sf.exe in the windows folders.
+		expect(sfCandidates(readSearchEnv({}).config, "win32", "x64", "/app", "/ag")).toEqual([
+			join("/app", "search_fetch", "windows", "amd64", "sf.exe"),
+			join("/ag", "sf", "windows", "amd64", "sf.exe"),
+		]);
 	});
-	it("returns the first existing candidate and explains Windows and a miss", () => {
+	it("returns the first existing candidate on every system and explains a miss", () => {
 		// Configuration without WA_SF.
 		const cfg = readSearchEnv({}).config;
 		// Second candidate exists.
 		const want = join("/a", "sf", "macos", "amd64", "sf");
 		expect(locateSf(cfg, "darwin", "x64", "/x", "/a", (p) => p === want)).toBe(want);
-		// Windows and nothing found.
-		expect(() => locateSf(cfg, "win32", "x64", "/x", "/a")).toThrow("暂不支持 Windows");
+		// Windows finds sf.exe; nothing found.
+		const exe = join("/x", "search_fetch", "windows", "arm64", "sf.exe");
+		expect(locateSf(cfg, "win32", "arm64", "/x", "/a", (p) => p === exe)).toBe(exe);
 		expect(() => locateSf(cfg, "linux", "x64", "/x", "/a", () => false)).toThrow("找不到 search_fetch");
 	});
 });
@@ -81,12 +88,21 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 describe("sfModelOff / sfStateEnv / sfChildEnv", () => {
 	it("keeps sf's state under the agent folder and points it at WriterAgent's browser host", () => {
 		// PyApp runtime, caches and search_fetch's home.
-		expect(sfStateEnv("/a")).toEqual({
+		const state = {
 			PYAPP_INSTALL_DIR_SEARCH_FETCH: join("/a", "sf", "runtime", "install"),
 			PYAPP_CACHE_DIR: join("/a", "sf", "runtime", "cache"),
 			PIP_CACHE_DIR: join("/a", "sf", "pip-cache"),
 			SEARCH_FETCH_HOME: join("/a", "sf", "home"),
+		};
+		// Linux and macOS: the host's socket.
+		expect(sfStateEnv("/a", "linux")).toEqual({
+			...state,
 			SEARCH_FETCH_BRIDGE_SOCKET: join("/a", "browser", "bridge.sock"),
+		});
+		// Windows: the port file the host writes (port and token).
+		expect(sfStateEnv("/a", "win32")).toEqual({
+			...state,
+			SEARCH_FETCH_BRIDGE_FILE: join("/a", "browser", "bridge.json"),
 		});
 	});
 	it("clears every driver-model variable, even ones the user set, and lets the parent choose the folders", () => {
@@ -100,6 +116,8 @@ describe("sfModelOff / sfStateEnv / sfChildEnv", () => {
 			...sfModelOff(),
 			SEARCH_FETCH_NO_HUMAN: "1",
 		});
+		// Windows children get the port file.
+		expect(sfChildEnv({}, true, "/a", "win32").SEARCH_FETCH_BRIDGE_FILE).toBe(join("/a", "browser", "bridge.json"));
 		// Interactive; the parent's SEARCH_FETCH_HOME wins.
 		expect(sfChildEnv({ A: "1", SEARCH_FETCH_HOME: "/mine" }, true, "/a")).toEqual({
 			...sfStateEnv("/a"),

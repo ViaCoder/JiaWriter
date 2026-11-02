@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # search_fetch as a PyApp binary, built natively per platform (no Windows build).
+  # search_fetch as a PyApp binary, built natively per platform (Windows under Git Bash, sf.exe).
   build-sf:
     strategy:
       fail-fast: false
@@ -25,6 +25,8 @@ jobs:
           - { runner: ubuntu-24.04-arm, name: linux-arm64 }
           - { runner: macos-latest, name: macos-arm64 }
           - { runner: macos-15-intel, name: macos-amd64 }
+          - { runner: windows-latest, name: windows-amd64 }
+          - { runner: windows-11-arm, name: windows-arm64 }
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
@@ -37,7 +39,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      # setup-python provides `python` on Windows (python3 is not guaranteed there).
       - name: Build sf
+        shell: bash
+        env:
+          PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
         run: bash search_fetch/build_binary.sh --out sf-dist
 
       - name: Upload sf
@@ -196,12 +202,15 @@ jobs:
 
       # The bundled sf runs once in a throwaway state folder (the first run installs its packages).
       - name: Bundled sf runs
-        if: runner.os != 'Windows'
         shell: bash
         run: |
           set -euo pipefail
           root="$(dirname "${{ steps.pkg.outputs.binary }}")"
-          sf="$(ls "${root}"/search_fetch/*/*/sf)"
+          sf=""
+          for c in "${root}"/search_fetch/*/*/sf "${root}"/search_fetch/*/*/sf.exe; do
+            if [ -f "${c}" ]; then sf="${c}"; fi
+          done
+          test -n "${sf}"
           state="${RUNNER_TEMP}/sf-state"
           PYAPP_INSTALL_DIR_SEARCH_FETCH="${state}/install" PYAPP_CACHE_DIR="${state}/cache" PIP_CACHE_DIR="${state}/pip" SEARCH_FETCH_HOME="${state}/home" "${sf}" --help
 

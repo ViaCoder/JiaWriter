@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
-"""Media + background-task tests — NO network, NO browser, NO yt-dlp download.
+"""Media tests — NO network, NO browser, NO yt-dlp download.
 
-Pure logic: URL classification, VTT cleaning, subtitle language ordering, ASR
-eligibility gates. Plus the FULL task-spool machinery end-to-end with a real
-detached worker subprocess (an unknown-kind task, so the worker exercises
-enqueue → run_worker → failed-state without touching any remote service).
-Runnable anywhere: `python3 tests/test_media_tasks.py`.
+Pure logic: URL classification, VTT cleaning, subtitle language ordering, the
+deadline helper, and the metadata-only answer for media without subtitles (there
+is no speech recognition). Plus the outbound-policy checks of the media path.
+Runnable anywhere: `python3 tests/test_media.py`.
 """
 import contextlib
 import http.server
 import io
-import json
 import os
 import socket
 import sys
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src"))
-from search_fetch import config, media, tasks  # noqa: E402
+from search_fetch import config, media  # noqa: E402
 
 _fail = 0
 
@@ -61,48 +60,31 @@ def run():
     check("pref languages next (zh before en)",
           order.index("zh-Hans") < order.index("en") < order.index("fr"))
 
-    # ── ASR eligibility gates ───────────────────────────────────────
-    check("live stream refused", "直播" in media._asr_eligibility({"is_live": True}))
-    check("overlong refused", "超过" in media._asr_eligibility({"duration": config.ASR_MAX_DURATION + 1}))
-    check("oversized refused", "上限" in media._asr_eligibility(
-        {"duration": 10, "filesize": (config.ASR_MAX_MB + 1) * 1024 * 1024}))
-    check("short media allowed", media._asr_eligibility({"duration": 30}) == "")
-    check("unknown duration allowed (caps enforced at download)",
-          media._asr_eligibility({}) == "")
+    # ── _call_deadline: hard deadline around library calls that have none of their own ──
+    check("deadline: fast call returns", media._call_deadline(lambda: 42, 5) == 42)
+    try:
+        media._call_deadline(lambda: time.sleep(3), 0.2)
+        check("deadline: hung call raises TimeoutError", False)
+    except TimeoutError:
+        check("deadline: hung call raises TimeoutError", True)
+    try:
+        media._call_deadline(lambda: 1 / 0, 5)
+        check("deadline: inner exception surfaces", False)
+    except ZeroDivisionError:
+        check("deadline: inner exception surfaces", True)
 
-    # ── task spool end-to-end (real detached worker, no remote calls) ─
-    old_cwd = os.getcwd()
-    with tempfile.TemporaryDirectory(prefix="sf-tasks-") as tmp:
-        os.chdir(tmp)
-        try:
-            tid = tasks.enqueue("bogus_kind", {"source": "https://x.com/a"})
-            rep = tasks.wait_all(timeout=30)
-            failed = {t["id"]: t for t in rep["failed"]}
-            check("worker ran and reported failure for unknown kind",
-                  tid in failed and "unknown task kind" in (failed[tid].get("error") or ""))
-            check("no pending tasks after barrier", rep["pending"] == [])
-
-            # snapshot staleness: a pending record older than TASK_STALE reads failed
-            d = tasks._tasks_dir()
-            stale = d / "ocr-stale00000.json"
-            stale.write_text(json.dumps({
-                "id": "ocr-stale00000", "kind": "ocr", "payload": {},
-                "status": "running",
-                "created": "2020-01-01T00:00:00+00:00"}), encoding="utf-8")
-            recs = {r["id"]: r for r in tasks.snapshot()}
-            check("stale running task reads failed",
-                  recs["ocr-stale00000"]["status"] == "failed")
-
-            # `since` filters out earlier tasks
-            recent = tasks.snapshot(since="2100-01-01T00:00:00+00:00")
-            check("since filter excludes old tasks", recent == [])
-
-            check("clear removes the spool", tasks.clear() >= 2)
-        finally:
-            os.chdir(old_cwd)
+    # ── no subtitles: metadata only (no speech recognition, no download) ──
+    saved_probe = media.probe
+    media.probe = lambda url: {"title": "节目", "webpage_url": "https://v.example/p", "duration": 30}
+    try:
+        page = media.fetch_media("https://v.example/a.mp3", "media")
+    finally:
+        media.probe = saved_probe
+    check("no subtitles: metadata block and a note", "节目" in page["markdown"] and "无可用字幕" in page["markdown"])
+    check("no subtitles: no task and no transcript", set(page) == {"final_url", "markdown"} and "转写" not in page["markdown"])
 
     media_guard_tests()
-    print("\nMEDIA+TASKS:", "PASS ✓" if _fail == 0 else f"{_fail} FAILED ✗")
+    print("\nMEDIA:", "PASS ✓" if _fail == 0 else f"{_fail} FAILED ✗")
     return _fail == 0
 
 
@@ -145,7 +127,7 @@ def _serve_on(addr):
 
 
 def media_guard_tests():
-    """2026-10-12: yt-dlp (probe / subtitles / ASR download) and the subtitle fetch obey
+    """2026-10-12: yt-dlp (probe / subtitles) and the subtitle fetch obey
     the outbound policy — including redirect hops that never pass through url_guard's
     own urlopen. Offline: only 127.0.0.x servers, IP-literal URLs (no DNS)."""
     from search_fetch import url_guard
@@ -174,32 +156,18 @@ def media_guard_tests():
         def sanitize_info(self, info):
             return info
 
-        def download(self, urls):
-            seen["download"] = socket.getaddrinfo is url_guard._guarded_getaddrinfo
-            seen["format"] = self.opts.get("format", "")
-
     fake_mod = type(sys)("yt_dlp")
     fake_mod.YoutubeDL = FakeYDL
     real_mod = sys.modules.get("yt_dlp")
     sys.modules["yt_dlp"] = fake_mod
     try:
         media.probe("https://example.org/a.mp3")
-        with tempfile.TemporaryDirectory(prefix="sf-media-") as td:
-            try:
-                media._download_audio("https://example.org/a.mp3", td)
-            except RuntimeError:
-                pass   # the fake writes no file
     finally:
         if real_mod is not None:
             sys.modules["yt_dlp"] = real_mod
         else:
             sys.modules.pop("yt_dlp", None)
     check("yt-dlp probe runs inside the resolution guard", seen.get("probe") is True)
-    check("yt-dlp download runs inside the resolution guard", seen.get("download") is True)
-    fmt = seen.get("format", "")
-    alts = fmt.split("/")
-    check("ASR download format restricted to Python-native protocols (no ffmpeg/rtmp/rtsp fetch)",
-          bool(alts) and all("[protocol^=http]" in a or "[protocol=m3u8_native]" in a for a in alts))
     check("guard released after yt-dlp returns", socket.getaddrinfo is url_guard._sys_getaddrinfo)
 
     # (2) subtitle tracks are fetched through the guard: a track URL on a private

@@ -21,12 +21,10 @@ def _default_home() -> Path:
 
 HOME = Path(os.environ.get("SEARCH_FETCH_HOME") or _default_home())
 # Third-party caches follow HOME so nothing lands outside the package:
-# crawl4ai's base dir (it creates one on import), yt-dlp's cache (media.py),
-# tiktoken's BPE download (kb.py — defaults to /tmp/data-gym-cache) and
-# gradio_client's Space-output dir (media/OCR workers — defaults to /tmp/gradio).
+# crawl4ai's base dir (it creates one on import), yt-dlp's cache (media.py) and
+# tiktoken's BPE download (kb.py — defaults to /tmp/data-gym-cache).
 os.environ.setdefault("CRAWL4AI_BASE_DIRECTORY", str(HOME))
 os.environ.setdefault("TIKTOKEN_CACHE_DIR", str(HOME / "tiktoken-cache"))
-os.environ.setdefault("GRADIO_TEMP_DIR", str(HOME / "gradio-tmp"))
 _RUN_ID_RE = re.compile(r"[A-Za-z0-9_-]{1,64}")
 _TRUE = ("1", "true", "yes", "on")
 
@@ -166,33 +164,12 @@ def _log(msg: str):
 # always sets SEARCH_FETCH_HOME explicitly.
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# ── Media understanding (YouTube subtitles + short-media ASR) ────────
-# yt-dlp fetches metadata + subtitles for YouTube (and most video sites); short
-# video/audio without subtitles is transcribed REMOTELY on the Qwen3-ASR HF Space
-# (automatic language detection). Live streams and oversized media are NEVER
-# downloaded — their metadata/description already carries the gist (video has low
-# information density); the notes say why.
-ASR_ENABLED = os.environ.get("SEARCH_FETCH_ASR", "on").strip().lower() not in ("0", "off", "false", "no", "")
-ASR_SPACE = os.environ.get("SEARCH_FETCH_ASR_SPACE", "Qwen/Qwen3-ASR")
-ASR_API = os.environ.get("SEARCH_FETCH_ASR_API", "/transcribe")
-ASR_TIMEOUT = float(os.environ.get("SEARCH_FETCH_ASR_TIMEOUT", "240"))   # per remote ASR call
-ASR_RETRIES = int(os.environ.get("SEARCH_FETCH_ASR_RETRIES", "2"))
-# "short videos and audio" — anything longer is represented by metadata + description only.
-ASR_MAX_DURATION = float(os.environ.get("SEARCH_FETCH_ASR_MAX_DURATION", "900"))  # seconds
-ASR_MAX_MB = int(os.environ.get("SEARCH_FETCH_ASR_MAX_MB", "60"))                 # download cap
+# ── Media (YouTube subtitles and metadata) ────────────────────────────
+# yt-dlp fetches metadata + subtitles for YouTube (and most video sites); media
+# without subtitles is represented by its metadata and description (no download,
+# no speech recognition).
 # Subtitle language preference AFTER the video's original language (comma list).
 SUB_LANG_PREF = [s.strip() for s in os.environ.get("SEARCH_FETCH_SUB_LANGS", "zh,en").split(",") if s.strip()]
 MEDIA_EXTS = {".mp3", ".m4a", ".wav", ".ogg", ".opus", ".flac", ".aac",
               ".mp4", ".webm", ".mov", ".mkv", ".avi"}
 
-# ── Background tasks (OCR + ASR run detached; the KB build waits) ────
-# OCR/ASR must never block further searching/fetching, so the CLI fetch path
-# enqueues them as detached worker processes under .search_fetchres/tasks/.
-# Before the knowledge base is built the caller runs `sf.py tasks wait` — a
-# barrier bounded by SEARCH_FETCH_TASK_WAIT so one hung HF Space can only cost
-# the timeout, never the run.
-TASK_WAIT = float(os.environ.get("SEARCH_FETCH_TASK_WAIT", "300"))
-# A pending/running task older than this is treated as failed(stale) — a crashed
-# worker from an earlier run must not make every later barrier wait the full timeout.
-TASK_STALE = float(os.environ.get("SEARCH_FETCH_TASK_STALE", "3600"))
-TASKS_DIRNAME = "tasks"

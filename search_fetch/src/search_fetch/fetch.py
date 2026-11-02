@@ -3,9 +3,9 @@
 Deterministic and model-free: only a suspicious/empty page gets ONE extra
 challenge check (_still_blocked). Media URLs (YouTube / audio / video) route to
 search_fetch.media; document URLs (pdf/docx/…) route to search_fetch.docparse.
-OCR and ASR run as BACKGROUND tasks (search_fetch.tasks) on the CLI path so
-they never block further searching/fetching; --sync runs them
-inline (its caller needs the content in the reply).
+There is no OCR and no speech recognition: a document without a text layer
+(image, scanned PDF) is left to the browser path, and media without subtitles
+returns its metadata only.
 """
 
 # Blocking work runs in threads.
@@ -26,8 +26,8 @@ import time
 # Plausibility of publication years.
 from datetime import date
 
-# Writers, browser, knobs, parsing, rendering, media, tasks and both URL policies.
-from . import artifacts, browser, config, docparse, filters, known_urls, markdown, media, tasks, url_guard
+# Writers, browser, knobs, parsing, rendering, media and both URL policies.
+from . import artifacts, browser, config, docparse, filters, known_urls, markdown, media, url_guard
 
 # Shared stderr logger.
 from .config import _log
@@ -39,14 +39,7 @@ def _doc_suffix(doc: dict, url: str) -> str:
     return docparse.doc_suffix(doc["meta"]["kind"], doc["final_url"] or url)
 
 
-def _enqueue_ocr(doc: dict, url: str, bin_path) -> str:
-    """Start the background OCR task of a document whose binary is saved at bin_path; return the task id."""
-    # The worker reads the saved binary.
-    return tasks.enqueue("ocr", {"bin": str(bin_path), "kind": doc["meta"]["kind"],
-                                 "suffix": _doc_suffix(doc, url), "source": doc["final_url"] or url})
-
-
-def _grab_page_docs(html: str, final_url: str, defer: bool = False) -> list:
+def _grab_page_docs(html: str, final_url: str) -> list:
     """Browser-path bonus: download + parse the documents (pdf/docx/…) LINKED on the fetched
     page, capped at config.PAGE_DOCS_MAX. Sure links (document extension) are taken as-is; if the
     cap has room, extensionless links that HINT at a document (…/pdf/…, /download?id=…) are
@@ -82,7 +75,7 @@ def _grab_page_docs(html: str, final_url: str, defer: bool = False) -> list:
             break
         # One failing document costs only itself.
         try:
-            doc = docparse.try_fetch_document(u, assume_doc=True, keep_bytes=True, defer_ocr=defer)
+            doc = docparse.try_fetch_document(u, assume_doc=True, keep_bytes=True)
         except Exception as ex:
             _log(f"page doc failed {u}: {ex}")
             continue
@@ -91,20 +84,6 @@ def _grab_page_docs(html: str, final_url: str, defer: bool = False) -> list:
             continue
         # The original binary next to the parsed text.
         bin_path = artifacts._save_binary(doc["final_url"] or u, _doc_suffix(doc, u), doc.pop("data", b""))
-        # OCR deferred to a background task, which needs the saved binary.
-        if doc.get("needs_task"):
-            # Without the binary there is nothing to OCR.
-            if bin_path is None:
-                _log(f"page doc {u}: OCR needed but the binary could not be saved — skipped")
-                continue
-            # Start the task.
-            tid = _enqueue_ocr(doc, u, bin_path)
-            # Ledger row.
-            artifacts._append_index("doc-ocr", u, [bin_path], final_url)
-            # Record without text yet.
-            rows.append({"url": doc["final_url"], "kind": doc["meta"]["kind"], "chars": 0, "file": str(bin_path), "task": tid})
-            _log(f"page doc {doc['meta']['kind']}: {u} → OCR task {tid}")
-            continue
         # Parsed text as a page.
         fit, _ = artifacts._save_results(u, doc["final_url"], {"fit": doc["text"], "raw": doc["text"]}, {"docparse": doc["meta"]})
         # Ledger row with both files.
@@ -211,49 +190,34 @@ def _emit_page(payload: dict, as_json: bool):
           if as_json else payload["markdown"])
 
 
-def _route_document(url: str, defer_ocr: bool):
+def _route_document(url: str):
     """Document routing for the CLI path: extension → direct; extensionless →
     header sniff. Returns (doc_dict_or_None, attempted): `attempted` is True when
-    docparse FULLY tried this URL (downloaded/parsed/OCR'd) — the browser path's
-    DOC_RESCUE must then not repeat the whole pipeline on an OCR-empty result."""
+    docparse FULLY tried this URL (downloaded and parsed) — the browser path's
+    DOC_RESCUE must then not repeat the download on a document without text."""
     # A document extension: parse directly.
     if docparse.looks_like_document(url):
-        return docparse.try_fetch_document(url, defer_ocr=defer_ocr, keep_bytes=True), True
+        return docparse.try_fetch_document(url, keep_bytes=True), True
     # Extensionless but worth a header sniff, and the server confirms a document.
     if docparse.worth_sniffing(url) and docparse.sniff_remote_kind(url):
-        return docparse.try_fetch_document(url, assume_doc=True, defer_ocr=defer_ocr, keep_bytes=True), True
+        return docparse.try_fetch_document(url, assume_doc=True, keep_bytes=True), True
     # A web page.
     return None, False
 
 
 def _finish_doc(requested_url: str, doc: dict) -> dict:
-    """Persist a parsed document — or, when its OCR was deferred (needs_task), save
-    the binary + enqueue the background OCR task — and return {final_url, markdown}."""
+    """Persist a parsed document (text plus its original binary) and return {final_url, markdown}."""
     # Where the document ended up.
     final = doc["final_url"]
     # The original binary (pdf/docx/…) beside the parsed text when it was kept, so the user can open the source itself.
     data = doc.get("data")
     bin_path = artifacts._save_binary(final or requested_url, _doc_suffix(doc, requested_url), data) if data else None
-    # OCR deferred to a background task.
-    if doc.get("needs_task"):
-        # The task needs the saved binary.
-        if bin_path is None:
-            raise RuntimeError(f"{requested_url}: OCR needed but the document could not be saved")
-        # Start it.
-        tid = _enqueue_ocr(doc, requested_url, bin_path)
-        # Ledger row.
-        artifacts._append_index("doc-ocr", requested_url, [bin_path], final)
-        _log(f"docparse {doc['meta']['kind']}: OCR deferred → background task {tid}")
-        # A receipt instead of text.
-        note = (f"[OCR running in background: task {tid} — {doc['meta']['kind']} saved as "
-                f"{bin_path.name}; the text joins the knowledge base after `tasks wait`]")
-        return {"final_url": final, "markdown": note, "task": tid}
     # Parsed text as a page.
     fit, raw = artifacts._save_results(requested_url, final, {"fit": doc["text"], "raw": doc["text"]},
                                        {"final_url": final, "docparse": doc["meta"]})
     # Ledger row with every saved file.
     artifacts._append_index("fetch", requested_url, [p for p in (fit, raw, bin_path) if p], final)
-    _log(f"docparse {doc['meta']['kind']} → {doc['meta']['chars']}B{' (OCR)' if doc['meta'].get('ocr_used') else ''}")
+    _log(f"docparse {doc['meta']['kind']} → {doc['meta']['chars']}B")
     # Bounded body.
     return {"final_url": final, "markdown": markdown._clamp_chars(doc["text"], config.FETCH_MAX_CHARS)}
 
@@ -286,29 +250,23 @@ def _page_body(md: dict, meta: dict) -> str:
     return markdown._clamp_chars(body_md, config.FETCH_MAX_CHARS)
 
 
-async def run_fetch(url: str, query: str = None, as_json: bool = False, defer: bool = True):
-    """The `fetch` subcommand — ONE decision ladder: media → document → browser.
-
-    `defer=True` (the CLI/research contract) backgrounds OCR and ASR so they never
-    block further searching/fetching; the fetch returns immediately with a task
-    receipt and the KB barrier (`sf.py tasks wait`) collects the text later.
-    `sf.py fetch --sync` calls the same pieces with defer=False (its caller needs the
-    content in the reply, bounded by the per-call deadlines)."""
+async def run_fetch(url: str, query: str = None, as_json: bool = False):
+    """The `fetch` subcommand — ONE decision ladder: media → document → browser."""
     # 0. Outbound policy FIRST — the URL comes from an LLM that reads untrusted pages: http(s) only,
     #    public addresses only unless SEARCH_FETCH_ALLOW_PRIVATE=1. Raises → `failed: …`, rc 1.
     url_guard.check_url(url)
     # Opt-in (SEARCH_FETCH_ONLY_KNOWN_URLS=1): only URLs this run's searches / KB sources produced;
     # may drop an unregistered #fragment.
     url = known_urls.check(url)
-    # 1. Media (YouTube / direct audio-video): subtitles inline, else metadata + background ASR.
+    # 1. Media (YouTube / direct audio-video): subtitles, else metadata only.
     kind = media.classify_url(url)
     if kind:
-        _emit_page(await asyncio.to_thread(media.fetch_media, url, kind, defer), as_json)
+        _emit_page(await asyncio.to_thread(media.fetch_media, url, kind), as_json)
         return
     # 2. Documents: extension → direct; extensionless → header sniff (no body download).
     doc, doc_attempted = None, False
     try:
-        doc, doc_attempted = await asyncio.to_thread(_route_document, url, defer)
+        doc, doc_attempted = await asyncio.to_thread(_route_document, url)
     except Exception as ex:
         _log(f"docparse skipped ({ex}); using browser")
     if doc:
@@ -326,7 +284,7 @@ async def run_fetch(url: str, query: str = None, as_json: bool = False, defer: b
     if len((md["raw"] or "").strip()) < config.DOC_RESCUE_CHARS and not doc_attempted:
         rescue = None
         try:
-            rescue = await asyncio.to_thread(docparse.try_fetch_document, url, assume_doc=True, defer_ocr=defer)
+            rescue = await asyncio.to_thread(docparse.try_fetch_document, url, assume_doc=True)
         except Exception as ex:
             _log(f"doc rescue failed: {ex}")
         if rescue:
@@ -346,7 +304,7 @@ async def run_fetch(url: str, query: str = None, as_json: bool = False, defer: b
     docs = []
     if config.PAGE_DOCS_MAX > 0:
         try:
-            docs = await asyncio.to_thread(_grab_page_docs, html, final, defer)
+            docs = await asyncio.to_thread(_grab_page_docs, html, final)
         except Exception as ex:
             _log(f"page-doc grab failed: {ex}")
     # List of downloaded documents.

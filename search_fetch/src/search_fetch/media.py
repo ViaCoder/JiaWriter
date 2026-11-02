@@ -4,15 +4,10 @@ ONE ladder per media URL, ordered by cost:
   1. metadata (title/uploader/date/description) — always, via yt-dlp probe
   2. subtitles — manual first, then auto captions (any language, original
      preferred) — fetched inline, no media download
-  3. ASR — ONLY for short, downloadable media with no subtitles: the audio is
-     downloaded (size-capped) and transcribed on the Qwen3-ASR HuggingFace
-     Space with automatic language detection. On the CLI path this runs as a
-     detached background task (search_fetch.tasks) so it never blocks further
-     searching/fetching; `sf.py fetch --sync` runs it inline, deadline-bounded.
 
-Live streams and media past SEARCH_FETCH_ASR_MAX_DURATION / _MAX_MB are NEVER
-downloaded — video has low information density, so metadata + description +
-the note of what was skipped is the honest, cheap representation.
+There is no speech recognition and no media download: media without subtitles
+is represented by its metadata and description, with a note that no transcript
+is available.
 
 yt-dlp is the single retrieval dependency: it covers YouTube, most video
 sites AND direct audio/video file URLs (generic extractor).
@@ -24,32 +19,17 @@ import contextlib
 # Subtitle cleaning.
 import re
 
-# ffmpeg lookup and temp-dir removal.
-import shutil
-
-# Temp download directory.
-import tempfile
-
-# Backoff between ASR attempts.
-import time
-
 # URL parsing.
 import urllib.parse
 
 # Subtitle track requests.
 import urllib.request
 
-# Path arithmetic.
-from pathlib import Path
-
-# Knobs, clamps, pacing, the task spool and the outbound policy.
-from . import config, markdown, pacing, tasks, url_guard
+# Knobs, clamps, pacing and the outbound policy.
+from . import config, markdown, pacing, url_guard
 
 # Shared stderr logger.
 from .config import _log
-
-# Deadline-bounded calls.
-from .docparse import _call_deadline
 
 # YouTube host names.
 _YT_HOSTS = ("youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "music.youtube.com")
@@ -69,6 +49,27 @@ _VTT_TS_RE = re.compile(
 # Inline cue tags such as <c> or <00:00:01.000>.
 _VTT_TAG_RE = re.compile(r"<[^>]+>")
 
+
+
+def _call_deadline(fn, timeout):
+    """Run fn() under a hard deadline. yt-dlp's metadata probe carries no overall timeout
+    of its own, and a hung site must not stall the whole fetch. The call runs in a daemon
+    thread; on deadline it is abandoned (never joined) and TimeoutError raised."""
+    import threading
+    box = {}
+    def _run():
+        try:
+            box["val"] = fn()
+        except BaseException as e:  # surfaced to the caller below
+            box["err"] = e
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        raise TimeoutError(f"no response within {timeout:.0f}s")
+    if "err" in box:
+        raise box["err"]
+    return box.get("val")
 
 def classify_url(url: str) -> str:
     """'youtube' | 'media' (direct audio/video file) | '' (not media)."""
@@ -225,39 +226,18 @@ def _fetch_subtitles(info: dict) -> tuple:
     return "", "", ""
 
 
-def _asr_eligibility(info: dict) -> str:
-    """'' when ASR may run; otherwise the human-readable reason it must not."""
-    # Switched off.
-    if not config.ASR_ENABLED:
-        return "ASR 已禁用（SEARCH_FETCH_ASR=off）"
-    # Live streams are never downloaded.
-    if info.get("is_live"):
-        return "直播流不下载，仅收录元数据与简介"
-    # Too long.
-    dur = info.get("duration")
-    if isinstance(dur, (int, float)) and dur > config.ASR_MAX_DURATION:
-        return (f"时长 {int(dur)}s 超过 ASR 上限 {int(config.ASR_MAX_DURATION)}s，"
-                f"不下载，仅收录元数据与简介")
-    # Too large.
-    size = info.get("filesize") or info.get("filesize_approx")
-    if isinstance(size, (int, float)) and size > config.ASR_MAX_MB * 1024 * 1024:
-        return f"文件约 {int(size) // (1024 * 1024)}MB 超过 {config.ASR_MAX_MB}MB 上限，不下载"
-    # Eligible.
-    return ""
-
-
-def fetch_media(url: str, kind: str, defer: bool) -> dict:
-    """The media fetch: returns {final_url, markdown[, task]}. Never raises for a
+def fetch_media(url: str, kind: str) -> dict:
+    """The media fetch: returns {final_url, markdown}. Never raises for a
     normal media page — a probe failure is reported in the markdown so the
     research loop can move on (the Rust runner treats empty stdout as failure)."""
     # Metadata first.
     try:
         info = probe(url)
     except Exception as ex:
-        # A plain file server can refuse metadata probes; the worker's size cap still protects the download.
+        # A plain file server can refuse metadata probes; the file name stands in for the title.
         if kind == "media":
             info = {"title": url.rsplit("/", 1)[-1], "webpage_url": url}
-            _log(f"media probe failed ({str(ex)[:80]}); proceeding on caps only")
+            _log(f"media probe failed ({str(ex)[:80]}); using the file name")
         else:
             # A video page that cannot be read is reported, not raised.
             _log(f"media probe failed: {str(ex)[:120]}")
@@ -272,116 +252,7 @@ def fetch_media(url: str, kind: str, defer: bool) -> dict:
     if text:
         parts += ["", f"## 内容转写（{sub_kind}/{lang}）", markdown._clamp_chars(text, config.FETCH_MAX_CHARS)]
         return {"final_url": final, "markdown": "\n".join(parts)}
-    # Why ASR may not run, if it may not.
-    reason = _asr_eligibility(info)
-    if reason:
-        parts += ["", f"（无可用字幕；{reason}）"]
-        return {"final_url": final, "markdown": "\n".join(parts)}
-    # What the ASR worker needs.
-    payload = {"url": url, "source": final, "title": info.get("title") or "", "duration": info.get("duration")}
-    # Background task on the CLI path.
-    if defer:
-        tid = tasks.enqueue("asr", payload)
-        parts += ["", f"[语音转写已在后台运行：task {tid}；文本将在 `tasks wait` 汇合后并入知识库]"]
-        return {"final_url": final, "markdown": "\n".join(parts), "task": tid}
-    # Inline (--sync): a failure becomes a note.
-    try:
-        parts += ["", "## 内容转写（ASR）", markdown._clamp_chars(transcribe(payload), config.FETCH_MAX_CHARS)]
-    except Exception as ex:
-        parts += ["", f"（无可用字幕；ASR 失败：{str(ex)[:160]}）"]
+    # No subtitles: metadata and description only.
+    parts += ["", "（无可用字幕，仅收录元数据与简介）"]
     # The page.
     return {"final_url": final, "markdown": "\n".join(parts)}
-
-
-def _download_audio(url: str, tmpdir: str) -> Path:
-    """Download the smallest useful AUDIO rendition, size-capped. When the source
-    is video-only or a video container and ffmpeg exists, extract audio to m4a
-    (the ASR Space wants an audio file); without ffmpeg the downloaded file is
-    offered to the Space as-is."""
-    # yt-dlp options.
-    opts = {
-        # Only protocols yt-dlp downloads in-process (http/https/DASH, native HLS): rtmp/rtsp/ffmpeg
-        # formats would hand the fetch to an external program that resolves hosts outside the guard.
-        "format": "/".join(f"{base}[protocol{proto}]"
-                           for base in ("bestaudio[abr<=128]", "bestaudio", "best")
-                           for proto in ("^=http", "=m3u8_native")),
-        # Fixed name inside the temp directory.
-        "outtmpl": str(Path(tmpdir) / "audio.%(ext)s"),
-        # Size cap.
-        "max_filesize": config.ASR_MAX_MB * 1024 * 1024,
-        "match_filter": None,
-    }
-    # Audio extraction when ffmpeg is available.
-    if shutil.which("ffmpeg"):
-        opts["postprocessors"] = [{"key": "FFmpegExtractAudio", "preferredcodec": "m4a", "preferredquality": "96"}]
-    # Download under the policy guard.
-    with _ytdl(opts) as y:
-        y.download([url])
-    # Largest produced file first.
-    files = sorted(Path(tmpdir).glob("audio.*"), key=lambda p: p.stat().st_size, reverse=True)
-    # The size cap stops yt-dlp without an error, so an empty result is reported here.
-    if not files:
-        raise RuntimeError(f"download produced no file (max {config.ASR_MAX_MB}MB — size cap hit?)")
-    # The audio file.
-    return files[0]
-
-
-def _asr_file(path: Path) -> str:
-    """One audio file → transcription via the Qwen3-ASR Space (auto language).
-    Deadline-bounded per remote call; a couple of retries, then the error raises."""
-    # Imported lazily: only the ASR worker needs it.
-    from gradio_client import Client, handle_file
-    # Connecting is bounded too.
-    client = _call_deadline(lambda: Client(config.ASR_SPACE, verbose=False), config.ASR_TIMEOUT)
-    # Last error, for the final message.
-    last = None
-    # Bounded attempts.
-    for attempt in range(1, config.ASR_RETRIES + 1):
-        try:
-            # One remote transcription with automatic language detection.
-            res = _call_deadline(
-                lambda: client.predict(handle_file(str(path)), "Auto", False, api_name=config.ASR_API),
-                config.ASR_TIMEOUT)
-            # The Space returns (language, text).
-            pair = isinstance(res, (list, tuple)) and len(res) > 1
-            # Detected language.
-            detected = str(res[0]).strip() if pair else ""
-            # Transcript.
-            text = str(res[1] if pair else res).strip()
-            # An empty transcript is a failure.
-            if not text:
-                raise RuntimeError("ASR returned empty text")
-            # Transcript with the detected language noted.
-            return f"（检测语言：{detected}）\n{text}" if detected else text
-        except Exception as ex:
-            # Remember and log.
-            last = ex
-            _log(f"ASR attempt {attempt}/{config.ASR_RETRIES} failed: {str(ex)[:120]}")
-            # Linear backoff before the next attempt.
-            if attempt < config.ASR_RETRIES:
-                time.sleep(5 * attempt)
-    # All attempts failed.
-    raise RuntimeError(f"ASR failed after {config.ASR_RETRIES} attempts: {str(last)[:160]}")
-
-
-def transcribe(payload: dict) -> str:
-    """Worker side: download the (short) media's audio and transcribe it.
-    Returns the transcript prefixed by the media title."""
-    # Media URL.
-    url = payload["url"]
-    # Scratch space inside the package home (never the system /tmp).
-    scratch = config.HOME / "tmp"
-    # Create it once.
-    scratch.mkdir(parents=True, exist_ok=True)
-    # Per-task temp directory.
-    tmpdir = tempfile.mkdtemp(prefix="search_fetch_asr_", dir=str(scratch))
-    # Download and transcribe; always remove the audio afterwards.
-    try:
-        audio = _download_audio(url, tmpdir)
-        _log(f"ASR: downloaded {audio.name} ({audio.stat().st_size // 1024}KB) — transcribing")
-        text = _asr_file(audio)
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-    # Title and source above the transcript.
-    title = payload.get("title") or url
-    return f"# {title}（语音转写）\n来源: {payload.get('source') or url}\n\n{text}"

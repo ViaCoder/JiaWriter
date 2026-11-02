@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Direct unit tests for the docparse parsers, OCR helpers and CLI — real files generated
-on the fly (text PDF, image PDF via Pillow, docx, xlsx, GBK CSV), real pdftoppm, the OCR
-Space mocked. Needs the venv (pypdf, markitdown, openpyxl, Pillow). No network.
+"""Direct unit tests for the docparse parsers and CLI — real files generated on the fly
+(text PDF, image PDF via Pillow, docx, xlsx, GBK CSV); there is no OCR.
+Needs the venv (pypdf, markitdown, openpyxl, Pillow). No network.
 Run: python3 tests/test_docparse_units.py
 """
 # Output capture.
@@ -11,7 +11,6 @@ import json
 import shutil
 import sys
 import tempfile
-import types
 import unittest
 import zipfile
 from pathlib import Path
@@ -137,58 +136,29 @@ class DocparseUnitsTest(unittest.TestCase):
         # GBK falls back cleanly.
         self.assertEqual(docparse._parse_csv("地区,数量\n温州,12\n".encode("gbk")), "地区,数量\n温州,12")
 
-    def test_rasterize_pdf_real_pdftoppm(self):
-        # An image-only PDF from Pillow rasterizes to one PNG inside HOME/tmp.
+    def test_parse_bytes_without_ocr(self):
+        # A text PDF gives its text; an image-only PDF and a picture give none (there is no OCR).
         from PIL import Image
         buf = io.BytesIO()
         Image.new("RGB", (200, 100), "white").save(buf, format="PDF")
-        paths, tmpdir = docparse._rasterize_pdf(buf.getvalue(), 3)
-        try:
-            self.assertEqual((len(paths), Path(tmpdir).parent), (1, self.home / "tmp"))
-        finally:
-            shutil.rmtree(tmpdir, ignore_errors=True)
-        # Missing pdftoppm is reported, not raised.
-        with mock.patch.object(docparse.subprocess, "run", side_effect=FileNotFoundError), \
+        self.assertEqual(docparse.parse_bytes(text_pdf("Layer"), "pdf"), {"text": "Layer", "kind": "pdf", "chars": 5})
+        self.assertEqual(docparse.parse_bytes(buf.getvalue(), "pdf")["text"], "")
+        self.assertEqual(docparse.parse_bytes(b"\x89PNG", "image")["text"], "")
+
+    def test_try_fetch_document_scanned_is_none(self):
+        # A downloaded scanned PDF has no text layer: None hands the URL back to the browser path.
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new("RGB", (200, 100), "white").save(buf, format="PDF")
+        with mock.patch.object(docparse, "_http_get", return_value=(buf.getvalue(), "application/pdf", "https://example.com/s.pdf", "")), \
                 contextlib.redirect_stderr(io.StringIO()):
-            paths, tmpdir = docparse._rasterize_pdf(b"%PDF", 1)
-        shutil.rmtree(tmpdir, ignore_errors=True)
-        self.assertEqual(paths, [])
-
-    def _fake_space(self, results):
-        # A gradio_client stand-in whose predict returns or raises the queued results.
-        queue = list(results)
-
-        class Client:
-            def __init__(self, *a, **k):
-                pass
-
-            def predict(self, *a, **k):
-                r = queue.pop(0)
-                if isinstance(r, Exception):
-                    raise r
-                return r
-
-        return types.SimpleNamespace(Client=Client, handle_file=lambda p: p)
-
-    def test_ocr_images(self):
-        # Page 1 succeeds after a retry, page 2 fails every attempt and is skipped.
-        fake = self._fake_space([RuntimeError("busy"), ("第一页",), RuntimeError("x"), RuntimeError("y")])
-        with mock.patch.dict(sys.modules, {"gradio_client": fake}), mock.patch.object(docparse.time, "sleep"), \
-                mock.patch.object(docparse, "OCR_RETRIES", 2), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(docparse._ocr_images(["a.png", "b.png"]), "第一页")
-            self.assertEqual(docparse._ocr_images([]), "")
-
-    def test_ocr_pdf_and_image_bytes_clean_up(self):
-        # The rasterize dir and the temp image are removed after OCR.
-        tmpdir = Path(tempfile.mkdtemp(dir=str(self.home)))
-        with mock.patch.object(docparse, "_rasterize_pdf", return_value=(["p.png"], str(tmpdir))), \
-                mock.patch.object(docparse, "_ocr_images", return_value="识别"):
-            self.assertEqual(docparse._ocr_pdf(b"%PDF"), "识别")
-        self.assertFalse(tmpdir.exists())
-        seen = []
-        with mock.patch.object(docparse, "_ocr_images", side_effect=lambda ps: seen.append(Path(ps[0])) or "图"):
-            self.assertEqual(docparse._ocr_image_bytes(b"\x89PNG", ".png"), "图")
-        self.assertEqual((seen[0].parent, seen[0].exists()), (self.home / "tmp", False))
+            self.assertIsNone(docparse.try_fetch_document("https://example.com/s.pdf"))
+        # A text PDF comes back with its kind and length.
+        with mock.patch.object(docparse, "_http_get", return_value=(text_pdf("Body"), "application/pdf", "https://example.com/t.pdf", "")), \
+                contextlib.redirect_stderr(io.StringIO()):
+            doc = docparse.try_fetch_document("https://example.com/t.pdf", keep_bytes=True)
+        self.assertEqual((doc["text"], doc["meta"], doc["final_url"]), ("Body", {"kind": "pdf", "chars": 4}, "https://example.com/t.pdf"))
+        self.assertTrue(doc["data"].startswith(b"%PDF"))
 
     def test_main_cli(self):
         # Usage, a text PDF on disk, an unsupported file and a URL.
@@ -198,9 +168,10 @@ class DocparseUnitsTest(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(docparse._main([]), 2)
             self.assertEqual(docparse._main([str(self.home / "b.xyz")]), 1)
-        # A short text layer triggers OCR: the Space is replaced so the test never goes online.
-        with mock.patch.object(docparse, "_ocr_pdf", return_value=""), contextlib.redirect_stdout(io.StringIO()) as out:
+        # A text PDF on disk: its text layer as JSON, with kind and length only.
+        with contextlib.redirect_stdout(io.StringIO()) as out:
             self.assertEqual(docparse._main([str(pdf), "--json"]), 0)
+        self.assertEqual(json.loads(out.getvalue())["meta"], {"kind": "pdf", "chars": 8})
         self.assertIn("CLI text", json.loads(out.getvalue())["markdown"])
         with mock.patch.object(docparse, "try_fetch_document",
                                return_value={"final_url": "u", "text": "网页文档", "meta": {}}), \

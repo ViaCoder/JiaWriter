@@ -18,6 +18,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 # Import the package from ./src.
@@ -55,6 +56,27 @@ class PacingTest(unittest.TestCase):
         self.assertEqual((p.parent, p.name), (self.home / "pacing", "host_a_b_c.json"))
         with pacing._locked(p) as f:
             self.assertEqual(f.read(), "")
+
+    def test_lock_posix_branch(self):
+        # POSIX: flock with LOCK_EX to take and LOCK_UN to release.
+        import fcntl
+        seen = []
+        p = pacing._slot_file("p")
+        with p.open("a+", encoding="utf-8") as f, mock.patch.object(fcntl, "flock", side_effect=lambda fd, op: seen.append(op)):
+            pacing._lock(f, True)
+            pacing._lock(f, False)
+        self.assertEqual(seen, [fcntl.LOCK_EX, fcntl.LOCK_UN])
+
+    def test_lock_windows_branch(self):
+        # Windows: a one-byte msvcrt lock at offset 0, taken and released in that order.
+        calls = []
+        fake = SimpleNamespace(LK_LOCK=2, LK_UNLCK=0, locking=lambda fd, mode, n: calls.append((mode, n)))
+        p = pacing._slot_file("k")
+        with mock.patch.dict(sys.modules, {"msvcrt": fake}), mock.patch.object(pacing.os, "name", "nt"):
+            with pacing._locked(p) as f:
+                f.write("x")
+        self.assertEqual(calls, [(2, 1), (0, 1)])
+        self.assertEqual(p.read_text(encoding="utf-8"), "x")
 
     def test_jittered(self):
         # Bounds of the jitter.

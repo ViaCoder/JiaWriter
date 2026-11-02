@@ -76,7 +76,7 @@ Run `/wa` inside WriterAgent to see each variable's value in effect, where it co
 
 Put reference files in `参考资料/` (or `sources/`) in the writing folder. At startup and before every prompt WriterAgent imports new and changed files automatically into Markdown with page markers under `参考资料/.parsed/`, where `read` and `grep` find them, so citations can name a page. Imported text is treated as untrusted data, and instructions in it are not followed.
 
-A scan without a text layer needs OCR. With search_fetch configured (`WA_SF`, or the sf in the release package), `import_document` uses its OCR, which uploads the page images to a public Hugging Face Space; the automatic import does no OCR.
+WriterAgent does no OCR: a scan without a text layer is listed in the import report and not imported; use a PDF or Word file with a text layer instead. Nothing you import leaves your computer.
 
 ## Export
 
@@ -114,7 +114,7 @@ A skill made from a session collects only what you wrote in the current session 
   - Two queries to the same engine are at least 20 seconds apart, two visits to the same site at least 6 seconds, both with random jitter; local and private network addresses are refused. On a human check, interactive mode brings the Chrome window to the front and waits up to 90 seconds for you.
   - Before the first use, load the extension: open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and choose the package's `chrome-extension` folder. Check with `/browser`.
 - `anysearch`: the AnySearch API, anonymously when no key is set.
-- `sf`: search_fetch, whose pages go through the same extension, with OCR of scans and media transcription. The Linux and macOS packages include sf; Windows is not supported yet. The first sf run installs its dependencies (about 1.1 GB, a few minutes), all under `~/.writeragent/agent/sf/`.
+- `sf`: search_fetch, whose pages go through the same extension. It reads the text layer of documents and the metadata and subtitles of videos; it does no OCR and no speech recognition. All six packages include sf (`sf.exe` on Windows, where it reaches the browser host through its loopback port and token). The first sf run installs its dependencies (about 1.1 GB, a few minutes), all under `~/.writeragent/agent/sf/`.
 
 ## Network and privacy
 
@@ -122,7 +122,7 @@ WriterAgent sends no network request at startup or while idle, and has no teleme
 
 ## Platforms and testing
 
-On every push to dev, GitHub Actions runs WriterAgent's own tests on all six platforms, builds the six packages, and checks each package on its own platform: fd and ripgrep run, the extension, the guide and the reference folder are in the package, `--version`, `--help`, one writing run against a local mock model server, one round of PDF import, docx export and automatic export, and the extension's native messaging host (a request routed through the program to a fake extension and back, a stranger refused; no key, no real model). On Windows it also runs the guide's `setx`; on Linux and macOS it also checks the interactive interface in both languages and the bundled sf. The full upstream pi test suite runs on Linux. The browser backend is tested on the development machine in Chrome for Testing against local look-alike Bing and Google pages (every event the pages receive is trusted).
+On every push to dev, GitHub Actions runs WriterAgent's own tests on all six platforms, builds the six packages, and checks each package on its own platform: fd and ripgrep run, the extension, the guide and the reference folder are in the package, `--version`, `--help`, one writing run against a local mock model server, one round of PDF import, docx export and automatic export, and the extension's native messaging host (a request routed through the program to a fake extension and back, a stranger refused; no key, no real model). On every platform it also runs the bundled sf; on Windows it also runs the guide's `setx`, and on Linux and macOS it checks the interactive interface in both languages. The full upstream pi test suite runs on Linux. The browser backend is tested on the development machine in Chrome for Testing against local look-alike Bing and Google pages (every event the pages receive is trusted).
 
 The development machine is Linux x64, where the Linux setup commands were run; the Windows `setx` runs on CI's Windows machines; the macOS commands follow zsh's syntax, and the Windows cmd form has not been run.
 

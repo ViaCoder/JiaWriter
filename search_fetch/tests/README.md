@@ -6,14 +6,14 @@ profile or a real website. Scratch files (temp `SEARCH_FETCH_HOME`, working fold
 `python3 -m unittest discover -s tests` (from this directory, with the venv python) runs every
 suite, each through `tests/netguard.py`, which
 refuses any socket connection that is not loopback — a test that reaches the internet
-(an unmocked OCR Space, an engine, a CDN) fails on the spot.
+(an unmocked remote service, an engine, a CDN) fails on the spot.
 
 | Script | Needs | What it covers |
 |---|---|---|
 | `test_pure.py` | stdlib | URL builders, slugs, the challenge heuristic, the observe page script's argument, the `SEARCH_FETCH_HOME` confinement default + override, the char clamp, the entry point's stale-name check, and an AST guard against module-shadowing parameters. |
 | `test_kb.py` | numpy | KB sidecar pure logic: BM25/RRF fusion, date extraction, chunking, append-index invariants. |
 | `test_docparse.py` | stdlib | Document-fetch routing: extension/sniff gating, Content-Disposition, magic numbers + zip structure, in-page document links. |
-| `test_media_tasks.py` | stdlib | Media ladder (URL classes, VTT cleaning, subtitle order, ASR gates) + the detached background-task pool end to end. |
+| `test_media.py` | stdlib | Media ladder (URL classes, VTT cleaning, subtitle order, the deadline helper, metadata-only answer without subtitles) + the outbound policy of the media path. |
 | `test_ingest.py` | stdlib | 参考资料 parsing: UTF-8/GBK fallback, type routing, 来源 markers, hidden/unsupported/empty filtering, symlink confinement. |
 | `test_url_guard.py` | stdlib | Outbound-URL policy (SSRF / local-file guard): schemes, non-public addresses (literal/encoded/IPv4-mapped/DNS), per-redirect-hop re-check, the `--` argv contract. |
 | `test_known_urls.py` | stdlib (+ numpy) | `SEARCH_FETCH_ONLY_KNOWN_URLS`: normalization, the run ledger fed by search results and KB sources, removal with the run directory. |

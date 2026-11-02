@@ -5,7 +5,7 @@ Runnable anywhere: `python3 tests/test_docparse.py`. Covers the routing decision
 (extension gate, extensionless sniff gate, kind detection from headers/magic bytes)
 and the embedded-document link extraction — everything sf.py/server.py rely on
 to route a URL between the browser and the document pipeline. The actual downloads,
-pypdf/markitdown/openpyxl parsing and remote OCR are exercised by the live paths only.
+pypdf/markitdown/openpyxl parsing are exercised by the live paths only (there is no OCR).
 """
 import io
 import os
@@ -143,7 +143,9 @@ def run():
     csv = docparse.parse_bytes(b"a,b\n1,2\n", "csv")
     check("csv decodes", csv["text"] == "a,b\n1,2" and csv["kind"] == "csv" and csv["chars"] == 7)
     unknown = docparse.parse_bytes(b"\x00\x01", "")
-    check("unknown kind yields no text", unknown["text"] == "" and not unknown["ocr_used"])
+    check("unknown kind yields no text", unknown == {"text": "", "kind": "", "chars": 0})
+    # Images carry no text layer and there is no OCR.
+    check("image yields no text (no OCR)", docparse.parse_bytes(b"\x89PNG\r\n", "image")["text"] == "")
 
     # ── _ext semantics: the extension comes from the BASENAME only ──
     check("_ext basename pdf", docparse._ext("https://x.org/a/b/report.pdf?x=1") == ".pdf")
@@ -197,20 +199,6 @@ def run():
         check("sniff: plain html page → ''", docparse.sniff_remote_kind("https://x.org/dl4") == "")
     finally:
         docparse._urlopen = saved_open
-
-    # ── _call_deadline: hard deadline around library calls that have none of their own ──
-    import time
-    check("deadline: fast call returns", docparse._call_deadline(lambda: 42, 5) == 42)
-    try:
-        docparse._call_deadline(lambda: time.sleep(3), 0.2)
-        check("deadline: hung call raises TimeoutError", False)
-    except TimeoutError:
-        check("deadline: hung call raises TimeoutError", True)
-    try:
-        docparse._call_deadline(lambda: 1 / 0, 5)
-        check("deadline: inner exception surfaces", False)
-    except ZeroDivisionError:
-        check("deadline: inner exception surfaces", True)
 
     print("\nDOCPARSE LOGIC:", "PASS ✓" if _fail == 0 else f"{_fail} FAILED ✗")
     return _fail == 0

@@ -563,7 +563,7 @@ def test_page_doc_harvest():
     os.chdir(_TMP)
     try:
         with fake_dns(), contextlib.redirect_stderr(io.StringIO()):
-            rows = fetch._grab_page_docs(html, f"http://{PUBLIC_IP}/landing", defer=True)
+            rows = fetch._grab_page_docs(html, f"http://{PUBLIC_IP}/landing")
         check("no LAN/loopback document saved", rows == [])
         check("file:// link never even attempted", not any(c.startswith("file:") for c in calls))
         saved_files = list((Path(_TMP) / ".search_fetchres").glob("*.pdf")) \

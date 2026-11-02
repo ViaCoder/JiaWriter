@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""docparse.py — turn a fetched document (pdf/docx/pptx/xlsx/csv/image) into text.
+"""docparse.py — turn a fetched document (pdf/docx/pptx/xlsx/csv) into text.
 
 Ships next to engine.py (sibling, like kb.py/filters.py). engine.py's `fetch` command
 routes document URLs here instead of the headed browser, which returns empty markdown for
@@ -11,20 +11,10 @@ Text extraction uses the SAME libraries the vendored MiniMax skills use:
     pptx/docx  -> markitdown                 (vendor/skills/pptx-generator)
     csv/tsv    -> plain decode
 
-Image pages and scanned/image-only PDFs are OCR'd REMOTELY via the PaddleOCR-VL
-HuggingFace Space (no local model): PDF pages are rasterized with poppler `pdftoppm`,
-each page image is POSTed to /parse_vl_router through gradio_client. On a Space error /
-rate-limit each image is retried up to SEARCH_FETCH_OCR_RETRIES times a few seconds apart,
-then skipped gracefully.
+There is no OCR: images and scanned (image-only) PDFs carry no text layer, so they
+yield no text and the caller treats them like any document without text.
 
 Env knobs (all optional):
-    SEARCH_FETCH_OCR            on|off        (default on)
-    SEARCH_FETCH_OCR_SPACE      HF space id   (default PaddlePaddle/PaddleOCR-VL_Online_Demo)
-    SEARCH_FETCH_OCR_API        endpoint      (default /parse_vl_router)
-    SEARCH_FETCH_OCR_MAX_PAGES  int           (default 10)  — cap pages rasterized+OCR'd
-    SEARCH_FETCH_OCR_RETRIES    int           (default 3)
-    SEARCH_FETCH_OCR_MIN_TEXT   int           (default 40)  — pdf with less embedded text ⇒ OCR
-    SEARCH_FETCH_OCR_TIMEOUT    seconds       (default 60)  — per remote OCR call hard deadline
     SEARCH_FETCH_DOC_HTTP_TIMEOUT  seconds    (default 60)  — per-document http download timeout
     SEARCH_FETCH_DOC_MAX_MB     int           (default 40)  — per-document download cap
 """
@@ -33,11 +23,8 @@ import io
 import json
 import os
 import re
-import shutil
-import subprocess
 import sys
 import tempfile
-import time
 import urllib.parse
 import urllib.request
 
@@ -50,13 +37,6 @@ except ImportError:   # run as a standalone script: docparse.py <file-or-url>
     config = pacing = None
 
 # ── config ──────────────────────────────────────────────────────────
-OCR_ENABLED   = os.environ.get("SEARCH_FETCH_OCR", "on").strip().lower() not in ("0", "off", "false", "no", "")
-OCR_SPACE     = os.environ.get("SEARCH_FETCH_OCR_SPACE", "PaddlePaddle/PaddleOCR-VL_Online_Demo")
-OCR_API       = os.environ.get("SEARCH_FETCH_OCR_API", "/parse_vl_router")
-OCR_MAX_PAGES = int(os.environ.get("SEARCH_FETCH_OCR_MAX_PAGES", "10"))
-OCR_RETRIES   = int(os.environ.get("SEARCH_FETCH_OCR_RETRIES", "3"))
-OCR_MIN_TEXT  = int(os.environ.get("SEARCH_FETCH_OCR_MIN_TEXT", "40"))
-OCR_TIMEOUT   = float(os.environ.get("SEARCH_FETCH_OCR_TIMEOUT", "60"))
 # Renamed from SEARCH_FETCH_FETCH_TIMEOUT, which COLLIDED with the Rust runner's whole-fetch
 # hard-kill env of the same name — an operator setting the documented download semantics (60)
 # would silently make the runner kill every challenge-waiting fetch.
@@ -451,138 +431,23 @@ def _parse_csv(data: bytes) -> str:
     return _decode_text(data).strip()
 
 
-# ── OCR via the PaddleOCR-VL HF Space (remote; no local model) ──────
-def _rasterize_pdf(data: bytes, max_pages: int):
-    """PDF bytes → list of page PNG paths (poppler pdftoppm). Returns (paths, tmpdir)."""
-    tmpdir = tempfile.mkdtemp(prefix="docparse_ocr_", dir=_scratch())
-    pdf_path = os.path.join(tmpdir, "in.pdf")
-    with open(pdf_path, "wb") as f:
-        f.write(data)
-    try:
-        subprocess.run(
-            ["pdftoppm", "-png", "-r", "150", "-l", str(max_pages), pdf_path,
-             os.path.join(tmpdir, "pg")],
-            check=True, capture_output=True, timeout=180)
-    except FileNotFoundError:
-        _log("pdftoppm not found (install poppler-utils) — cannot OCR PDF")
-        return [], tmpdir
-    except Exception as e:
-        _log(f"pdftoppm failed: {e}")
-        return [], tmpdir
-    imgs = sorted(os.path.join(tmpdir, n) for n in os.listdir(tmpdir) if n.endswith(".png"))
-    return imgs, tmpdir
-
-
-def _call_deadline(fn, timeout):
-    """Run fn() under a hard deadline. gradio_client's connect/predict carry no timeout of
-    their own, and a hung HF Space must not stall the whole fetch (which sits on the
-    server's critical path and under the Rust runner's kill). The call runs in a daemon
-    thread; on deadline it is abandoned (never joined) and TimeoutError raised."""
-    import threading
-    box = {}
-    def _run():
-        try:
-            box["val"] = fn()
-        except BaseException as e:  # surfaced to the caller below
-            box["err"] = e
-    t = threading.Thread(target=_run, daemon=True)
-    t.start()
-    t.join(timeout)
-    if t.is_alive():
-        raise TimeoutError(f"no response within {timeout:.0f}s")
-    if "err" in box:
-        raise box["err"]
-    return box.get("val")
-
-
-def _ocr_images(paths):
-    """OCR each image path via the HF Space. One Client for the batch; per-image retry
-    (a few seconds apart, up to OCR_RETRIES) then graceful skip. Every remote call runs
-    under the SEARCH_FETCH_OCR_TIMEOUT deadline. Returns concatenated md."""
-    if not paths:
-        return ""
-    try:
-        from gradio_client import Client, handle_file
-    except Exception as e:
-        _log(f"gradio_client unavailable: {e}")
-        return ""
-    try:
-        client = _call_deadline(lambda: Client(OCR_SPACE, verbose=False), OCR_TIMEOUT)
-    except Exception as e:
-        _log(f"OCR space connect failed ({OCR_SPACE}): {str(e)[:120]} — skipping OCR")
-        return ""
-    out = []
-    for idx, p in enumerate(paths, 1):
-        md = ""
-        for attempt in range(1, OCR_RETRIES + 1):
-            try:
-                res = _call_deadline(
-                    lambda p=p: client.predict(handle_file(p), api_name=OCR_API), OCR_TIMEOUT)
-                md = (res[0] if isinstance(res, (list, tuple)) else res) or ""
-                md = str(md).strip()
-                break
-            except Exception as e:
-                _log(f"OCR page {idx} attempt {attempt}/{OCR_RETRIES} failed: {str(e)[:100]}")
-                if attempt < OCR_RETRIES:
-                    time.sleep(3 * attempt)  # a few seconds, backing off
-        if md:
-            out.append(md)
-    return "\n\n".join(out).strip()
-
-
-def _ocr_pdf(data: bytes) -> str:
-    imgs, tmpdir = _rasterize_pdf(data, OCR_MAX_PAGES)
-    try:
-        if len(imgs) >= OCR_MAX_PAGES:
-            _log(f"OCR capped at {OCR_MAX_PAGES} page(s)")
-        return _ocr_images(imgs)
-    finally:
-        shutil.rmtree(tmpdir, ignore_errors=True)
-
-
-def _ocr_image_bytes(data: bytes, suffix: str) -> str:
-    path = None
-    try:
-        with tempfile.NamedTemporaryFile(suffix=suffix or ".png", delete=False, dir=_scratch()) as f:
-            f.write(data)
-            path = f.name
-        return _ocr_images([path])
-    finally:
-        if path and os.path.exists(path):
-            os.unlink(path)
-
-
 # ── top-level parse ─────────────────────────────────────────────────
-def parse_bytes(data: bytes, kind: str, suffix: str = "", defer_ocr: bool = False) -> dict:
-    """Return {'text', 'kind', 'needs_ocr', 'ocr_used', 'chars'[, 'deferred']}.
-    With defer_ocr=True a document that NEEDS OCR is not OCR'd here — 'deferred'
-    is set and the caller enqueues a background task (search_fetch.tasks)."""
-    text, needs_ocr, ocr_used, deferred = "", False, False, False
+def parse_bytes(data: bytes, kind: str) -> dict:
+    """Return {'text', 'kind', 'chars'}. Images and scanned PDFs give empty text (no OCR)."""
+    # Extracted text ('' when the document has no text layer).
+    text = ""
+    # PDF text layer.
     if kind == "pdf":
         text = _parse_pdf_text(data)
-        if len(text) < OCR_MIN_TEXT:                     # empty/near-empty ⇒ image-only PDF
-            needs_ocr = True
-            if OCR_ENABLED and defer_ocr:
-                deferred = True
-            elif OCR_ENABLED:
-                ocr = _ocr_pdf(data)
-                if ocr:
-                    text, ocr_used = ocr, True
+    # Word and PowerPoint.
     elif kind in ("docx", "pptx"):
         text = _parse_markitdown(data, "." + kind)
     elif kind == "xlsx":
         text = _parse_xlsx(data)
     elif kind in ("csv", "tsv"):
         text = _parse_csv(data)
-    elif kind == "image":
-        needs_ocr = True
-        if OCR_ENABLED and defer_ocr:
-            deferred = True
-        elif OCR_ENABLED:
-            text = _ocr_image_bytes(data, suffix)
-            ocr_used = bool(text)
-    return {"text": text, "kind": kind, "needs_ocr": needs_ocr,
-            "ocr_used": ocr_used, "chars": len(text), "deferred": deferred}
+    # Text, kind and length.
+    return {"text": text, "kind": kind, "chars": len(text)}
 
 
 def doc_suffix(kind: str, url: str = "") -> str:
@@ -594,8 +459,7 @@ def doc_suffix(kind: str, url: str = "") -> str:
             "csv": ".csv", "tsv": ".tsv"}.get(kind, ".bin")
 
 
-def try_fetch_document(url: str, assume_doc: bool = False, keep_bytes: bool = False,
-                       defer_ocr: bool = False):
+def try_fetch_document(url: str, assume_doc: bool = False, keep_bytes: bool = False):
     """If `url` (redirect-unwrapped) is a document/image, download + parse it and return
     {'text', 'final_url', 'meta'} (+ 'data' raw bytes when keep_bytes — for saving the
     original file to disk). Return None for anything that should stay on the browser path
@@ -613,18 +477,13 @@ def try_fetch_document(url: str, assume_doc: bool = False, keep_bytes: bool = Fa
     kind = _detect_kind(final, ct, data, cd)
     if not kind:
         return None
-    res = parse_bytes(data, kind, _ext(final) or _ext(target), defer_ocr=defer_ocr)
-    if res.get("deferred"):
-        # OCR is needed but deferred: hand the caller the binary + a needs_task
-        # marker so it saves the file and enqueues the background OCR task.
-        return {"text": "", "final_url": final, "needs_task": True, "data": data,
-                "meta": {"kind": kind, "ocr_used": False, "chars": 0, "needs_ocr": True}}
+    res = parse_bytes(data, kind)
+    # No text layer (an image or a scanned PDF): back to the caller's other paths.
     if not res["text"]:
-        _log(f"{kind}: no text (needs_ocr={res['needs_ocr']}, ocr_used={res['ocr_used']})")
+        _log(f"{kind}: no text layer ← {final}")
         return None
-    _log(f"{kind}: {res['chars']}B{' via OCR' if res['ocr_used'] else ''} ← {final}")
-    out = {"text": res["text"], "final_url": final,
-           "meta": {"kind": kind, "ocr_used": res["ocr_used"], "chars": res["chars"]}}
+    _log(f"{kind}: {res['chars']}B ← {final}")
+    out = {"text": res["text"], "final_url": final, "meta": {"kind": kind, "chars": res["chars"]}}
     if keep_bytes:
         out["data"] = data
     return out
@@ -655,9 +514,9 @@ def _main(argv):
         if not kind:
             sys.stderr.write(f"unsupported file type: {e or '(no ext)'}\n")
             return 1
-        res = parse_bytes(data, kind, e)
+        res = parse_bytes(data, kind)
         out = {"final_url": src, "markdown": res["text"], "meta": {k: res[k] for k in
-               ("kind", "needs_ocr", "ocr_used", "chars")}}
+               ("kind", "chars")}}
     if as_json:
         sys.stdout.write(json.dumps(out, ensure_ascii=False, indent=1))
     else:

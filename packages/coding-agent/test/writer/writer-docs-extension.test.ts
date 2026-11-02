@@ -2,7 +2,7 @@
 // both tools and both commands end to end on temp folders, and the startup scan. No network.
 
 // Files.
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
@@ -12,21 +12,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Extension API types.
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../src/core/extensions/types.ts";
 // Extension under test.
-import writerDocsExtension, { findSfOcr, parseExportArgs } from "../../src/extensions/writer-docs/index.ts";
+import writerDocsExtension, { parseExportArgs } from "../../src/extensions/writer-docs/index.ts";
 // Automatic export helpers.
 import { autoExportEnabled, editedDrafts, isDraftPath } from "../../src/writer/docs/auto.ts";
 // Fixtures.
 import { makePdf } from "./doc-fixtures.ts";
-
-// sf has no Windows build and these cases run fake sf shell scripts: Linux and macOS only.
-const UNIX_ONLY = process.platform === "win32";
 
 // Working folder.
 let cwd = "";
 beforeEach(() => {
 	cwd = mkdtempSync(join(tmpdir(), "wa-docs-"));
 	vi.stubEnv("WA_LANG", "zh");
-	vi.stubEnv("WA_SF", "");
 	vi.stubEnv("HOME", cwd);
 });
 afterEach(() => {
@@ -63,19 +59,7 @@ function text(r: { content: { type: string; text?: string }[] }): string {
 	return r.content[0]?.text ?? "";
 }
 
-describe("findSfOcr / parseExportArgs", () => {
-	it.skipIf(UNIX_ONLY)("finds sf only where it exists", () => {
-		// No sf anywhere.
-		expect(findSfOcr({ HOME: cwd, WA_SF: join(cwd, "none") })).toBeUndefined();
-		// A WA_SF that exists.
-		const sf = join(cwd, "sf");
-		writeFileSync(sf, "#!/bin/sh\n");
-		chmodSync(sf, 0o755);
-		expect(findSfOcr({ HOME: cwd, WA_SF: sf, WA_SEARCH_TIMEOUT: "60" })).toMatchObject({
-			bin: sf,
-			timeoutMs: 60_000,
-		});
-	});
+describe("parseExportArgs", () => {
 	it("parses /export-doc arguments", () => {
 		// Arguments.
 		expect(parseExportArgs(" 稿件.md md --profile=apa --out=x/y.md extra ")).toEqual({
@@ -109,7 +93,7 @@ describe("import_document and export_document", () => {
 		).toEqual([
 			"参考资料导入：2 个文件",
 			`- ${join("参考资料", "a.txt")} → ${join("参考资料", ".parsed", "a.txt.md")}（1 页，4 字）`,
-			`- ${join("参考资料", "scan.pdf")}：扫描件，没有文字层，需要 OCR。可用 WA_SF 指定 search_fetch，由它识别（页面图片会上传到公开的 Hugging Face Space）。`,
+			`- ${join("参考资料", "scan.pdf")}：扫描件，没有文字层，WriterAgent 不做文字识别。请换成带文字层的 PDF 或 Word 文件。`,
 		]);
 		// One file by path.
 		const one = await tools

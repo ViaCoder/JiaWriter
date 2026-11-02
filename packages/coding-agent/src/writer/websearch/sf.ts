@@ -2,7 +2,7 @@
  * search_fetch (`sf`) backend: WriterSuite's engine, which searches and fetches in the user's
  * own Chrome through its extension bridge. sf is started as a child process without a shell;
  * options are `--opt=value` and the query or URL comes after `--`, so a value starting with
- * "-" can never become an option. Linux and macOS only (sf has no Windows build).
+ * "-" can never become an option. Linux, macOS and Windows (sf.exe), amd64 and arm64.
  */
 
 // Child processes.
@@ -11,6 +11,8 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 // Path arithmetic.
 import { join } from "node:path";
+// The browser host's address (socket, or the Windows port file).
+import { bridgeAddress } from "../browser/bridge.ts";
 // Output messages.
 import { t } from "../i18n/index.ts";
 // Shared types.
@@ -28,10 +30,10 @@ export interface SfRun {
 	timedOut: boolean;
 }
 
-/** sf's platform folder names: linux|macos and amd64|arm64 (null on Windows or other systems). */
+/** sf's platform folder names: linux|macos|windows and amd64|arm64 (null on other systems). */
 export function sfPlatform(platform: NodeJS.Platform, arch: string): { os: string; arch: string } | null {
 	// Operating system.
-	const os = platform === "linux" ? "linux" : platform === "darwin" ? "macos" : "";
+	const os = platform === "linux" ? "linux" : platform === "darwin" ? "macos" : platform === "win32" ? "windows" : "";
 	// CPU.
 	const cpu = arch === "x64" ? "amd64" : arch === "arm64" ? "arm64" : "";
 	// Both must be known.
@@ -51,13 +53,15 @@ export function sfCandidates(
 	const p = sfPlatform(platform, arch);
 	// Explicit path first.
 	const out = cfg.sfPath ? [cfg.sfPath] : [];
+	// Program name (sf.exe on Windows).
+	const name = platform === "win32" ? "sf.exe" : "sf";
 	// The release layout and the agent directory.
-	if (p) out.push(join(execDir, "search_fetch", p.os, p.arch, "sf"), join(agentDir, "sf", p.os, p.arch, "sf"));
+	if (p) out.push(join(execDir, "search_fetch", p.os, p.arch, name), join(agentDir, "sf", p.os, p.arch, name));
 	// The list.
 	return out;
 }
 
-/** Path of sf; throws a translated error on Windows or when no candidate exists. */
+/** Path of sf; throws a translated error when no candidate exists. */
 export function locateSf(
 	cfg: SearchConfig,
 	platform: NodeJS.Platform,
@@ -66,8 +70,6 @@ export function locateSf(
 	agentDir: string,
 	exists: (p: string) => boolean = existsSync,
 ): string {
-	// sf has no Windows build.
-	if (platform === "win32") throw new Error(t("sf.windows"));
 	// Candidates in order.
 	const candidates = sfCandidates(cfg, platform, arch, execDir, agentDir);
 	// First that exists.
@@ -90,24 +92,31 @@ export function sfModelOff(): Record<string, string> {
 
 /** Where a release sf keeps its state, all under <agentDir>/sf: PyApp's Python and packages, its download
  * cache, pip's cache, and search_fetch's own state (pacing, caches); its pages go through WriterAgent's
- * browser host socket (Linux and macOS; sf has no Windows build). */
-export function sfStateEnv(agentDir: string): Record<string, string> {
+ * browser host: the socket on Linux and macOS, the port file (port and token) on Windows. */
+export function sfStateEnv(agentDir: string, platform: NodeJS.Platform = process.platform): Record<string, string> {
 	// One folder for everything sf writes.
 	const root = join(agentDir, "sf");
+	// The host's address, computed like the host computes it.
+	const addr = bridgeAddress(agentDir, platform);
 	return {
 		PYAPP_INSTALL_DIR_SEARCH_FETCH: join(root, "runtime", "install"),
 		PYAPP_CACHE_DIR: join(root, "runtime", "cache"),
 		PIP_CACHE_DIR: join(root, "pip-cache"),
 		SEARCH_FETCH_HOME: join(root, "home"),
-		SEARCH_FETCH_BRIDGE_SOCKET: join(agentDir, "browser", "bridge.sock"),
+		...(addr.kind === "unix" ? { SEARCH_FETCH_BRIDGE_SOCKET: addr.path } : { SEARCH_FETCH_BRIDGE_FILE: addr.file }),
 	};
 }
 
 /** Environment of the sf child: state under agentDir unless the parent sets it, no driver model, and
  * no human waits when nobody watches. */
-export function sfChildEnv(base: NodeJS.ProcessEnv, interactive: boolean, agentDir: string): NodeJS.ProcessEnv {
+export function sfChildEnv(
+	base: NodeJS.ProcessEnv,
+	interactive: boolean,
+	agentDir: string,
+	platform: NodeJS.Platform = process.platform,
+): NodeJS.ProcessEnv {
 	// State folders first (the parent's values win), then the model variables cleared.
-	const env: NodeJS.ProcessEnv = { ...sfStateEnv(agentDir), ...base, ...sfModelOff() };
+	const env: NodeJS.ProcessEnv = { ...sfStateEnv(agentDir, platform), ...base, ...sfModelOff() };
 	// Print mode: a captcha must not wait for a person.
 	if (!interactive) env.SEARCH_FETCH_NO_HUMAN = "1";
 	// The environment.

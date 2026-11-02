@@ -10,15 +10,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "search-fetch"
-version = "1.1.0"
-description = "WriterAgent search backend: search/fetch through the user's own Chrome (extension bridge), docparse, media, background tasks, vector KB"
+version = "1.2.0"
+description = "WriterAgent search backend: search/fetch through the user's own Chrome (extension bridge), docparse (text layers), media metadata and subtitles, vector KB"
 requires-python = ">=3.10"
 dependencies = [
     "crawl4ai==0.9.0",
     "pypdf==6.14.2",
     "openpyxl==3.1.5",
     "markitdown[pptx,docx,xlsx]==0.1.6",
-    "gradio_client==2.5.0",
     "yt-dlp==2026.6.9",
     "numpy==2.5.0",
     "requests==2.34.2",

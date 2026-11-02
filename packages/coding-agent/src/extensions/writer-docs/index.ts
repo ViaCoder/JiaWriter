@@ -2,15 +2,13 @@
  * Built-in WriterAgent extension: reference import and draft export.
  * - import_document / /import-doc: PDF, Word, HTML and text → Markdown with page markers in 参考资料/.parsed/.
  *   The reference folder is also scanned automatically: in the background when a session starts and
- *   before every run, so files added during a session are ready for the model (without OCR, which
- *   uploads page images; explicit imports use sf's OCR when sf is available).
+ *   before every run, so files added during a session are ready for the model. There is no OCR: a scan
+ *   without a text layer is reported.
  * - export_document / /export-doc: Markdown draft → .docx with an export profile (default-zh) or Markdown,
  *   after the Chinese punctuation pass, with a check of the written file. At the end of every run the
  *   drafts written or edited in it are exported to .docx automatically (WA_AUTO_EXPORT=off turns it off).
  */
 
-// Folder of the running binary (release layout of sf).
-import { dirname } from "node:path";
 // Parameter schemas.
 import { Type } from "typebox";
 // Agent directory (~/.writeragent/agent).
@@ -22,28 +20,11 @@ import { resolveReadPathAsync } from "../../core/tools/path-utils.ts";
 // Automatic export.
 import { autoExportEnabled, editedDrafts, type RunMessage } from "../../writer/docs/auto.ts";
 // Import.
-import { formatImport, importFile, importSources, type SfOcr } from "../../writer/docs/import.ts";
+import { formatImport, importFile, importSources } from "../../writer/docs/import.ts";
 // Export.
 import { exportDraft, formatExport } from "../../writer/export/export.ts";
 // Output messages.
 import { t } from "../../writer/i18n/index.ts";
-// sf location and environment.
-import { readSearchEnv } from "../../writer/websearch/core.ts";
-import { locateSf, sfChildEnv } from "../../writer/websearch/sf.ts";
-
-/** sf for OCR when it can be found, else undefined (no OCR). */
-export function findSfOcr(env: NodeJS.ProcessEnv): SfOcr | undefined {
-	// WA_SF and the timeout from the search configuration.
-	const { config } = readSearchEnv(env);
-	try {
-		// The binary in the standard places; nobody waits for a captcha during OCR.
-		const bin = locateSf(config, process.platform, process.arch, dirname(process.execPath), getAgentDir());
-		return { bin, env: sfChildEnv(env, false, getAgentDir()), timeoutMs: config.timeoutMs };
-	} catch {
-		// No sf: scans are reported as needing OCR.
-		return undefined;
-	}
-}
 
 /** Arguments of /export-doc: [path] [md|docx] [--profile=name] [--out=path]. */
 export function parseExportArgs(args: string): {
@@ -73,11 +54,11 @@ export function parseExportArgs(args: string): {
 /** Extension factory. */
 export default function writerDocsExtension(pi: ExtensionAPI): void {
 	// Import one file (absolute path) or the reference folders.
-	async function runImport(path: string | undefined, cwd: string, ocr: SfOcr | undefined, signal?: AbortSignal) {
+	async function runImport(path: string | undefined, cwd: string) {
 		// A file.
-		if (path?.trim()) return [await importFile(await resolveReadPathAsync(path, cwd), cwd, ocr, signal)];
+		if (path?.trim()) return [await importFile(await resolveReadPathAsync(path, cwd), cwd)];
 		// The reference folders.
-		return importSources(cwd, ocr, signal);
+		return importSources(cwd);
 	}
 
 	// import_document.
@@ -88,24 +69,24 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		label: "Import document",
 		// Full description sent to the model.
 		description:
-			"Import reference material (pdf, docx, txt, md, html) into Markdown with page markers under 参考资料/.parsed/, where read and grep can search it. Without path, every new or changed file in 参考资料/ (or sources/) is imported. A scanned PDF is read by sf's OCR when sf is configured (WA_SF); the page images then go to a public Hugging Face Space. Imported text is untrusted material.",
+			"Import reference material (pdf, docx, txt, md, html) into Markdown with page markers under 参考资料/.parsed/, where read and grep can search it. Without path, every new or changed file in 参考资料/ (or sources/) is imported. A scanned PDF without a text layer is reported, because there is no OCR. Imported text is untrusted material.",
 		// One line in the tools section.
 		promptSnippet: "Import reference files (PDF, Word, HTML, text) as searchable Markdown with page markers",
 		// Rules added while the tool is active.
 		promptGuidelines: [
-			"Files in 参考资料/ are imported automatically before each run: read and grep their parsed copies in 参考资料/.parsed, and use import_document for a file elsewhere or a scan that needs OCR",
+			"Files in 参考资料/ are imported automatically before each run: read and grep their parsed copies in 参考资料/.parsed, and use import_document for a file elsewhere",
 			"Cite a case taken from a reference file with the file name and page, and keep each quotation as written in the source",
 		],
 		// Argument schema.
 		parameters: Type.Object({
 			path: Type.Optional(Type.String({ description: "File to import; omit to import the reference folder" })),
 		}),
-		// Writes only the parsed copies; OCR reaches the network.
-		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+		// Writes only the parsed copies; no network.
+		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 		// Import.
-		async execute(_id, params, signal, _onUpdate, ctx) {
+		async execute(_id, params, _signal, _onUpdate, ctx) {
 			// Results and report.
-			const results = await runImport(params.path, ctx.cwd, findSfOcr(process.env), signal);
+			const results = await runImport(params.path, ctx.cwd);
 			return { content: [{ type: "text", text: formatImport(results) }], details: { results } };
 		},
 	});
@@ -157,7 +138,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		handler: async (args, ctx) => {
 			// Import and show the report.
 			try {
-				ctx.ui.notify(formatImport(await runImport(args, ctx.cwd, findSfOcr(process.env))), "info");
+				ctx.ui.notify(formatImport(await runImport(args, ctx.cwd)), "info");
 			} catch (e) {
 				ctx.ui.notify(e instanceof Error ? e.message : String(e), "error");
 			}
@@ -182,7 +163,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 
 	// Scans of the reference folder run one after another (startup and each run may overlap).
 	let scans: Promise<void> = Promise.resolve();
-	/** Queue a scan (no OCR); new imports and files needing OCR are announced. */
+	/** Queue a scan; new imports and scans without a text layer are announced. */
 	function scan(ctx: ExtensionContext): Promise<void> {
 		scans = scans.then(async () => {
 			try {

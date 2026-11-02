@@ -24,6 +24,9 @@ import contextlib
 # Slot records.
 import json
 
+# Operating system (the lock differs on Windows).
+import os
+
 # Random jitter.
 import random
 
@@ -75,20 +78,34 @@ def _slot_file(key: str) -> Path:
     return d / (re.sub(r"[^A-Za-z0-9._-]+", "_", key)[:120] + ".json")
 
 
+def _lock(f, on: bool) -> None:
+    """Take (on=True) or release the exclusive lock of an open file: flock on POSIX, a one-byte
+    msvcrt lock at offset 0 on Windows (LK_LOCK retries for up to 10 seconds)."""
+    # Windows.
+    if os.name == "nt":
+        import msvcrt
+        # The locked byte is the first one, whatever has been read or written.
+        f.seek(0)
+        msvcrt.locking(f.fileno(), msvcrt.LK_LOCK if on else msvcrt.LK_UNLCK, 1)
+        return
+    # POSIX.
+    import fcntl
+    fcntl.flock(f, fcntl.LOCK_EX if on else fcntl.LOCK_UN)
+
+
 @contextlib.contextmanager
 def _locked(path: Path):
-    """Open path for read/write under an exclusive lock (POSIX flock; Windows runs unlocked)."""
+    """Open path for read/write under an exclusive lock shared by every sf process."""
     # a+ creates the file and never truncates it.
     with path.open("a+", encoding="utf-8") as f:
-        # Lock when the platform supports it.
+        # Lock, use, always unlock.
+        _lock(f, True)
         try:
-            import fcntl
-            fcntl.flock(f, fcntl.LOCK_EX)
-        except ImportError:
-            pass
-        # The open file, positioned for reading.
-        f.seek(0)
-        yield f
+            # The open file, positioned for reading.
+            f.seek(0)
+            yield f
+        finally:
+            _lock(f, False)
 
 
 def jittered(base: float, spread: float, rnd=random.random) -> float:

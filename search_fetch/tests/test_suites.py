@@ -19,7 +19,7 @@ from pathlib import Path
 # This directory.
 HERE = Path(__file__).resolve().parent
 # Check-style scripts (each prints PASS/FAIL and sets its exit code).
-SCRIPTS = ["test_pure.py", "test_kb.py", "test_docparse.py", "test_media_tasks.py", "test_ingest.py",
+SCRIPTS = ["test_pure.py", "test_kb.py", "test_docparse.py", "test_media.py", "test_ingest.py",
            "test_url_guard.py", "test_known_urls.py", "test_units.py"]
 
 

@@ -12,8 +12,8 @@
 #   --offline-model-data Build with bundled model data instead of refreshing it
 #   --platform <name>    Build only for specified platform (darwin-arm64, darwin-x64, linux-x64, linux-arm64, windows-x64, windows-arm64)
 #   --out <dir>          Output directory (default: packages/coding-agent/binaries)
-#   --sf-dir <dir>       WriterAgent: search_fetch binaries as <dir>/<os>/<arch>/sf (search_fetch/build_binary.sh);
-#                        each Linux and macOS package gets its own as search_fetch/<os>/<arch>/sf
+#   --sf-dir <dir>       WriterAgent: search_fetch binaries as <dir>/<os>/<arch>/sf[.exe] (search_fetch/build_binary.sh);
+#                        each package gets its own as search_fetch/<os>/<arch>/sf (sf.exe on Windows)
 #
 # Output:
 #   packages/coding-agent/binaries/
@@ -194,17 +194,18 @@ for platform in "${PLATFORMS[@]}"; do
     node ../../scripts/writer-guide.mjs "$platform" "$OUTPUT_DIR/$platform/使用说明.html"
     mkdir -p "$OUTPUT_DIR/$platform/参考资料"
 
-    # WriterAgent: the search_fetch binary of this platform (no Windows build), where locateSf looks.
-    if [[ -n "$SF_DIR" && "$platform" != windows-* ]]; then
+    # WriterAgent: the search_fetch binary of this platform, where locateSf looks.
+    if [[ -n "$SF_DIR" ]]; then
         sf_os="${platform%-*}"; sf_os="${sf_os/darwin/macos}"
         sf_arch="${platform#*-}"; sf_arch="${sf_arch/x64/amd64}"
-        if [[ ! -f "$SF_DIR/$sf_os/$sf_arch/sf" ]]; then
-            echo "error: missing $SF_DIR/$sf_os/$sf_arch/sf" >&2
+        sf_name=sf; [[ "$platform" == windows-* ]] && sf_name=sf.exe
+        if [[ ! -f "$SF_DIR/$sf_os/$sf_arch/$sf_name" ]]; then
+            echo "error: missing $SF_DIR/$sf_os/$sf_arch/$sf_name" >&2
             exit 1
         fi
         mkdir -p "$OUTPUT_DIR/$platform/search_fetch/$sf_os/$sf_arch"
-        cp "$SF_DIR/$sf_os/$sf_arch/sf" "$OUTPUT_DIR/$platform/search_fetch/$sf_os/$sf_arch/sf"
-        chmod 0755 "$OUTPUT_DIR/$platform/search_fetch/$sf_os/$sf_arch/sf"
+        cp "$SF_DIR/$sf_os/$sf_arch/$sf_name" "$OUTPUT_DIR/$platform/search_fetch/$sf_os/$sf_arch/$sf_name"
+        chmod 0755 "$OUTPUT_DIR/$platform/search_fetch/$sf_os/$sf_arch/$sf_name"
     fi
 done
 

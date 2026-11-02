@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Materials-folder ingest tests — NO network, NO venv deps (stdlib only:
-text/markdown parsing paths; PDF/OCR routing is checked WITHOUT importing pypdf).
+text/markdown parsing paths; PDF routing is checked WITHOUT importing pypdf; there is no OCR).
 
 Runnable anywhere: `python3 tests/test_ingest.py`. Scratch lives under
 tests/tmp (inside the repo, per the confinement rule).
@@ -95,7 +95,7 @@ def run():
     check(".pdf ext → pdf", ingest._local_kind(Path("a.pdf"), b"x") == "pdf")
     check("%PDF magic wins for unknown ext", ingest._local_kind(Path("a.dat"), b"%PDF-1.7") == "pdf")
     check("docx → docx", ingest._local_kind(Path("a.docx"), b"PK") == "docx")
-    check("png → image", ingest._local_kind(Path("a.png"), b"\x89PNG") == "image")
+    check("png unsupported (no OCR)", ingest._local_kind(Path("a.png"), b"\x89PNG") == "")
     check("mp3 unsupported", ingest._local_kind(Path("a.mp3"), b"ID3") == "")
 
     # ── ingest_dir end-to-end (text-only; artifacts land in cwd/.search_fetchres) ──
@@ -110,6 +110,8 @@ def run():
         f.write("must not appear")
     with open(os.path.join(mats, "录音.mp3"), "wb") as f:
         f.write(b"ID3")
+    with open(os.path.join(mats, "照片.png"), "wb") as f:
+        f.write(b"\x89PNG\r\n")
     with open(os.path.join(mats, "空文件.txt"), "w") as f:
         f.write("   ")
 
@@ -133,6 +135,8 @@ def run():
           and by.get("子目录/笔记.md", {}).get("status") == "ok")
     check("hidden file skipped", not any("隐藏" in f["file"] for f in rep["files"]))
     check("mp3 unsupported", by.get("录音.mp3", {}).get("status") == "unsupported")
+    check("picture unsupported (no OCR, no task)",
+          by.get("照片.png") == {"file": "照片.png", "kind": ".png", "status": "unsupported", "chars": 0})
     check("blank file empty", by.get("空文件.txt", {}).get("status") == "empty")
     check("over-cap file skipped as too_large", by.get("超大.pdf", {}).get("status") == "too_large")
     check("corpus has per-file 来源 markers",

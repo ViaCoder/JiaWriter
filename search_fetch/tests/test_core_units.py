@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Direct unit tests for the helpers of artifacts, __main__, config, ingest, known_urls,
-tasks, fetch and cli — stdlib + mocks only: no browser, no network, no driver model.
+fetch and cli — stdlib + mocks only: no browser, no network, no driver model.
 Scratch HOME and working folder under tests/tmp. Run: python3 tests/test_core_units.py
 """
 # Async helpers under test.
@@ -22,7 +22,7 @@ from unittest import mock
 # Import the package from ./src.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from search_fetch import __main__ as entry  # noqa: E402
-from search_fetch import artifacts, cli, config, fetch, ingest, known_urls, tasks  # noqa: E402
+from search_fetch import artifacts, cli, config, fetch, ingest, known_urls  # noqa: E402
 
 # Scratch root inside the repository.
 _TMP_ROOT = Path(__file__).resolve().parent / "tmp"
@@ -155,75 +155,13 @@ class KnownUrlsTest(Scratch):
         self.assertIn("https://a.example/p#s", known_urls._ledger_keys("https://a.example/p#s"))
 
 
-class TasksTest(Scratch):
-    def test_now_and_created(self):
-        # UTC ISO now; malformed creation times are 0.
-        self.assertTrue(tasks._now_iso().endswith("+00:00"))
-        self.assertEqual((tasks._created_ts({"created": "nope"}), tasks._created_ts({"created": None})), (0.0, 0.0))
-
-    def test_write_record_and_load(self):
-        # A written record loads back; broken files load as {}.
-        p = self.tmp / "t.json"
-        tasks._write_record(p, {"id": "x"})
-        (self.tmp / "bad.json").write_text("{", encoding="utf-8")
-        self.assertEqual((tasks._load(p), tasks._load(self.tmp / "bad.json"), tasks._load(self.tmp / "none")),
-                         ({"id": "x"}, {}, {}))
-
-    def test_cutoff(self):
-        # Naive values are UTC; empty or bad values disable the filter.
-        self.assertEqual(tasks._cutoff("1970-01-01T00:01:00"), 60.0)
-        self.assertEqual((tasks._cutoff(""), tasks._cutoff("garbage")), (0.0, 0.0))
-
-    def test_run_task_kinds(self):
-        # OCR of an image, ASR, and an unknown kind.
-        img = self.tmp / "p.png"
-        img.write_bytes(b"png")
-        with mock.patch("search_fetch.docparse._ocr_image_bytes", return_value="文字") as ocr:
-            self.assertEqual(tasks._run_task({"kind": "ocr", "payload": {"bin": str(img), "kind": "image"}}), "文字")
-        ocr.assert_called_once_with(b"png", ".png")
-        with mock.patch("search_fetch.docparse._ocr_image_bytes", return_value=""), self.assertRaises(RuntimeError):
-            tasks._run_task({"kind": "ocr", "payload": {"bin": str(img), "kind": "image"}})
-        with mock.patch("search_fetch.media.transcribe", return_value="转写"):
-            self.assertEqual(tasks._run_task({"kind": "asr", "payload": {}}), "转写")
-        with self.assertRaises(RuntimeError):
-            tasks._run_task({"kind": "zzz"})
-
-    def test_run_worker_done_failed_and_cleared(self):
-        # A finished task writes its output and a done record.
-        rec = tasks._tasks_dir() / "asr-1.json"
-        tasks._write_record(rec, {"id": "asr-1", "kind": "asr", "payload": {"source": "s", "title": "t"},
-                                  "status": "pending", "created": tasks._now_iso()})
-        with mock.patch.object(tasks, "_run_task", return_value="文本"), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(tasks.run_worker(str(rec)), 0)
-        self.assertEqual(tasks._load(rec)["status"], "done")
-        self.assertEqual((rec.parent / "asr-1.out.md").read_text(encoding="utf-8"), "文本")
-        # A failing task writes a failed record.
-        with mock.patch.object(tasks, "_run_task", side_effect=RuntimeError("boom")), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(tasks.run_worker(str(rec)), 1)
-        self.assertEqual(tasks._load(rec)["error"], "boom")
-        # A record cleared while running is not resurrected.
-        def clear_then_return(_rec):
-            rec.unlink()
-            return "late"
-        tasks._write_record(rec, {"id": "asr-1", "kind": "asr", "payload": {}, "status": "pending", "created": ""})
-        with mock.patch.object(tasks, "_run_task", side_effect=clear_then_return), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(tasks.run_worker(str(rec)), 1)
-        self.assertFalse(rec.exists())
-        # An unreadable record exits 1.
-        with contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(tasks.run_worker(str(self.tmp / "missing.json")), 1)
-
-
 class FetchHelpersTest(Scratch):
     DOC = {"final_url": "https://example.com/r.pdf", "text": "正文" * 10,
            "meta": {"kind": "pdf", "chars": 20}, "data": b"%PDF-1.4"}
 
-    def test_doc_suffix_and_enqueue(self):
-        # Suffix from the kind; the OCR task carries the binary path.
+    def test_doc_suffix(self):
+        # Suffix from the kind.
         self.assertEqual(fetch._doc_suffix(self.DOC, "u"), ".pdf")
-        with mock.patch.object(tasks, "enqueue", return_value="ocr-1") as enq:
-            self.assertEqual(fetch._enqueue_ocr(self.DOC, "u", Path("/b.pdf")), "ocr-1")
-        self.assertEqual(enq.call_args.args[1]["bin"], "/b.pdf")
 
     def test_still_blocked(self):
         # Content after all; an iframe wall is captcha; a phrase-only short page counts as content (no model).
@@ -243,18 +181,16 @@ class FetchHelpersTest(Scratch):
             fetch._emit_page({"final_url": "f", "markdown": "m"}, False)
         self.assertEqual(out.getvalue(), 'a{"final_url": "f", "markdown": "m"}m')
 
-    def test_finish_doc_text_and_deferred(self):
-        # Parsed text is saved with its original; deferred OCR returns a receipt.
+    def test_finish_doc_text(self):
+        # Parsed text is saved with its original; the reply is the text only (no task receipt).
         with contextlib.redirect_stderr(io.StringIO()):
             res = fetch._finish_doc("https://example.com/r.pdf", dict(self.DOC))
-        self.assertEqual(res["markdown"], "正文" * 10)
+        self.assertEqual(res, {"final_url": "https://example.com/r.pdf", "markdown": "正文" * 10})
         self.assertTrue(any(p.suffix == ".pdf" for p in (self.tmp / ".search_fetchres").iterdir()))
-        with mock.patch.object(tasks, "enqueue", return_value="ocr-9"), contextlib.redirect_stderr(io.StringIO()):
-            res = fetch._finish_doc("https://example.com/s.pdf", dict(self.DOC, needs_task=True))
-        self.assertEqual(res["task"], "ocr-9")
-        # Deferred OCR without bytes is an error, not an empty OCR job.
-        with self.assertRaises(RuntimeError), contextlib.redirect_stderr(io.StringIO()):
-            fetch._finish_doc("https://example.com/t.pdf", dict(self.DOC, needs_task=True, data=b""))
+        # Without the original bytes only the text is saved.
+        with contextlib.redirect_stderr(io.StringIO()):
+            res = fetch._finish_doc("https://example.com/t.pdf", dict(self.DOC, data=b""))
+        self.assertEqual(res["markdown"], "正文" * 10)
 
     def test_page_markdown(self):
         # BM25 with a query, pruning without one or when BM25 fails.
@@ -300,8 +236,11 @@ class CliHelpersTest(Scratch):
         # Every subcommand parses.
         ap = cli._parser()
         self.assertEqual(ap.parse_args(["search", "q", "--fresh", "day"]).fresh, "day")
-        self.assertTrue(ap.parse_args(["fetch", "u", "--sync"]).sync)
-        self.assertEqual(ap.parse_args(["tasks", "wait", "--timeout", "3"]).timeout, 3.0)
+        self.assertEqual(ap.parse_args(["fetch", "u", "--json"]).url, "u")
+        # The removed OCR/ASR task commands are gone.
+        for argv in (["tasks", "wait"], ["fetch", "u", "--sync"]):
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(io.StringIO()):
+                ap.parse_args(argv)
 
     def test_cmd_search_saves_and_registers(self):
         # Mocked browser and search: the result links reach the ledger and stdout.
@@ -316,10 +255,10 @@ class CliHelpersTest(Scratch):
         self.assertEqual(json.loads(out.getvalue())["blocks"][0]["results"][0]["u"], "https://r.example/a")
 
     def test_cmd_fetch_and_ingest(self):
-        # Fetch defers OCR unless --sync; ingest returns its exit code.
+        # Fetch passes the URL, query and output mode; ingest returns its exit code.
         with mock.patch("search_fetch.fetch.run_fetch", mock.AsyncMock()) as rf:
-            self.assertEqual(cli._cmd_fetch(SimpleNamespace(url="u", query=None, json=False, sync=True)), 0)
-        self.assertFalse(rf.call_args.kwargs["defer"])
+            self.assertEqual(cli._cmd_fetch(SimpleNamespace(url="u", query="q", json=True)), 0)
+        self.assertEqual((rf.call_args.args, rf.call_args.kwargs), (("u",), {"query": "q", "as_json": True}))
         with mock.patch("search_fetch.ingest.run", return_value=2):
             self.assertEqual(cli._cmd_ingest(SimpleNamespace(dir="d", json=False)), 2)
 
@@ -331,20 +270,6 @@ class CliHelpersTest(Scratch):
             with mock.patch("search_fetch.browser._connect", mock.AsyncMock(return_value=object())), \
                     mock.patch("search_fetch.search.search", search), contextlib.redirect_stdout(io.StringIO()):
                 self.assertEqual(cli._cmd_selftest(SimpleNamespace(engine="bing", json=False)), want)
-
-    def test_cmd_tasks_ops(self):
-        # wait, list and clear.
-        with mock.patch.object(tasks, "wait_all", return_value={"done": [1], "failed": [], "pending": []}), \
-                contextlib.redirect_stdout(io.StringIO()) as out:
-            cli._cmd_tasks(SimpleNamespace(op="wait", timeout=1, since=None, json=False))
-        self.assertEqual(out.getvalue(), "done=1 failed=0 pending=0\n")
-        with mock.patch.object(tasks, "snapshot", return_value=[{"id": "a", "status": "done", "payload": {"source": "s"}}]), \
-                contextlib.redirect_stdout(io.StringIO()) as out:
-            cli._cmd_tasks(SimpleNamespace(op="list", since=None, json=False))
-        self.assertIn("a  done", out.getvalue())
-        with mock.patch.object(tasks, "clear", return_value=3), contextlib.redirect_stdout(io.StringIO()) as out:
-            cli._cmd_tasks(SimpleNamespace(op="clear"))
-        self.assertEqual(out.getvalue(), "cleared 3 file(s)\n")
 
     def test_cmd_browser_status_and_stop(self):
         # status reports the bridge; stop reports the closed tabs and always exits 0.

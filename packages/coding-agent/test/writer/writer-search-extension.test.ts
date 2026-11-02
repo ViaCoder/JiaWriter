@@ -25,7 +25,7 @@ import { manifestDir } from "../../src/writer/browser/install.ts";
 // Main-model state store.
 import { setWriterModel, type WriterModelState } from "../../src/writer/writer-model.ts";
 
-// sf has no Windows build and these cases run fake sf shell scripts: Linux and macOS only.
+// These cases run fake sf scripts with a shebang line: Linux and macOS only.
 const UNIX_ONLY = process.platform === "win32";
 
 // Working directory of each test (also holds the fake sf and its log).

@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
-"""Direct unit tests for the url_guard helpers and the media download/ASR helpers.
+"""Direct unit tests for the url_guard helpers and the media metadata helpers.
 stdlib + mocks only; the connection-pinning test talks to a throwaway 127.0.0.1 server.
 Run: python3 tests/test_guard_media_units.py
 """
 # Output capture.
 import contextlib
 import http.server
-import io
 import os
 import shutil
 import sys
@@ -143,47 +142,6 @@ class MediaHelpersTest(unittest.TestCase):
         self.assertIn("- 播放量: 9", md)
         self.assertTrue(md.endswith("## 简介\n简介"))
         self.assertIn("- 时长: 未知", media._meta_block({}, "u"))
-
-    def test_asr_file_retries_then_succeeds_or_fails(self):
-        # The fake Space fails once, then returns (language, text).
-        calls = []
-
-        class FakeClient:
-            def __init__(self, *a, **k):
-                pass
-
-            def predict(self, *a, **k):
-                calls.append(1)
-                if len(calls) == 1:
-                    raise RuntimeError("busy")
-                return ("Chinese", "你好")
-
-        fake = types.SimpleNamespace(Client=FakeClient, handle_file=lambda p: p)
-        with mock.patch.dict(sys.modules, {"gradio_client": fake}), mock.patch.object(media.time, "sleep"), \
-                mock.patch.object(config, "ASR_RETRIES", 2), contextlib.redirect_stderr(io.StringIO()):
-            self.assertEqual(media._asr_file(Path("a.m4a")), "（检测语言：Chinese）\n你好")
-            # Every attempt failing raises with the last error.
-            calls.clear()
-            FakeClient.predict = lambda self, *a, **k: (_ for _ in ()).throw(RuntimeError("down"))
-            with self.assertRaisesRegex(RuntimeError, "after 2 attempts: down"):
-                media._asr_file(Path("a.m4a"))
-
-    def test_transcribe_uses_home_scratch_and_cleans_up(self):
-        # Download and ASR mocked; the temp dir lives under HOME/tmp and is removed.
-        made = []
-
-        def fake_download(url, tmpdir):
-            made.append(Path(tmpdir))
-            p = Path(tmpdir) / "audio.m4a"
-            p.write_bytes(b"x" * 2048)
-            return p
-
-        with mock.patch.object(media, "_download_audio", side_effect=fake_download), \
-                mock.patch.object(media, "_asr_file", return_value="转写"), contextlib.redirect_stderr(io.StringIO()):
-            out = media.transcribe({"url": "https://v.example/a.mp3", "title": "标题", "source": "https://v.example/p"})
-        self.assertEqual(out, "# 标题（语音转写）\n来源: https://v.example/p\n\n转写")
-        self.assertEqual(made[0].parent, self.home / "tmp")
-        self.assertFalse(made[0].exists())
 
 
 if __name__ == "__main__":

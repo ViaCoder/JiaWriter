@@ -6,11 +6,10 @@ marker per file — the exact shape kb.py's split_pages consumes — so a caller
 prepend interview transcripts, reference PDFs etc. to the research corpus and the
 knowledge base retrieves them like any fetched page.
 
-Parsing reuses docparse (pdf/docx/pptx/xlsx/csv/tsv + image OCR); plain-text
-notes (.txt/.md) are decoded directly (utf-8 first, then GBK — the two encodings
-Chinese material files actually arrive in). Scanned/image-only documents follow
-the SAME deferred-OCR path as fetched pages: a background task is enqueued and
-the caller's `tasks wait` barrier folds the text in under the same 来源 marker.
+Parsing reuses docparse (pdf/docx/pptx/xlsx/csv/tsv); plain-text notes (.txt/.md)
+are decoded directly (utf-8 first, then GBK — the two encodings Chinese material
+files actually arrive in). There is no OCR: pictures are unsupported, and a scanned
+PDF without a text layer is listed as empty.
 """
 
 # Machine output.
@@ -25,8 +24,8 @@ import sys
 # Path arithmetic.
 from pathlib import Path
 
-# Saved records, parsing and the OCR task spool.
-from . import artifacts, docparse, tasks
+# Saved records and parsing.
+from . import artifacts, docparse
 
 # Shared stderr logger.
 from .config import _log
@@ -43,9 +42,6 @@ def _local_kind(path: Path, data: bytes) -> str:
     # Notes.
     if e in TEXT_EXTS:
         return "text"
-    # Pictures (OCR).
-    if e in docparse.IMG_EXTS:
-        return "image"
     # Office and PDF formats by extension.
     kind = docparse._EXT_KIND.get(e, "")
     # A PDF without the extension.
@@ -130,9 +126,7 @@ def _skip(files: list, rel_p: Path, status: str, why: str) -> None:
 def ingest_dir(root: Path) -> dict:
     """Parse every supported file under `root` (recursive, sorted, hidden files
     skipped). Returns {dir, files: [{file, kind, status, chars}], corpus} where
-    corpus concatenates each file's text under its 来源 marker. Files needing
-    OCR are enqueued as background tasks (status=deferred) whose text joins the
-    corpus later via the standard `tasks wait` barrier."""
+    corpus concatenates each file's text under its 来源 marker."""
     # Folder name used in the 来源 markers.
     label = root.name
     # Per-file records.
@@ -171,23 +165,8 @@ def ingest_dir(root: Path) -> dict:
         if kind == "text":
             text = docparse._decode_text(data).strip()
         else:
-            # Documents go through docparse; scanned pages are deferred to OCR.
-            res = docparse.parse_bytes(data, kind, rel_p.suffix.lower(), defer_ocr=True)
-            # OCR runs as a background task whose text joins at the `tasks wait` barrier.
-            if res.get("deferred"):
-                # Enqueue the task on the validated real path.
-                tid = tasks.enqueue("ocr", {
-                    "bin": str(path),
-                    "kind": "pdf" if kind == "pdf" else "image",
-                    "suffix": rel_p.suffix.lower(),
-                    "source": source,
-                    "title": rel_p.name,
-                })
-                # Record it as deferred.
-                files.append({"file": rel, "kind": kind, "status": "deferred", "chars": 0, "task": tid})
-                continue
-            # Text layer of the document.
-            text = (res.get("text") or "").strip()
+            # Text layer of the document (empty for a scanned PDF).
+            text = (docparse.parse_bytes(data, kind).get("text") or "").strip()
         # Nothing extracted.
         if not text:
             files.append({"file": rel, "kind": kind, "status": "empty", "chars": 0})
@@ -219,11 +198,8 @@ def run(dir_arg: str, as_json: bool) -> int:
     out = ingest_dir(root)
     # Parsed files.
     ok = sum(1 for f in out["files"] if f["status"] == "ok")
-    # Files waiting for OCR.
-    deferred = sum(1 for f in out["files"] if f["status"] == "deferred")
     # Summary line.
-    _log(f"ingest: {ok} parsed, {deferred} deferred (OCR), "
-         f"{len(out['files']) - ok - deferred} skipped, {len(out['corpus'])} chars")
+    _log(f"ingest: {ok} parsed, {len(out['files']) - ok} skipped, {len(out['corpus'])} chars")
     # JSON for machines, the corpus text otherwise.
     sys.stdout.write(json.dumps(out, ensure_ascii=False) if as_json else out["corpus"])
     # Success.

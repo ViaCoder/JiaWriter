@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Run a test script with outbound networking blocked: every socket connect that is not
 loopback raises OSError and prints `NETGUARD outbound connect to <host>` on stderr, so a
-test that reaches a real website (an unmocked OCR Space, an engine, a CDN) fails at once.
+test that reaches a real website (an unmocked remote service, an engine, a CDN) fails at once.
 Usage: python3 tests/netguard.py tests/test_x.py [args…]   (tests/run_all.sh runs every suite this way)
 """
 import runpy  # Running the target script as __main__.

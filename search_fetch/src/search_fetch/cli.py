@@ -1,20 +1,18 @@
 """search_fetch.cli — the one script-invocation surface (no interactive UI).
 
     sf.py search "<query>" [--engine …] [--pages N] [--lang xx] [--region yy] [--fresh day|week|month|year] [--json]
-    sf.py fetch <url> [--query …] [--json] [--sync]
+    sf.py fetch <url> [--query …] [--json]
     sf.py ingest <dir> [--json]                   (local materials folder → corpus text)
     sf.py selftest [--engine …] [--json]
     sf.py kb <index|retrieve-multi|retire|query> … (the RAG sidecar, same args as before)
-    sf.py tasks <wait|list|clear> [--timeout N] [--since ISO] [--json]
     sf.py browser <stop|status> [--json]          (close this run's tabs / report the bridge)
     sf.py bridge <install|status> [--json]        (set up / check the Chrome extension bridge)
     sf.py bridge-host <origin>                    (internal: started by Chrome via native messaging)
-    sf.py worker <task.json>                      (internal: detached OCR/ASR worker)
 
 WriterAgent (WA_SF) runs `sf search` / `sf fetch` as a child process; this CLI is the one
 and only invocation surface.
 
-Each command imports its modules inside its handler: `sf tasks list` must not pay
+Each command imports its modules inside its handler: `sf browser status` must not pay
 for loading crawl4ai and the browser stack.
 """
 
@@ -95,8 +93,8 @@ def _cmd_fetch(a) -> int:
     """`sf fetch`: render one URL (or document) to markdown."""
     # The fetch ladder.
     from .fetch import run_fetch
-    # OCR/ASR deferred unless --sync.
-    asyncio.run(run_fetch(a.url, query=a.query, as_json=a.json, defer=not a.sync))
+    # Render and print.
+    asyncio.run(run_fetch(a.url, query=a.query, as_json=a.json))
     # Success.
     return 0
 
@@ -164,40 +162,6 @@ def _cmd_selftest(a) -> int:
     return 0 if all_ok else 2
 
 
-def _cmd_tasks(a) -> int:
-    """`sf tasks wait|list|clear`."""
-    # The spool.
-    from . import tasks
-    # The KB barrier.
-    if a.op == "wait":
-        # Wait for the matching tasks.
-        rep = tasks.wait_all(timeout=a.timeout, since=a.since or "")
-        # Full report or a one-line count.
-        sys.stdout.write(json.dumps(rep, ensure_ascii=False, indent=1) if a.json else
-                         f"done={len(rep['done'])} failed={len(rep['failed'])} pending={len(rep['pending'])}\n")
-        # Success.
-        return 0
-    # Listing.
-    if a.op == "list":
-        # Records.
-        recs = tasks.snapshot(a.since or "")
-        # JSON for machines.
-        if a.json:
-            sys.stdout.write(json.dumps(recs, ensure_ascii=False, indent=1))
-        else:
-            # One line per task.
-            for r in recs:
-                sys.stdout.write(f"{r.get('id')}  {r.get('status'):8}  {r.get('payload', {}).get('source', '')}\n")
-        # Success.
-        return 0
-    # Clearing (the only remaining op).
-    n = tasks.clear()
-    # Count.
-    sys.stdout.write(f"cleared {n} file(s)\n")
-    # Success.
-    return 0
-
-
 def _cmd_browser(a) -> int:
     """`sf browser stop|status`: close this run's tabs in the user's Chrome, or report the bridge."""
     # Page handling and the bridge.
@@ -259,7 +223,7 @@ def _guarded(fn, *args) -> int:
 
 
 def _parser() -> argparse.ArgumentParser:
-    """The argparse tree of every command except kb and worker."""
+    """The argparse tree of every command except kb and bridge-host."""
     # Top level with the module docstring as help.
     ap = argparse.ArgumentParser(prog="sf", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     # One required subcommand.
@@ -271,11 +235,10 @@ def _parser() -> argparse.ArgumentParser:
     pf.add_argument("--query", default=None,
                     help="BM25 relevance query: fit markdown keeps the query-relevant content "
                          "(deterministic bounding only — all summarising stays with the LLM reader)")
-    pf.add_argument("--sync", action="store_true", help="run OCR/ASR inline instead of as background tasks")
     # ingest.
     pg = sub.add_parser("ingest",
                         help="parse every supported document in a local materials folder "
-                             "(pdf/docx/pptx/xlsx/csv/txt/md; scanned pages via deferred OCR) "
+                             "(pdf/docx/pptx/xlsx/csv/txt/md with a text layer; no OCR) "
                              "into corpus text with per-file 来源 markers")
     pg.add_argument("dir")
     pg.add_argument("--json", action="store_true", help="emit {dir, files:[{file,kind,status,chars}], corpus} as JSON")
@@ -298,12 +261,6 @@ def _parser() -> argparse.ArgumentParser:
                              "engine frontend change to locate the broken layer")
     pt.add_argument("--engine", default=None, help="test only this engine (default: all)")
     pt.add_argument("--json", action="store_true")
-    # tasks.
-    pk = sub.add_parser("tasks", help="background OCR/ASR task spool")
-    pk.add_argument("op", choices=["wait", "list", "clear"])
-    pk.add_argument("--timeout", type=float, default=None, help="barrier budget in seconds (default SEARCH_FETCH_TASK_WAIT)")
-    pk.add_argument("--since", default=None, help="only tasks created at/after this ISO timestamp (a run's own tasks)")
-    pk.add_argument("--json", action="store_true")
     # browser.
     pb = sub.add_parser("browser", help="this run's pages in the user's Chrome: `stop` closes the run's "
                                         "tabs; `status` reports the extension bridge")
@@ -320,11 +277,11 @@ def _parser() -> argparse.ArgumentParser:
 
 # Handlers by subcommand name.
 _COMMANDS = {"search": _cmd_search, "fetch": _cmd_fetch, "ingest": _cmd_ingest,
-             "selftest": _cmd_selftest, "tasks": _cmd_tasks, "browser": _cmd_browser, "bridge": _cmd_bridge}
+             "selftest": _cmd_selftest, "browser": _cmd_browser, "bridge": _cmd_bridge}
 
 
 def main(argv=None) -> int:
-    """Entry: kb and worker are delegated before argparse; everything else is parsed here."""
+    """Entry: kb and bridge-host are delegated before argparse; everything else is parsed here."""
     # Arguments without the program name.
     argv = sys.argv[1:] if argv is None else argv
     # kb keeps its own argparse, so its flags never collide with ours.
@@ -333,16 +290,6 @@ def main(argv=None) -> int:
         from . import kb
         # Same failure contract as the other commands.
         return _guarded(kb.main, argv[1:])
-    # The detached OCR/ASR worker.
-    if argv and argv[0] == "worker":
-        # Exactly one record path.
-        if len(argv) != 2:
-            sys.stderr.write("usage: sf.py worker <task.json>\n")
-            return 2
-        # Task spool.
-        from . import tasks
-        # Same failure contract.
-        return _guarded(tasks.run_worker, argv[1])
     # The native messaging host, started by Chrome with the caller's origin as its argument.
     if argv and argv[0] == "bridge-host":
         # The bridge.

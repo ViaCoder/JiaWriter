@@ -76,7 +76,7 @@ WriterAgent 是一个通用写作 agent，在终端里运行。它读取参考�
 
 把资料放进写作文件夹下的 `参考资料/`（或 `sources/`）。WriterAgent 启动时和每次提问前都会自动导入新文件和改过的文件，结果是带页码标记的 Markdown，放在 `参考资料/.parsed/`，可以用 `read` 和 `grep` 查找，引用时可以写明页码。导入的内容按不可信数据处理，其中的指令一律不执行。
 
-没有文字层的扫描件需要 OCR。设置了 search_fetch（`WA_SF`，或使用发布包里自带的 sf）时，`import_document` 会调用它的 OCR，页面图片会上传到公开的 Hugging Face Space；自动导入不做 OCR。
+WriterAgent 不做文字识别（OCR）：没有文字层的扫描件会列在导入报告里，不导入，请换成带文字层的 PDF 或 Word 文件。导入的文件不会离开你的电脑。
 
 ## 导出
 
@@ -114,7 +114,7 @@ WriterAgent 是一个通用写作 agent，在终端里运行。它读取参考�
   - 同一引擎两次检索至少间隔 20 秒，同一网站两次访问至少间隔 6 秒，都另加随机抖动；不打开内网和本机地址。遇到人机验证时，交互模式下 Chrome 窗口会跳到前台，等你完成（最多 90 秒）。
   - 第一次使用前在 Chrome 加载扩展：打开 `chrome://extensions`，打开“开发者模式”，点“加载未打包的扩展程序”，选择包里的 `chrome-extension` 文件夹。用 `/browser` 确认已连接。
 - `anysearch`：调用 AnySearch API，不设 key 时匿名调用。
-- `sf`：search_fetch，网页同样经这个扩展打开，另有扫描件 OCR 和视频转写。Linux 和 macOS 的发布包自带 sf，Windows 暂不支持。sf 第一次运行会安装依赖，约 1.1 GB，需要几分钟，全部放在 `~/.writeragent/agent/sf/`。
+- `sf`：search_fetch，网页同样经这个扩展打开。它读取文档的文字层、视频的元数据和字幕，不做文字识别，也不做语音转写。6 个发布包都自带 sf（Windows 上是 `sf.exe`，经回环端口加令牌连接本机通信程序）。sf 第一次运行会安装依赖，约 1.1 GB，需要几分钟，全部放在 `~/.writeragent/agent/sf/`。
 
 ## 联网与隐私
 
@@ -122,7 +122,7 @@ WriterAgent 启动和空闲时不发任何网络请求，没有遥测、版本�
 
 ## 平台与测试
 
-每次推送到 dev 时，GitHub Actions 在 6 个平台上运行 WriterAgent 自己的测试，构建 6 个发布包，再在每个平台的原生机器上检查包：fd 和 ripgrep 能否运行，扩展、使用说明和参考资料文件夹是否在包里，`--version`、`--help`，对本机模拟模型服务器的一次写作运行和一轮导入 PDF、导出 docx、自动导出，以及扩展的本机通信程序（一个请求经程序转给模拟扩展再返回，陌生来源被拒绝；不需要 key，不调用真实模型）。Windows 另外实际执行一次使用说明里的 `setx`，Linux 和 macOS 另外检查交互界面的中英文显示和包内的 sf。上游 pi 的完整测试套件在 Linux 上运行。浏览器后端在开发机上用 Chrome for Testing 加本地仿 Bing、Google 页面做功能测试（页面收到的事件全部是可信事件）。
+每次推送到 dev 时，GitHub Actions 在 6 个平台上运行 WriterAgent 自己的测试，构建 6 个发布包，再在每个平台的原生机器上检查包：fd 和 ripgrep 能否运行，扩展、使用说明和参考资料文件夹是否在包里，`--version`、`--help`，对本机模拟模型服务器的一次写作运行和一轮导入 PDF、导出 docx、自动导出，以及扩展的本机通信程序（一个请求经程序转给模拟扩展再返回，陌生来源被拒绝；不需要 key，不调用真实模型）。每个平台另外运行一次包内的 sf；Windows 还实际执行一次使用说明里的 `setx`，Linux 和 macOS 还检查交互界面的中英文显示。上游 pi 的完整测试套件在 Linux 上运行。浏览器后端在开发机上用 Chrome for Testing 加本地仿 Bing、Google 页面做功能测试（页面收到的事件全部是可信事件）。
 
 本仓库的开发机是 Linux x64，Linux 的设置命令在这台机器上实际测过；Windows 的 `setx` 在 CI 的 Windows 机器上执行过；macOS 的设置命令按 zsh 的语法写成，Windows cmd 的写法没有测过。
 

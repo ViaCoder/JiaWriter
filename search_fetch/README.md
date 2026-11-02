@@ -7,13 +7,13 @@ WriterAgent 的 `web_search` / `web_fetch` 工具在 `WA_SEARCH=sf` 时以子进
 
 **不使用驾驶模型（LLM），不需要 key**（2026-11-01 起）：页面状态由固定规则判断，翻页靠确定性信号。
 以后需要驾驶模型时的接入点在 `browser.py` 的「Model hook」注释里说明。
-扫描件 OCR 和短媒体转写仍调用公开的 HF Space（PaddleOCR-VL、Qwen3-ASR），可分别用 `SEARCH_FETCH_OCR`、`SEARCH_FETCH_ASR` 关闭；`kb` 子命令需要嵌入接口，WriterAgent 不使用它。
+不做 OCR，也不做语音转写：图片和扫描件只取文字层，没有文字层就按无内容处理；音视频只收录元数据和字幕。`kb` 子命令需要嵌入接口，WriterAgent 不使用它。
 
 - **search** — 直接打开各引擎的结果页（Google、Startpage，可选 Brave、Bing、DuckDuckGo、百度、搜狗），
   用扩展内置的页面脚本取出结果链接，SERP 原样转成 markdown 返回，由调用方挑选结果。
   有 consent 弹窗时自动点“同意”；翻页依次尝试“下一页”链接、“更多结果”按钮和无限滚动。
 - **fetch** — 打开任意 URL，转成 markdown；带 `--query` 时先 Pruning 去噪再用 BM25 只留相关片段。
-  文档 URL（pdf/docx/pptx/xlsx/csv/图片）交给 `docparse.py` 解析，扫描件走远程 OCR；
+  文档 URL（pdf/docx/pptx/xlsx/csv）交给 `docparse.py` 提取文字层；
   网页里链接的文档也会顺带下载解析（`SEARCH_FETCH_PAGE_DOCS`，默认 3 个）。
 - **ingest** — 解析工作文件夹里的本地材料目录（参考资料/），输出带 `##### 来源：参考资料/<文件>` 标记的语料。
 
@@ -51,7 +51,7 @@ search_fetch/
 │   ├── search.py         #   多引擎 SERP（URL 模板导航 + 分层翻页）
 │   ├── fetch.py          #   URL → markdown（媒体 → 文档 → 浏览器）
 │   ├── markdown.py / filters.py / artifacts.py   # 渲染、去噪与 BM25、落盘
-│   ├── docparse.py / media.py / tasks.py         # 文档解析、视频字幕与转写、后台任务
+│   ├── docparse.py / media.py                    # 文档解析、视频元数据与字幕
 │   ├── url_guard.py      #   外连策略（只允许 http(s)，默认拒绝内网与本机地址，防 DNS 重绑定）
 │   └── kb.py / ingest.py / known_urls.py / cli.py
 ├── tests/                # 隔离测试（见 tests/README.md）
@@ -77,22 +77,21 @@ PY=home/venv/bin/python3
 $PY sf.py fetch  "https://example.com/report"
 $PY sf.py search "world news" --pages 1 --lang en --engine google,startpage
 $PY sf.py selftest            # 各引擎 SERP 契约自检
-$PY sf.py tasks wait --json   # 后台 OCR/ASR 汇合
 ```
 
 ## 发布包里的 sf
 
-- WriterAgent 的 Linux 和 macOS 发布包带有 `search_fetch/<os>/<arch>/sf`（PyApp 单文件，内嵌本包 wheel 和 CPython 3.12），`WA_SEARCH=sf` 时不设 `WA_SF` 也能找到；Windows 没有 sf。
+- WriterAgent 的 6 个发布包都带有 `search_fetch/<os>/<arch>/sf`（Windows 上是 `search_fetch/windows/<arch>/sf.exe`；PyApp 单文件，内嵌本包 wheel 和 CPython 3.12），`WA_SEARCH=sf` 时不设 `WA_SF` 也能找到。
 - WriterAgent 运行 sf 时，把它的全部状态放在 `~/.writeragent/agent/sf/`：`runtime/`（PyApp 的 Python 和依赖）、`pip-cache/`、`home/`（扩展副本、桥接 socket、节流记录）。第一次运行会从 PyPI 安装依赖，约 1.1 GB，需要两三分钟。
-- 在 WriterAgent 里，扩展的本机通信程序是 writeragent 本身（主机名 `com.writeragent.browser`，发布版启动时自动向 Chrome 注册）；sf 由 `SEARCH_FETCH_BRIDGE_SOCKET` 指向它的 socket（`~/.writeragent/agent/browser/bridge.sock`），不再自己注册。按包里的「使用说明.html」在 Chrome 加载 `chrome-extension` 文件夹后，用 `/browser` 确认已连接。
-- 打包：`bash build_binary.sh [--out <目录>]` 在本机原生构建，产物为 `<目录>/<os>/<arch>/sf`。PyApp 固定为 v0.31.0 源码（校验 SHA256），用 `pyapp/Cargo.toml` 与 `pyapp/Cargo.lock` 替换上游的依赖清单：zip 升到 9、zstd 升到 0.14，bytes、quinn-proto、rustls、tar、time 升到修复版本，`cargo audit` 为 0 个漏洞（2026-11-01）。
+- 在 WriterAgent 里，扩展的本机通信程序是 writeragent 本身（主机名 `com.writeragent.browser`，发布版启动时自动向 Chrome 注册）；sf 由 `SEARCH_FETCH_BRIDGE_SOCKET` 指向它的 socket（`~/.writeragent/agent/browser/bridge.sock`），Windows 上由 `SEARCH_FETCH_BRIDGE_FILE` 指向它写的端口文件（`bridge.json`，内含回环端口和令牌），不再自己注册；Windows 上 `sf bridge install` 和 `sf bridge-host` 只提示改用 WriterAgent。按包里的「使用说明.html」在 Chrome 加载 `chrome-extension` 文件夹后，用 `/browser` 确认已连接。
+- 打包：`bash build_binary.sh [--out <目录>]` 在本机原生构建（Windows 上在 Git Bash 里运行），产物为 `<目录>/<os>/<arch>/sf`，Windows 上是 `sf.exe`。PyApp 固定为 v0.31.0 源码（校验 SHA256），用 `pyapp/Cargo.toml` 与 `pyapp/Cargo.lock` 替换上游的依赖清单：zip 升到 9、zstd 升到 0.14，bytes、quinn-proto、rustls、tar、time 升到修复版本，`cargo audit` 为 0 个漏洞（2026-11-01）。
 
 ## 产物（`./.search_fetchres/`）
 
 - `search-*.md` / `search-*.ops.jsonl`：各引擎 SERP markdown / 每步动作与耗时。
 - `search-*.<引擎>-p<页>-empty.md`：没取到结果链接的结果页原样保存（被拦、改版或确实无结果），不用重访就能判断原因。
 - `<slug>_fit.md` / `<slug>_raw.md`：精简正文（带 query 时为 BM25 片段）/ 全量正文。
-- `tasks/`：后台 OCR/ASR 任务状态；`index.md`：采集清单。
+- `index.md`：采集清单。
 
 ## 配置
 
@@ -111,7 +110,6 @@ $PY sf.py tasks wait --json   # 后台 OCR/ASR 汇合
 | `SEARCH_FETCH_ENGINE_CONCURRENCY` | 并发引擎数，默认 `1`（顺序） |
 | `SEARCH_FETCH_PAGE_DOCS` | fetch 网页时顺带下载页内文档的上限，默认 `3`；`0` 关闭 |
 | `SEARCH_FETCH_DOC_MAX_MB` | 单个文档下载上限（MB），默认 `40` |
-| `SEARCH_FETCH_OCR` / `SEARCH_FETCH_OCR_MAX_PAGES` | 扫描件远程 OCR（PaddleOCR-VL HF Space）开关 / 页数上限（默认 10） |
 
 ## 排错
 
@@ -121,12 +119,9 @@ $PY sf.py tasks wait --json   # 后台 OCR/ASR 汇合
 | bridge not connected | 运行 `sf bridge install`，在 chrome://extensions 加载它打印的目录；保持 Chrome 开着，用 `sf bridge status` 检查 |
 | 某引擎结果少/空 | 看 `search-*.ops.jsonl` 是否卡在验证页；`sf.py selftest --engine <名>` 定位 |
 
-## 视频与后台任务
+## 视频
 
-媒体 URL（YouTube、直链音视频）走 `media.py`：元数据 → 字幕（人工优先）→ 仅对无字幕的短媒体做
-`Qwen/Qwen3-ASR` 转写；直播与超限媒体不下载。OCR 与 ASR 以分离的 worker 进程运行（`tasks.py`），
-fetch 立即返回占位回执，由 `sf.py tasks wait --timeout 300` 统一汇合；`sf.py fetch --sync` 改为内联执行。
-主要旋钮：`SEARCH_FETCH_ASR`、`SEARCH_FETCH_ASR_TIMEOUT`（240 秒）、`SEARCH_FETCH_ASR_MAX_DURATION`（900 秒）、
-`SEARCH_FETCH_ASR_MAX_MB`（60）、`SEARCH_FETCH_TASK_WAIT`（300 秒）。
+媒体 URL（YouTube、直链音视频）走 `media.py`：只取元数据和字幕（人工字幕优先），不下载媒体，也不做语音转写；
+没有字幕时只收录元数据与简介。字幕语言偏好用 `SEARCH_FETCH_SUB_LANGS` 设置（默认 `zh,en`）。
 
 来源：从 WriterSuite 的 search_fetch（提交 0a0f160）复制而来，此后只在 WriterAgent 中维护。

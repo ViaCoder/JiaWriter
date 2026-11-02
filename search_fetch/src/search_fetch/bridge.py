@@ -10,11 +10,16 @@ version — nothing is spoofed and no automation protocol is attached. Pieces:
               32-bit native-order length + UTF-8 JSON); it also listens on a private Unix
               socket (<HOME>/bridge/bridge.sock, directory 0700, socket 0600)
   client      every `sf search` / `sf fetch` process sends one JSON request line to that
-              socket and reads one JSON reply line
+              socket and reads one JSON reply line. On Windows (and whenever
+              SEARCH_FETCH_BRIDGE_FILE is set) the host is WriterAgent itself: it listens on a
+              loopback port and writes {port, token} to a private file; every request line
+              then carries the token.
 
 `sf bridge install` copies the extension to <HOME>/extension (load it once in
 chrome://extensions → Developer mode → Load unpacked) and writes the native-messaging
 host manifest for this user's Chrome (Chrome only; the user does not use Chromium).
+On Windows sf has no host of its own (Chrome registers native hosts in the registry
+there, and WriterAgent already is the host), so install and bridge-host only explain that.
 """
 
 # Async host and client.
@@ -65,6 +70,9 @@ DEFAULT_TIMEOUT = 60.0
 SETUP_HINT = ("Chrome with the search_fetch extension is not connected. Run `sf bridge install`, "
               "load the folder it prints in chrome://extensions (Developer mode → Load unpacked), "
               "and keep Chrome open.")
+# On Windows the host is WriterAgent's, so the hint points there.
+WINDOWS_HINT = ("On Windows the browser host is WriterAgent itself: load the chrome-extension folder of the "
+                "WriterAgent package in chrome://extensions, keep Chrome open, and check it with /browser.")
 
 
 class BridgeUnavailable(RuntimeError):
@@ -99,6 +107,34 @@ def socket_path() -> Path:
         return Path(override)
     # Inside the private directory.
     return bridge_dir() / "bridge.sock"
+
+
+def address() -> tuple:
+    """Where the host listens: ("tcp", <port file>) when SEARCH_FETCH_BRIDGE_FILE is set or on Windows,
+    else ("unix", <socket path>)."""
+    # WriterAgent's loopback host writes its port and token to this file.
+    port_file = os.environ.get("SEARCH_FETCH_BRIDGE_FILE", "").strip()
+    # A port file, given or the default one on Windows.
+    if port_file or sys.platform == "win32":
+        return ("tcp", Path(port_file) if port_file else bridge_dir() / "bridge.json")
+    # The Unix socket.
+    return ("unix", socket_path())
+
+
+def _tcp_info(port_file: Path) -> tuple:
+    """(port, token) from the host's port file; BridgeUnavailable when it is missing or unreadable."""
+    # Read and check both fields.
+    try:
+        info = json.loads(port_file.read_text(encoding="utf-8"))
+        port, token = int(info["port"]), str(info["token"])
+    except (OSError, ValueError, KeyError, TypeError) as ex:
+        # No file: the host is not running.
+        raise BridgeUnavailable(WINDOWS_HINT if sys.platform == "win32" else SETUP_HINT) from ex
+    # A real port only.
+    if not 0 < port < 65536:
+        raise BridgeUnavailable(SETUP_HINT)
+    # Both values.
+    return port, token
 
 
 def installed_extension_dir() -> Path:
@@ -149,6 +185,9 @@ def launcher_script() -> str:
 
 def install(platform: str = None, home: Path = None) -> dict:
     """Copy the extension to <HOME>/extension, write the launcher and the host manifests; return what was written."""
+    # Windows: WriterAgent is the host.
+    if (platform or sys.platform) == "win32":
+        raise RuntimeError(WINDOWS_HINT)
     # Private bridge directory.
     d = bridge_dir()
     d.mkdir(parents=True, exist_ok=True)
@@ -312,6 +351,10 @@ async def serve(stdin, stdout, sock: Path) -> None:
 
 def host_main(argv: list) -> int:
     """`sf bridge-host <origin>`: started by Chrome; refuses any caller but our extension."""
+    # Windows: WriterAgent is the host.
+    if sys.platform == "win32":
+        _log(f"bridge-host: {WINDOWS_HINT}")
+        return 2
     # Chrome passes the caller's origin first.
     origin = argv[0] if argv else ""
     # Only our extension may start the host.
@@ -337,26 +380,48 @@ def _reply_result(line: bytes):
     return reply.get("result")
 
 
-def _request_line(op: str, args: dict, timeout: float) -> bytes:
-    """One request line for the host."""
+def _request_line(op: str, args: dict, timeout: float, token: str = "") -> bytes:
+    """One request line for the host (with the token of a loopback host)."""
+    # Request fields.
+    req = {"op": op, "args": args, "timeout": timeout}
+    # The loopback host checks the token.
+    if token:
+        req["token"] = token
     # JSON plus newline.
-    return json.dumps({"op": op, "args": args, "timeout": timeout}, ensure_ascii=False).encode("utf-8") + b"\n"
+    return json.dumps(req, ensure_ascii=False).encode("utf-8") + b"\n"
+
+
+def _connect() -> tuple:
+    """Blocking connection to the host: (socket, token); BridgeUnavailable when nobody listens."""
+    # Where the host listens.
+    kind, where = address()
+    # Loopback port with a token.
+    if kind == "tcp":
+        port, token = _tcp_info(where)
+        try:
+            return socket.create_connection(("127.0.0.1", port), timeout=10), token
+        except OSError as ex:
+            raise BridgeUnavailable(WINDOWS_HINT if sys.platform == "win32" else SETUP_HINT) from ex
+    # Unix socket (no token: the socket's permissions guard it).
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        s.connect(str(where))
+    except (FileNotFoundError, ConnectionRefusedError) as ex:
+        s.close()
+        raise BridgeUnavailable(SETUP_HINT) from ex
+    # Connected.
+    return s, ""
 
 
 def call(op: str, timeout: float = DEFAULT_TIMEOUT, **args):
     """Blocking request to the extension; BridgeUnavailable when Chrome/the extension is not connected."""
-    # Connect to the host socket.
-    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    # Connect to the host.
+    s, token = _connect()
     try:
-        # A missing socket or a dead host.
-        try:
-            s.connect(str(socket_path()))
-        except (FileNotFoundError, ConnectionRefusedError) as ex:
-            raise BridgeUnavailable(SETUP_HINT) from ex
         # The host's own timeout plus a margin.
         s.settimeout(timeout + 10)
         # Send the request.
-        s.sendall(_request_line(op, args, timeout))
+        s.sendall(_request_line(op, args, timeout, token))
         # Read one line.
         buf = b""
         while not buf.endswith(b"\n") and len(buf) < MAX_REPLY:
@@ -373,14 +438,21 @@ def call(op: str, timeout: float = DEFAULT_TIMEOUT, **args):
 
 async def acall(op: str, timeout: float = DEFAULT_TIMEOUT, **args):
     """Async request to the extension (same contract as call)."""
+    # Where the host listens.
+    kind, where = address()
+    token = ""
     # Connect.
     try:
-        reader, writer = await asyncio.open_unix_connection(str(socket_path()), limit=MAX_REPLY)
+        if kind == "tcp":
+            port, token = _tcp_info(where)
+            reader, writer = await asyncio.open_connection("127.0.0.1", port, limit=MAX_REPLY)
+        else:
+            reader, writer = await asyncio.open_unix_connection(str(where), limit=MAX_REPLY)
     except (FileNotFoundError, ConnectionRefusedError) as ex:
-        raise BridgeUnavailable(SETUP_HINT) from ex
+        raise BridgeUnavailable(WINDOWS_HINT if sys.platform == "win32" else SETUP_HINT) from ex
     # Send and read one line.
     try:
-        writer.write(_request_line(op, args, timeout))
+        writer.write(_request_line(op, args, timeout, token))
         await writer.drain()
         line = await asyncio.wait_for(reader.readline(), timeout + 10)
     finally:
