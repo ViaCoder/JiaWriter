@@ -55,6 +55,9 @@ class FakePage:
         return "{}"
     async def activate(self):
         self.evals.append(("activate",))
+    async def input(self, op, **args):
+        self.evals.append((op, args))
+        return {}
     async def wait(self, t):
         pass
 
@@ -88,17 +91,17 @@ def run():
     # ── _act (fake page, all actions) ──
     p = FakePage()
     asyncio.run(browser._act(p, {"action": "type", "target_id": "wf0", "text": "hello"}))
-    check("_act type → type_target with the text", p.evals == [("run", "type_target", {"id": "wf0", "text": "hello"}, "ISOLATED")])
+    check("_act type → trusted typing with Enter", p.evals == [("human_type", {"target": {"wfId": "wf0"}, "text": "hello", "enter": True})])
     p = FakePage()
     asyncio.run(browser._act(p, {"action": "press_enter", "target_id": "wf0"}))
-    check("_act press_enter → submit only", p.evals == [("run", "type_target", {"id": "wf0"}, "ISOLATED")])
+    check("_act press_enter → click into the field and Enter", p.evals == [("human_type", {"target": {"wfId": "wf0"}, "text": "", "enter": True})])
     p = FakePage()
     asyncio.run(browser._act(p, {"action": "click", "target_id": "wf1"}))
-    # click is a DOM click fired in page context by ops/click_target.js
-    check("_act click", p.evals == [("run", "click_target", {"id": "wf1"}, "ISOLATED")])
+    # click is a trusted mouse click by the extension (chrome.debugger Input events)
+    check("_act click", p.evals == [("human_click", {"target": {"wfId": "wf1"}})])
     p = FakePage()
     asyncio.run(browser._act(p, {"action": "scroll"}))
-    check("_act scroll", p.evals == [("run", "scroll_bottom", {}, "ISOLATED")])
+    check("_act scroll", p.evals == [("human_scroll", {"steps": 4})])
 
     # ── _human_wait (mock _observe) ──
     saved_obs, saved_hw, saved_hp = browser._observe, config.HUMAN_WAIT, config.HUMAN_POLL

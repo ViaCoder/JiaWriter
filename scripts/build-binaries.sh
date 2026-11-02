@@ -183,6 +183,13 @@ for platform in "${PLATFORMS[@]}"; do
     cp ../../node_modules/docx/LICENSE "$OUTPUT_DIR/$platform/THIRD_PARTY/docx/"
     cp ../../node_modules/fflate/LICENSE "$OUTPUT_DIR/$platform/THIRD_PARTY/fflate/"
     cp src/writer/data/UNICODE-LICENSE.txt "$OUTPUT_DIR/$platform/THIRD_PARTY/unicode/"
+    # WriterAgent: the Chrome extension (loaded once in chrome://extensions), Readability's license,
+    # the Chinese guide with screenshots for this system, and an empty reference folder.
+    cp -R ../../search_fetch/src/search_fetch/extension "$OUTPUT_DIR/$platform/chrome-extension"
+    mkdir -p "$OUTPUT_DIR/$platform/THIRD_PARTY/readability"
+    cp ../../search_fetch/src/search_fetch/extension/vendor/Readability-LICENSE.md "$OUTPUT_DIR/$platform/THIRD_PARTY/readability/LICENSE.md"
+    node ../../scripts/writer-guide.mjs "$platform" "$OUTPUT_DIR/$platform/使用说明.html"
+    mkdir -p "$OUTPUT_DIR/$platform/参考资料"
 
     # WriterAgent: the search_fetch binary of this platform (no Windows build), where locateSf looks.
     if [[ -n "$SF_DIR" && "$platform" != windows-* ]]; then

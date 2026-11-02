@@ -14,7 +14,7 @@ version — nothing is spoofed and no automation protocol is attached. Pieces:
 
 `sf bridge install` copies the extension to <HOME>/extension (load it once in
 chrome://extensions → Developer mode → Load unpacked) and writes the native-messaging
-host manifest for Chrome and Chromium of this user.
+host manifest for this user's Chrome (Chrome only; the user does not use Chromium).
 """
 
 # Async host and client.
@@ -52,7 +52,7 @@ from . import config
 from .config import _log
 
 # Native messaging host name (lowercase letters, digits, dots and underscores only).
-HOST_NAME = "com.writeragent.search_fetch"
+HOST_NAME = "com.writeragent.browser"
 # The extension inside the package.
 EXTENSION_SRC = Path(__file__).resolve().parent / "extension"
 # Largest message the host may send to Chrome (Chrome's limit is 1 MB).
@@ -92,7 +92,11 @@ def bridge_dir() -> Path:
 
 
 def socket_path() -> Path:
-    """The host's Unix socket."""
+    """The host's Unix socket: SEARCH_FETCH_BRIDGE_SOCKET when set (WriterAgent's own host), else <HOME>/bridge."""
+    # WriterAgent runs the host itself and tells sf where it listens.
+    override = os.environ.get("SEARCH_FETCH_BRIDGE_SOCKET", "").strip()
+    if override:
+        return Path(override)
     # Inside the private directory.
     return bridge_dir() / "bridge.sock"
 
@@ -104,18 +108,15 @@ def installed_extension_dir() -> Path:
 
 
 def host_manifest_dirs(platform: str = None, home: Path = None) -> list:
-    """NativeMessagingHosts directories of Chrome and Chromium for this user (existing browsers first;
-    Chrome's is always included so a later Chrome install finds the host)."""
+    """Chrome's NativeMessagingHosts directory for this user, as a one-item list (written even before
+    Chrome is installed, so a later install finds the host)."""
     # Inputs.
     platform = platform or sys.platform
     home = home or Path.home()
-    # Browser profile roots per OS.
-    if platform == "darwin":
-        roots = [home / "Library/Application Support/Google/Chrome", home / "Library/Application Support/Chromium"]
-    else:
-        roots = [home / ".config/google-chrome", home / ".config/chromium"]
-    # Chrome always; Chromium only when it is installed for this user.
-    return [r / "NativeMessagingHosts" for i, r in enumerate(roots) if i == 0 or r.is_dir()]
+    # Chrome's profile root per OS.
+    root = home / "Library/Application Support/Google/Chrome" if platform == "darwin" else home / ".config/google-chrome"
+    # The one folder.
+    return [root / "NativeMessagingHosts"]
 
 
 def _write_private(path: Path, text: str, mode: int) -> None:

@@ -79,6 +79,11 @@ class ExtPage:
         # The extension refuses unknown script names.
         return await bridge.acall("run", timeout=30, tab=self.tab, script=script, args=args or {}, world=world)
 
+    async def input(self, op: str, **args) -> dict:
+        """One trusted-input action of the extension (human_click, human_type, human_scroll) on this tab."""
+        # Input may navigate: the load wait plus a margin.
+        return await bridge.acall(op, timeout=_request_timeout() + 30, tab=self.tab, load_ms=_load_ms(), **args)
+
     async def get_content(self) -> str:
         """The rendered HTML."""
         # outerHTML of the document.
@@ -362,22 +367,23 @@ _CHALLENGE_MARKS = ("just a moment", "verify you are human", "are you a robot",
 # ── Acting on an observed element ───────────────────────────────────
 
 async def _act(page, decision: dict) -> None:
-    """Carry out an action on the element observe.js tagged with target_id."""
+    """Carry out an action on the element observe.js tagged with target_id, with the trusted
+    mouse and keyboard input of the extension (as a person would: move, click, type, Enter)."""
     # Action and target.
     action = decision.get("action")
-    tid = decision.get("target_id")
-    # Fill the field and submit its form.
+    target = {"wfId": decision.get("target_id")}
+    # Click into the field, type the text and press Enter.
     if action == "type":
-        await page.run("type_target", {"id": tid, "text": decision.get("text", "")})
-    # Submit only.
+        await page.input("human_type", target=target, text=decision.get("text", ""), enter=True)
+    # Click into the field and press Enter.
     elif action == "press_enter":
-        await page.run("type_target", {"id": tid})
-    # DOM click on the element, scrolled to the centre (a no-op when it is gone).
+        await page.input("human_type", target=target, text="", enter=True)
+    # Wheel to the element, move the pointer there and click (nothing happens when it is gone).
     elif action == "click":
-        await page.run("click_target", {"id": tid})
-    # Bottom of the page.
+        await page.input("human_click", target=target)
+    # A few wheel turns down.
     elif action == "scroll":
-        await page.run("scroll_bottom")
+        await page.input("human_scroll", steps=4)
 
 
 async def _install_activity_probe(page):

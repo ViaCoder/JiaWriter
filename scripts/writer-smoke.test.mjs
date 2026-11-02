@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 // Test runner.
 import { after, before, test } from "node:test";
 // Functions under test.
-import { onePagePdf, programPath, REPLY, run, SECRET, smoke, startMock, TOOLS } from "./writer-smoke.mjs";
+import { EXTENSION_ID, frame, frames, hostRound, onePagePdf, programPath, REPLY, run, SECRET, smoke, startMock, TOOLS } from "./writer-smoke.mjs";
 
 // Folder of the fake programs.
 let dir = "";
@@ -21,20 +21,43 @@ before(() => {
 });
 after(() => rmSync(dir, { recursive: true, force: true }));
 
-/** A fake program: version, help, and one Chat Completions request in print mode. */
-function fake(leak) {
+// A native messaging host in plain JS for the fake program: refuses other origins, serves one line
+// protocol over a Unix socket (or the Windows port file), forwards frames to stdout and replies back.
+// noisy also writes bytes that are not frames to stdout.
+const HOST = (noisy) => `
+if (a[0] !== "chrome-extension://${EXTENSION_ID}/") process.exit(2);
+const fs = await import("node:fs"); const net = await import("node:net"); const path = await import("node:path");
+const dir = path.join(process.env.WA_DIR, "browser"); fs.mkdirSync(dir, { recursive: true });
+const win = process.platform === "win32"; const addr = path.join(dir, win ? "bridge.json" : "bridge.sock");
+const waiting = new Map(); let id = 0; let rest = Buffer.alloc(0);
+const server = net.createServer((s) => s.on("data", (c) => { const req = JSON.parse(String(c).split("\\n")[0]); const n = ++id;
+  waiting.set(n, (r) => s.end(JSON.stringify(r) + "\\n"));
+  const body = Buffer.from(JSON.stringify({ ...req.args, id: n, op: req.op })); const h = Buffer.alloc(4); h.writeUInt32LE(body.length);
+  process.stdout.write(Buffer.concat([h, body]));${noisy ? ' process.stdout.write("junk");' : ""} }));
+if (win) server.listen(0, "127.0.0.1", () => fs.writeFileSync(addr, JSON.stringify({ port: server.address().port, token: "t" })));
+else server.listen(addr);
+process.stdin.on("data", (c) => { rest = Buffer.concat([rest, c]);
+  while (rest.length >= 4 && rest.length >= 4 + rest.readUInt32LE(0)) { const len = rest.readUInt32LE(0);
+    const m = JSON.parse(rest.subarray(4, 4 + len)); rest = rest.subarray(4 + len); const w = waiting.get(m.id); if (w) w(m); } });
+process.stdin.on("end", () => server.close(() => { try { fs.unlinkSync(addr); } catch {} process.exit(0); }));
+`;
+
+/** A fake program: version, help, one Chat Completions request in print mode, and the host mode. */
+function fake(leak, noisyHost = false) {
 	// Node script answering like writeragent.
-	const p = join(dir, leak ? "leaky.mjs" : "good.mjs");
+	const p = join(dir, `${leak ? "leaky" : "good"}${noisyHost ? "-noisy" : ""}.mjs`);
 	writeFileSync(
 		p,
 		`const a = process.argv.slice(2);
-if (a[0] === "--version") console.log("1.4.0");
+if (a[0]?.startsWith("chrome-extension://")) {${HOST(noisyHost)}}
+else if (a[0] === "--version") console.log("1.4.0");
 else if (a[0] === "--help") console.log("writeragent - AI writing assistant");
 else if (a[1] === "导入并导出") {
   const fs = await import("node:fs");
   fs.mkdirSync("参考资料/.parsed", { recursive: true });
   fs.writeFileSync("参考资料/.parsed/a.pdf.md", "Smoke reference text");
   fs.writeFileSync("d.docx", "PK fake");
+  fs.writeFileSync("稿件.docx", "PK auto");
   console.log(${JSON.stringify(REPLY)});
 } else {
   const body = { max_tokens: 100, messages: [{ role: "system", content: "You are an expert writing assistant. <name>report-analysis</name>" }],
@@ -86,7 +109,15 @@ test("smoke passes a well-behaved program and fails one that leaks the key", asy
 		["key hidden", true],
 		["import pdf", true],
 		["export docx", true],
+		["auto export", true],
+		["host listens", true],
+		["host round trip", true],
+		["host exits", true],
+		["host refuses strangers", true],
 	]);
+	// A host that writes other bytes to stdout fails the round trip.
+	const noisy = await smoke(process.execPath, [fake(false, true)]);
+	assert.deepEqual(noisy.find(([name]) => name === "host round trip")?.[1], false);
 	// The key on stderr fails the key check.
 	const leaky = await smoke(process.execPath, [fake(true)]);
 	assert.deepEqual(leaky.find(([name]) => name === "key hidden"), ["key hidden", false, ""]);
@@ -118,4 +149,27 @@ test("programPath makes a relative program path absolute and keeps a bare comman
 	assert.equal(programPath("extracted/writeragent/writeragent"), resolve("extracted/writeragent/writeragent"));
 	assert.equal(programPath("extracted\\writeragent.exe"), resolve("extracted\\writeragent.exe"));
 	assert.equal(programPath("node"), "node");
+});
+
+test("frame and frames round-trip messages and flag bytes that are not frames", () => {
+	// Two frames and a cut third.
+	const buf = Buffer.concat([frame({ id: 1 }), frame({ hello: "x" }), frame({ id: 2 }).subarray(0, 5)]);
+	const got = frames(buf);
+	assert.deepEqual(got.messages, [{ id: 1 }, { hello: "x" }]);
+	assert.equal(got.rest.length, 5);
+	assert.equal(got.bad, false);
+	// A length over 1 MB is not a frame.
+	assert.equal(frames(Buffer.from("junkjunk")).bad, true);
+});
+
+test("hostRound routes one request through a host and checks that it exits and refuses strangers", async () => {
+	// A well-behaved fake host in its own agent folder.
+	const env = { ...process.env, WA_DIR: join(dir, "host-agent") };
+	const rows = await hostRound(process.execPath, [fake(false)], env);
+	assert.deepEqual(rows.map(([name, ok]) => [name, ok]), [
+		["host listens", true],
+		["host round trip", true],
+		["host exits", true],
+		["host refuses strangers", true],
+	]);
 });

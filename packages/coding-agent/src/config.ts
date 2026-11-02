@@ -447,6 +447,14 @@ export function getWriterSkillsDir(): string {
 	return join(getPackageDir(), "skills", "writer");
 }
 
+/** WriterAgent: the Chrome extension folder (chrome-extension/ next to the binary, the search_fetch copy in a source checkout). */
+export function getWriterExtensionDir(): string {
+	if (isBunBinary) {
+		return join(getPackageDir(), "chrome-extension");
+	}
+	return resolve(getPackageDir(), "..", "..", "search_fetch", "src", "search_fetch", "extension");
+}
+
 /** Get path to package.json */
 export function getPackageJsonPath(): string {
 	return join(getPackageDir(), "package.json");

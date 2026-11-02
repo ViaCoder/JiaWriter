@@ -94,7 +94,7 @@ export const zh = {
 	// URL not allowed.
 	"fetch.badUrl": "只能抓取 http(s) 网址：{url}",
 	// Unknown backend.
-	"search.badBackend": "WA_SEARCH 只能是 anysearch 或 sf，当前为「{value}」。",
+	"search.badBackend": "WA_SEARCH 只能是 auto、browser、anysearch 或 sf，当前为「{value}」。",
 	// AnySearch quota exhausted (402 body discarded).
 	"anysearch.quota": "AnySearch 匿名额度已用完，可设置 WA_SEARCH_KEY 后重试。",
 	// AnySearch key rejected.
@@ -242,9 +242,24 @@ export const zh = {
 	"lang.envWins": "当前设置了 WA_LANG={value}，它优先于 /lang 的选择。",
 	"lang.bad": "可选语言：zh、en。",
 	// /sf.
-	"sf.cmdUsage": "用法：/sf status 查看 Chrome 扩展是否连接，/sf install 安装扩展桥接。",
-	"sf.installNext":
-		"下一步：在 Chrome 打开 chrome://extensions，打开“开发者模式”，点“加载已解压的扩展程序”，选择上面的扩展目录；保持 Chrome 开着，再运行 /sf status 确认 connected 为 true。sf 第一次运行会下载约 1 GB 的依赖，需要几分钟。",
+	"sf.cmdUsage": "用法：/sf status 或 /sf install，与 /browser 相同。",
+	// Browser backend.
+	"browser.label": "浏览器（{detail}）",
+	"browser.engineLine": "{engine} {pages} 页",
+	"browser.stopped": "{engine} 读到第 {pages} 页后停止：{reason}",
+	"browser.fallback": "Chrome 里的 WriterAgent 扩展没有连接，本次改用 AnySearch。安装扩展的步骤见 /browser。",
+	"browser.notConnected": "Chrome 里的 WriterAgent 扩展没有连接。请打开 Chrome，并按 /browser 的说明加载扩展。",
+	"browser.verify": "{engine} 要求人机验证：Chrome 窗口已切到前台，请在窗口里完成验证，最多等待 {seconds} 秒。",
+	"browser.connected": "Chrome 扩展已连接（扩展版本 {version}）。",
+	"browser.disconnected": "Chrome 扩展未连接。",
+	"browser.steps":
+		"安装扩展（只需一次）：\n1. 在 Chrome 地址栏输入 chrome://extensions 并回车；\n2. 打开右上角的“开发者模式”；\n3. 点“加载未打包的扩展程序”，选择这个文件夹：\n   {dir}\n4. 保持 Chrome 开着。\n图文步骤见安装包里的「使用说明.html」。",
+	"browser.hostFailed": "无法向 Chrome 注册本机通信程序：{reason}",
+	"browser.hostOk": "已向 Chrome 注册本机通信程序：{files}",
+	"browser.cmdUsage": "用法：/browser 查看扩展是否连接和安装步骤。",
+	// Automatic export.
+	"export.autoTitle": "本轮修改的稿件已自动导出：",
+	"export.autoFailed": "自动导出 {path} 失败：{reason}",
 };
 
 /** Message keys shared by all languages. */

@@ -1,10 +1,12 @@
 /**
  * Built-in WriterAgent extension: reference import and draft export.
  * - import_document / /import-doc: PDF, Word, HTML and text → Markdown with page markers in 参考资料/.parsed/.
- *   The reference folder is also scanned once in the background when a session starts (without OCR,
- *   which uploads page images; explicit imports use sf's OCR when sf is available).
+ *   The reference folder is also scanned automatically: in the background when a session starts and
+ *   before every run, so files added during a session are ready for the model (without OCR, which
+ *   uploads page images; explicit imports use sf's OCR when sf is available).
  * - export_document / /export-doc: Markdown draft → .docx with an export profile (default-zh) or Markdown,
- *   after the Chinese punctuation pass, with a check of the written file.
+ *   after the Chinese punctuation pass, with a check of the written file. At the end of every run the
+ *   drafts written or edited in it are exported to .docx automatically (WA_AUTO_EXPORT=off turns it off).
  */
 
 // Folder of the running binary (release layout of sf).
@@ -14,9 +16,11 @@ import { Type } from "typebox";
 // Agent directory (~/.writeragent/agent).
 import { getAgentDir } from "../../config.ts";
 // Extension API types.
-import type { ExtensionAPI } from "../../core/extensions/types.ts";
+import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
 // Upstream path resolution (cwd, ~, @ prefix).
 import { resolveReadPathAsync } from "../../core/tools/path-utils.ts";
+// Automatic export.
+import { autoExportEnabled, editedDrafts, type RunMessage } from "../../writer/docs/auto.ts";
 // Import.
 import { formatImport, importFile, importSources, type SfOcr } from "../../writer/docs/import.ts";
 // Export.
@@ -89,7 +93,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		promptSnippet: "Import reference files (PDF, Word, HTML, text) as searchable Markdown with page markers",
 		// Rules added while the tool is active.
 		promptGuidelines: [
-			"Import the user's reference files with import_document before drafting, then read and grep the parsed copies in 参考资料/.parsed",
+			"Files in 参考资料/ are imported automatically before each run: read and grep their parsed copies in 参考资料/.parsed, and use import_document for a file elsewhere or a scan that needs OCR",
 			"Cite a case taken from a reference file with the file name and page, and keep each quotation as written in the source",
 		],
 		// Argument schema.
@@ -120,7 +124,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 			"Export a finished Markdown draft to .docx or Markdown with Chinese punctuation and the export profile's layout",
 		// Rules added while the tool is active.
 		promptGuidelines: [
-			"Write drafts in Markdown with # for the title and ## / ### / #### for heading levels 1–3, then export the finished draft with export_document after style_check passes",
+			"Write drafts in Markdown with # for the title and ## / ### / #### for heading levels 1–3; a draft written or edited in a run is exported to .docx automatically at its end, so run style_check before finishing, and use export_document for another format or profile",
 			"Fix every unpaired quote the export reports in the draft with edit, then export again",
 		],
 		// Argument schema.
@@ -176,15 +180,49 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	// Background scan of the reference folder at startup (no OCR); new imports are announced.
-	pi.on("session_start", (event, ctx) => {
-		if (event.reason !== "startup") return;
-		void importSources(ctx.cwd)
-			.then((results) => {
-				// Only files that were imported or need OCR are worth a message.
-				const news = results.filter((r) => r.status !== "unchanged");
+	// Scans of the reference folder run one after another (startup and each run may overlap).
+	let scans: Promise<void> = Promise.resolve();
+	/** Queue a scan (no OCR); new imports and files needing OCR are announced. */
+	function scan(ctx: ExtensionContext): Promise<void> {
+		scans = scans.then(async () => {
+			try {
+				const news = (await importSources(ctx.cwd)).filter((r) => r.status !== "unchanged");
 				if (news.length > 0 && ctx.hasUI) ctx.ui.notify(formatImport(news), "info");
-			})
-			.catch(() => undefined);
+			} catch {
+				// A folder that cannot be read is skipped; import_document reports the reason.
+			}
+		});
+		return scans;
+	}
+
+	// Background scan at startup.
+	pi.on("session_start", (event, ctx) => {
+		if (event.reason === "startup") void scan(ctx);
+	});
+
+	// Before every run: files added since are imported before the model reads the folder.
+	pi.on("before_agent_start", async (_event, ctx) => {
+		await scan(ctx);
+	});
+
+	// After every run: the drafts written or edited in it become .docx files.
+	pi.on("agent_end", async (event, ctx) => {
+		if (!autoExportEnabled(process.env)) return;
+		const drafts = editedDrafts(event.messages as unknown as RunMessage[], ctx.cwd);
+		if (drafts.length === 0) return;
+		// Export each; one failure does not stop the others.
+		const lines = [t("export.autoTitle")];
+		let failed = false;
+		for (const d of drafts) {
+			try {
+				lines.push(formatExport(await exportDraft(d, ctx.cwd, getAgentDir())));
+			} catch (e) {
+				failed = true;
+				lines.push(t("export.autoFailed", { path: d, reason: e instanceof Error ? e.message : String(e) }));
+			}
+		}
+		// In the interface, or on stderr in print mode (stdout carries the answer).
+		if (ctx.hasUI) ctx.ui.notify(lines.join("\n"), failed ? "warning" : "info");
+		else process.stderr.write(`${lines.join("\n")}\n`);
 	});
 }

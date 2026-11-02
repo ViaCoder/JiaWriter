@@ -83,7 +83,9 @@ export function otherRows(env: NodeJS.ProcessEnv, lang?: WriterLang): ConfigRow[
 	const src = (name: string) => t(readEnv(env, name) ? "wa.src.env" : "wa.src.default", {}, lang);
 	return [
 		{ name: "WA_LANG", value: currentLang(), source: t(langSource, {}, lang) },
-		{ name: "WA_SEARCH", value: readEnv(env, "WA_SEARCH") ?? "anysearch", source: src("WA_SEARCH") },
+		{ name: "WA_SEARCH", value: readEnv(env, "WA_SEARCH") ?? "auto", source: src("WA_SEARCH") },
+		{ name: "WA_ENGINES", value: readEnv(env, "WA_ENGINES") ?? "bing,google", source: src("WA_ENGINES") },
+		{ name: "WA_SEARCH_PAGES", value: readEnv(env, "WA_SEARCH_PAGES") ?? "3", source: src("WA_SEARCH_PAGES") },
 		{
 			name: "WA_SEARCH_URL",
 			value: redactUrl(readEnv(env, "WA_SEARCH_URL") ?? DEFAULT_ANYSEARCH_URL),

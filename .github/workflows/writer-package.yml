@@ -160,6 +160,31 @@ jobs:
           "${root}/bin/fd" --version
           "${root}/bin/rg" --version
 
+      # The Chrome extension, the Chinese guide and the reference folder (Chinese names survive the archive).
+      - name: Package contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="$(dirname "${{ steps.pkg.outputs.binary }}")"
+          test -f "${root}/chrome-extension/manifest.json"
+          test -f "${root}/chrome-extension/vendor/Readability.js"
+          test -f "${root}/使用说明.html"
+          test -d "${root}/参考资料"
+          grep -q '"name": "WriterAgent"' "${root}/chrome-extension/manifest.json"
+          grep -q "加载未打包的扩展程序" "${root}/使用说明.html"
+
+      # The guide's Windows step: setx stores a user variable that a new process can read.
+      - name: setx as in the guide
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          setx WA_SETX_CHECK "https://api.example.com"
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $v = [Environment]::GetEnvironmentVariable("WA_SETX_CHECK", "User")
+          if ($v -ne "https://api.example.com") { Write-Error "setx value not stored: $v"; exit 1 }
+          reg query HKCU\Environment /v WA_SETX_CHECK
+          [Environment]::SetEnvironmentVariable("WA_SETX_CHECK", $null, "User")
+
       # --version, --help, a print run against a local mock model, and an import/export round.
       - name: Offline smoke test
         timeout-minutes: 10

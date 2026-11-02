@@ -79,13 +79,14 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 });
 
 describe("sfModelOff / sfStateEnv / sfChildEnv", () => {
-	it("keeps sf's state under the agent folder", () => {
+	it("keeps sf's state under the agent folder and points it at WriterAgent's browser host", () => {
 		// PyApp runtime, caches and search_fetch's home.
 		expect(sfStateEnv("/a")).toEqual({
 			PYAPP_INSTALL_DIR_SEARCH_FETCH: join("/a", "sf", "runtime", "install"),
 			PYAPP_CACHE_DIR: join("/a", "sf", "runtime", "cache"),
 			PIP_CACHE_DIR: join("/a", "sf", "pip-cache"),
 			SEARCH_FETCH_HOME: join("/a", "sf", "home"),
+			SEARCH_FETCH_BRIDGE_SOCKET: join("/a", "browser", "bridge.sock"),
 		});
 	});
 	it("clears every driver-model variable, even ones the user set, and lets the parent choose the folders", () => {

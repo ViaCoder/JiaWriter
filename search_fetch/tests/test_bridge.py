@@ -80,13 +80,12 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(bridge.installed_extension_dir(), self.home / "extension")
 
     def test_host_manifest_dirs(self):
-        # macOS and Linux Chrome always; Chromium only when present.
+        # Chrome's folder only, also when a Chromium profile exists.
         fake = self.home / "u"
         mac = bridge.host_manifest_dirs("darwin", fake)
         self.assertEqual(mac, [fake / "Library/Application Support/Google/Chrome/NativeMessagingHosts"])
         (fake / ".config/chromium").mkdir(parents=True)
-        self.assertEqual(bridge.host_manifest_dirs("linux", fake),
-                         [fake / ".config/google-chrome/NativeMessagingHosts", fake / ".config/chromium/NativeMessagingHosts"])
+        self.assertEqual(bridge.host_manifest_dirs("linux", fake), [fake / ".config/google-chrome/NativeMessagingHosts"])
 
     def test_write_private(self):
         # Content and mode, no temp file left.
@@ -110,7 +109,7 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(Path(rep["launcher"]).stat().st_mode), 0o700)
         self.assertEqual(stat.S_IMODE(bridge.bridge_dir().stat().st_mode), 0o700)
         m = json.loads(Path(rep["manifests"][0]).read_text())
-        self.assertEqual(m, {"name": "com.writeragent.search_fetch", "description": "search_fetch bridge host",
+        self.assertEqual(m, {"name": "com.writeragent.browser", "description": "search_fetch bridge host",
                              "path": rep["launcher"], "type": "stdio",
                              "allowed_origins": ["chrome-extension://mnoicnfoocibanokjfbpmbgpamlmdgje/"]})
         # A second install replaces the copy.

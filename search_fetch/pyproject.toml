@@ -33,7 +33,7 @@ where = ["src"]
 
 # The Chrome extension ships inside the package; `sf bridge install` copies it to <HOME>/extension.
 [tool.setuptools.package-data]
-search_fetch = ["extension/*.json", "extension/*.js", "extension/ops/*.js"]
+search_fetch = ["extension/*.json", "extension/*.js", "extension/ops/*.js", "extension/vendor/*.js", "extension/vendor/*.md"]
 
 # Lint: pyflakes + pycodestyle errors, bugbear, import order and pyupgrade.
 # Broad `except` in best-effort paths is deliberate (each one is commented), so BLE/S rules are not selected.

@@ -81,7 +81,9 @@ describe("otherRows / setupCommands", () => {
 		// Defaults, then the /lang choice, then WA_LANG.
 		expect(otherRows({}, "zh")).toEqual([
 			{ name: "WA_LANG", value: "zh", source: "默认值" },
-			{ name: "WA_SEARCH", value: "anysearch", source: "默认值" },
+			{ name: "WA_SEARCH", value: "auto", source: "默认值" },
+			{ name: "WA_ENGINES", value: "bing,google", source: "默认值" },
+			{ name: "WA_SEARCH_PAGES", value: "3", source: "默认值" },
 			{ name: "WA_SEARCH_URL", value: "https://api.anysearch.com", source: "默认值" },
 			{ name: "WA_SEARCH_KEY", value: "未设置（匿名调用）", source: "默认值" },
 			{ name: "WA_SF", value: "未设置（在约定位置查找）", source: "默认值" },

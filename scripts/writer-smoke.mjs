@@ -1,8 +1,10 @@
 // Offline smoke test of a WriterAgent build: --version, --help, one print-mode run against a local
 // mock Chat Completions server (API detection probes and one streamed reply), and one run where the
-// mock calls import_document on a PDF and export_document on a draft. Checks the reply, the tools and
-// the writing prompt with the built-in skills in the request, the parsed PDF and the .docx, and that
-// the dummy key appears in no output and no file. No real model, no network beyond 127.0.0.1.
+// mock calls import_document on a PDF, export_document on a draft and write on another draft. Checks
+// the reply, the tools and the writing prompt with the built-in skills in the request, the parsed PDF,
+// the exported and the automatically exported .docx, that the dummy key appears in no output and no
+// file, and the native messaging host of the browser extension (a request routed through the program
+// to a fake extension and back, a stranger refused). No real model, no network beyond 127.0.0.1.
 // Usage: node scripts/writer-smoke.mjs <program> [program args...]
 //   e.g. node scripts/writer-smoke.mjs ./writeragent
 
@@ -12,12 +14,116 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 // Mock server.
 import { createServer } from "node:http";
+// Client of the browser host.
+import { createConnection } from "node:net";
 // Temp folder.
 import { tmpdir } from "node:os";
 // Path helpers.
 import { join, resolve } from "node:path";
 // Entry-point check.
 import { fileURLToPath } from "node:url";
+
+/** Chrome's id of the WriterAgent extension (src/writer/browser/bridge.ts EXTENSION_ID). */
+export const EXTENSION_ID = "mnoicnfoocibanokjfbpmbgpamlmdgje";
+
+/** One native messaging frame: 32-bit little-endian length plus JSON. */
+export function frame(obj) {
+	// Body and prefix.
+	const body = Buffer.from(JSON.stringify(obj), "utf-8");
+	const head = Buffer.alloc(4);
+	head.writeUInt32LE(body.length, 0);
+	return Buffer.concat([head, body]);
+}
+
+/** Complete frames in a buffer and the rest; bad marks bytes that are not frames. */
+export function frames(buf) {
+	// Read position and results.
+	const out = [];
+	let at = 0;
+	let bad = false;
+	while (buf.length - at >= 4) {
+		const len = buf.readUInt32LE(at);
+		if (len > 1024 * 1024) {
+			bad = true;
+			break;
+		}
+		if (buf.length - at - 4 < len) break;
+		try {
+			out.push(JSON.parse(buf.subarray(at + 4, at + 4 + len).toString("utf-8")));
+		} catch {
+			bad = true;
+		}
+		at += 4 + len;
+	}
+	return { messages: out, rest: buf.subarray(at), bad };
+}
+
+/** Run the program as Chrome does and route one request through it; returns check rows. */
+export async function hostRound(cmd, args, env) {
+	// Rows.
+	const rows = [];
+	// Where the host listens (Unix socket, or the Windows port file with its token).
+	const dir = join(env.WA_DIR, "browser");
+	const win = process.platform === "win32";
+	const addrFile = join(dir, win ? "bridge.json" : "bridge.sock");
+	// Started with our extension's origin (and Windows' extra argument).
+	const child = spawn(cmd, [...args, `chrome-extension://${EXTENSION_ID}/`, ...(win ? ["--parent-window=0"] : [])], {
+		env,
+		stdio: ["pipe", "pipe", "pipe"],
+	});
+	let exited = null;
+	child.on("close", (code) => {
+		exited = code;
+	});
+	// The fake extension: answer every forwarded command.
+	let rest = Buffer.alloc(0);
+	let stray = false;
+	let seen = "";
+	child.stdout.on("data", (chunk) => {
+		const got = frames(Buffer.concat([rest, chunk]));
+		rest = got.rest;
+		if (got.bad) stray = true;
+		for (const m of got.messages) {
+			seen = m.op;
+			child.stdin.write(frame({ id: m.id, ok: true, result: { version: "smoke", echo: m.url ?? "" } }));
+		}
+	});
+	child.stdin.write(frame({ hello: "2.0.0" }));
+	// Wait for the listener.
+	for (let i = 0; i < 100 && !existsSync(addrFile); i++) await new Promise((r) => setTimeout(r, 100));
+	rows.push(["host listens", existsSync(addrFile), addrFile]);
+	// One request line, one reply line.
+	let reply = null;
+	try {
+		const info = win ? JSON.parse(readFileSync(addrFile, "utf-8")) : null;
+		reply = await new Promise((resolve, reject) => {
+			const sock = win ? createConnection(info.port, "127.0.0.1") : createConnection(addrFile);
+			let buf = "";
+			sock.on("connect", () => sock.write(`${JSON.stringify({ op: "open", args: { url: "https://example.com/" }, timeout: 10, ...(win ? { token: info.token } : {}) })}\n`));
+			sock.on("data", (c) => {
+				buf += c;
+				if (buf.includes("\n")) {
+					sock.destroy();
+					resolve(JSON.parse(buf.split("\n")[0]));
+				}
+			});
+			sock.on("error", reject);
+			setTimeout(() => reject(new Error("no reply")), 15_000);
+		});
+	} catch (e) {
+		reply = { error: String(e) };
+	}
+	rows.push(["host round trip", seen === "open" && reply?.ok === true && reply.result?.echo === "https://example.com/" && !stray, JSON.stringify(reply).slice(0, 200)]);
+	// Chrome closes the pipe: the host exits and removes its address.
+	child.stdin.end();
+	for (let i = 0; i < 100 && exited === null; i++) await new Promise((r) => setTimeout(r, 100));
+	rows.push(["host exits", exited === 0 && !existsSync(addrFile), `exit ${exited}`]);
+	if (exited === null) child.kill();
+	// Any other caller is refused.
+	const other = await run(cmd, [...args, "chrome-extension://abcdefghijklmnopabcdefghijklmnop/"], env, 30_000);
+	rows.push(["host refuses strangers", other.code === 2, `exit ${other.code}`]);
+	return rows;
+}
 
 /** Text the mock model replies with. */
 export const REPLY = "冒烟测试回复";
@@ -162,6 +268,7 @@ export async function smoke(command, args) {
 		const tools = await startMock([
 			{ tool: "import_document", args: { path: "参考资料/a.pdf" } },
 			{ tool: "export_document", args: { path: "d.md" } },
+			{ tool: "write", args: { path: "稿件.md", content: "# 题目\n\n正文, 自动导出.\n" } },
 			{ text: REPLY },
 		]);
 		try {
@@ -170,9 +277,13 @@ export async function smoke(command, args) {
 			rows.push(["import pdf", t.code === 0 && existsSync(parsed) && readFileSync(parsed, "utf-8").includes("Smoke reference text"), t.code === 0 ? "" : t.stderr.trim().slice(-300)]);
 			const docx = join(work, "d.docx");
 			rows.push(["export docx", existsSync(docx) && readFileSync(docx).subarray(0, 2).toString("latin1") === "PK", ""]);
+			const auto = join(work, "稿件.docx");
+			rows.push(["auto export", existsSync(auto) && readFileSync(auto).subarray(0, 2).toString("latin1") === "PK", ""]);
 		} finally {
 			tools.server.close();
 		}
+		// The browser extension's native messaging host.
+		rows.push(...(await hostRound(cmd, args, env)));
 	} finally {
 		mock.server.close();
 		rmSync(home, { recursive: true, force: true });

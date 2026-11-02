@@ -107,7 +107,7 @@ export const en: Record<MessageKey, string> = {
 	// URL not allowed.
 	"fetch.badUrl": "Only http(s) URLs can be fetched: {url}",
 	// Unknown backend.
-	"search.badBackend": 'WA_SEARCH must be anysearch or sf, not "{value}".',
+	"search.badBackend": 'WA_SEARCH must be auto, browser, anysearch or sf, not "{value}".',
 	// AnySearch quota exhausted (402 body discarded).
 	"anysearch.quota": "The anonymous AnySearch quota is used up; set WA_SEARCH_KEY and retry.",
 	// AnySearch key rejected.
@@ -258,7 +258,25 @@ export const en: Record<MessageKey, string> = {
 	"lang.envWins": "WA_LANG={value} is set and takes precedence over /lang.",
 	"lang.bad": "Languages: zh, en.",
 	// /sf.
-	"sf.cmdUsage": "Usage: /sf status shows whether the Chrome extension is connected; /sf install sets up the bridge.",
-	"sf.installNext":
-		"Next: open chrome://extensions in Chrome, turn on Developer mode, click Load unpacked and choose the extension folder above; keep Chrome open and run /sf status until connected is true. The first sf run downloads about 1 GB of dependencies and takes a few minutes.",
+	"sf.cmdUsage": "Usage: /sf status or /sf install, the same as /browser.",
+	// Browser backend.
+	"browser.label": "browser ({detail})",
+	"browser.engineLine": "{engine} {pages} pages",
+	"browser.stopped": "{engine} stopped after page {pages}: {reason}",
+	"browser.fallback":
+		"The WriterAgent extension in Chrome is not connected, so AnySearch was used this time. See /browser to install the extension.",
+	"browser.notConnected":
+		"The WriterAgent extension in Chrome is not connected. Open Chrome and load the extension as /browser shows.",
+	"browser.verify":
+		"{engine} asks for a human check: the Chrome window is in front; complete the check there (waiting up to {seconds} s).",
+	"browser.connected": "Chrome extension connected (extension version {version}).",
+	"browser.disconnected": "Chrome extension not connected.",
+	"browser.steps":
+		'Install the extension (once):\n1. Type chrome://extensions in Chrome\'s address bar and press Enter;\n2. Turn on "Developer mode" at the top right;\n3. Click "Load unpacked" and choose this folder:\n   {dir}\n4. Keep Chrome open.\nThe package\'s 使用说明.html shows the steps with pictures.',
+	"browser.hostFailed": "Could not register the native messaging host with Chrome: {reason}",
+	"browser.hostOk": "Native messaging host registered with Chrome: {files}",
+	"browser.cmdUsage": "Usage: /browser shows whether the extension is connected and how to install it.",
+	// Automatic export.
+	"export.autoTitle": "Drafts changed in this run were exported:",
+	"export.autoFailed": "Automatic export of {path} failed: {reason}",
 };

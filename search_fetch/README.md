@@ -23,9 +23,11 @@ WriterAgent 的 `web_search` / `web_fetch` 工具在 `WA_SEARCH=sf` 时以子进
 
 ## 浏览器与请求节奏
 
-- 扩展（`src/search_fetch/extension`，MV3）经 native messaging 连接 `sf bridge-host`，
-  后者在 `home/bridge/bridge.sock`（目录 0700、socket 0600）上服务本机的 sf 进程；
+- 扩展（`src/search_fetch/extension`，MV3）经 native messaging 连接本机通信程序：在 WriterAgent 里是 writeragent 本身，
+  单独使用 sf 时是 `sf bridge-host`（`home/bridge/bridge.sock`，目录 0700、socket 0600；设置 `SEARCH_FETCH_BRIDGE_SOCKET` 时改用它指定的 socket）；
   host 只接受本扩展的 origin。页面操作全部是扩展内置的静态脚本，不执行字符串代码。
+- 点击、输入和滚动经 `chrome.debugger` 的 Input 接口发出（`human_click`、`human_type`、`human_scroll`），页面收到的是可信事件：
+  鼠标沿曲线移到目标再点，逐字输入，滚轮滚动；不在页面里调用 `click()` 或直接改输入框的值。
 - 节流（`pacing.py`，本机所有 sf 进程共享，记录在 `home/pacing/`）：同一搜索引擎两次查询至少间隔 45 秒，
   同一网站两次请求至少 8 秒，任意两次跳转至少 1.5 秒，均另加随机抖动；本机回环地址不节流。
 - 验证码：search 命中时有界等待你在 Chrome 窗口里处理（默认 80 秒，`SEARCH_FETCH_HUMAN_WAIT`；
@@ -63,7 +65,7 @@ search_fetch/
 cd search_fetch
 bash setup.sh                                  # venv 与依赖装进 ./home，并做导入自检
 home/venv/bin/python3 sf.py bridge install     # 一次：复制扩展、写 native messaging 清单
-# 按提示在 Chrome 打开 chrome://extensions →「开发者模式」→「加载已解压的扩展程序」，选它打印的目录
+# 按提示在 Chrome 打开 chrome://extensions →「开发者模式」→「加载未打包的扩展程序」，选它打印的目录
 home/venv/bin/python3 sf.py bridge status      # connected=true 即可（保持 Chrome 开着）
 ```
 
@@ -82,7 +84,7 @@ $PY sf.py tasks wait --json   # 后台 OCR/ASR 汇合
 
 - WriterAgent 的 Linux 和 macOS 发布包带有 `search_fetch/<os>/<arch>/sf`（PyApp 单文件，内嵌本包 wheel 和 CPython 3.12），`WA_SEARCH=sf` 时不设 `WA_SF` 也能找到；Windows 没有 sf。
 - WriterAgent 运行 sf 时，把它的全部状态放在 `~/.writeragent/agent/sf/`：`runtime/`（PyApp 的 Python 和依赖）、`pip-cache/`、`home/`（扩展副本、桥接 socket、节流记录）。第一次运行会从 PyPI 安装依赖，约 1.1 GB，需要两三分钟。
-- 在 WriterAgent 里运行 `/sf install` 安装扩展桥接（使用和工具相同的状态目录），按提示在 Chrome 加载扩展后，用 `/sf status` 确认 `connected` 为 true。
+- 在 WriterAgent 里，扩展的本机通信程序是 writeragent 本身（主机名 `com.writeragent.browser`，发布版启动时自动向 Chrome 注册）；sf 由 `SEARCH_FETCH_BRIDGE_SOCKET` 指向它的 socket（`~/.writeragent/agent/browser/bridge.sock`），不再自己注册。按包里的「使用说明.html」在 Chrome 加载 `chrome-extension` 文件夹后，用 `/browser` 确认已连接。
 - 打包：`bash build_binary.sh [--out <目录>]` 在本机原生构建，产物为 `<目录>/<os>/<arch>/sf`。PyApp 固定为 v0.31.0 源码（校验 SHA256），用 `pyapp/Cargo.toml` 与 `pyapp/Cargo.lock` 替换上游的依赖清单：zip 升到 9、zstd 升到 0.14，bytes、quinn-proto、rustls、tar、time 升到修复版本，`cargo audit` 为 0 个漏洞（2026-11-01）。
 
 ## 产物（`./.search_fetchres/`）

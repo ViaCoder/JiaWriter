@@ -89,7 +89,8 @@ export function sfModelOff(): Record<string, string> {
 }
 
 /** Where a release sf keeps its state, all under <agentDir>/sf: PyApp's Python and packages, its download
- * cache, pip's cache, and search_fetch's own state (bridge, pacing, extension copy). */
+ * cache, pip's cache, and search_fetch's own state (pacing, caches); its pages go through WriterAgent's
+ * browser host socket (Linux and macOS; sf has no Windows build). */
 export function sfStateEnv(agentDir: string): Record<string, string> {
 	// One folder for everything sf writes.
 	const root = join(agentDir, "sf");
@@ -98,6 +99,7 @@ export function sfStateEnv(agentDir: string): Record<string, string> {
 		PYAPP_CACHE_DIR: join(root, "runtime", "cache"),
 		PIP_CACHE_DIR: join(root, "pip-cache"),
 		SEARCH_FETCH_HOME: join(root, "home"),
+		SEARCH_FETCH_BRIDGE_SOCKET: join(agentDir, "browser", "bridge.sock"),
 	};
 }
 

@@ -1,7 +1,7 @@
-// search_fetch bridge page script: type window.__sfArgs.text into the tagged field and submit
+// search_fetch bridge page script: type window.__sfArgs.text into the remembered field and submit
 // its form (requestSubmit, else an Enter key event); without text it only submits (press_enter). From browser.py _act.
 (() => { const a = window.__sfArgs || {};
-  const e = a.id ? document.querySelector(`[data-wf-id="${CSS.escape(a.id)}"]`) : null;
+  const e = a.id ? (window.__waEls || {})[a.id] : null;
   if (!e) return false;
   e.focus();
   const proto = e instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;

@@ -3,11 +3,16 @@
  * Backends (anysearch.ts, sf.ts) return SearchResult / FetchResult; everything here is pure.
  */
 
+// Engine names of the browser backend.
+import { type EngineName, parseEngines } from "../browser/engines.ts";
 // Output messages.
 import { t, type WriterLang } from "../i18n/index.ts";
 
-/** Search backends. */
-export type SearchBackendName = "anysearch" | "sf";
+/** Search backends: auto (the browser when its extension is connected, else AnySearch), browser, anysearch, sf. */
+export type SearchBackendName = "auto" | "browser" | "anysearch" | "sf";
+
+/** Every backend name. */
+const BACKENDS: readonly SearchBackendName[] = ["auto", "browser", "anysearch", "sf"];
 
 /** One search result. */
 export interface SearchResult {
@@ -47,6 +52,10 @@ export interface SearchConfig {
 	timeoutMs: number;
 	// Hosts whose results are dropped (suffix match).
 	blocklist: string[];
+	// Browser backend: engines in order.
+	engines: EngineName[];
+	// Browser backend: results pages per engine (3–5).
+	pages: number;
 }
 
 /** Default AnySearch API root. */
@@ -62,15 +71,18 @@ const MAX_SNIPPET_CHARS = 300;
 export function readSearchEnv(env: NodeJS.ProcessEnv): { config: SearchConfig; errors: string[] } {
 	// Collected problems.
 	const errors: string[] = [];
-	// Backend name, AnySearch by default.
-	const raw = (env.WA_SEARCH ?? "").trim().toLowerCase() || "anysearch";
-	// Only the two known backends.
-	if (raw !== "anysearch" && raw !== "sf") errors.push(t("search.badBackend", { value: raw }));
+	// Backend name, auto by default.
+	const raw = (env.WA_SEARCH ?? "").trim().toLowerCase() || "auto";
+	// Only the known backends.
+	const known = BACKENDS.includes(raw as SearchBackendName);
+	if (!known) errors.push(t("search.badBackend", { value: raw }));
+	// Pages per engine: 3–5, default 3.
+	const pages = Math.round(Number(env.WA_SEARCH_PAGES ?? ""));
 	// Timeout in seconds (positive number), else the default.
 	const seconds = Number(env.WA_SEARCH_TIMEOUT ?? "");
 	// The configuration.
 	const config: SearchConfig = {
-		backend: raw === "sf" ? "sf" : "anysearch",
+		backend: known ? (raw as SearchBackendName) : "auto",
 		anysearchUrl: (env.WA_SEARCH_URL ?? "").trim().replace(/\/+$/, "") || DEFAULT_ANYSEARCH_URL,
 		anysearchKey: (env.WA_SEARCH_KEY ?? "").trim(),
 		sfPath: (env.WA_SF ?? "").trim(),
@@ -79,6 +91,8 @@ export function readSearchEnv(env: NodeJS.ProcessEnv): { config: SearchConfig; e
 			.split(/[,\s]+/)
 			.map((h) => h.trim().toLowerCase().replace(/^\.+/, ""))
 			.filter(Boolean),
+		engines: parseEngines(env.WA_ENGINES),
+		pages: Number.isFinite(pages) && pages > 0 ? Math.max(3, Math.min(5, pages)) : 3,
 	};
 	// Both.
 	return { config, errors };

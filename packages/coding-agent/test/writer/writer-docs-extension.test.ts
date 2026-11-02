@@ -13,6 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../src/core/extensions/types.ts";
 // Extension under test.
 import writerDocsExtension, { findSfOcr, parseExportArgs } from "../../src/extensions/writer-docs/index.ts";
+// Automatic export helpers.
+import { autoExportEnabled, editedDrafts, isDraftPath } from "../../src/writer/docs/auto.ts";
 // Fixtures.
 import { makePdf } from "./doc-fixtures.ts";
 
@@ -148,5 +150,83 @@ describe("/import-doc, /export-doc and the startup scan", () => {
 		handlers.get("session_start")?.({ type: "session_start", reason: "startup" }, ctx(startNotes));
 		await vi.waitFor(() => expect(startNotes.length).toBe(1));
 		expect(startNotes[0].split("\n")[0]).toBe("参考资料导入：1 个文件");
+	});
+});
+
+describe("automatic import before each run and export after it", () => {
+	/** An assistant message calling one tool on a path. */
+	const call = (id: string, name: string, path: string) => ({
+		role: "assistant",
+		content: [{ type: "toolCall", id, name, arguments: { path } }],
+	});
+
+	it("imports files added during the session before the run, and exports the drafts the run changed", async () => {
+		mkdirSync(join(cwd, "参考资料"));
+		const { handlers } = load();
+		const notes: string[] = [];
+		// A file added mid-session is imported before the model starts.
+		writeFileSync(join(cwd, "参考资料", "新.txt"), "新资料");
+		await handlers.get("before_agent_start")?.({ type: "before_agent_start" }, ctx(notes));
+		expect(notes[0].split("\n")[0]).toBe("参考资料导入：1 个文件");
+		expect(readFileSync(join(cwd, "参考资料", ".parsed", "新.txt.md"), "utf-8")).toContain("新资料");
+		// The run wrote a draft and notes, and one edit failed.
+		writeFileSync(join(cwd, "稿件.md"), "# 题\n\n文字.\n");
+		writeFileSync(join(cwd, "素材笔记.md"), "笔记");
+		writeFileSync(join(cwd, "坏.md"), "x");
+		const messages = [
+			call("1", "write", "稿件.md"),
+			call("2", "write", "素材笔记.md"),
+			call("3", "edit", "坏.md"),
+			{ role: "toolResult", toolCallId: "3", isError: true },
+		];
+		await handlers.get("agent_end")?.({ type: "agent_end", messages }, ctx(notes));
+		expect(notes[1].split("\n").slice(0, 2)).toEqual([
+			"本轮修改的稿件已自动导出：",
+			"已导出：稿件.docx（docx，排版方案 default-zh）",
+		]);
+		expect(existsSync(join(cwd, "稿件.docx"))).toBe(true);
+		expect(existsSync(join(cwd, "素材笔记.docx"))).toBe(false);
+		expect(existsSync(join(cwd, "坏.docx"))).toBe(false);
+		// Switched off: nothing more.
+		vi.stubEnv("WA_AUTO_EXPORT", "off");
+		await handlers.get("agent_end")?.({ type: "agent_end", messages }, ctx(notes));
+		expect(notes).toHaveLength(2);
+	});
+});
+
+describe("editedDrafts / isDraftPath / autoExportEnabled", () => {
+	const call = (id: string, name: string, path: string) => ({
+		role: "assistant",
+		content: [{ type: "toolCall", id, name, arguments: { path } }],
+	});
+	it("keeps drafts changed after their last export, in first-change order", () => {
+		const msgs = [
+			call("1", "write", "b.md"),
+			call("2", "edit", "a.md"),
+			call("3", "export_document", "b.md"),
+			call("4", "edit", "a.md"),
+			call("5", "read", "c.md"),
+		];
+		expect(editedDrafts(msgs, cwd)).toEqual([join(cwd, "a.md")]);
+		expect(editedDrafts([...msgs, call("6", "edit", "b.md")], cwd)).toEqual([join(cwd, "b.md"), join(cwd, "a.md")]);
+	});
+	it("accepts Markdown drafts in the working folder only", () => {
+		expect(isDraftPath(join(cwd, "报告.md"), cwd)).toBe(true);
+		expect(isDraftPath(join(cwd, "章节", "第一章.markdown"), cwd)).toBe(true);
+		for (const p of [
+			"报告.txt",
+			"报告.export.md",
+			"大纲.md",
+			"notes.md",
+			join("参考资料", "a.md"),
+			join(".parsed", "a.md"),
+			join(".hidden", "a.md"),
+		])
+			expect(isDraftPath(join(cwd, p), cwd), p).toBe(false);
+		expect(isDraftPath(join(tmpdir(), "elsewhere.md"), cwd)).toBe(false);
+	});
+	it("is on unless switched off", () => {
+		expect(autoExportEnabled({})).toBe(true);
+		for (const v of ["off", "0", "FALSE", "no"]) expect(autoExportEnabled({ WA_AUTO_EXPORT: v })).toBe(false);
 	});
 });

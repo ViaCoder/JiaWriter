@@ -45,6 +45,12 @@ class ScriptedPage:
         self.calls.append(("get", url))
         self.url = url
 
+    async def input(self, op, **args):
+        # Trusted input: recorded, answered like a page script of the same name.
+        self.calls.append((op, args))
+        a = self.answers.get(op)
+        return a(args) if callable(a) else a
+
     async def back(self):
         # History step.
         self.calls.append(("back",))
@@ -94,8 +100,11 @@ class BridgePageTest(unittest.TestCase):
             self.assertEqual(asyncio.run(page.get_content()), "<html/>")
             asyncio.run(page.run("probe", world="MAIN"))
             asyncio.run(page.activate())
+            asyncio.run(page.input("human_click", target={"wfId": "wf2"}))
             asyncio.run(page.close())
-        self.assertEqual([op for op, _ in sent], ["navigate", "back", "run", "run", "activate", "close"])
+        self.assertEqual([op for op, _ in sent], ["navigate", "back", "run", "run", "activate", "human_click", "close"])
+        self.assertEqual(sent[5][1]["target"], {"wfId": "wf2"})
+        self.assertEqual((sent[5][1]["tab"], sent[5][1]["load_ms"]), (7, browser._load_ms()))
         self.assertEqual(sent[3][1], {"tab": 7, "script": "probe", "args": {}, "world": "MAIN"})
         page._set({"url": "u"})
         self.assertEqual((page.url, page.title), ("u", ""))
@@ -256,10 +265,18 @@ class SearchHelpersTest(unittest.TestCase):
             return True
 
         obs = json.dumps({"elements": [{"id": "wf3", "nextish": True, "text": "Next"}]})
-        page = ScriptedPage({"url": lambda a: state["url"], "extent": "100", "observe": obs, "click_target": click,
+        page = ScriptedPage({"url": lambda a: state["url"], "extent": "100", "observe": obs, "human_click": click,
                              "results": json.dumps([{"u": "https://r.example/", "t": "r"}])})
         self.assertTrue(run_async(search_mod._next_page(page, 1)))
-        self.assertIn(("click_target", {"id": "wf3"}), page.calls)
+        self.assertIn(("human_click", {"target": {"wfId": "wf3"}}), page.calls)
+        # Pagination comes into view by wheel turns, not a scripted scroll.
+        self.assertIn(("human_scroll", {"steps": 5, "px": 800}), page.calls)
+        # Layer 1b: the Next link is tagged by its script, then clicked with trusted input.
+        state["url"] = "https://s.example/search?p=1"
+        page = ScriptedPage({"url": lambda a: state["url"], "extent": "100", "observe": json.dumps({"elements": []}),
+                             "next_link": True, "human_click": click, "results": json.dumps([{"u": "https://r.example/", "t": "r"}])})
+        self.assertTrue(run_async(search_mod._next_page(page, 1)))
+        self.assertIn(("human_click", {"target": {"wfId": "wfnext"}}), page.calls)
         # Layer 3: nothing to click, but infinite scroll grows the page.
         grow = {"n": 100}
 
@@ -279,9 +296,9 @@ class SearchHelpersTest(unittest.TestCase):
         # The accept-worded consent control is clicked; none → False.
         obs = {"elements": [{"id": "a", "consentish": True, "text": "Settings"}, {"id": "b", "consentish": True, "text": "Accept all"},
                             {"id": "c", "consentish": True, "avoid": True, "text": "Accept"}]}
-        page = ScriptedPage({"click_target": True})
+        page = ScriptedPage({"human_click": {"clicked": True}})
         self.assertTrue(run_async(search_mod._accept_consent(page, obs)))
-        self.assertIn(("click_target", {"id": "b"}), page.calls)
+        self.assertIn(("human_click", {"target": {"wfId": "b"}}), page.calls)
         self.assertFalse(run_async(search_mod._accept_consent(ScriptedPage(), {"elements": []})))
 
     def test_run_engine_results_and_challenge(self):

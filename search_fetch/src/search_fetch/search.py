@@ -184,7 +184,7 @@ async def _next_page(page, pno: int, ops=None, eng="") -> bool:
 
     # 1. Bring the bottom pagination / lazy results into view, then look for the control.
     #    Skip anything flagged `avoid` (settings/login/help) so a clearly-wrong link is never clicked.
-    await page.run("scroll_bottom")
+    await page.input("human_scroll", steps=5, px=800)
     await page.wait(1.0)
     obs = await browser._observe(page)
     els = [e for e in obs.get("elements", []) if not e.get("avoid")]
@@ -205,7 +205,8 @@ async def _next_page(page, pno: int, ops=None, eng="") -> bool:
                              "target": target.get("text", "")[:20], "advanced": True})
             return True
 
-    # 1b. Explicit "Next" link/button (rel=next, aria-label, or text Next/下一页/»/›/→) — many
+    # 1b. Explicit "Next" link/button (rel=next, aria-label, or text Next/下一页/»/›/→), tagged by
+    #     ops/next_link.js and clicked with trusted input — many
     #     engines (Startpage, some Bing/Google variants) use this instead of a numbered control.
     #     EXCLUDE settings/login/help links so ">"-style glyphs on nav can't hijack the click.
     try:
@@ -214,6 +215,7 @@ async def _next_page(page, pno: int, ops=None, eng="") -> bool:
         nx = False
     if nx:
         await browser._pace()
+        await browser._act(page, {"action": "click", "target_id": "wfnext"})
         await browser._ready(page)
         await page.wait(0.6)
         grew = await _content_extent(page) > base_ext * 1.1
@@ -231,6 +233,7 @@ async def _next_page(page, pno: int, ops=None, eng="") -> bool:
         clicked = False
     if clicked:
         await browser._pace()
+        await browser._act(page, {"action": "click", "target_id": "wfmore"})
         await page.wait(1.4)
         if await _content_extent(page) > base_ext * 1.1 and not _is_offtrack(await _cur_url(page)):
             if ops:
@@ -242,7 +245,7 @@ async def _next_page(page, pno: int, ops=None, eng="") -> bool:
     # 3. Pure infinite scroll: scroll several times; advancement = the results grew (lower
     #    threshold + more tries than before, so a slow lazy-load isn't missed → e.g. Sogou).
     for _ in range(4):
-        await page.run("scroll_bottom")
+        await page.input("human_scroll", steps=5, px=800)
         await page.wait(1.2)
         if await _content_extent(page) > base_ext * 1.1:
             if ops:

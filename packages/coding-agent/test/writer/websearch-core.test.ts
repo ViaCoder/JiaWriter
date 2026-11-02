@@ -18,18 +18,20 @@ import {
 } from "../../src/writer/websearch/core.ts";
 
 describe("readSearchEnv", () => {
-	it("defaults to anonymous AnySearch with a 300 s timeout", () => {
+	it("defaults to auto (browser, else anonymous AnySearch) with a 300 s timeout, Bing then Google, 3 pages", () => {
 		// Empty environment.
 		const { config, errors } = readSearchEnv({});
 		// Defaults.
 		expect(errors).toEqual([]);
 		expect(config).toEqual({
-			backend: "anysearch",
+			backend: "auto",
 			anysearchUrl: DEFAULT_ANYSEARCH_URL,
 			anysearchKey: "",
 			sfPath: "",
 			timeoutMs: 300_000,
 			blocklist: [],
+			engines: ["bing", "google"],
+			pages: 3,
 		});
 	});
 	it("reads every variable and reports an unknown backend", () => {
@@ -41,6 +43,8 @@ describe("readSearchEnv", () => {
 			WA_SF: "/x/sf",
 			WA_SEARCH_TIMEOUT: "60",
 			WA_SEARCH_BLOCK: "Spam.example, .junk.example",
+			WA_ENGINES: "google",
+			WA_SEARCH_PAGES: "9",
 		});
 		// Parsed.
 		expect(config).toEqual({
@@ -50,6 +54,13 @@ describe("readSearchEnv", () => {
 			sfPath: "/x/sf",
 			timeoutMs: 60_000,
 			blocklist: ["spam.example", "junk.example"],
+			engines: ["google"],
+			pages: 5,
+		});
+		// The browser backends are known; pages below 3 become 3.
+		expect(readSearchEnv({ WA_SEARCH: "browser", WA_SEARCH_PAGES: "1" }).config).toMatchObject({
+			backend: "browser",
+			pages: 3,
 		});
 		// Unknown backend.
 		expect(readSearchEnv({ WA_SEARCH: "exa", WA_LANG: "zh" }).errors[0]).toContain("「exa」");

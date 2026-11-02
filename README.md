@@ -13,6 +13,7 @@ WriterAgent is a general-purpose writing agent for the terminal. It reads refere
 1. Download the package for your platform: `writeragent-<platform>.tar.gz` (Linux, macOS) or `writeragent-<platform>.zip` (Windows), where the platform is `linux-x64`, `linux-arm64`, `darwin-arm64`, `darwin-x64`, `windows-x64` or `windows-arm64`. The packages and `SHA256SUMS` are attached to the runs of the "WriterAgent packages" GitHub Actions workflow.
 2. Check the digests: `sha256sum -c SHA256SUMS` (on macOS `shasum -a 256 -c SHA256SUMS`).
 3. Extract the package and run `writeragent` (`writeragent.exe` on Windows). Each package carries pinned fd and ripgrep, so nothing is downloaded at run time.
+4. Load the package's `chrome-extension` folder in Chrome (once). Every package carries a Chinese `使用说明.html` that shows each step, from the model settings to the extension, with screenshots.
 
 ## Model configuration
 
@@ -28,7 +29,10 @@ The model is configured with environment variables. OpenAI Responses, OpenAI Cha
 | `WA_OUT` | Maximum output (tokens) | 128000 |
 | `WA_REASONING` | Reasoning level: `off`, `low`, `medium`, `high`, `xhigh`, `max` | `medium` |
 | `WA_LANG` | Interface and tool-output language: `zh`, `en` | `zh` |
-| `WA_SEARCH` | Search backend: `anysearch`, `sf` | `anysearch` |
+| `WA_SEARCH` | Search backend: `auto`, `browser`, `anysearch`, `sf` | `auto` |
+| `WA_ENGINES` | Engines the browser backend uses, in order | `bing,google` |
+| `WA_SEARCH_PAGES` | Results pages per engine for the browser backend (3–5) | `3` |
+| `WA_AUTO_EXPORT` | `off` stops the automatic docx export at the end of each run | on |
 | `WA_SEARCH_KEY` | AnySearch key | anonymous when unset |
 | `WA_SF` | Path of the search_fetch program | standard places |
 
@@ -63,17 +67,20 @@ Run `/wa` inside WriterAgent to see each variable's value in effect, where it co
 | `/lang zh`, `/lang en` | Interface language (`WA_LANG`, when set, takes precedence) |
 | `/skills` | Manage writing skills: turn on or off, edit, update from this session, delete (after a backup) |
 | `/skill-new` | New skill: from this session, from a blank template, or written by the model with skill-creator |
+| `/browser` | Whether the Chrome extension is connected, and how to install it |
 | `/import-doc [file]` | Import reference files |
 | `/export-doc <draft.md> [md\|docx] [--profile=name] [--out=path]` | Export a draft |
-| `/sf status`, `/sf install` | Chrome extension bridge of search_fetch |
+| `/sf status`, `/sf install` | The same as `/browser` |
 
 ## Reference material
 
-Put reference files in `参考资料/` (or `sources/`) in the writing folder. At startup WriterAgent imports new and changed files in the background into Markdown with page markers under `参考资料/.parsed/`, where `read` and `grep` find them, so citations can name a page. Imported text is treated as untrusted data, and instructions in it are not followed.
+Put reference files in `参考资料/` (or `sources/`) in the writing folder. At startup and before every prompt WriterAgent imports new and changed files automatically into Markdown with page markers under `参考资料/.parsed/`, where `read` and `grep` find them, so citations can name a page. Imported text is treated as untrusted data, and instructions in it are not followed.
 
-A scan without a text layer needs OCR. With search_fetch configured (`WA_SF`, or the sf in the release package), `import_document` uses its OCR, which uploads the page images to a public Hugging Face Space; the background import at startup does no OCR.
+A scan without a text layer needs OCR. With search_fetch configured (`WA_SF`, or the sf in the release package), `import_document` uses its OCR, which uploads the page images to a public Hugging Face Space; the automatic import does no OCR.
 
 ## Export
+
+Markdown drafts written or edited with `write` or `edit` in a run are exported to a .docx of the same name at the end of that run; notes, materials, outlines and files in the reference folders are left alone, and so is a draft the model exported after its last change.
 
 `export_document` and `/export-doc` first convert punctuation to Chinese full-width marks: ASCII marks become Chinese ones, and a `-`, `–` or `--` between Chinese characters becomes `—`; numbers, times, versions, URLs, e-mail addresses, code, links, abbreviations and word-internal hyphens keep their form. Quotes are paired per paragraph, and an unpaired quote is reported for its paragraph only.
 
@@ -99,19 +106,26 @@ A skill made from a session collects only what you wrote in the current session 
 
 ## Search
 
-- `anysearch` (default): the AnySearch API, anonymously when no key is set.
-- `sf`: search_fetch opens pages in your own Chrome through an extension and a local bridge, with paced requests. The Linux and macOS packages include sf; Windows is not supported yet. Before the first use, run `/sf install`, load the extension in Chrome's extensions page as shown, and check with `/sf status`. The first sf run installs its dependencies (about 1.1 GB, a few minutes), all under `~/.writeragent/agent/sf/`.
+- `auto` (default): the browser when the Chrome extension is connected, else AnySearch, with a note at the top of the results.
+- `browser`: your own Chrome, on all six platforms. The writeragent program itself is the extension's native messaging host; a release build registers it with Chrome at startup (Chrome's NativeMessagingHosts folder on Linux and macOS, the current user's registry on Windows), with no Python or other dependency.
+  - Searching works as a person does: open Bing's home page, click the search box, type the query key by key, press Enter, scroll through the results and click "Next"; after 3–5 pages the same on Google. A cookie consent dialog is accepted with a click. Clicks, typing and scrolling go through `chrome.debugger`'s Input domain, so pages receive the same trusted events (isTrusted) as from a real mouse and keyboard. Only the time filter (`fresh`) adds the engine's filter parameter to the results address, because its menu is several clicks deep.
+  - The results of both engines are merged and ranked on this computer: BM25 of the query against title and snippet (0.45), reciprocal-rank fusion of the positions on both engines (0.35), and the share of query terms covered (0.20).
+  - A result still shown on an open results page is clicked there and the tab goes back afterwards; other addresses open in a new tab. The page is scrolled a few times, then Readability (Firefox's reader-view algorithm) takes the main text; PDF and Word documents are downloaded through Chrome and parsed here.
+  - Two queries to the same engine are at least 20 seconds apart, two visits to the same site at least 6 seconds, both with random jitter; local and private network addresses are refused. On a human check, interactive mode brings the Chrome window to the front and waits up to 90 seconds for you.
+  - Before the first use, load the extension: open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and choose the package's `chrome-extension` folder. Check with `/browser`.
+- `anysearch`: the AnySearch API, anonymously when no key is set.
+- `sf`: search_fetch, whose pages go through the same extension, with OCR of scans and media transcription. The Linux and macOS packages include sf; Windows is not supported yet. The first sf run installs its dependencies (about 1.1 GB, a few minutes), all under `~/.writeragent/agent/sf/`.
 
 ## Network and privacy
 
-WriterAgent sends no network request at startup or while idle, and has no telemetry, version check or upload. It goes online only for your configured model API, the search backend, and URLs you ask it to import; OCR of scans sends page images to a public Hugging Face Space. All configuration and sessions live under `~/.writeragent/`.
+WriterAgent sends no network request at startup or while idle, and has no telemetry, version check or upload. It goes online only for your configured model API, the search backend, and URLs you ask it to import; OCR of scans sends page images to a public Hugging Face Space. All configuration and sessions live under `~/.writeragent/`; a release build also writes a small native messaging host manifest for Chrome at startup (see Search).
 
 ## Platforms and testing
 
-On every push to dev, GitHub Actions runs WriterAgent's own tests on all six platforms, builds the six packages, and checks each package on its own platform: fd and ripgrep run, `--version`, `--help`, one writing run against a local mock model server, and one round of PDF import and docx export (no key, no real model). On Linux and macOS it also checks the interactive interface in both languages and the bundled sf. The full upstream pi test suite runs on Linux.
+On every push to dev, GitHub Actions runs WriterAgent's own tests on all six platforms, builds the six packages, and checks each package on its own platform: fd and ripgrep run, the extension, the guide and the reference folder are in the package, `--version`, `--help`, one writing run against a local mock model server, one round of PDF import, docx export and automatic export, and the extension's native messaging host (a request routed through the program to a fake extension and back, a stranger refused; no key, no real model). On Windows it also runs the guide's `setx`; on Linux and macOS it also checks the interactive interface in both languages and the bundled sf. The full upstream pi test suite runs on Linux. The browser backend is tested on the development machine in Chrome for Testing against local look-alike Bing and Google pages (every event the pages receive is trusted).
 
-The development machine is Linux x64, where the Linux setup commands were run; the macOS and Windows commands follow each shell's syntax, and the Windows `setx` and cmd forms have not been run on a real machine.
+The development machine is Linux x64, where the Linux setup commands were run; the Windows `setx` runs on CI's Windows machines; the macOS commands follow zsh's syntax, and the Windows cmd form has not been run.
 
 ## License
 
-MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The `THIRD_PARTY/` folder of each package holds the licenses of fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate and the Unicode data.
+MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The `THIRD_PARTY/` folder of each package holds the licenses of fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate, Readability and the Unicode data.

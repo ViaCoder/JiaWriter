@@ -10,18 +10,18 @@
   };
   const txt = e => ((e.innerText || e.value || e.getAttribute('aria-label') ||
                      e.placeholder || e.title || '') + '').replace(/\s+/g, ' ').trim().slice(0, 100);
-  // Clear stale ids from earlier observations FIRST. Otherwise an element that was
-  // visible at a previous scroll position keeps its old data-wf-id, so after a scroll
-  // two elements can share an id and querySelector('[data-wf-id=..]') resolves to the
-  // first (stale, top-of-page) one — which made next-page clicks hit a dead element.
-  for (const old of document.querySelectorAll('[data-wf-id]')) old.removeAttribute('data-wf-id');
+  // Candidates are remembered in window.__waEls of the extension's isolated world (the page's DOM is
+  // not changed). Ids from earlier observations are dropped FIRST, so after a scroll an id never
+  // points at a stale, top-of-page element (which once made next-page clicks hit a dead element).
+  const els = (window.__waEls = window.__waEls || {});
+  for (const k of Object.keys(els)) if (k.startsWith('wf')) delete els[k];
   const nodes = [...document.querySelectorAll(
     'input,textarea,button,a,[role="button"],[role="link"],[role="searchbox"],[role="combobox"]')];
   const cands = [];
   for (const e of nodes) {
     if (!vis(e)) continue;
     const id = 'wf' + cands.length;
-    e.setAttribute('data-wf-id', id);
+    els[id] = e;
     // Pagination hints so the driver can target the real next-page control on noisy
     // SERPs instead of guessing (Bing buries it among dozens of '›' glyphs).
     const al = ((e.getAttribute('aria-label') || '') + ' ' + (e.getAttribute('title') || '')).toLowerCase();

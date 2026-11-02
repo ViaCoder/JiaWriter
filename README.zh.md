@@ -13,6 +13,7 @@ WriterAgent 是一个通用写作 agent，在终端里运行。它读取参考�
 1. 下载对应平台的包：`writeragent-<平台>.tar.gz`（Linux、macOS）或 `writeragent-<平台>.zip`（Windows），平台为 `linux-x64`、`linux-arm64`、`darwin-arm64`、`darwin-x64`、`windows-x64`、`windows-arm64`。包和 `SHA256SUMS` 在 GitHub Actions「WriterAgent packages」工作流的运行结果里。
 2. 核对校验值：`sha256sum -c SHA256SUMS`（macOS 用 `shasum -a 256 -c SHA256SUMS`）。
 3. 解压后运行 `writeragent`（Windows 为 `writeragent.exe`）。包里自带固定版本的 fd 和 ripgrep，运行时不下载任何工具。
+4. 在 Chrome 里加载包里的 `chrome-extension` 文件夹（只需一次）。每个包都带一份中文的 `使用说明.html`，用截图写明了从设置模型到安装扩展的每一步。
 
 ## 配置模型
 
@@ -28,7 +29,10 @@ WriterAgent 是一个通用写作 agent，在终端里运行。它读取参考�
 | `WA_OUT` | 最大输出（token） | 128000 |
 | `WA_REASONING` | 推理档位：`off`、`low`、`medium`、`high`、`xhigh`、`max` | `medium` |
 | `WA_LANG` | 界面和工具输出的语言：`zh`、`en` | `zh` |
-| `WA_SEARCH` | 检索后端：`anysearch`、`sf` | `anysearch` |
+| `WA_SEARCH` | 检索后端：`auto`、`browser`、`anysearch`、`sf` | `auto` |
+| `WA_ENGINES` | 浏览器检索依次使用的引擎 | `bing,google` |
+| `WA_SEARCH_PAGES` | 浏览器检索每个引擎看几页结果（3–5） | `3` |
+| `WA_AUTO_EXPORT` | 设为 `off` 时，每轮结束不再自动导出 docx | 开启 |
 | `WA_SEARCH_KEY` | AnySearch 的 key | 不设则匿名调用 |
 | `WA_SF` | search_fetch 程序的路径 | 在约定位置查找 |
 
@@ -63,17 +67,20 @@ WriterAgent 是一个通用写作 agent，在终端里运行。它读取参考�
 | `/lang zh`、`/lang en` | 切换界面语言（设置了 `WA_LANG` 时以它为准） |
 | `/skills` | 管理写作 skill：启用、停用、编辑、用当前会话更新、删除（删除前先备份） |
 | `/skill-new` | 新建 skill：从当前会话生成、空白模板，或由模型按 skill-creator 编写 |
+| `/browser` | Chrome 扩展是否连接，以及安装步骤 |
 | `/import-doc [文件]` | 导入参考资料 |
 | `/export-doc <稿件.md> [md\|docx] [--profile=方案] [--out=路径]` | 导出稿件 |
-| `/sf status`、`/sf install` | search_fetch 的 Chrome 扩展桥接 |
+| `/sf status`、`/sf install` | 与 `/browser` 相同 |
 
 ## 参考资料
 
-把资料放进写作文件夹下的 `参考资料/`（或 `sources/`）。WriterAgent 启动时会在后台导入新文件和改过的文件，结果是带页码标记的 Markdown，放在 `参考资料/.parsed/`，可以用 `read` 和 `grep` 查找，引用时可以写明页码。导入的内容按不可信数据处理，其中的指令一律不执行。
+把资料放进写作文件夹下的 `参考资料/`（或 `sources/`）。WriterAgent 启动时和每次提问前都会自动导入新文件和改过的文件，结果是带页码标记的 Markdown，放在 `参考资料/.parsed/`，可以用 `read` 和 `grep` 查找，引用时可以写明页码。导入的内容按不可信数据处理，其中的指令一律不执行。
 
-没有文字层的扫描件需要 OCR。设置了 search_fetch（`WA_SF`，或使用发布包里自带的 sf）时，`import_document` 会调用它的 OCR，页面图片会上传到公开的 Hugging Face Space；启动时的后台导入不做 OCR。
+没有文字层的扫描件需要 OCR。设置了 search_fetch（`WA_SF`，或使用发布包里自带的 sf）时，`import_document` 会调用它的 OCR，页面图片会上传到公开的 Hugging Face Space；自动导入不做 OCR。
 
 ## 导出
+
+每一轮里用 `write` 或 `edit` 写过的 Markdown 稿件，会在这一轮结束时自动导出为同名 docx；笔记、素材、大纲和参考资料目录里的文件不导出，模型在最后一次修改之后已经导出过的稿件也不重复导出。
 
 `export_document` 和 `/export-doc` 先把标点统一为中文全角：英文标点转成中文标点，汉字之间的 `-`、`–`、`--` 改为 `—`；数字、时间、版本号、URL、邮箱、代码、链接、缩写和英文词内的连字符保持原样；引号按段落配对，未配对的引号只在报告里列出所在段落。
 
@@ -99,19 +106,26 @@ WriterAgent 是一个通用写作 agent，在终端里运行。它读取参考�
 
 ## 检索
 
-- `anysearch`（默认）：调用 AnySearch API，不设 key 时匿名调用。
-- `sf`：search_fetch 在你自己的 Chrome 里打开网页，通过扩展和本机桥接取回内容，请求间隔有节流。Linux 和 macOS 的发布包自带 sf，Windows 暂不支持。第一次使用前运行 `/sf install`，按提示在 Chrome 的扩展页面加载扩展，再用 `/sf status` 确认已连接。sf 第一次运行会安装依赖，约 1.1 GB，需要几分钟，全部放在 `~/.writeragent/agent/sf/`。
+- `auto`（默认）：Chrome 扩展已连接时用浏览器检索，否则改用 AnySearch，并在结果开头说明。
+- `browser`：用你自己的 Chrome 检索，6 个平台都支持。WriterAgent 程序本身就是扩展的本机通信程序，发布版启动时会自动向 Chrome 注册（Linux、macOS 写 Chrome 的 NativeMessagingHosts 目录，Windows 写当前用户的注册表），不需要 Python 和其他依赖。
+  - 检索像真人一样操作：打开 Bing 首页，用鼠标点搜索框，逐字输入，回车，滚动阅读结果，再点“下一页”；看完 3–5 页后，用同样的方式查 Google。有 cookie 同意弹窗时点“接受”。点击、输入和滚动都通过 `chrome.debugger` 的 Input 接口发送，页面收到的是和真实鼠标键盘相同的可信事件（isTrusted）。只有时间筛选（`fresh`）是在结果页地址上加引擎的筛选参数，因为它的菜单要点好几层。
+  - 两个引擎的结果合并去重后，在本机打分排序：查询词与标题、摘要的 BM25 匹配度占 0.45，两个引擎名次的倒数融合占 0.35，查询词覆盖率占 0.20。
+  - 读网页时，如果结果页还开着并且有这条链接，就在结果页上点开，读完后退回；其他网址在新标签页打开。页面加载后先滚动几下，再用 Readability（Firefox 阅读模式的算法）取出正文；PDF 和 Word 文档经 Chrome 下载后在本机解析。
+  - 同一引擎两次检索至少间隔 20 秒，同一网站两次访问至少间隔 6 秒，都另加随机抖动；不打开内网和本机地址。遇到人机验证时，交互模式下 Chrome 窗口会跳到前台，等你完成（最多 90 秒）。
+  - 第一次使用前在 Chrome 加载扩展：打开 `chrome://extensions`，打开“开发者模式”，点“加载未打包的扩展程序”，选择包里的 `chrome-extension` 文件夹。用 `/browser` 确认已连接。
+- `anysearch`：调用 AnySearch API，不设 key 时匿名调用。
+- `sf`：search_fetch，网页同样经这个扩展打开，另有扫描件 OCR 和视频转写。Linux 和 macOS 的发布包自带 sf，Windows 暂不支持。sf 第一次运行会安装依赖，约 1.1 GB，需要几分钟，全部放在 `~/.writeragent/agent/sf/`。
 
 ## 联网与隐私
 
-WriterAgent 启动和空闲时不发任何网络请求，没有遥测、版本检查和上传功能。联网只有三类：你配置的模型 API、检索后端，以及你要求导入的网址；扫描件 OCR 会把页面图片发给公开的 Hugging Face Space。所有配置和会话都在 `~/.writeragent/` 下。
+WriterAgent 启动和空闲时不发任何网络请求，没有遥测、版本检查和上传功能。联网只有三类：你配置的模型 API、检索后端，以及你要求导入的网址；扫描件 OCR 会把页面图片发给公开的 Hugging Face Space。所有配置和会话都在 `~/.writeragent/` 下；发布版启动时会向 Chrome 写一份很小的本机通信程序清单（见“检索”）。
 
 ## 平台与测试
 
-每次推送到 dev 时，GitHub Actions 在 6 个平台上运行 WriterAgent 自己的测试，构建 6 个发布包，再在每个平台的原生机器上检查包：fd 和 ripgrep 能否运行，`--version`、`--help`，以及对本机模拟模型服务器的一次写作运行和一轮导入 PDF、导出 docx（不需要 key，不调用真实模型）。Linux 和 macOS 另外检查交互界面的中英文显示和包内的 sf。上游 pi 的完整测试套件在 Linux 上运行。
+每次推送到 dev 时，GitHub Actions 在 6 个平台上运行 WriterAgent 自己的测试，构建 6 个发布包，再在每个平台的原生机器上检查包：fd 和 ripgrep 能否运行，扩展、使用说明和参考资料文件夹是否在包里，`--version`、`--help`，对本机模拟模型服务器的一次写作运行和一轮导入 PDF、导出 docx、自动导出，以及扩展的本机通信程序（一个请求经程序转给模拟扩展再返回，陌生来源被拒绝；不需要 key，不调用真实模型）。Windows 另外实际执行一次使用说明里的 `setx`，Linux 和 macOS 另外检查交互界面的中英文显示和包内的 sf。上游 pi 的完整测试套件在 Linux 上运行。浏览器后端在开发机上用 Chrome for Testing 加本地仿 Bing、Google 页面做功能测试（页面收到的事件全部是可信事件）。
 
-本仓库的开发机是 Linux x64，Linux 的设置命令在这台机器上实际测过；macOS 和 Windows 的设置命令按各自 shell 的语法写成，Windows 的 `setx` 和 cmd 写法没有在真实机器上测过。
+本仓库的开发机是 Linux x64，Linux 的设置命令在这台机器上实际测过；Windows 的 `setx` 在 CI 的 Windows 机器上执行过；macOS 的设置命令按 zsh 的语法写成，Windows cmd 的写法没有测过。
 
 ## 许可证
 
-MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包的 `THIRD_PARTY/` 目录包含 fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate 和 Unicode 数据的许可证。
+MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包的 `THIRD_PARTY/` 目录包含 fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate、Readability 和 Unicode 数据的许可证。

@@ -1,12 +1,15 @@
 // Functional tests for the built-in writer-search extension (src/extensions/writer-search/index.ts):
-// both tools end to end over a fake sf script and a fake AnySearch fetch. No network.
+// both tools end to end over a fake sf script, a fake AnySearch fetch, and a browser host with a fake
+// extension behind it. No network.
 
 // Temp files.
-import { chmodSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
 import { join } from "node:path";
+// Fake stdio of the browser host.
+import { PassThrough } from "node:stream";
 // Test API.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Extension API types.
@@ -15,6 +18,10 @@ import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../s
 import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 // Extension under test.
 import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
+// Browser host and frames.
+import { bridgeAddress, decodeFrames, encodeFrame, HOST_NAME, runHost } from "../../src/writer/browser/bridge.ts";
+// Chrome's host folder of this system.
+import { manifestDir } from "../../src/writer/browser/install.ts";
 // Main-model state store.
 import { setWriterModel, type WriterModelState } from "../../src/writer/writer-model.ts";
 
@@ -29,7 +36,20 @@ beforeEach(() => {
 	cwd = realpathSync(mkdtempSync(join(tmpdir(), "wa-search-")));
 	vi.stubEnv("WA_LANG", "zh");
 	vi.stubEnv("WA_KEY", "sk-main-test-1");
-	for (const k of ["WA_SEARCH", "WA_SF", "WA_SEARCH_KEY", "WA_SEARCH_BLOCK", "SF_URL", "SF_KEY", "SF_MODEL", "SF_API"])
+	// Own agent folder: the browser bridge looked up by auto is the test's, not this machine's.
+	vi.stubEnv("WA_DIR", join(cwd, "agent"));
+	for (const k of [
+		"WA_SEARCH",
+		"WA_SF",
+		"WA_SEARCH_KEY",
+		"WA_SEARCH_BLOCK",
+		"WA_ENGINES",
+		"WA_SEARCH_PAGES",
+		"SF_URL",
+		"SF_KEY",
+		"SF_MODEL",
+		"SF_API",
+	])
 		vi.stubEnv(k, "");
 	setWriterModel({
 		kind: "ready",
@@ -78,21 +98,23 @@ function tools(): Map<string, ToolDefinition> {
 	writerSearchExtension({
 		registerTool: (t: ToolDefinition) => map.set(t.name, t),
 		registerCommand: () => undefined,
+		on: () => () => undefined,
 	} as unknown as ExtensionAPI);
 	return map;
 }
 
-/** The /sf command of a fresh extension instance. */
-function sfCommand(): (args: string, ctx: unknown) => Promise<void> {
+/** A command of a fresh extension instance (/sf by default). */
+function sfCommand(name = "sf"): (args: string, ctx: unknown) => Promise<void> {
 	// Collected command handlers.
 	const cmds = new Map<string, (args: string, ctx: unknown) => Promise<void>>();
 	writerSearchExtension({
 		registerTool: () => undefined,
 		registerCommand: (name: string, o: { handler: (args: string, ctx: unknown) => Promise<void> }) =>
 			cmds.set(name, o.handler),
+		on: () => () => undefined,
 	} as unknown as ExtensionAPI);
-	const h = cmds.get("sf");
-	if (!h) throw new Error("missing /sf");
+	const h = cmds.get(name);
+	if (!h) throw new Error(`missing /${name}`);
 	return h;
 }
 
@@ -162,31 +184,179 @@ describe.skipIf(UNIX_ONLY)("writer-search over sf", () => {
 	});
 });
 
-describe.skipIf(UNIX_ONLY)("/sf", () => {
-	it("runs sf bridge status or install with the tools' environment and refuses other arguments", async () => {
-		// The fake sf as WA_SF.
-		vi.stubEnv("WA_SF", fakeSf());
-		vi.stubEnv("WA_DIR", join(cwd, "agent"));
+describe.skipIf(UNIX_ONLY)("/browser and /sf", () => {
+	it("registers the host in Chrome's folder, shows the install steps, and refuses other arguments", async () => {
+		// A temp home: registration writes into its Chrome folder.
+		vi.stubEnv("HOME", join(cwd, "home"));
 		const notes: { text: string; type: string }[] = [];
 		const ctx = { cwd, ui: { notify: (text: string, type: string) => notes.push({ text, type }) } };
-		// Status (default), install, a bad argument.
-		await sfCommand()("", ctx);
+		// /browser, then /sf install (same page), then a bad argument to each.
+		await sfCommand("browser")("", ctx);
 		await sfCommand()("install", ctx);
 		await sfCommand()("rm -rf", ctx);
-		expect(notes[0]).toEqual({ text: '{"connected":false}', type: "warning" });
-		expect(
-			notes[1].text.startsWith("extension folder: /x/extension\n\n下一步：在 Chrome 打开 chrome://extensions"),
-		).toBe(true);
-		expect(notes[2]).toEqual({
-			text: "用法：/sf status 查看 Chrome 扩展是否连接，/sf install 安装扩展桥接。",
-			type: "error",
-		});
-		// sf got the bridge arguments, no model and no human waits.
-		expect(sfLog().map((l) => l.argv)).toEqual([
-			["bridge", "status"],
-			["bridge", "install"],
-		]);
-		expect(sfLog().every((l) => l.key === "" && l.noHuman === "1")).toBe(true);
+		await sfCommand("browser")("x", ctx);
+		// First time: registered, not connected, the steps with the extension folder.
+		const manifest = join(manifestDir(process.platform, join(cwd, "home")), `${HOST_NAME}.json`);
+		expect(existsSync(manifest)).toBe(true);
+		expect(notes[0].type).toBe("warning");
+		expect(notes[0].text).toContain("已向 Chrome 注册本机通信程序");
+		expect(notes[0].text).toContain("Chrome 扩展未连接。");
+		expect(notes[0].text).toContain("search_fetch/src/search_fetch/extension");
+		// Second time: nothing new to register.
+		expect(notes[1].text.startsWith("Chrome 扩展未连接。")).toBe(true);
+		expect(notes[2]).toEqual({ text: "用法：/sf status 或 /sf install，与 /browser 相同。", type: "error" });
+		expect(notes[3]).toEqual({ text: "用法：/browser 查看扩展是否连接和安装步骤。", type: "error" });
+	});
+});
+
+/** A browser host in the test's agent folder with a fake extension: one site, two engines, one article. */
+async function fakeBrowser() {
+	// Chrome's side of the pipe.
+	const toHost = new PassThrough();
+	const fromHost = new PassThrough();
+	// Tab → [engine, page].
+	const tabs = new Map<number, [string, number]>();
+	let nextTab = 1;
+	const ops: string[] = [];
+	// Answer one command.
+	const answer = (m: Record<string, unknown>): unknown => {
+		ops.push(String(m.op === "run" ? `run:${(m as { script: string }).script}` : m.op));
+		const st = tabs.get(m.tab as number);
+		switch (m.op) {
+			case "status":
+				return { version: "2.0.0" };
+			case "open":
+				tabs.set(nextTab, [
+					String(m.url).includes("bing") ? "bing" : String(m.url).includes("google") ? "google" : "page",
+					0,
+				]);
+				return { tab: nextTab++, url: m.url };
+			case "human_type":
+				if (st) st[1] = 1;
+				return { typed: true, navigated: true, newTab: null };
+			case "human_click":
+				if (st) st[1]++;
+				return { clicked: true, navigated: true, newTab: null };
+			case "info":
+				return { url: st ? `https://${st[0]}/s?p=${st[1]}` : "" };
+			case "run": {
+				const script = (m as { script: string }).script;
+				if (script === "serp" && st) {
+					const results =
+						st[1] === 0
+							? []
+							: [
+									{
+										u: `https://news.example.com/${st[0]}-${st[1]}`,
+										t: `温州 消息 ${st[0]} ${st[1]}`,
+										s: "温州 报道",
+										r: 0,
+									},
+								];
+					return JSON.stringify({
+						results,
+						next: true,
+						challenge: false,
+						consent: false,
+						url: `https://${st[0]}/s?p=${st[1]}`,
+					});
+				}
+				if (script === "probe")
+					return JSON.stringify({
+						title: "t",
+						textLen: 900,
+						excerpt: "z".repeat(900),
+						challengeIframe: false,
+						cfChallenge: false,
+						cfCleared: false,
+					});
+				if (script === "article")
+					return JSON.stringify({
+						title: "温州新闻",
+						published: "",
+						markdown: "温州正文",
+						contentType: "text/html",
+					});
+				if (script === "meta")
+					return JSON.stringify({ pub: "2026-11-01", final_url: "https://news.example.com/google-3" });
+				return null;
+			}
+			default:
+				return true;
+		}
+	};
+	let rest: Buffer = Buffer.alloc(0);
+	fromHost.on("data", (chunk: Buffer) => {
+		const got = decodeFrames(Buffer.concat([rest, chunk]));
+		rest = got.rest;
+		for (const m of got.messages) {
+			const msg = m as Record<string, unknown>;
+			toHost.write(encodeFrame({ id: msg.id, ok: true, result: answer(msg) }));
+		}
+	});
+	const address = bridgeAddress(join(cwd, "agent"), process.platform);
+	const done = runHost({ input: toHost, output: fromHost, address });
+	for (let i = 0; i < 50 && !existsSync(address.kind === "unix" ? address.path : address.file); i++)
+		await new Promise((r) => setTimeout(r, 20));
+	return {
+		ops,
+		stop: async () => {
+			toHost.end();
+			await done;
+		},
+	};
+}
+
+describe("writer-search over the browser", () => {
+	it("searches Bing and Google through the extension and fetches a result by clicking it", async () => {
+		const host = await fakeBrowser();
+		try {
+			const map = tools();
+			// auto finds the connected extension.
+			const s = await run(map, "web_search", { query: "温州", max_results: 20 });
+			expect(s.text.split("\n")[0]).toBe("检索结果（浏览器（Bing 3 页、Google 3 页），6 条）：温州");
+			expect(s.details.backend).toBe("browser");
+			// The marker that the extension was seen.
+			expect(existsSync(join(cwd, "agent", "browser", "seen"))).toBe(true);
+			// A result on Google's last page is clicked on that page, then the tab goes back.
+			const f = await run(map, "web_fetch", { url: "https://news.example.com/google-3" });
+			expect(f.text.split("\n")[0]).toBe("网页正文（browser）：温州新闻");
+			expect(f.details).toMatchObject({ backend: "browser", date: "2026-11-01" });
+			expect(host.ops.slice(-9)).toEqual([
+				"info",
+				"run:serp",
+				"human_click",
+				"run:probe",
+				"run:probe",
+				"human_scroll",
+				"run:article",
+				"run:meta",
+				"back",
+			]);
+		} finally {
+			await host.stop();
+		}
+	}, 60_000);
+
+	it("falls back to AnySearch with a note when the extension is not connected, and fails when browser is required", async () => {
+		vi.stubGlobal(
+			"fetch",
+			async () =>
+				new Response(
+					JSON.stringify({
+						code: 0,
+						data: { results: [{ title: "T", url: "https://a.example/x", snippet: "" }] },
+					}),
+					{ status: 200 },
+				),
+		);
+		const s = await run(tools(), "web_search", { query: "q" });
+		expect(s.text.split("\n")[0]).toBe(
+			"Chrome 里的 WriterAgent 扩展没有连接，本次改用 AnySearch。安装扩展的步骤见 /browser。",
+		);
+		expect(s.details.backend).toBe("anysearch");
+		vi.stubEnv("WA_SEARCH", "browser");
+		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("Chrome 里的 WriterAgent 扩展没有连接");
 	});
 });
 
