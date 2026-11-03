@@ -15,7 +15,7 @@ import { test } from "node:test";
 // Resolve the script path from this file.
 import { fileURLToPath } from "node:url";
 // The functions under test.
-import { BRAND_CONFIG_DIR, BRAND_NAME, brandPackageJson, writeBrandedPackageJson } from "./writer-brand.mjs";
+import { BRAND_CONFIG_DIR, BRAND_NAME, BRAND_TITLE, brandPackageJson, writeBrandedPackageJson } from "./writer-brand.mjs";
 
 // Absolute path of the script, for the CLI test.
 const script = fileURLToPath(new URL("./writer-brand.mjs", import.meta.url));
@@ -26,9 +26,9 @@ test("brandPackageJson sets name, config dir and command without changing the in
 	// Brand it.
 	const out = brandPackageJson(input);
 	// piConfig carries the new name and directory.
-	assert.deepEqual(out.piConfig, { name: BRAND_NAME, configDir: BRAND_CONFIG_DIR });
+	assert.deepEqual(out.piConfig, { name: BRAND_NAME, configDir: BRAND_CONFIG_DIR, title: BRAND_TITLE });
 	// The command is renamed and keeps the same entry script.
-	assert.deepEqual(out.bin, { writeragent: "dist/bundle/cli.js" });
+	assert.deepEqual(out.bin, { jiawriter: "dist/bundle/cli.js" });
 	// Other fields are kept.
 	assert.equal(out.name, "@earendil-works/pi-coding-agent");
 	// The input object is untouched.
@@ -39,7 +39,7 @@ test("brandPackageJson falls back to the default entry when bin is missing", () 
 	// No bin and no piConfig at all.
 	const out = brandPackageJson({ name: "x" });
 	// The default bundle entry is used.
-	assert.deepEqual(out.bin, { writeragent: "dist/bundle/cli.js" });
+	assert.deepEqual(out.bin, { jiawriter: "dist/bundle/cli.js" });
 });
 
 test("writeBrandedPackageJson writes a branded file and leaves no temp file", () => {
@@ -56,8 +56,8 @@ test("writeBrandedPackageJson writes a branded file and leaves no temp file", ()
 		// Read back the result.
 		const written = JSON.parse(readFileSync(dest, "utf-8"));
 		// The branded fields are on disk.
-		assert.equal(written.piConfig.name, "writeragent");
-		assert.deepEqual(written.bin, { writeragent: "cli.js" });
+		assert.equal(written.piConfig.name, "jiawriter");
+		assert.deepEqual(written.bin, { jiawriter: "cli.js" });
 		// The file ends with a newline.
 		assert.ok(readFileSync(dest, "utf-8").endsWith("\n"));
 	} finally {

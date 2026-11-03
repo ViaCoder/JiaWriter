@@ -1,5 +1,5 @@
 /**
- * Request pacing shared by every WriterAgent process of this user: the same search engine is
+ * Request pacing shared by every JiaWriter process of this user: the same search engine is
  * queried, and the same site visited, no faster than a person would. The last visit per key is
  * kept in <agentDir>/browser/pacing.json.
  */

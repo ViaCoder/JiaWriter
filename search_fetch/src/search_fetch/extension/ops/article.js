@@ -1,4 +1,4 @@
-// WriterAgent page script: the page's main text as Markdown. Readability (vendor/Readability.js,
+// JiaWriter page script: the page's main text as Markdown. Readability (vendor/Readability.js,
 // injected first, Apache-2.0) picks the article; without one the body minus navigation is used.
 // Returns JSON {title, byline, published, site, lang, contentType, markdown, article}.
 (() => {

@@ -1,4 +1,4 @@
-// Functional test: WA_* configuration end to end against a local mock of the three APIs.
+// Functional test: JW_* configuration end to end against a local mock of the three APIs.
 // The CLI runs from source in print mode; nothing leaves 127.0.0.1.
 
 // Child process for the CLI.
@@ -243,9 +243,9 @@ function runCli(
 	const childEnv: NodeJS.ProcessEnv = { ...process.env };
 	// Remove variables that could interfere.
 	for (const k of Object.keys(childEnv))
-		if (/^(WA_|PI_CODING_AGENT_|HTTPS?_PROXY$|https?_proxy$)/.test(k)) delete childEnv[k];
+		if (/^(JW_|PI_CODING_AGENT_|HTTPS?_PROXY$|https?_proxy$)/.test(k)) delete childEnv[k];
 	// Isolated agent directory plus the test variables.
-	Object.assign(childEnv, { WA_DIR: agentDir }, env);
+	Object.assign(childEnv, { JW_DIR: agentDir }, env);
 	// Wrap the child process in a promise.
 	return new Promise((done, reject) => {
 		// Print mode with a short prompt; stdin closed.
@@ -332,14 +332,14 @@ afterEach(() => {
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
-describe("WA_* end to end", () => {
+describe("JW_* end to end", () => {
 	it("detects Anthropic Messages, clamps max_tokens and prints the reply", async () => {
 		// Only Anthropic is served.
 		supported = ["anthropic-messages"];
 		// Fresh agent directory.
 		const dir = newAgentDir();
 		// Run.
-		const r = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_CTX: String(CTX) }, dir);
+		const r = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_CTX: String(CTX) }, dir);
 		// Success with the reply.
 		expect([r.code, r.stdout.includes(REPLY)]).toEqual([0, true]);
 		// One detection probe and five reasoning probes, then the real request.
@@ -351,11 +351,13 @@ describe("WA_* end to end", () => {
 		]);
 		// Output limit lowered from 128000 to fit the 20000 window.
 		expect(realRequest()?.body.max_tokens).toBeLessThan(CTX);
+		// The user message reaches the model with the time it was sent.
+		expect(JSON.stringify(realRequest()?.body.messages)).toMatch(/\[Sent \d{4}-\d{2}-\d{2} \d{2}:\d{2} \w+, /);
 		// The request carries the writing system prompt.
 		expect(JSON.stringify(realRequest()?.body.system)).toContain(
-			"expert writing assistant operating inside WriterAgent",
+			"expert writing assistant operating inside JiaWriter",
 		);
-		// The built-in Chinese writing skills are offered (WA_LANG unset: zh).
+		// The built-in Chinese writing skills are offered (JW_LANG unset: zh).
 		expect(JSON.stringify(realRequest()?.body.system)).toContain("<name>report-analysis</name>");
 		expect(JSON.stringify(realRequest()?.body.system)).toContain("写调研报告、情况分析、对策建议和工作总结");
 		// The default writing tools, the four checks, web search, import and export are offered, bash is not.
@@ -389,7 +391,7 @@ describe("WA_* end to end", () => {
 		// Fresh agent directory.
 		const dir = newAgentDir();
 		// Run.
-		const r = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_CTX: String(CTX) }, dir);
+		const r = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_CTX: String(CTX) }, dir);
 		// Success with the reply.
 		expect([r.code, r.stdout.includes(REPLY)]).toEqual([0, true]);
 		// Two detection probes (Anthropic missed, Responses matched).
@@ -405,7 +407,7 @@ describe("WA_* end to end", () => {
 		const dir = newAgentDir();
 		// First run with a trailing /v1 in the URL.
 		const first = await runCli(
-			{ WA_URL: `${baseUrl}/v1/`, WA_KEY: SECRET, WA_MODEL: "m1", WA_CTX: String(CTX) },
+			{ JW_URL: `${baseUrl}/v1/`, JW_KEY: SECRET, JW_MODEL: "m1", JW_CTX: String(CTX) },
 			dir,
 		);
 		// Success with the reply after three detection probes.
@@ -418,19 +420,19 @@ describe("WA_* end to end", () => {
 		seen = [];
 		// Second run in the same agent directory.
 		const second = await runCli(
-			{ WA_URL: `${baseUrl}/v1/`, WA_KEY: SECRET, WA_MODEL: "m1", WA_CTX: String(CTX) },
+			{ JW_URL: `${baseUrl}/v1/`, JW_KEY: SECRET, JW_MODEL: "m1", JW_CTX: String(CTX) },
 			dir,
 		);
 		// Cached: no probe, just the real request.
 		expect([second.code, seen.filter((s) => s.probe).length, seen.length]).toEqual([0, 0, 1]);
 	}, 120_000);
 
-	it("uses the nearest supported reasoning level when WA_REASONING is unavailable", async () => {
+	it("uses the nearest supported reasoning level when JW_REASONING is unavailable", async () => {
 		// Responses that accepts low, medium and high only.
 		supported = ["openai-responses"];
 		acceptedLevels = ["low", "medium", "high"];
 		// Ask for max.
-		const r = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_REASONING: "max" }, newAgentDir());
+		const r = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_REASONING: "max" }, newAgentDir());
 		// Success, and the request uses high, the nearest supported level.
 		expect([
 			r.code,
@@ -447,13 +449,13 @@ describe("WA_* end to end", () => {
 		// Shared agent directory.
 		const dir = newAgentDir();
 		// First run at max fails at the real request.
-		const first = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_REASONING: "max" }, dir);
+		const first = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_REASONING: "max" }, dir);
 		// The real request carried max.
 		expect((realRequest()?.body.reasoning as { effort?: string })?.effort).toBe("max");
 		// Forget the first run.
 		seen = [];
 		// Second run in the same directory.
-		const second = await runCli({ WA_URL: baseUrl, WA_KEY: SECRET, WA_MODEL: "m1", WA_REASONING: "max" }, dir);
+		const second = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_REASONING: "max" }, dir);
 		// The cache dropped max, so the nearest level xhigh is used and the reply arrives.
 		expect([
 			first.code !== 0 || !first.stdout.includes(REPLY),
@@ -467,9 +469,9 @@ describe("WA_* end to end", () => {
 		// All APIs served, but the key will not match.
 		supported = ["anthropic-messages", "openai-responses", "openai-completions"];
 		// Run with a wrong key.
-		const r = await runCli({ WA_URL: baseUrl, WA_KEY: "wrong-key", WA_MODEL: "m1" }, newAgentDir());
+		const r = await runCli({ JW_URL: baseUrl, JW_KEY: "wrong-key", JW_MODEL: "m1" }, newAgentDir());
 		// Configuration error with the Chinese reason.
-		expect([r.code, r.stderr.includes("WA_KEY 无效或没有权限")]).toEqual([1, true]);
+		expect([r.code, r.stderr.includes("JW_KEY 无效或没有权限")]).toEqual([1, true]);
 		// Exactly one request was sent.
 		expect(seen.length).toBe(1);
 	}, 90_000);
@@ -478,11 +480,11 @@ describe("WA_* end to end", () => {
 		// Anything served.
 		supported = ["openai-completions"];
 		// Only the URL is set.
-		const r = await runCli({ WA_URL: baseUrl }, newAgentDir());
+		const r = await runCli({ JW_URL: baseUrl }, newAgentDir());
 		// Configuration error with the hint.
 		// The commands follow the platform (PowerShell on Windows).
-		const command = process.platform === "win32" ? "$env:WA_KEY=" : "export WA_KEY=";
-		expect([r.code, r.stderr.includes("缺少：WA_KEY、WA_MODEL"), r.stderr.includes(command)]).toEqual([
+		const command = process.platform === "win32" ? "$env:JW_KEY=" : "export JW_KEY=";
+		expect([r.code, r.stderr.includes("缺少：JW_KEY、JW_MODEL"), r.stderr.includes(command)]).toEqual([
 			1,
 			true,
 			true,

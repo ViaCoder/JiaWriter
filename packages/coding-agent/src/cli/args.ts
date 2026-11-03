@@ -4,9 +4,10 @@
 
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import chalk from "chalk";
-import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, ENV_SESSION_DIR } from "../config.ts";
+import { APP_NAME, APP_TITLE, CONFIG_DIR_NAME, ENV_AGENT_DIR, ENV_SESSION_DIR } from "../config.ts";
 import type { ExtensionFlag } from "../core/extensions/types.ts";
 import { getToolListError, type TuiMode } from "../core/settings-manager.ts";
+import { brandText } from "../writer/brand.ts";
 
 export type Mode = "text" | "json" | "rpc";
 
@@ -281,8 +282,9 @@ export function printHelp(extensionFlags?: ExtensionFlag[]): void {
 					})
 					.join("\n")}\n`
 			: "";
-	// WriterAgent: writing assistant and its default tools.
-	console.log(`${chalk.bold(APP_NAME)} - AI writing assistant with read, write, edit, ls, find, grep tools
+	// JiaWriter: writing assistant and its default tools; a release package shows its own name throughout.
+	console.log(
+		brandText(`${chalk.bold(APP_NAME === "pi" ? APP_NAME : APP_TITLE)} - AI writing assistant with read, write, edit, ls, find, grep tools
 
 ${chalk.bold("Usage:")}
   ${APP_NAME} [options] [--] [@files...] [messages...]
@@ -476,5 +478,6 @@ ${chalk.bold("Built-in Tool Names:")}
   grep       - Search file contents (read-only, off by default)
   find       - Find files by glob pattern (read-only, off by default)
   ls         - List directory contents (read-only, off by default)
-`);
+`),
+	);
 }

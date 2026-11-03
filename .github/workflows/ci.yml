@@ -1,6 +1,6 @@
 name: CI
 
-# WriterAgent: development happens on dev; workflow_dispatch allows a manual rerun.
+# JiaWriter: development happens on dev; workflow_dispatch allows a manual rerun.
 on:
   push:
     branches: [main, dev]
@@ -46,7 +46,7 @@ jobs:
       - name: Test
         run: npm test
 
-  # WriterAgent: its own tests on all six platforms (the upstream suite runs on Linux above).
+  # JiaWriter: its own tests on all six platforms (the upstream suite runs on Linux above).
   writer-platforms:
     strategy:
       fail-fast: false
@@ -69,12 +69,12 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: WriterAgent tests
+      - name: JiaWriter tests
         shell: bash
         working-directory: packages/coding-agent
         run: node ../../node_modules/vitest/dist/cli.js --run test/writer
 
-      - name: WriterAgent script tests
+      - name: JiaWriter script tests
         shell: bash
         run: node --test scripts/writer-*.test.mjs
 

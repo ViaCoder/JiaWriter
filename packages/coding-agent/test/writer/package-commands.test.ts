@@ -1,4 +1,4 @@
-// Unit tests for the WriterAgent package-command and self-update guards.
+// Unit tests for the JiaWriter package-command and self-update guards.
 
 // Test API.
 import { describe, expect, it } from "vitest";
@@ -8,9 +8,9 @@ import { selfUpdateSupported } from "../../src/config.ts";
 import { isPackageCommandInvocation, updateTargetWantsSelf } from "../../src/package-manager-cli.ts";
 
 describe("selfUpdateSupported", () => {
-	it("is false for the writeragent brand and true for upstream pi", () => {
-		// Release builds carry the writeragent brand.
-		expect(selfUpdateSupported("writeragent")).toBe(false);
+	it("is false for the jiawriter brand and true for upstream pi", () => {
+		// Release builds carry the jiawriter brand.
+		expect(selfUpdateSupported("jiawriter")).toBe(false);
 		// The source tree keeps the upstream brand.
 		expect(selfUpdateSupported("pi")).toBe(true);
 	});

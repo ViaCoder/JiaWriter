@@ -1,5 +1,5 @@
 /**
- * English messages for WriterAgent tool output (WA_LANG=en).
+ * English messages for JiaWriter tool output (JW_LANG=en).
  * The type forces exactly the same keys as the Chinese table.
  */
 
@@ -107,11 +107,11 @@ export const en: Record<MessageKey, string> = {
 	// URL not allowed.
 	"fetch.badUrl": "Only http(s) URLs can be fetched: {url}",
 	// Unknown backend.
-	"search.badBackend": 'WA_SEARCH must be auto, browser, anysearch or sf, not "{value}".',
+	"search.badBackend": 'JW_SEARCH must be auto, browser, anysearch or sf, not "{value}".',
 	// AnySearch quota exhausted (402 body discarded).
-	"anysearch.quota": "The anonymous AnySearch quota is used up; set WA_SEARCH_KEY and retry.",
+	"anysearch.quota": "The anonymous AnySearch quota is used up; set JW_SEARCH_KEY and retry.",
 	// AnySearch key rejected.
-	"anysearch.auth": "AnySearch rejected the key (HTTP {status}); check WA_SEARCH_KEY.",
+	"anysearch.auth": "AnySearch rejected the key (HTTP {status}); check JW_SEARCH_KEY.",
 	// AnySearch rate limit after the single retry.
 	"anysearch.rate": "AnySearch rate limit reached (HTTP 429); try again later.",
 	// AnySearch could not extract the page.
@@ -121,7 +121,7 @@ export const en: Record<MessageKey, string> = {
 	// Network failure.
 	"anysearch.network": "Cannot reach AnySearch: {reason}",
 	// sf not found.
-	"sf.missing": "search_fetch's sf program was not found. Set WA_SF, or put it at {paths}.",
+	"sf.missing": "search_fetch's sf program was not found. Set JW_SF, or put it at {paths}.",
 	// sf failed.
 	"sf.failed": "sf failed (exit code {code}): {reason}",
 	// sf timed out.
@@ -136,7 +136,7 @@ export const en: Record<MessageKey, string> = {
 	"import.unchanged": "- {source}: unchanged, using {out}",
 	// Scan without a text layer (there is no OCR).
 	"import.scanned":
-		"- {source}: a scan without a text layer; WriterAgent does no text recognition. Use a PDF or Word file with a text layer.",
+		"- {source}: a scan without a text layer; JiaWriter does no text recognition. Use a PDF or Word file with a text layer.",
 	// Unsupported type.
 	"import.unsupported": "- {source}: unsupported file type; pdf, docx, txt, md and html can be imported.",
 	// Failure.
@@ -223,32 +223,32 @@ export const en: Record<MessageKey, string> = {
 	// Blank body.
 	"skills.blankBody":
 		"## Before writing\n\n- \n\n## Structure\n\n- \n\n## Style\n\n- \n\n## Final checks\n\n- Run style_check on the finished draft.",
-	// /wa page.
-	"wa.title": "WriterAgent configuration (read-only; set environment variables to change it)",
-	"wa.problem": "Configuration problem:",
-	"wa.groupModel": "Model",
-	"wa.groupOther": "Interface and search",
-	"wa.groupSetup": "Setup commands (Linux / macOS; add them to ~/.bashrc or ~/.zshrc to keep them)",
-	"wa.groupSetupWin": 'Setup commands (PowerShell, this window; use setx NAME "value" to keep them)',
-	"wa.src.env": "environment",
-	"wa.src.default": "default",
-	"wa.src.detect": "detected",
-	"wa.src.cache": "detected (cache)",
-	"wa.src.manual": "set by WA_API",
-	"wa.src.lang": "/lang",
-	"wa.set": "set",
-	"wa.unset": "not set",
-	"wa.anonymous": "not set (anonymous)",
-	"wa.sfAuto": "not set (standard places)",
-	"wa.reasoningLevels": " (available: {levels})",
-	"wa.keyPlaceholder": "<your API key>",
-	"wa.modelPlaceholder": "<model name>",
-	"wa.close": "Press any key to close",
+	// /jw page.
+	"jw.title": "JiaWriter configuration (read-only; set environment variables to change it)",
+	"jw.problem": "Configuration problem:",
+	"jw.groupModel": "Model",
+	"jw.groupOther": "Interface and search",
+	"jw.groupSetup": "Setup commands (Linux / macOS; add them to ~/.bashrc or ~/.zshrc to keep them)",
+	"jw.groupSetupWin": 'Setup commands (PowerShell, this window; use setx NAME "value" to keep them)',
+	"jw.src.env": "environment",
+	"jw.src.default": "default",
+	"jw.src.detect": "detected",
+	"jw.src.cache": "detected (cache)",
+	"jw.src.manual": "set by JW_API",
+	"jw.src.lang": "/lang",
+	"jw.set": "set",
+	"jw.unset": "not set",
+	"jw.anonymous": "not set (anonymous)",
+	"jw.sfAuto": "not set (standard places)",
+	"jw.reasoningLevels": " (available: {levels})",
+	"jw.keyPlaceholder": "<your API key>",
+	"jw.modelPlaceholder": "<model name>",
+	"jw.close": "Press any key to close",
 	// /lang.
 	"lang.choose": "Interface language",
 	"lang.saved":
 		"Interface language set to English. Command descriptions and hints change now; built-in skills switch after /reload.",
-	"lang.envWins": "WA_LANG={value} is set and takes precedence over /lang.",
+	"lang.envWins": "JW_LANG={value} is set and takes precedence over /lang.",
 	"lang.bad": "Languages: zh, en.",
 	// /sf.
 	"sf.cmdUsage": "Usage: /sf status or /sf install, the same as /browser.",
@@ -257,11 +257,22 @@ export const en: Record<MessageKey, string> = {
 	"browser.engineLine": "{engine} {pages} pages",
 	"browser.stopped": "{engine} stopped after page {pages}: {reason}",
 	"browser.fallback":
-		"The WriterAgent extension in Chrome is not connected, so AnySearch was used this time. See /browser to install the extension.",
+		"The JiaWriter extension in Chrome is not connected, so AnySearch was used this time. See /browser to install the extension.",
 	"browser.notConnected":
-		"The WriterAgent extension in Chrome is not connected. Open Chrome and load the extension as /browser shows.",
+		"The JiaWriter extension in Chrome is not connected. Open Chrome and load the extension as /browser shows.",
 	"browser.verify":
 		"{engine} asks for a human check: the Chrome window is in front; complete the check there (waiting up to {seconds} s).",
+	"browser.verifyLeft": "{seconds} s left for the {engine} verification.",
+	"browser.verifyOk": "The {engine} verification was cleared; continuing.",
+	"browser.verifyTimeout": "The {engine} verification was not cleared in time; stopped waiting.",
+	"browser.reason.verification": "a verification was not cleared in time; this engine rests for 30 minutes",
+	"browser.reason.resting": "the last verification was not cleared; resting for 30 minutes",
+	"clock.skew":
+		"This machine's clock differs from the model server by about {minutes} min; the model is given the server's time. Check the system time settings.",
+	"search.time": "Searched at: {time}",
+	"search.methodUnavailable":
+		"The browser method is not available now: the JiaWriter extension in Chrome is not connected. Use method=anysearch, or connect the extension as /browser explains.",
+	"search.sfSearchGone": "sf no longer searches (it serves web_fetch only); this search runs as auto.",
 	"browser.connected": "Chrome extension connected (extension version {version}).",
 	"browser.disconnected": "Chrome extension not connected.",
 	"browser.steps":

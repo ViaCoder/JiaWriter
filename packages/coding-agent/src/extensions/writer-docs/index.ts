@@ -1,17 +1,17 @@
 /**
- * Built-in WriterAgent extension: reference import and draft export.
+ * Built-in JiaWriter extension: reference import and draft export.
  * - import_document / /import-doc: PDF, Word, HTML and text → Markdown with page markers in 参考资料/.parsed/.
  *   The reference folder is also scanned automatically: in the background when a session starts and
  *   before every run, so files added during a session are ready for the model. There is no OCR: a scan
  *   without a text layer is reported.
  * - export_document / /export-doc: Markdown draft → .docx with an export profile (default-zh) or Markdown,
  *   after the Chinese punctuation pass, with a check of the written file. At the end of every run the
- *   drafts written or edited in it are exported to .docx automatically (WA_AUTO_EXPORT=off turns it off).
+ *   drafts written or edited in it are exported to .docx automatically (JW_AUTO_EXPORT=off turns it off).
  */
 
 // Parameter schemas.
 import { Type } from "typebox";
-// Agent directory (~/.writeragent/agent).
+// Agent directory (~/.jiawriter/agent).
 import { getAgentDir } from "../../config.ts";
 // Extension API types.
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";

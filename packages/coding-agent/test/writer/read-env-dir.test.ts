@@ -1,4 +1,4 @@
-// Unit tests for readEnvDir() in src/config.ts (WriterAgent short env names).
+// Unit tests for readEnvDir() in src/config.ts (JiaWriter short env names).
 
 // vitest helpers; stubEnv restores variables after each test.
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,13 +15,13 @@ describe("readEnvDir", () => {
 	// Undo every stubbed variable so tests stay independent.
 	afterEach(() => vi.unstubAllEnvs());
 
-	it("uses the short WriterAgent names", () => {
+	it("uses the short JiaWriter names", () => {
 		// The public names are short.
-		expect(ENV_AGENT_DIR).toBe("WA_DIR");
-		expect(ENV_SESSION_DIR).toBe("WA_SESSION_DIR");
+		expect(ENV_AGENT_DIR).toBe("JW_DIR");
+		expect(ENV_SESSION_DIR).toBe("JW_SESSION_DIR");
 	});
 
-	it("returns the WriterAgent variable when only it is set", () => {
+	it("returns the JiaWriter variable when only it is set", () => {
 		// Only the new name holds a value.
 		vi.stubEnv(ENV_AGENT_DIR, "/tmp/wa-a");
 		vi.stubEnv(LEGACY_ENV_AGENT_DIR, "");
@@ -37,7 +37,7 @@ describe("readEnvDir", () => {
 		expect(readEnvDir(ENV_SESSION_DIR, LEGACY_ENV_SESSION_DIR)).toBe("/tmp/legacy-s");
 	});
 
-	it("prefers the WriterAgent variable when both are set", () => {
+	it("prefers the JiaWriter variable when both are set", () => {
 		// Both names hold values.
 		vi.stubEnv(ENV_AGENT_DIR, "/tmp/new");
 		vi.stubEnv(LEGACY_ENV_AGENT_DIR, "/tmp/old");

@@ -31,5 +31,5 @@ metadata:
 
 ## 保存
 
-- 新 skill 放在 ~/.writeragent/agent/skills/<name>/SKILL.md；修改已有 skill 前先备份原文件。
+- 新 skill 放在 ~/.jiawriter/agent/skills/<name>/SKILL.md；修改已有 skill 前先备份原文件。
 - 保存后提示用户运行 /reload 使改动生效。

@@ -2,8 +2,8 @@
 
 There is intentionally NO model call in this module (sf uses no model at all); all
 "intelligent" work (extracting facts, synthesising, translating queries) is done by
-WriterAgent's writing model, which receives these results and, for large pages, reads the
-saved file. This module only makes what WriterAgent receives small and relevant:
+JiaWriter's writing model, which receives these results and, for large pages, reads the
+saved file. This module only makes what JiaWriter receives small and relevant:
 
   * bm25_fit — query-relevance filtering via crawl4ai's BM25ContentFilter (copied into vendor/crawl4ai)
 Length bounding lives in markdown._clamp_chars.

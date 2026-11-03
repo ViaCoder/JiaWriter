@@ -1,6 +1,6 @@
-// WriterAgent branding for release packages.
+// JiaWriter branding for release packages.
 // The source tree keeps the upstream "pi" name so upstream tests stay unchanged;
-// release packages get a package.json with the WriterAgent name and config directory.
+// release packages get a package.json with the JiaWriter name and config directory.
 // Usage: node scripts/writer-brand.mjs <source package.json> <destination package.json>
 
 // Read and write files synchronously; the script runs once per platform build.
@@ -9,19 +9,21 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 // The command users type and the name shown in the interface.
-export const BRAND_NAME = "writeragent";
-// Directory under the home folder that holds config and sessions (~/.writeragent).
-export const BRAND_CONFIG_DIR = ".writeragent";
+export const BRAND_NAME = "jiawriter";
+// Directory under the home folder that holds config and sessions (~/.jiawriter).
+export const BRAND_CONFIG_DIR = ".jiawriter";
+// The name shown in titles and text (the command stays lowercase).
+export const BRAND_TITLE = "JiaWriter";
 
-/** Return a copy of a package.json object carrying the WriterAgent brand. */
+/** Return a copy of a package.json object carrying the JiaWriter brand. */
 export function brandPackageJson(pkg) {
 	// Copy the object so the caller's data is never changed.
 	const branded = { ...pkg };
 	// config.ts derives APP_NAME and CONFIG_DIR_NAME from piConfig.
-	branded.piConfig = { ...(pkg.piConfig ?? {}), name: BRAND_NAME, configDir: BRAND_CONFIG_DIR };
+	branded.piConfig = { ...(pkg.piConfig ?? {}), name: BRAND_NAME, configDir: BRAND_CONFIG_DIR, title: BRAND_TITLE };
 	// Keep the existing entry script but publish it under the new command name.
 	const entry = Object.values(pkg.bin ?? {})[0] ?? "dist/bundle/cli.js";
-	// The package now exposes only the "writeragent" command.
+	// The package now exposes only the "jiawriter" command.
 	branded.bin = { [BRAND_NAME]: entry };
 	// Hand back the branded copy.
 	return branded;

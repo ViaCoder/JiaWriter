@@ -5,6 +5,8 @@
 
 // Engine names of the browser backend.
 import { type EngineName, parseEngines } from "../browser/engines.ts";
+// JW_VERIFY_WAIT.
+import { verifyWaitMs } from "../browser/search.ts";
 // Output messages.
 import { t, type WriterLang } from "../i18n/index.ts";
 
@@ -38,7 +40,7 @@ export interface FetchResult {
 	date: string;
 }
 
-/** Plugin configuration from WA_SEARCH* and WA_SF. */
+/** Plugin configuration from JW_SEARCH* and JW_SF. */
 export interface SearchConfig {
 	// Which backend serves web_search and web_fetch.
 	backend: SearchBackendName;
@@ -56,6 +58,8 @@ export interface SearchConfig {
 	engines: EngineName[];
 	// Browser backend: results pages per engine (3–5).
 	pages: number;
+	// Longest wait for a person to clear a verification page (JW_VERIFY_WAIT, ms; 0: no wait).
+	verifyWaitMs: number;
 }
 
 /** Default AnySearch API root. */
@@ -72,27 +76,28 @@ export function readSearchEnv(env: NodeJS.ProcessEnv): { config: SearchConfig; e
 	// Collected problems.
 	const errors: string[] = [];
 	// Backend name, auto by default.
-	const raw = (env.WA_SEARCH ?? "").trim().toLowerCase() || "auto";
+	const raw = (env.JW_SEARCH ?? "").trim().toLowerCase() || "auto";
 	// Only the known backends.
 	const known = BACKENDS.includes(raw as SearchBackendName);
 	if (!known) errors.push(t("search.badBackend", { value: raw }));
 	// Pages per engine: 3–5, default 3.
-	const pages = Math.round(Number(env.WA_SEARCH_PAGES ?? ""));
+	const pages = Math.round(Number(env.JW_SEARCH_PAGES ?? ""));
 	// Timeout in seconds (positive number), else the default.
-	const seconds = Number(env.WA_SEARCH_TIMEOUT ?? "");
+	const seconds = Number(env.JW_SEARCH_TIMEOUT ?? "");
 	// The configuration.
 	const config: SearchConfig = {
 		backend: known ? (raw as SearchBackendName) : "auto",
-		anysearchUrl: (env.WA_SEARCH_URL ?? "").trim().replace(/\/+$/, "") || DEFAULT_ANYSEARCH_URL,
-		anysearchKey: (env.WA_SEARCH_KEY ?? "").trim(),
-		sfPath: (env.WA_SF ?? "").trim(),
+		anysearchUrl: (env.JW_SEARCH_URL ?? "").trim().replace(/\/+$/, "") || DEFAULT_ANYSEARCH_URL,
+		anysearchKey: (env.JW_SEARCH_KEY ?? "").trim(),
+		sfPath: (env.JW_SF ?? "").trim(),
 		timeoutMs: (Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_TIMEOUT_S) * 1000,
-		blocklist: (env.WA_SEARCH_BLOCK ?? "")
+		blocklist: (env.JW_SEARCH_BLOCK ?? "")
 			.split(/[,\s]+/)
 			.map((h) => h.trim().toLowerCase().replace(/^\.+/, ""))
 			.filter(Boolean),
-		engines: parseEngines(env.WA_ENGINES),
+		engines: parseEngines(env.JW_ENGINES),
 		pages: Number.isFinite(pages) && pages > 0 ? Math.max(3, Math.min(5, pages)) : 3,
+		verifyWaitMs: verifyWaitMs(env.JW_VERIFY_WAIT),
 	};
 	// Both.
 	return { config, errors };

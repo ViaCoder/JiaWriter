@@ -1,10 +1,12 @@
 /**
  * Chinese text for the parts of the upstream interface users see most: key hints, the startup help
- * and the descriptions of the built-in and WriterAgent commands. The upstream code keeps its English
+ * and the descriptions of the built-in and JiaWriter commands. The upstream code keeps its English
  * strings; uiText() looks each one up when the interface language is Chinese and leaves unknown
  * strings unchanged, so upstream additions show in English until they are added here.
  */
 
+// The JiaWriter name in a release package.
+import { brandText } from "./brand.ts";
 // Current interface language.
 import { currentLang } from "./i18n/index.ts";
 
@@ -94,7 +96,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Reload keybindings, extensions, skills, prompts, themes, and context files":
 		"重新加载快捷键、扩展、skill、提示词、主题和上下文文件",
 	"Quit {app}": "退出 {app}",
-	// WriterAgent commands.
+	// JiaWriter commands.
 	"Import reference files (参考资料/ or one file) as Markdown with page markers":
 		"导入参考资料（参考资料/ 或单个文件），转成带页码标记的 Markdown",
 	"Export a Markdown draft: /export-doc <draft.md> [md|docx] [--profile=name] [--out=path]":
@@ -104,7 +106,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Create a writing skill from this session, a blank template, or with skill-creator":
 		"新建写作 skill：从当前会话生成、空白模板，或由 skill-creator 引导",
 	"Switch the interface language: /lang zh or /lang en": "切换界面语言：/lang zh 或 /lang en",
-	"Show the WriterAgent model and search configuration (read-only)": "查看 WriterAgent 的模型和检索配置（只读）",
+	"Show the JiaWriter model and search configuration (read-only)": "查看 JiaWriter 的模型和检索配置（只读）",
 	"search_fetch Chrome bridge: /sf status, or /sf install to set up the extension":
 		"search_fetch 的 Chrome 桥接：/sf status 查看状态，/sf install 安装扩展",
 };
@@ -113,6 +115,6 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 export function uiText(text: string, vars: Readonly<Record<string, string>> = {}): string {
 	// Chinese entry when there is one.
 	const chosen = currentLang() === "zh" ? (UI_ZH[text] ?? text) : text;
-	// Placeholders.
-	return chosen.replace(/\{(\w+)\}/g, (whole, name: string) => vars[name] ?? whole);
+	// Placeholders, then the product name of a release package.
+	return brandText(chosen.replace(/\{(\w+)\}/g, (whole, name: string) => vars[name] ?? whole));
 }

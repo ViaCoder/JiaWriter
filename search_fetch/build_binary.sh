@@ -3,7 +3,7 @@
 #
 # The binary is a bundle: it embeds a CPython 3.12 distribution with search_fetch and every dependency
 # already installed. On first run it only unpacks that copy into the folder named by
-# PYAPP_INSTALL_DIR_SEARCH_FETCH (WriterAgent sets it under ~/.writeragent/agent/sf/): no network,
+# PYAPP_INSTALL_DIR_SEARCH_FETCH (JiaWriter sets it under ~/.jiawriter/agent/sf/): no network,
 # no pip, no virtual environment on the user's machine.
 # The release workflow runs this on one native runner per platform (on Windows under Git Bash).
 #

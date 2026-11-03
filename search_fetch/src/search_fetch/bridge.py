@@ -11,7 +11,7 @@ version — nothing is spoofed and no automation protocol is attached. Pieces:
               socket (<HOME>/bridge/bridge.sock, directory 0700, socket 0600)
   client      every `sf search` / `sf fetch` process sends one JSON request line to that
               socket and reads one JSON reply line. On Windows (and whenever
-              SEARCH_FETCH_BRIDGE_FILE is set) the host is WriterAgent itself: it listens on a
+              SEARCH_FETCH_BRIDGE_FILE is set) the host is JiaWriter itself: it listens on a
               loopback port and writes {port, token} to a private file; every request line
               then carries the token.
 
@@ -19,7 +19,7 @@ version — nothing is spoofed and no automation protocol is attached. Pieces:
 chrome://extensions → Developer mode → Load unpacked) and writes the native-messaging
 host manifest for this user's Chrome (Chrome only; the user does not use Chromium).
 On Windows sf has no host of its own (Chrome registers native hosts in the registry
-there, and WriterAgent already is the host), so install and bridge-host only explain that.
+there, and JiaWriter already is the host), so install and bridge-host only explain that.
 """
 
 # Async host and client.
@@ -57,7 +57,7 @@ from . import config
 from .config import _log
 
 # Native messaging host name (lowercase letters, digits, dots and underscores only).
-HOST_NAME = "com.writeragent.browser"
+HOST_NAME = "com.jiawriter.browser"
 # The extension inside the package.
 EXTENSION_SRC = Path(__file__).resolve().parent / "extension"
 # Largest message the host may send to Chrome (Chrome's limit is 1 MB).
@@ -70,9 +70,9 @@ DEFAULT_TIMEOUT = 60.0
 SETUP_HINT = ("Chrome with the search_fetch extension is not connected. Run `sf bridge install`, "
               "load the folder it prints in chrome://extensions (Developer mode → Load unpacked), "
               "and keep Chrome open.")
-# On Windows the host is WriterAgent's, so the hint points there.
-WINDOWS_HINT = ("On Windows the browser host is WriterAgent itself: load the chrome-extension folder of the "
-                "WriterAgent package in chrome://extensions, keep Chrome open, and check it with /browser.")
+# On Windows the host is JiaWriter's, so the hint points there.
+WINDOWS_HINT = ("On Windows the browser host is JiaWriter itself: load the chrome-extension folder of the "
+                "JiaWriter package in chrome://extensions, keep Chrome open, and check it with /browser.")
 
 
 class BridgeUnavailable(RuntimeError):
@@ -100,8 +100,8 @@ def bridge_dir() -> Path:
 
 
 def socket_path() -> Path:
-    """The host's Unix socket: SEARCH_FETCH_BRIDGE_SOCKET when set (WriterAgent's own host), else <HOME>/bridge."""
-    # WriterAgent runs the host itself and tells sf where it listens.
+    """The host's Unix socket: SEARCH_FETCH_BRIDGE_SOCKET when set (JiaWriter's own host), else <HOME>/bridge."""
+    # JiaWriter runs the host itself and tells sf where it listens.
     override = os.environ.get("SEARCH_FETCH_BRIDGE_SOCKET", "").strip()
     if override:
         return Path(override)
@@ -112,7 +112,7 @@ def socket_path() -> Path:
 def address() -> tuple:
     """Where the host listens: ("tcp", <port file>) when SEARCH_FETCH_BRIDGE_FILE is set or on Windows,
     else ("unix", <socket path>)."""
-    # WriterAgent's loopback host writes its port and token to this file.
+    # JiaWriter's loopback host writes its port and token to this file.
     port_file = os.environ.get("SEARCH_FETCH_BRIDGE_FILE", "").strip()
     # A port file, given or the default one on Windows.
     if port_file or sys.platform == "win32":
@@ -185,7 +185,7 @@ def launcher_script() -> str:
 
 def install(platform: str = None, home: Path = None) -> dict:
     """Copy the extension to <HOME>/extension, write the launcher and the host manifests; return what was written."""
-    # Windows: WriterAgent is the host.
+    # Windows: JiaWriter is the host.
     if (platform or sys.platform) == "win32":
         raise RuntimeError(WINDOWS_HINT)
     # Private bridge directory.
@@ -351,7 +351,7 @@ async def serve(stdin, stdout, sock: Path) -> None:
 
 def host_main(argv: list) -> int:
     """`sf bridge-host <origin>`: started by Chrome; refuses any caller but our extension."""
-    # Windows: WriterAgent is the host.
+    # Windows: JiaWriter is the host.
     if sys.platform == "win32":
         _log(f"bridge-host: {WINDOWS_HINT}")
         return 2

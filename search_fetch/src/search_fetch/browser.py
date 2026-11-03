@@ -303,7 +303,7 @@ async def _await_content(page, url: str = ""):
         await asyncio.sleep(poll)
         obs = await _probe(page)
 
-# ── Model hook (no model in WriterAgent's sf, 2026-11-01) ───────────
+# ── Model hook (no model in JiaWriter's sf, 2026-11-01) ───────────
 # sf runs without any model, at the user's request: page states come from the heuristics in
 # this file, pagination from deterministic signals in search.py. To add a model later, bring
 # back a driver-model call (WriterSuite's search_fetch at commit 5f8a67e has one: SF_URL /

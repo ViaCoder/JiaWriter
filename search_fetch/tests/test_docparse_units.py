@@ -139,7 +139,7 @@ class DocparseUnitsTest(unittest.TestCase):
 
     def test_parse_pdf_text(self):
         # Text layer extracted; garbage gives "".
-        self.assertIn("Hello WriterAgent", docparse._parse_pdf_text(text_pdf("Hello WriterAgent")))
+        self.assertIn("Hello JiaWriter", docparse._parse_pdf_text(text_pdf("Hello JiaWriter")))
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(docparse._parse_pdf_text(b"%PDF-broken"), "")
 

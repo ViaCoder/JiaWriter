@@ -1,9 +1,9 @@
-// WriterAgent real-output evaluation (P2 onward).
-// Runs a fixed set of writing tasks through `writeragent -p` with the user's WA_* variables,
+// JiaWriter real-output evaluation (P2 onward).
+// Runs a fixed set of writing tasks through `jiawriter -p` with the user's JW_* variables,
 // saves each draft and prints simple, deterministic quality metrics. The key is read only from
-// the WA_KEY environment variable by WriterAgent itself; this script never reads or prints it.
-// Usage: node scripts/writer-eval.mjs <writeragent command> <output dir>
-//   e.g. node scripts/writer-eval.mjs /path/to/writeragent ./eval-out
+// the JW_KEY environment variable by JiaWriter itself; this script never reads or prints it.
+// Usage: node scripts/writer-eval.mjs <jiawriter command> <output dir>
+//   e.g. node scripts/writer-eval.mjs /path/to/jiawriter ./eval-out
 
 // Run the CLI and wait for it.
 import { spawnSync } from "node:child_process";
@@ -13,9 +13,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 // Entry-point check.
 import { fileURLToPath } from "node:url";
-// Readability check of WriterAgent (TypeScript source, run by Node's type stripping).
+// Readability check of JiaWriter (TypeScript source, run by Node's type stripping).
 import { readabilityCheck } from "../packages/coding-agent/src/writer/readability.ts";
-// AI-style check of WriterAgent, the same rules as the style_check tool.
+// AI-style check of JiaWriter, the same rules as the style_check tool.
 import { styleCheck } from "../packages/coding-agent/src/writer/style/check.ts";
 // Character and word counts.
 import { countText } from "../packages/coding-agent/src/writer/text-stats.ts";
@@ -105,7 +105,7 @@ export function runEval(command, outDir) {
 	for (const task of TASKS) {
 		// Start time.
 		const started = Date.now();
-		// Print mode; WA_* comes from the environment; stdin closed.
+		// Print mode; JW_* comes from the environment; stdin closed.
 		const r = spawnSync(command, ["-p", task.prompt], { encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"], timeout: 600_000 });
 		// The draft text.
 		const text = (r.stdout ?? "").trim();
@@ -127,7 +127,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
 	// Both are required.
 	if (!command || !outDir) {
 		// Usage.
-		console.error("usage: node scripts/writer-eval.mjs <writeragent command> <output dir>");
+		console.error("usage: node scripts/writer-eval.mjs <jiawriter command> <output dir>");
 		// Usage error.
 		process.exit(2);
 	}

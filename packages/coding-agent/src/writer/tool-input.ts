@@ -1,5 +1,5 @@
 /**
- * Input of the WriterAgent check tools: a text file given by path, or text given inline.
+ * Input of the JiaWriter check tools: a text file given by path, or text given inline.
  */
 
 // Read the file.

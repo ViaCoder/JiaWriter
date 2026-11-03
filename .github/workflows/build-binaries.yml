@@ -91,12 +91,12 @@ jobs:
           cd packages/coding-agent/binaries
 
           binary_assets=(
-            writeragent-darwin-arm64.tar.gz
-            writeragent-darwin-x64.tar.gz
-            writeragent-linux-x64.tar.gz
-            writeragent-linux-arm64.tar.gz
-            writeragent-windows-x64.zip
-            writeragent-windows-arm64.zip
+            jiawriter-darwin-arm64.tar.gz
+            jiawriter-darwin-x64.tar.gz
+            jiawriter-linux-x64.tar.gz
+            jiawriter-linux-arm64.tar.gz
+            jiawriter-windows-x64.zip
+            jiawriter-windows-arm64.zip
           )
 
           for asset in "${binary_assets[@]}"; do
@@ -109,12 +109,12 @@ jobs:
           source_asset="pi-${VERSION}-source.tar.gz"
           release_assets=(
             "${source_asset}"
-            writeragent-darwin-arm64.tar.gz
-            writeragent-darwin-x64.tar.gz
-            writeragent-linux-x64.tar.gz
-            writeragent-linux-arm64.tar.gz
-            writeragent-windows-x64.zip
-            writeragent-windows-arm64.zip
+            jiawriter-darwin-arm64.tar.gz
+            jiawriter-darwin-x64.tar.gz
+            jiawriter-linux-x64.tar.gz
+            jiawriter-linux-arm64.tar.gz
+            jiawriter-windows-x64.zip
+            jiawriter-windows-arm64.zip
             pi-coding-agent-install-package.json
             pi-coding-agent-install-package-lock.json
           )
@@ -166,21 +166,21 @@ jobs:
           case "${runtime_platform}" in
             darwin-arm64|darwin-x64|linux-arm64|linux-x64)
               platform="${runtime_platform}"
-              archive="release-assets/writeragent-${platform}.tar.gz"
-              root="extracted/writeragent"
-              binary="${root}/writeragent"
+              archive="release-assets/jiawriter-${platform}.tar.gz"
+              root="extracted/jiawriter"
+              binary="${root}/jiawriter"
               ;;
             win32-arm64)
               platform="windows-arm64"
-              archive="release-assets/writeragent-${platform}.zip"
+              archive="release-assets/jiawriter-${platform}.zip"
               root="extracted"
-              binary="${root}/writeragent.exe"
+              binary="${root}/jiawriter.exe"
               ;;
             win32-x64)
               platform="windows-x64"
-              archive="release-assets/writeragent-${platform}.zip"
+              archive="release-assets/jiawriter-${platform}.zip"
               root="extracted"
-              binary="${root}/writeragent.exe"
+              binary="${root}/jiawriter.exe"
               ;;
             *)
               echo "::error::Unsupported runner platform ${runtime_platform}"
@@ -235,12 +235,12 @@ jobs:
           source_asset="pi-${VERSION}-source.tar.gz"
           expected_assets=(
             "${source_asset}"
-            writeragent-darwin-arm64.tar.gz
-            writeragent-darwin-x64.tar.gz
-            writeragent-linux-x64.tar.gz
-            writeragent-linux-arm64.tar.gz
-            writeragent-windows-x64.zip
-            writeragent-windows-arm64.zip
+            jiawriter-darwin-arm64.tar.gz
+            jiawriter-darwin-x64.tar.gz
+            jiawriter-linux-x64.tar.gz
+            jiawriter-linux-arm64.tar.gz
+            jiawriter-windows-x64.zip
+            jiawriter-windows-arm64.zip
             pi-coding-agent-install-package.json
             pi-coding-agent-install-package-lock.json
             SHA256SUMS
@@ -265,12 +265,12 @@ jobs:
           source_asset="pi-${VERSION}-source.tar.gz"
           release_assets=(
             "${source_asset}"
-            writeragent-darwin-arm64.tar.gz
-            writeragent-darwin-x64.tar.gz
-            writeragent-linux-x64.tar.gz
-            writeragent-linux-arm64.tar.gz
-            writeragent-windows-x64.zip
-            writeragent-windows-arm64.zip
+            jiawriter-darwin-arm64.tar.gz
+            jiawriter-darwin-x64.tar.gz
+            jiawriter-linux-x64.tar.gz
+            jiawriter-linux-arm64.tar.gz
+            jiawriter-windows-x64.zip
+            jiawriter-windows-arm64.zip
             pi-coding-agent-install-package.json
             pi-coding-agent-install-package-lock.json
             SHA256SUMS
@@ -304,7 +304,7 @@ jobs:
   # The pi-env daemon for every remote system @earendil-works/pi-env supports; the npm package ships them all.
   publish-github-release:
     runs-on: ubuntu-latest
-    # WriterAgent: no npm package and no pi.dev announcement; publish right after staging.
+    # JiaWriter: no npm package and no pi.dev announcement; publish right after staging.
     needs:
       - stage-github-release
     permissions:
@@ -333,7 +333,7 @@ jobs:
 
   cleanup-draft-github-release:
     runs-on: ubuntu-latest
-    # WriterAgent: only the jobs that still exist.
+    # JiaWriter: only the jobs that still exist.
     needs:
       - build
       - stage-github-release

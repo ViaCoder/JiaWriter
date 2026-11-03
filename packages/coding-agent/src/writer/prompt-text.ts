@@ -1,16 +1,16 @@
 /**
- * WriterAgent system prompt text.
+ * JiaWriter system prompt text.
  * Every line goes into the upstream sections of system-prompt.ts (preamble, tools, rules, docs);
  * no new section or tag is added. Rules are written as positive instructions, because models
  * echo the phrasing of their prompt.
  */
 
-// Shared WA_LANG rule.
+// Shared JW_LANG rule.
 import { resolveLang } from "./i18n/index.ts";
 
 /** Opening sentence (the untagged preamble). */
 export const WRITER_PREAMBLE =
-	"You are an expert writing assistant operating inside WriterAgent. You help users by reading reference materials, researching sources, drafting and revising documents, and exporting finished work.";
+	"You are an expert writing assistant operating inside JiaWriter. You help users by reading reference materials, researching sources, drafting and revising documents, and exporting finished work.";
 
 /** General writing rules, placed first in the rules section. */
 export const WRITER_RULES: readonly string[] = [
@@ -40,9 +40,11 @@ export const WRITER_RULES: readonly string[] = [
 	"Vary sentence length and structure naturally, list as many items as the content has, and keep dashes for real breaks in thought",
 	// Idiom.
 	"Write idiomatic Chinese with natural Chinese word order and sentence patterns",
+	// The current time (writer/clock.ts puts it before each user message).
+	"Each user message starts with the local time it was sent, as [Sent …]; take the latest one as the current date and time, and use it for words such as today, this year and recent and for judging how current a source is",
 ];
 
-/** Rule for the language of replies to the user (WA_LANG, Chinese by default). */
+/** Rule for the language of replies to the user (JW_LANG, Chinese by default). */
 export function writerLanguageRule(lang: string | undefined): string {
 	// English when the interface language is English (same rule as the tool output).
 	if (resolveLang(lang) === "en") return "Reply to the user in English";
@@ -93,7 +95,7 @@ export function writerDocsSection(readmePath: string, docsPath: string): string 
 	// Lines of the section.
 	return [
 		// When to read the docs.
-		"WriterAgent documentation (read it when the user asks about WriterAgent itself, writing skills, environment variables or extensions):",
+		"JiaWriter documentation (read it when the user asks about JiaWriter itself, writing skills, environment variables or extensions):",
 		// Entry points.
 		`- Main documentation: ${readmePath}`,
 		// Detailed docs.

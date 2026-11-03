@@ -18,30 +18,30 @@ import {
 } from "../../src/writer/env-config.ts";
 
 // A complete, valid set of variables reused by several tests.
-const FULL = { WA_URL: "https://api.example.com/v1/", WA_KEY: "k", WA_MODEL: "m1" };
+const FULL = { JW_URL: "https://api.example.com/v1/", JW_KEY: "k", JW_MODEL: "m1" };
 
 describe("readWriterEnv", () => {
-	it("reports not present when no WA_* model variable is set", () => {
+	it("reports not present when no JW_* model variable is set", () => {
 		// Only unrelated variables.
-		const r = readWriterEnv({ HOME: "/home/x", WA_LANG: "zh" });
-		// The WA_* path is not in use and nothing is missing.
+		const r = readWriterEnv({ HOME: "/home/x", JW_LANG: "zh" });
+		// The JW_* path is not in use and nothing is missing.
 		expect(r).toEqual({ present: false, missing: [], errors: [] });
 	});
 
 	it("lists missing required variables in a fixed order", () => {
 		// Only the URL is set.
-		const r = readWriterEnv({ WA_URL: "https://api.example.com" });
+		const r = readWriterEnv({ JW_URL: "https://api.example.com" });
 		// Key and model are reported.
-		expect(r.missing).toEqual(["WA_KEY", "WA_MODEL"]);
+		expect(r.missing).toEqual(["JW_KEY", "JW_MODEL"]);
 		// No configuration is produced.
 		expect(r.config).toBeUndefined();
 	});
 
 	it("treats blank values as unset", () => {
 		// Whitespace-only key.
-		const r = readWriterEnv({ ...FULL, WA_KEY: "   " });
+		const r = readWriterEnv({ ...FULL, JW_KEY: "   " });
 		// The key counts as missing.
-		expect(r.missing).toEqual(["WA_KEY"]);
+		expect(r.missing).toEqual(["JW_KEY"]);
 	});
 
 	it("uses 128000 for context and output by default and normalizes the URL", () => {
@@ -61,21 +61,21 @@ describe("readWriterEnv", () => {
 		expect([DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_OUTPUT]).toEqual([128_000, 128_000]);
 	});
 
-	it("accepts every WA_REASONING choice and rejects others", () => {
+	it("accepts every JW_REASONING choice and rejects others", () => {
 		// Each documented level.
 		for (const level of ["off", "low", "medium", "high", "xhigh", "max"]) {
 			// Carried into the configuration.
-			expect(readWriterEnv({ ...FULL, WA_REASONING: level }).config?.reasoning).toBe(level);
+			expect(readWriterEnv({ ...FULL, JW_REASONING: level }).config?.reasoning).toBe(level);
 		}
 		// An unknown level is a format error.
-		const bad = readWriterEnv({ ...FULL, WA_REASONING: "minimal" });
+		const bad = readWriterEnv({ ...FULL, JW_REASONING: "minimal" });
 		// Reported with the variable name, no configuration.
-		expect([bad.errors.join("").includes("WA_REASONING"), bad.config]).toEqual([true, undefined]);
+		expect([bad.errors.join("").includes("JW_REASONING"), bad.config]).toEqual([true, undefined]);
 	});
 
-	it("accepts WA_API, WA_CTX and WA_OUT", () => {
+	it("accepts JW_API, JW_CTX and JW_OUT", () => {
 		// All optional values set.
-		const r = readWriterEnv({ ...FULL, WA_API: "openai-responses", WA_CTX: "200000", WA_OUT: "32000" });
+		const r = readWriterEnv({ ...FULL, JW_API: "openai-responses", JW_CTX: "200000", JW_OUT: "32000" });
 		// They are carried into the configuration.
 		expect(r.config).toMatchObject({ api: "openai-responses", contextWindow: 200_000, maxTokens: 32_000 });
 	});
@@ -84,16 +84,16 @@ describe("readWriterEnv", () => {
 		// Every optional check fails.
 		const r = readWriterEnv({
 			...FULL,
-			WA_URL: "api.example.com",
-			WA_API: "gemini",
-			WA_CTX: "128k",
-			WA_OUT: "0",
-			WA_LANG: "fr",
+			JW_URL: "api.example.com",
+			JW_API: "gemini",
+			JW_CTX: "128k",
+			JW_OUT: "0",
+			JW_LANG: "fr",
 		});
 		// Five Chinese errors, one per variable.
 		expect(r.errors).toHaveLength(5);
 		// Each error names its variable.
-		for (const name of ["WA_URL", "WA_API", "WA_CTX", "WA_OUT", "WA_LANG"])
+		for (const name of ["JW_URL", "JW_API", "JW_CTX", "JW_OUT", "JW_LANG"])
 			expect(r.errors.join("\n")).toContain(name);
 		// No configuration.
 		expect(r.config).toBeUndefined();
@@ -208,29 +208,29 @@ describe("applyOutputClamp", () => {
 describe("formatSetupHint", () => {
 	it("gives export commands on Linux and macOS", () => {
 		// Missing key and model.
-		const hint = formatSetupHint(["WA_KEY", "WA_MODEL"], [], "linux");
+		const hint = formatSetupHint(["JW_KEY", "JW_MODEL"], [], "linux");
 		// Chinese headline and the missing list.
-		expect(hint).toContain("缺少：WA_KEY、WA_MODEL");
+		expect(hint).toContain("缺少：JW_KEY、JW_MODEL");
 		// bash/zsh commands for exactly the missing variables.
-		expect(hint).toContain('export WA_KEY="<你的 API key>"');
-		expect(hint).not.toContain("export WA_URL");
+		expect(hint).toContain('export JW_KEY="<你的 API key>"');
+		expect(hint).not.toContain("export JW_URL");
 	});
 
 	it("gives PowerShell, setx and cmd commands on Windows", () => {
 		// Missing URL on Windows.
-		const hint = formatSetupHint(["WA_URL"], [], "win32");
+		const hint = formatSetupHint(["JW_URL"], [], "win32");
 		// All three Windows forms.
-		expect(hint).toContain('$env:WA_URL="https://api.example.com"');
-		expect(hint).toContain('setx WA_URL "https://api.example.com"');
-		expect(hint).toContain("set WA_URL=https://api.example.com");
+		expect(hint).toContain('$env:JW_URL="https://api.example.com"');
+		expect(hint).toContain('setx JW_URL "https://api.example.com"');
+		expect(hint).toContain("set JW_URL=https://api.example.com");
 	});
 
 	it("lists format errors and shows all required variables when none is missing", () => {
 		// One format error, nothing missing.
-		const hint = formatSetupHint([], ["WA_CTX 必须是正整数"], "darwin");
+		const hint = formatSetupHint([], ["JW_CTX 必须是正整数"], "darwin");
 		// The error is shown.
-		expect(hint).toContain("格式错误：WA_CTX 必须是正整数");
+		expect(hint).toContain("格式错误：JW_CTX 必须是正整数");
 		// All three required commands are listed.
-		for (const name of ["WA_URL", "WA_KEY", "WA_MODEL"]) expect(hint).toContain(`export ${name}=`);
+		for (const name of ["JW_URL", "JW_KEY", "JW_MODEL"]) expect(hint).toContain(`export ${name}=`);
 	});
 });

@@ -150,7 +150,7 @@ export function shouldRunFirstTimeSetup(settingsPath: string = getSettingsPath()
 	if (!areExperimentalFeaturesEnabled()) {
 		return false;
 	}
-	// WriterAgent: a custom config directory can come from WA_DIR or the upstream name.
+	// JiaWriter: a custom config directory can come from JW_DIR or the upstream name.
 	if (readEnvDir(ENV_AGENT_DIR, LEGACY_ENV_AGENT_DIR)) {
 		return false;
 	}

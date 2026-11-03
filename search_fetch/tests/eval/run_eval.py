@@ -10,7 +10,7 @@ user's browser profile is never touched.
 
 Usage: python3 tests/eval/run_eval.py --label baseline [--only search|fetch]
        [--python <venv python>] [--out <dir>]
-Output: <out>/<label>/rows.json and summary.json (default out: <WriterAgent>/.tmp/sf-eval).
+Output: <out>/<label>/rows.json and summary.json (default out: <JiaWriter>/.tmp/sf-eval).
 """
 # Command-line options.
 import argparse
@@ -43,7 +43,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 # search_fetch repository root.
 REPO = HERE.parents[1]
-# WriterAgent root (where .tmp lives).
+# JiaWriter root (where .tmp lives).
 SUITE = REPO.parent
 # sf.py dev shim of the checkout under test (main() may point it at another checkout).
 SF_PY = REPO / "sf.py"

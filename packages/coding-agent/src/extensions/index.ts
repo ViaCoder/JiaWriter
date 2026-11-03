@@ -3,35 +3,35 @@ import codemodeExtension from "./codemode/index.ts";
 import llamaExtension from "./llama/index.ts";
 import mcpExtension from "./mcp/index.ts";
 import toolSearchExtension from "./tool-search/index.ts";
-// WriterAgent: import_document, export_document and /import, /export.
+// JiaWriter: import_document, export_document and /import, /export.
 import writerDocsExtension from "./writer-docs/index.ts";
-// WriterAgent: the "wa" provider from WA_* environment variables.
+// JiaWriter: the "jw" provider from JW_* environment variables.
 import writerEnvExtension from "./writer-env/index.ts";
-// WriterAgent: gongwen_check for the lieflat-gongwen skill (PolyForm Noncommercial, see its LICENSE).
+// JiaWriter: gongwen_check for the lieflat-gongwen skill (PolyForm Noncommercial, see its LICENSE).
 import writerGongwenExtension from "./writer-gongwen/index.ts";
-// WriterAgent: web_search and web_fetch (AnySearch or search_fetch in the user's Chrome).
+// JiaWriter: web_search and web_fetch (AnySearch or search_fetch in the user's Chrome).
 import writerSearchExtension from "./writer-search/index.ts";
-// WriterAgent: built-in writing skills, /skills and /skill-new.
+// JiaWriter: built-in writing skills, /skills and /skill-new.
 import writerSkillsExtension from "./writer-skills/index.ts";
-// WriterAgent: read-only writing checks (style_check, word_count, readability_check).
+// JiaWriter: read-only writing checks (style_check, word_count, readability_check).
 import writerToolsExtension from "./writer-tools/index.ts";
-// WriterAgent: /lang and the /wa configuration page.
+// JiaWriter: /lang and the /jw configuration page.
 import writerUiExtension from "./writer-ui/index.ts";
 
 export const builtInExtensions: InlineExtension[] = [
-	// WriterAgent: registers the WA_* model and clamps its output limit.
+	// JiaWriter: registers the JW_* model and clamps its output limit.
 	{ name: "writer-env", factory: writerEnvExtension, builtin: true },
-	// WriterAgent: the writing checks.
+	// JiaWriter: the writing checks.
 	{ name: "writer-tools", factory: writerToolsExtension, builtin: true },
-	// WriterAgent: the 公文 self-check.
+	// JiaWriter: the 公文 self-check.
 	{ name: "writer-gongwen", factory: writerGongwenExtension, builtin: true },
-	// WriterAgent: web search.
+	// JiaWriter: web search.
 	{ name: "writer-search", factory: writerSearchExtension, builtin: true },
-	// WriterAgent: reference import and draft export.
+	// JiaWriter: reference import and draft export.
 	{ name: "writer-docs", factory: writerDocsExtension, builtin: true },
-	// WriterAgent: writing skills.
+	// JiaWriter: writing skills.
 	{ name: "writer-skills", factory: writerSkillsExtension, builtin: true },
-	// WriterAgent: interface language and configuration page.
+	// JiaWriter: interface language and configuration page.
 	{ name: "writer-ui", factory: writerUiExtension, builtin: true },
 	{ name: "llama.cpp", factory: llamaExtension, builtin: true },
 	// Replaceable: an extension that registers `codemode`, `tool_search`, or `/mcp` (such as a third-party

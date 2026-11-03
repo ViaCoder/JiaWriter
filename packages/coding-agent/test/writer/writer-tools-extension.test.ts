@@ -22,13 +22,13 @@ beforeEach(() => {
 	// Temp directory.
 	cwd = mkdtempSync(join(tmpdir(), "wa-tools-"));
 	// Chinese output.
-	vi.stubEnv("WA_LANG", "zh");
+	vi.stubEnv("JW_LANG", "zh");
 });
 // Clean up.
 afterEach(() => {
 	// Remove the directory.
 	rmSync(cwd, { recursive: true, force: true });
-	// Restore WA_LANG.
+	// Restore JW_LANG.
 	vi.unstubAllEnvs();
 });
 

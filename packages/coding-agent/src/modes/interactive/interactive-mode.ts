@@ -133,7 +133,8 @@ import { killTrackedDetachedChildren } from "../../utils/shell.ts";
 import { loadAllHighlightLanguages } from "../../utils/syntax-highlight.ts";
 import { ensureTool, type ToolStatus } from "../../utils/tools-manager.ts";
 import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-check.ts";
-// WriterAgent: interface text in the chosen language.
+// JiaWriter: interface text in the chosen language.
+import { brandText } from "../../writer/brand.ts";
 import { uiText } from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
@@ -728,7 +729,7 @@ export class InteractiveMode {
 		// Define commands for autocomplete
 		const slashCommands: SlashCommand[] = BUILTIN_SLASH_COMMANDS.map((command) => ({
 			name: command.name,
-			// WriterAgent: descriptions in the interface language.
+			// JiaWriter: descriptions in the interface language.
 			description: command.name === "quit" ? uiText("Quit {app}", { app: APP_NAME }) : uiText(command.description),
 			...(command.argumentHint && { argumentHint: command.argumentHint }),
 		}));
@@ -800,7 +801,7 @@ export class InteractiveMode {
 			.filter((cmd) => !builtinCommandNames.has(cmd.name))
 			.map((cmd) => ({
 				name: cmd.invocationName,
-				// WriterAgent: extension command descriptions in the interface language.
+				// JiaWriter: extension command descriptions in the interface language.
 				description: this.prefixAutocompleteDescription(cmd.description && uiText(cmd.description), cmd.sourceInfo),
 				getArgumentCompletions: cmd.getArgumentCompletions,
 			}));
@@ -1058,7 +1059,7 @@ export class InteractiveMode {
 					rawKeyHint("!", "bash"),
 					hint("app.tools.expand", "more"),
 				].join(theme.fg("muted", " · "));
-			// WriterAgent: onboarding lines in the interface language.
+			// JiaWriter: onboarding lines in the interface language.
 			const compactOnboarding = () =>
 				theme.fg(
 					"dim",
@@ -1332,7 +1333,9 @@ export class InteractiveMode {
 		}
 
 		if (extendedKeysFormat === "xterm") {
-			return "tmux extended-keys-format is xterm. Pi works best with csi-u. Add `set -g extended-keys-format csi-u` to ~/.tmux.conf and restart tmux.";
+			return brandText(
+				"tmux extended-keys-format is xterm. Pi works best with csi-u. Add `set -g extended-keys-format csi-u` to ~/.tmux.conf and restart tmux.",
+			);
 		}
 
 		return undefined;
@@ -2174,7 +2177,9 @@ export class InteractiveMode {
 	}
 
 	private crashReportInstructions(): string {
-		const resume = this.session.sessionFile ? `run \`${APP_NAME} -r\` to resume the session, then` : "start pi and";
+		const resume = this.session.sessionFile
+			? `run \`${APP_NAME} -r\` to resume the session, then`
+			: brandText("start pi and");
 		return `To report this crash: ${resume} run /bug. The crash details are attached automatically.`;
 	}
 
@@ -6593,13 +6598,13 @@ export class InteractiveMode {
 	}
 
 	private async handleShareCommand(): Promise<void> {
-		// WriterAgent: sessions are never uploaded, so /share only explains that.
-		this.showStatus("WriterAgent 不提供 /share：会话不会上传到任何服务。");
+		// JiaWriter: sessions are never uploaded, so /share only explains that.
+		this.showStatus("JiaWriter 不提供 /share：会话不会上传到任何服务。");
 	}
 
 	private async handleBugCommand(_hint: string | undefined): Promise<void> {
-		// WriterAgent: nothing is sent to the upstream developers, so /bug only explains that.
-		this.showStatus("WriterAgent 不提供 /bug：不会向任何服务发送报告。");
+		// JiaWriter: nothing is sent to the upstream developers, so /bug only explains that.
+		this.showStatus("JiaWriter 不提供 /bug：不会向任何服务发送报告。");
 	}
 
 	private async handleCopyCommand(

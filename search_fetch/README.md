@@ -1,13 +1,13 @@
-# search_fetch — WriterAgent 的检索后端（`WA_SEARCH=sf`）
+# search_fetch — JiaWriter 的检索后端（`JW_SEARCH=sf`）
 
-WriterAgent 的 `web_search` / `web_fetch` 工具在 `WA_SEARCH=sf` 时以子进程调用本程序
+JiaWriter 的 `web_search` / `web_fetch` 工具在 `JW_SEARCH=sf` 时以子进程调用本程序
 （`sf search --json …`、`sf fetch --json …`，参数不经 shell，查询词和 URL 放在 `--` 之后）。
 它通过 **search_fetch 扩展在你自己的 Chrome 专用窗口里**打开网页，再用 crawl4ai 转成 markdown：
 真实浏览器、真实的 Cookie 与登录状态，产物全部落盘，可以复查。
 
 **不使用驾驶模型（LLM），不需要 key**（2026-11-01 起）：页面状态由固定规则判断，翻页靠确定性信号。
 以后需要驾驶模型时的接入点在 `browser.py` 的「Model hook」注释里说明。
-不做 OCR，也不做语音转写：图片和扫描件只取文字层，没有文字层就按无内容处理；音视频只收录元数据和字幕。`kb` 子命令需要嵌入接口，WriterAgent 不使用它。
+不做 OCR，也不做语音转写：图片和扫描件只取文字层，没有文字层就按无内容处理；音视频只收录元数据和字幕。`kb` 子命令需要嵌入接口，JiaWriter 不使用它。
 
 - **search** — 直接打开各引擎的结果页（Google、Startpage，可选 Brave、Bing、DuckDuckGo、百度、搜狗），
   用扩展内置的页面脚本取出结果链接，SERP 原样转成 markdown 返回，由调用方挑选结果。
@@ -17,13 +17,13 @@ WriterAgent 的 `web_search` / `web_fetch` 工具在 `WA_SEARCH=sf` 时以子进
   网页里链接的文档也会顺带下载解析（`SEARCH_FETCH_PAGE_DOCS`，默认 3 个）。
 - **ingest** — 解析工作文件夹里的本地材料目录（参考资料/），输出带 `##### 来源：参考资料/<文件>` 标记的语料。
 
-所有产物落在**调用方当前目录**的 `./.search_fetchres/`；WriterAgent 以写作文件夹为工作目录运行 sf。
+所有产物落在**调用方当前目录**的 `./.search_fetchres/`；JiaWriter 以写作文件夹为工作目录运行 sf。
 **全部可变状态都在本目录内**：venv、扩展副本、桥接 socket、节流记录和缓存都在 `home/`
 （`SEARCH_FETCH_HOME`），删除本目录即完全卸载。
 
 ## 浏览器与请求节奏
 
-- 扩展（`src/search_fetch/extension`，MV3）经 native messaging 连接本机通信程序：在 WriterAgent 里是 writeragent 本身，
+- 扩展（`src/search_fetch/extension`，MV3）经 native messaging 连接本机通信程序：在 JiaWriter 里是 jiawriter 本身，
   单独使用 sf 时是 `sf bridge-host`（`home/bridge/bridge.sock`，目录 0700、socket 0600；设置 `SEARCH_FETCH_BRIDGE_SOCKET` 时改用它指定的 socket）；
   host 只接受本扩展的 origin。页面操作全部是扩展内置的静态脚本，不执行字符串代码。
 - 点击、输入和滚动经 `chrome.debugger` 的 Input 接口发出（`human_click`、`human_type`、`human_scroll`），页面收到的是可信事件：
@@ -31,7 +31,7 @@ WriterAgent 的 `web_search` / `web_fetch` 工具在 `WA_SEARCH=sf` 时以子进
 - 节流（`pacing.py`，本机所有 sf 进程共享，记录在 `home/pacing/`）：同一搜索引擎两次查询至少间隔 45 秒，
   同一网站两次请求至少 8 秒，任意两次跳转至少 1.5 秒，均另加随机抖动；本机回环地址不节流。
 - 验证码：search 命中时有界等待你在 Chrome 窗口里处理（默认 80 秒，`SEARCH_FETCH_HUMAN_WAIT`；
-  WriterAgent 的 print 模式自动设 `SEARCH_FETCH_NO_HUMAN=1`）。fetch 对盘查页最多等
+  JiaWriter 的 print 模式自动设 `SEARCH_FETCH_NO_HUMAN=1`）。fetch 对盘查页最多等
   `SEARCH_FETCH_FETCH_CHALLENGE_WAIT`（默认 45 秒），期满仍是带验证码框的盘查页才返回 `blocked:`；
   只凭措辞判断的疑似盘查短页按正文处理，不会丢失简短的真实页面。
 
@@ -69,7 +69,7 @@ home/venv/bin/python3 sf.py bridge install     # 一次：复制扩展、写 nat
 home/venv/bin/python3 sf.py bridge status      # connected=true 即可（保持 Chrome 开着）
 ```
 
-在 WriterAgent 里使用：`WA_SEARCH=sf`，`WA_SF` 指向 sf 程序（源码开发时可指向一个调用
+在 JiaWriter 里使用：`JW_SEARCH=sf`，`JW_SF` 指向 sf 程序（源码开发时可指向一个调用
 `home/venv/bin/python3 sf.py "$@"` 的脚本）。直接自测：
 
 ```bash
@@ -81,9 +81,9 @@ $PY sf.py selftest            # 各引擎 SERP 契约自检
 
 ## 发布包里的 sf
 
-- WriterAgent 的 6 个发布包都带有 `search_fetch/<os>/<arch>/sf`（Windows 上是 `search_fetch/windows/<arch>/sf.exe`；PyApp 单文件，内嵌已经装好本包和全部依赖的 CPython 3.12），`WA_SEARCH=sf` 时不设 `WA_SF` 也能找到。
-- WriterAgent 运行 sf 时，把它的全部状态放在 `~/.writeragent/agent/sf/`：`runtime/`（第一次运行时从程序里解开的 Python 和依赖）、`home/`（扩展副本、桥接 socket、节流记录）。第一次运行不联网、不调用 pip，只在本机解开一次。
-- 在 WriterAgent 里，扩展的本机通信程序是 writeragent 本身（主机名 `com.writeragent.browser`，发布版启动时自动向 Chrome 注册）；sf 由 `SEARCH_FETCH_BRIDGE_SOCKET` 指向它的 socket（`~/.writeragent/agent/browser/bridge.sock`），Windows 上由 `SEARCH_FETCH_BRIDGE_FILE` 指向它写的端口文件（`bridge.json`，内含回环端口和令牌），不再自己注册；Windows 上 `sf bridge install` 和 `sf bridge-host` 只提示改用 WriterAgent。按包里的「使用说明.html」在 Chrome 加载 `chrome-extension` 文件夹后，用 `/browser` 确认已连接。
+- JiaWriter 的 6 个发布包都带有 `search_fetch/<os>/<arch>/sf`（Windows 上是 `search_fetch/windows/<arch>/sf.exe`；PyApp 单文件，内嵌已经装好本包和全部依赖的 CPython 3.12），`JW_SEARCH=sf` 时不设 `JW_SF` 也能找到。
+- JiaWriter 运行 sf 时，把它的全部状态放在 `~/.jiawriter/agent/sf/`：`runtime/`（第一次运行时从程序里解开的 Python 和依赖）、`home/`（扩展副本、桥接 socket、节流记录）。第一次运行不联网、不调用 pip，只在本机解开一次。
+- 在 JiaWriter 里，扩展的本机通信程序是 jiawriter 本身（主机名 `com.jiawriter.browser`，发布版启动时自动向 Chrome 注册）；sf 由 `SEARCH_FETCH_BRIDGE_SOCKET` 指向它的 socket（`~/.jiawriter/agent/browser/bridge.sock`），Windows 上由 `SEARCH_FETCH_BRIDGE_FILE` 指向它写的端口文件（`bridge.json`，内含回环端口和令牌），不再自己注册；Windows 上 `sf bridge install` 和 `sf bridge-host` 只提示改用 JiaWriter。按包里的「使用说明.html」在 Chrome 加载 `chrome-extension` 文件夹后，用 `/browser` 确认已连接。
 - 打包：`bash build_binary.sh [--out <目录>]` 在本机原生构建（Windows 上在 Git Bash 里运行），产物为 `<目录>/<os>/<arch>/sf`，Windows 上是 `sf.exe`。构建时下载固定版本的 python-build-standalone CPython 3.12.16（20261026，校验 SHA256），用隔离模式（`python -I -m pip install --isolated`）把本包和全部依赖装进去，删掉用不到的 Playwright/Patchright Node 驱动，逐个导入 sf 用到的模块做自检，再整体嵌入程序（`PYAPP_DISTRIBUTION_PATH`、`PYAPP_FULL_ISOLATION=1`、`PYAPP_SKIP_INSTALL=1`）。PyApp 固定为 v0.31.0 源码（校验 SHA256），用 `pyapp/Cargo.toml` 与 `pyapp/Cargo.lock` 替换上游的依赖清单：zip 升到 9、zstd 升到 0.14，bytes、quinn-proto、rustls、tar、time 升到修复版本，`cargo audit` 为 0 个漏洞（2026-11-01）。
 
 ## 产物（`./.search_fetchres/`）
@@ -124,4 +124,4 @@ $PY sf.py selftest            # 各引擎 SERP 契约自检
 媒体 URL（YouTube、直链音视频）走 `media.py`：只取元数据和字幕（人工字幕优先），不下载媒体，也不做语音转写；
 没有字幕时只收录元数据与简介。字幕语言偏好用 `SEARCH_FETCH_SUB_LANGS` 设置（默认 `zh,en`）。
 
-来源：从 WriterSuite 的 search_fetch（提交 0a0f160）复制而来，此后只在 WriterAgent 中维护。
+来源：从 WriterSuite 的 search_fetch（提交 0a0f160）复制而来，此后只在 JiaWriter 中维护。

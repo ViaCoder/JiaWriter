@@ -172,7 +172,7 @@ describe("runHost / bridgeCall", () => {
 });
 
 describe("hostMain", () => {
-	it("refuses a caller that is not the WriterAgent extension", async () => {
+	it("refuses a caller that is not the JiaWriter extension", async () => {
 		expect(await hostMain(["chrome-extension://abcdefghijklmnopabcdefghijklmnop/"], dir)).toBe(2);
 	});
 });

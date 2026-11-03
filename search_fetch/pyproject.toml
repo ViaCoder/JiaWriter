@@ -1,4 +1,4 @@
-# search_fetch — WriterAgent's subprocess search/fetch backend, packaged as a wheel so a
+# search_fetch — JiaWriter's subprocess search/fetch backend, packaged as a wheel so a
 # release can embed it in a PyApp binary (search_fetch/<os>/<arch>/sf).
 # Dependency pins are THE validated set (single source of truth — setup.sh and
 # release install used to duplicate this list; they now read the same wheel).
@@ -13,7 +13,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "search-fetch"
 version = "1.3.0"
-description = "WriterAgent search backend: search/fetch through the user's own Chrome (extension bridge), docparse (text layers), media metadata and subtitles, optional vector KB"
+description = "JiaWriter search backend: search/fetch through the user's own Chrome (extension bridge), docparse (text layers), media metadata and subtitles, optional vector KB"
 requires-python = ">=3.10"
 dependencies = [
     "beautifulsoup4==4.15.0",
@@ -25,7 +25,7 @@ dependencies = [
     "yt-dlp==2026.6.9",
 ]
 
-# The knowledge-base sidecar (`sf kb`); WriterAgent does not use it, and the release binary leaves it out.
+# The knowledge-base sidecar (`sf kb`); JiaWriter does not use it, and the release binary leaves it out.
 [project.optional-dependencies]
 kb = [
     "numpy==2.5.0",

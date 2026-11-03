@@ -28,10 +28,10 @@ function makeSession(overrides: Partial<SessionInfo> & { id: string }): SessionI
 // Kitty keyboard protocol encoding for Ctrl+R
 const CTRL_R = "\x1b[114;5u";
 
-// WriterAgent: these tests read the upstream English hint text; the interface defaults to Chinese
+// JiaWriter: these tests read the upstream English hint text; the interface defaults to Chinese
 // (vitest restores stubbed variables after each test, so the stub runs before each one).
 beforeEach(() => {
-	vi.stubEnv("WA_LANG", "en");
+	vi.stubEnv("JW_LANG", "en");
 });
 
 describe("session selector rename", () => {

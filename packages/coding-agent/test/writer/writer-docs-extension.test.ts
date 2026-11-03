@@ -22,7 +22,7 @@ import { makePdf } from "./doc-fixtures.ts";
 let cwd = "";
 beforeEach(() => {
 	cwd = mkdtempSync(join(tmpdir(), "wa-docs-"));
-	vi.stubEnv("WA_LANG", "zh");
+	vi.stubEnv("JW_LANG", "zh");
 	vi.stubEnv("HOME", cwd);
 });
 afterEach(() => {
@@ -93,7 +93,7 @@ describe("import_document and export_document", () => {
 		).toEqual([
 			"参考资料导入：2 个文件",
 			`- ${join("参考资料", "a.txt")} → ${join("参考资料", ".parsed", "a.txt.md")}（1 页，4 字）`,
-			`- ${join("参考资料", "scan.pdf")}：扫描件，没有文字层，WriterAgent 不做文字识别。请换成带文字层的 PDF 或 Word 文件。`,
+			`- ${join("参考资料", "scan.pdf")}：扫描件，没有文字层，JiaWriter 不做文字识别。请换成带文字层的 PDF 或 Word 文件。`,
 		]);
 		// One file by path.
 		const one = await tools
@@ -172,7 +172,7 @@ describe("automatic import before each run and export after it", () => {
 		expect(existsSync(join(cwd, "素材笔记.docx"))).toBe(false);
 		expect(existsSync(join(cwd, "坏.docx"))).toBe(false);
 		// Switched off: nothing more.
-		vi.stubEnv("WA_AUTO_EXPORT", "off");
+		vi.stubEnv("JW_AUTO_EXPORT", "off");
 		await handlers.get("agent_end")?.({ type: "agent_end", messages }, ctx(notes));
 		expect(notes).toHaveLength(2);
 	});
@@ -211,6 +211,6 @@ describe("editedDrafts / isDraftPath / autoExportEnabled", () => {
 	});
 	it("is on unless switched off", () => {
 		expect(autoExportEnabled({})).toBe(true);
-		for (const v of ["off", "0", "FALSE", "no"]) expect(autoExportEnabled({ WA_AUTO_EXPORT: v })).toBe(false);
+		for (const v of ["off", "0", "FALSE", "no"]) expect(autoExportEnabled({ JW_AUTO_EXPORT: v })).toBe(false);
 	});
 });

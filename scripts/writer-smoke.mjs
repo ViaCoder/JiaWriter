@@ -1,4 +1,4 @@
-// Offline smoke test of a WriterAgent build: --version, --help, one print-mode run against a local
+// Offline smoke test of a JiaWriter build: --version, --help, one print-mode run against a local
 // mock Chat Completions server (API detection probes and one streamed reply), and one run where the
 // mock calls import_document on a PDF, export_document on a draft and write on another draft. Checks
 // the reply, the tools and the writing prompt with the built-in skills in the request, the parsed PDF,
@@ -6,7 +6,7 @@
 // file, and the native messaging host of the browser extension (a request routed through the program
 // to a fake extension and back, a stranger refused). No real model, no network beyond 127.0.0.1.
 // Usage: node scripts/writer-smoke.mjs <program> [program args...]
-//   e.g. node scripts/writer-smoke.mjs ./writeragent
+//   e.g. node scripts/writer-smoke.mjs ./jiawriter
 
 // Child processes.
 import { spawn } from "node:child_process";
@@ -23,7 +23,7 @@ import { join, resolve } from "node:path";
 // Entry-point check.
 import { fileURLToPath } from "node:url";
 
-/** Chrome's id of the WriterAgent extension (src/writer/browser/bridge.ts EXTENSION_ID). */
+/** Chrome's id of the JiaWriter extension (src/writer/browser/bridge.ts EXTENSION_ID). */
 export const EXTENSION_ID = "mnoicnfoocibanokjfbpmbgpamlmdgje";
 
 /** One native messaging frame: 32-bit little-endian length plus JSON. */
@@ -63,7 +63,7 @@ export async function hostRound(cmd, args, env) {
 	// Rows.
 	const rows = [];
 	// Where the host listens (Unix socket, or the Windows port file with its token).
-	const dir = join(env.WA_DIR, "browser");
+	const dir = join(env.JW_DIR, "browser");
 	const win = process.platform === "win32";
 	const addrFile = join(dir, win ? "bridge.json" : "bridge.sock");
 	// Started with our extension's origin (and Windows' extra argument).
@@ -238,10 +238,10 @@ export function programPath(cmd) {
 export async function smoke(command, args) {
 	// The program as an absolute path when one was given.
 	const cmd = programPath(command);
-	// Isolated home and agent folder; no WA_* or PI_* from the caller.
+	// Isolated home and agent folder; no JW_* or PI_* from the caller.
 	const home = mkdtempSync(join(tmpdir(), "wa-smoke-"));
-	const base = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(WA_|PI_|SF_)/.test(k)));
-	const env = { ...base, HOME: home, USERPROFILE: home, WA_DIR: join(home, "agent") };
+	const base = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(JW_|PI_|SF_)/.test(k)));
+	const env = { ...base, HOME: home, USERPROFILE: home, JW_DIR: join(home, "agent") };
 	const rows = [];
 	const mock = await startMock();
 	try {
@@ -251,7 +251,7 @@ export async function smoke(command, args) {
 		const h = await run(cmd, [...args, "--help"], env);
 		rows.push(["--help", h.code === 0 && h.stdout.includes("writing assistant"), ""]);
 		// One print-mode run against the mock.
-		const p = await run(cmd, [...args, "-p", "写一句话"], { ...env, WA_URL: mock.url, WA_KEY: SECRET, WA_MODEL: "smoke-model" });
+		const p = await run(cmd, [...args, "-p", "写一句话"], { ...env, JW_URL: mock.url, JW_KEY: SECRET, JW_MODEL: "smoke-model" });
 		rows.push(["print reply", p.code === 0 && p.stdout.includes(REPLY), p.code === 0 ? "" : p.stderr.trim().slice(-300)]);
 		const body = mock.requests.at(-1) ?? {};
 		const names = (body.tools ?? []).map((t) => t.function?.name ?? t.name);
@@ -275,7 +275,7 @@ export async function smoke(command, args) {
 			{ text: REPLY },
 		]);
 		try {
-			const t = await run(cmd, [...args, "-p", "导入并导出"], { ...env, WA_URL: tools.url, WA_KEY: SECRET, WA_MODEL: "smoke-model" }, 120_000, work);
+			const t = await run(cmd, [...args, "-p", "导入并导出"], { ...env, JW_URL: tools.url, JW_KEY: SECRET, JW_MODEL: "smoke-model" }, 120_000, work);
 			const parsed = join(work, "参考资料", ".parsed", "a.pdf.md");
 			rows.push(["import pdf", t.code === 0 && existsSync(parsed) && readFileSync(parsed, "utf-8").includes("Smoke reference text"), t.code === 0 ? "" : t.stderr.trim().slice(-300)]);
 			const docx = join(work, "d.docx");

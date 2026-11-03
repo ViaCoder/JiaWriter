@@ -31,5 +31,5 @@ metadata:
 
 ## Saving
 
-- Save new skills as ~/.writeragent/agent/skills/<name>/SKILL.md; back up an existing skill before changing it.
+- Save new skills as ~/.jiawriter/agent/skills/<name>/SKILL.md; back up an existing skill before changing it.
 - After saving, tell the user to run /reload.

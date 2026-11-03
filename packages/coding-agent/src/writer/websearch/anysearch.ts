@@ -1,6 +1,6 @@
 /**
  * AnySearch backend (https://www.anysearch.com/docs): POST /v1/search and /v1/extract.
- * Anonymous use works (rate-limited per IP); WA_SEARCH_KEY adds `Authorization: Bearer`.
+ * Anonymous use works (rate-limited per IP); JW_SEARCH_KEY adds `Authorization: Bearer`.
  * The key never appears in errors or logs. A 402 body is never read: for anonymous callers
  * it may carry generated credentials.
  */

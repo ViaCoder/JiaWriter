@@ -27,7 +27,7 @@ import {
 // A key that must never be written or printed.
 const SECRET = "sk-test-secret-123";
 // Valid variables for most tests.
-const ENV = { WA_URL: "https://h.example.com/v1", WA_KEY: SECRET, WA_MODEL: "m1" };
+const ENV = { JW_URL: "https://h.example.com/v1", JW_KEY: SECRET, JW_MODEL: "m1" };
 // All levels the probes test.
 const ALL = ["low", "medium", "high", "xhigh", "max"];
 // Temp directories to clean.
@@ -70,7 +70,7 @@ function setup(env: NodeJS.ProcessEnv, dir: string, fetchFn: typeof fetch, probe
 }
 
 describe("setupWriterModel", () => {
-	it("returns none when no WA_* variable is set and makes no request", async () => {
+	it("returns none when no JW_* variable is set and makes no request", async () => {
 		// Calls made.
 		const calls: string[] = [];
 		// Empty environment.
@@ -81,17 +81,17 @@ describe("setupWriterModel", () => {
 
 	it("returns a Chinese setup hint when variables are missing", async () => {
 		// Only the URL.
-		const s = await setup({ WA_URL: "https://h.example.com" }, agentDir(), fetch);
+		const s = await setup({ JW_URL: "https://h.example.com" }, agentDir(), fetch);
 		// It names what is missing.
-		expect(s.kind === "error" && s.message).toContain("缺少：WA_KEY、WA_MODEL");
+		expect(s.kind === "error" && s.message).toContain("缺少：JW_KEY、JW_MODEL");
 	});
 
-	it("uses WA_API with reasoning off without any request", async () => {
+	it("uses JW_API with reasoning off without any request", async () => {
 		// Calls made.
 		const calls: string[] = [];
 		// Explicit API, reasoning off.
 		const s = await setup(
-			{ ...ENV, WA_API: "openai-completions", WA_REASONING: "off" },
+			{ ...ENV, JW_API: "openai-completions", JW_REASONING: "off" },
 			agentDir(),
 			mockFetch({}, calls),
 		);
@@ -104,12 +104,12 @@ describe("setupWriterModel", () => {
 		]);
 	});
 
-	it("probes reasoning levels for WA_API with one baseline and one probe per level", async () => {
+	it("probes reasoning levels for JW_API with one baseline and one probe per level", async () => {
 		// Calls made.
 		const calls: string[] = [];
 		// Explicit Responses API, default reasoning.
 		const s = (await setup(
-			{ ...ENV, WA_API: "openai-responses" },
+			{ ...ENV, JW_API: "openai-responses" },
 			agentDir(),
 			mockFetch({ "/v1/responses": 400 }, calls),
 		)) as WriterModelReady;
@@ -162,14 +162,14 @@ describe("setupWriterModel", () => {
 		expect(getWriterModel()).toBe(s);
 	});
 
-	it("skips reasoning probes when WA_REASONING is off", async () => {
+	it("skips reasoning probes when JW_REASONING is off", async () => {
 		// Agent directory.
 		const dir = agentDir();
 		// Calls made.
 		const calls: string[] = [];
 		// Detection with reasoning off.
 		const s = (await setup(
-			{ ...ENV, WA_REASONING: "off" },
+			{ ...ENV, JW_REASONING: "off" },
 			dir,
 			mockFetch({ "/v1/responses": 400 }, calls),
 		)) as WriterModelReady;
@@ -187,7 +187,7 @@ describe("setupWriterModel", () => {
 		// Error message.
 		const message = s.kind === "error" ? s.message : "";
 		// Names the problem and the status, not the key.
-		expect([message.includes("WA_KEY 无效"), message.includes("HTTP 401"), message.includes(SECRET)]).toEqual([
+		expect([message.includes("JW_KEY 无效"), message.includes("HTTP 401"), message.includes(SECRET)]).toEqual([
 			true,
 			true,
 			false,
@@ -257,9 +257,9 @@ describe("buildProviderConfig, formatDetectFailure, getWriterDefaultModel", () =
 	it("registers the key as an environment reference and no reasoning by default", () => {
 		// Anthropic provider without reasoning.
 		const p = buildProviderConfig("https://h.example.com", "anthropic-messages", "m1", 128_000, 128_000);
-		// $WA_KEY reference, root base URL, limits, reasoning off.
+		// $JW_KEY reference, root base URL, limits, reasoning off.
 		expect([p.apiKey, p.baseUrl, p.models[0].contextWindow, p.models[0].maxTokens, p.models[0].reasoning]).toEqual([
-			"$WA_KEY",
+			"$JW_KEY",
 			"https://h.example.com",
 			128_000,
 			128_000,
@@ -287,20 +287,20 @@ describe("buildProviderConfig, formatDetectFailure, getWriterDefaultModel", () =
 				{ api: "openai-responses", status: 404, verdict: "next", body: "" },
 			],
 		});
-		// Both statuses and the WA_API advice are present.
-		expect([text.includes("无响应"), text.includes("HTTP 404"), text.includes("WA_API")]).toEqual([true, true, true]);
+		// Both statuses and the JW_API advice are present.
+		expect([text.includes("无响应"), text.includes("HTTP 404"), text.includes("JW_API")]).toEqual([true, true, true]);
 	});
 
 	it("selects wa/<model> with the requested level only when ready", async () => {
 		// Nothing ready.
 		expect(getWriterDefaultModel()).toBeUndefined();
-		// Ready via WA_API with reasoning off.
+		// Ready via JW_API with reasoning off.
 		await setup(
-			{ ...ENV, WA_API: "openai-completions", WA_REASONING: "max" },
+			{ ...ENV, JW_API: "openai-completions", JW_REASONING: "max" },
 			agentDir(),
 			mockFetch({ "/v1/chat/completions": 400 }, []),
 		);
 		// Default model is wa/m1 at level max (pi clamps it later).
-		expect(getWriterDefaultModel()).toEqual({ provider: "wa", modelId: "m1", thinkingLevel: "max" });
+		expect(getWriterDefaultModel()).toEqual({ provider: "jw", modelId: "m1", thinkingLevel: "max" });
 	});
 });

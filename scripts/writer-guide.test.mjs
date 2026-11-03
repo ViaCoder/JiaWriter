@@ -24,14 +24,14 @@ test("systemParts gives each system its own commands", () => {
 	// Windows: setx and the exe; no shell startup files.
 	const w = systemParts("windows-arm64");
 	assert.equal(w.system, "Windows");
-	assert.ok(w.env.includes("setx WA_URL") && w.run.includes("writeragent.exe") && w.safety.includes("仍要运行"));
+	assert.ok(w.env.includes("setx JW_URL") && w.run.includes("jiawriter.exe") && w.safety.includes("仍要运行"));
 	assert.equal(w.pick, "选择文件夹");
 	// macOS: zsh, quarantine removal.
 	const m = systemParts("darwin-arm64");
 	assert.ok(m.env.includes("~/.zshrc") && m.safety.includes("xattr -dr com.apple.quarantine"));
 	// Linux: bash, no safety step.
 	const l = systemParts("linux-x64");
-	assert.ok(l.env.includes("~/.bashrc") && l.safety === "" && l.run.includes("./writeragent"));
+	assert.ok(l.env.includes("~/.bashrc") && l.safety === "" && l.run.includes("./jiawriter"));
 });
 
 test("every guide has the six steps, the three screenshots and Chrome's real button names", () => {

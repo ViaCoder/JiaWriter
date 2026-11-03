@@ -50,6 +50,8 @@ const CONTENT_MIN = 200;
 const SETTLE_MS = 12_000;
 /** Longest wait for a bot check to clear by itself (ms). */
 const CHALLENGE_MS = 45_000;
+/** How long a challenge page may try to clear itself (Cloudflare-style checks) before a person is asked (ms). */
+const SELF_CLEAR_MS = 8_000;
 /** Longest wait for Chrome's load event when opening, clicking or going back (ms): busy news sites keep
  * loading ads long after the text is there, and awaitContent watches the text itself. */
 const PAGE_LOAD_MS = 10_000;
@@ -106,22 +108,34 @@ export async function awaitContent(
 	let lastLen = -1;
 	// Elapsed time by our own sleeps (tests use fake sleeps).
 	for (let t = 0; ; t += 1000) {
+		// Esc ends every wait at once.
+		if (deps.aborted?.()) throw new Error("aborted");
 		const p = await probe(deps, tab);
 		const v = pageVerdict(p);
 		if (v === "content") {
+			// A cleared verification is reported once.
+			if (handed) {
+				handed = false;
+				deps.notify?.({ kind: "verify_ok", engine: "page" });
+			}
 			// Same text length twice in a row: settled.
 			if (p.textLen === lastLen || t >= SETTLE_MS) return "content";
 			lastLen = p.textLen;
 		} else if (v === "challenge") {
 			if (chalSince < 0) chalSince = t;
-			// A person may solve it (once, interactive mode only).
-			if (deps.interactive && !handed) {
+			// Print mode: the page may clear itself within CHALLENGE_MS. Interactive mode (JW_VERIFY_WAIT > 0):
+			// after SELF_CLEAR_MS a person is asked, for the configured wait.
+			const person = deps.interactive && timing.humanWaitMs > 0;
+			if (person && !handed && t - chalSince >= SELF_CLEAR_MS) {
 				handed = true;
 				await deps.call("activate", { tab }, 10_000).catch(() => {});
-				deps.notify?.("verification:page");
+				deps.notify?.({ kind: "verify", engine: "page", seconds: Math.round(timing.humanWaitMs / 1000) });
 			}
-			const limit = deps.interactive ? Math.max(CHALLENGE_MS, timing.humanWaitMs) : CHALLENGE_MS;
-			if (t - chalSince >= limit) return "challenge";
+			const limit = person ? SELF_CLEAR_MS + timing.humanWaitMs : CHALLENGE_MS;
+			if (t - chalSince >= limit) {
+				if (handed) deps.notify?.({ kind: "verify_timeout", engine: "page" });
+				return "challenge";
+			}
 			// Content after a clearance starts fresh.
 			blankSince = -1;
 			lastLen = -1;

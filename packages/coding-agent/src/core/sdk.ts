@@ -4,8 +4,8 @@ import type { ModelsSimpleStreamOptions } from "@earendil-works/pi-ai";
 import { clampThinkingLevel, type Message, type Model, streamSimple } from "@earendil-works/pi-ai/compat";
 import { getAgentDir } from "../config.ts";
 import { resolvePath } from "../utils/paths.ts";
-// WriterAgent: default model from WA_* variables.
-import { WA_PROVIDER } from "../writer/env-config.ts";
+// JiaWriter: default model from JW_* variables.
+import { JW_PROVIDER } from "../writer/env-config.ts";
 import { getWriterDefaultModel } from "../writer/writer-model.ts";
 import { AgentSession } from "./agent-session.ts";
 import { formatNoModelsAvailableMessage } from "./auth-guidance.ts";
@@ -236,7 +236,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 
 	// If still no model, use findInitialModel (checks settings default, then provider defaults)
 	if (!model) {
-		// WriterAgent: a ready WA_* model is the default ahead of the saved settings default.
+		// JiaWriter: a ready JW_* model is the default ahead of the saved settings default.
 		const writerDefault = getWriterDefaultModel();
 		const result = await findInitialModel({
 			scopedModels: [],
@@ -272,8 +272,8 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		}
 	}
 	if (thinkingLevel === undefined) {
-		// WriterAgent: for the WA_* model, WA_REASONING sets the level; clampThinkingLevel below picks the nearest supported one.
-		const writerLevel = model?.provider === WA_PROVIDER ? getWriterDefaultModel()?.thinkingLevel : undefined;
+		// JiaWriter: for the JW_* model, JW_REASONING sets the level; clampThinkingLevel below picks the nearest supported one.
+		const writerLevel = model?.provider === JW_PROVIDER ? getWriterDefaultModel()?.thinkingLevel : undefined;
 		thinkingLevel = writerLevel ?? settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL;
 	}
 

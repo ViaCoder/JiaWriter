@@ -15,7 +15,7 @@ import { DEFAULT_ZH, loadProfile, mergeProfile } from "../../src/writer/export/p
 let dir = "";
 beforeEach(() => {
 	dir = mkdtempSync(join(tmpdir(), "wa-profile-"));
-	vi.stubEnv("WA_LANG", "zh");
+	vi.stubEnv("JW_LANG", "zh");
 });
 afterEach(() => {
 	rmSync(dir, { recursive: true, force: true });

@@ -28,7 +28,7 @@ import { makeDocx, makePdf, wp } from "./doc-fixtures.ts";
 let cwd = "";
 beforeEach(() => {
 	cwd = mkdtempSync(join(tmpdir(), "wa-import-"));
-	vi.stubEnv("WA_LANG", "zh");
+	vi.stubEnv("JW_LANG", "zh");
 });
 afterEach(() => {
 	rmSync(cwd, { recursive: true, force: true });

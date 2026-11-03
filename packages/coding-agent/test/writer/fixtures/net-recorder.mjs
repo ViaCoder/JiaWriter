@@ -1,5 +1,5 @@
 // Preload module (node --import) that records every outbound connection attempt.
-// Each attempt is appended as one JSON line to the file named by WA_NET_LOG.
+// Each attempt is appended as one JSON line to the file named by JW_NET_LOG.
 
 // Append lines synchronously so nothing is lost when the process exits abruptly.
 import { appendFileSync } from "node:fs";
@@ -9,7 +9,7 @@ import net from "node:net";
 import dns from "node:dns";
 
 // Where to write the records; without it the recorder stays silent.
-const logFile = process.env.WA_NET_LOG;
+const logFile = process.env.JW_NET_LOG;
 
 /** Write one record when logging is enabled. */
 function record(kind, target) {

@@ -1,7 +1,7 @@
-"""search_fetch — WriterAgent's web Search + Fetch backend (WA_SEARCH=sf) through the user's own Chrome (extension bridge),
+"""search_fetch — JiaWriter's web Search + Fetch backend (JW_SEARCH=sf) through the user's own Chrome (extension bridge),
 with document parsing (text layers only, no OCR), media metadata and YouTube
 subtitles (no speech recognition), and a hybrid-retrieval knowledge base.
-Invoked as a subprocess (WriterAgent's WA_SF); it uses no driver model (LLM) and
+Invoked as a subprocess (JiaWriter's JW_SF); it uses no driver model (LLM) and
 needs no key; it is not an MCP server.
 
 Modules:

@@ -34,7 +34,7 @@ let dir = "";
 beforeEach(() => {
 	// Real path: macOS temp folders are symlinks (/var → /private/var), and sf reports the real cwd.
 	dir = realpathSync(mkdtempSync(join(tmpdir(), "wa-sf-")));
-	vi.stubEnv("WA_LANG", "zh");
+	vi.stubEnv("JW_LANG", "zh");
 });
 // Clean up.
 afterEach(() => {
@@ -59,12 +59,12 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 		expect(sfPlatform("linux", "x64")).toEqual({ os: "linux", arch: "amd64" });
 		expect(sfPlatform("win32", "arm64")).toEqual({ os: "windows", arch: "arm64" });
 		expect([sfPlatform("freebsd", "x64"), sfPlatform("linux", "ia32")]).toEqual([null, null]);
-		// WA_SF first, then the release layout, then the agent dir.
-		const cfg = readSearchEnv({ WA_SF: "/opt/sf" }).config;
-		expect(sfCandidates(cfg, "linux", "arm64", "/app", "/home/u/.writeragent/agent")).toEqual([
+		// JW_SF first, then the release layout, then the agent dir.
+		const cfg = readSearchEnv({ JW_SF: "/opt/sf" }).config;
+		expect(sfCandidates(cfg, "linux", "arm64", "/app", "/home/u/.jiawriter/agent")).toEqual([
 			"/opt/sf",
 			join("/app", "search_fetch", "linux", "arm64", "sf"),
-			join("/home/u/.writeragent/agent", "sf", "linux", "arm64", "sf"),
+			join("/home/u/.jiawriter/agent", "sf", "linux", "arm64", "sf"),
 		]);
 		// Windows: sf.exe in the windows folders.
 		expect(sfCandidates(readSearchEnv({}).config, "win32", "x64", "/app", "/ag")).toEqual([
@@ -73,7 +73,7 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 		]);
 	});
 	it("returns the first existing candidate on every system and explains a miss", () => {
-		// Configuration without WA_SF.
+		// Configuration without JW_SF.
 		const cfg = readSearchEnv({}).config;
 		// Second candidate exists.
 		const want = join("/a", "sf", "macos", "amd64", "sf");
@@ -86,7 +86,7 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 });
 
 describe("sfModelOff / sfStateEnv / sfChildEnv", () => {
-	it("keeps sf's state under the agent folder and points it at WriterAgent's browser host", () => {
+	it("keeps sf's state under the agent folder and points it at JiaWriter's browser host", () => {
 		// PyApp runtime, caches and search_fetch's home.
 		const state = {
 			PYAPP_INSTALL_DIR_SEARCH_FETCH: join("/a", "sf", "runtime", "install"),
@@ -109,10 +109,10 @@ describe("sfModelOff / sfStateEnv / sfChildEnv", () => {
 		// The four names, empty.
 		expect(sfModelOff()).toEqual({ SF_URL: "", SF_KEY: "", SF_MODEL: "", SF_API: "" });
 		// A parent key never reaches sf; print mode disables human waits.
-		expect(sfChildEnv({ A: "1", SF_KEY: "sk-user", WA_KEY: "w" }, false, "/a")).toEqual({
+		expect(sfChildEnv({ A: "1", SF_KEY: "sk-user", JW_KEY: "w" }, false, "/a")).toEqual({
 			...sfStateEnv("/a"),
 			A: "1",
-			WA_KEY: "w",
+			JW_KEY: "w",
 			...sfModelOff(),
 			SEARCH_FETCH_NO_HUMAN: "1",
 		});

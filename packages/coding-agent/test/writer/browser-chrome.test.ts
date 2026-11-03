@@ -1,7 +1,7 @@
 // Functional test of the browser backend in a real Chrome (Chrome for Testing, headless=new, temp
 // profile): the extension, the native messaging host, the page scripts and the trusted input, against
 // local look-alike Bing and Google pages. Nothing touches the user's Chrome or a real website.
-// Needs Chrome for Testing (WA_TEST_CHROME, or ~/.local/share/wa-test-tools/cft-*/chrome-linux64/chrome);
+// Needs Chrome for Testing (JW_TEST_CHROME, or ~/.local/share/wa-test-tools/cft-*/chrome-linux64/chrome);
 // skipped when it is missing (CI) or on Windows.
 
 // Chrome process.
@@ -19,7 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // Units under test.
 import { bridgeAddress, bridgeCall, HOST_NAME } from "../../src/writer/browser/bridge.ts";
 import type { EngineSpec } from "../../src/writer/browser/engines.ts";
-import { ENGINES } from "../../src/writer/browser/engines.ts";
+import { ENGINES, type EngineName } from "../../src/writer/browser/engines.ts";
 import { browserFetch } from "../../src/writer/browser/fetch.ts";
 import { hostManifest } from "../../src/writer/browser/install.ts";
 import { type BrowserDeps, browserSearch, DEFAULT_TIMING } from "../../src/writer/browser/search.ts";
@@ -29,7 +29,7 @@ import { makePdf } from "./doc-fixtures.ts";
 /** Chrome for Testing, or "" when none is installed. */
 function testChrome(): string {
 	// Explicit path.
-	if (process.env.WA_TEST_CHROME && existsSync(process.env.WA_TEST_CHROME)) return process.env.WA_TEST_CHROME;
+	if (process.env.JW_TEST_CHROME && existsSync(process.env.JW_TEST_CHROME)) return process.env.JW_TEST_CHROME;
 	// The tools folder of the dev machine.
 	const root = join(homedir(), ".local/share/wa-test-tools");
 	if (!existsSync(root)) return "";
@@ -159,7 +159,7 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 		const launcher = join(dir, "host.sh");
 		writeFileSync(
 			launcher,
-			`#!/bin/sh\nexport WA_DIR="${agentDir}"\nexec "${process.execPath}" "${HOST_ENTRY}" "$@"\n`,
+			`#!/bin/sh\nexport JW_DIR="${agentDir}"\nexec "${process.execPath}" "${HOST_ENTRY}" "$@"\n`,
 		);
 		chmodSync(launcher, 0o700);
 		writeFileSync(join(profile, "NativeMessagingHosts", `${HOST_NAME}.json`), hostManifest(launcher));
@@ -218,7 +218,8 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 
 	it("searches both engines with trusted input, reads a clicked result and a PDF, and closes its tabs", async () => {
 		// The engines pointed at the fixture server.
-		const specs: Record<"bing" | "google", EngineSpec> = {
+		const specs: Record<EngineName, EngineSpec> = {
+			...ENGINES,
 			bing: { ...ENGINES.bing, home: `${base}/bing/` },
 			google: { ...ENGINES.google, home: `${base}/google/` },
 		};
@@ -268,5 +269,5 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 		expect(pdf.content).toContain("report page two");
 		// Every tab of the run closes.
 		expect(await d.call("close_run", { run: "chrome-test" }, 10_000)).toBe(2);
-	}, 240_000);
+	}, 420_000);
 });

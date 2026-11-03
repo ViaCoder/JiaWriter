@@ -1,4 +1,4 @@
-// Functional test: WriterAgent opens no network connection on its own.
+// Functional test: JiaWriter opens no network connection on its own.
 // The CLI runs from source with a preload that records every socket connect and DNS lookup.
 
 // Start child processes.
@@ -65,7 +65,7 @@ function runRecorded(args: string[], killAfterMs?: number): Promise<{ code: numb
 	])
 		delete env[key];
 	// Isolated config directory and the record file.
-	Object.assign(env, { WA_DIR: join(dir, "agent"), WA_NET_LOG: logFile });
+	Object.assign(env, { JW_DIR: join(dir, "agent"), JW_NET_LOG: logFile });
 	// Wrap the asynchronous child process in a promise.
 	return new Promise((resolvePromise, reject) => {
 		// Recorder first, then the source loader, then the actual arguments.
@@ -95,7 +95,7 @@ function runRecorded(args: string[], killAfterMs?: number): Promise<{ code: numb
 	});
 }
 
-describe("WriterAgent makes no outbound connections by itself", () => {
+describe("JiaWriter makes no outbound connections by itself", () => {
 	it("records a connection in the positive control", async () => {
 		// Local server so the control never leaves the machine.
 		const server = createServer((socket) => socket.destroy());

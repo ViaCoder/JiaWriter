@@ -5,7 +5,7 @@ Covers the extension id derivation, paths, host-manifest locations per OS, the i
 (files, modes, manifest fields, launcher), native-messaging framing, the host's routing,
 and a protocol run end to end: the real host serves a real Unix socket, a thread plays the
 extension on the pipes Chrome would own, and sf clients (sync and async) get their replies.
-Also the loopback client of WriterAgent's Windows host (port file plus token).
+Also the loopback client of JiaWriter's Windows host (port file plus token).
 Run: python3 tests/test_bridge.py
 """
 # Async host and client.
@@ -110,7 +110,7 @@ class BridgeTest(unittest.TestCase):
         self.assertEqual(stat.S_IMODE(Path(rep["launcher"]).stat().st_mode), 0o700)
         self.assertEqual(stat.S_IMODE(bridge.bridge_dir().stat().st_mode), 0o700)
         m = json.loads(Path(rep["manifests"][0]).read_text())
-        self.assertEqual(m, {"name": "com.writeragent.browser", "description": "search_fetch bridge host",
+        self.assertEqual(m, {"name": "com.jiawriter.browser", "description": "search_fetch bridge host",
                              "path": rep["launcher"], "type": "stdio",
                              "allowed_origins": ["chrome-extension://mnoicnfoocibanokjfbpmbgpamlmdgje/"]})
         # A second install replaces the copy.
@@ -199,7 +199,7 @@ class BridgeTest(unittest.TestCase):
         self.assertNotIn("token", json.loads(bridge._request_line("status", {}, 3)))
 
     def test_tcp_client_end_to_end(self):
-        # A loopback host like WriterAgent's on Windows: one JSON line in, one out, token checked.
+        # A loopback host like JiaWriter's on Windows: one JSON line in, one out, token checked.
         import socketserver
         token = "f" * 64
 
@@ -234,8 +234,8 @@ class BridgeTest(unittest.TestCase):
                 asyncio.run(bridge.acall("status"))
 
     def test_windows_has_no_own_host(self):
-        # On Windows WriterAgent is the host: install refuses, bridge-host explains and exits 2.
-        with self.assertRaisesRegex(RuntimeError, "WriterAgent"):
+        # On Windows JiaWriter is the host: install refuses, bridge-host explains and exits 2.
+        with self.assertRaisesRegex(RuntimeError, "JiaWriter"):
             bridge.install("win32", self.home / "u")
         with mock.patch.object(bridge.sys, "platform", "win32"), contextlib.redirect_stderr(io.StringIO()) as err:
             self.assertEqual(bridge.host_main([f"chrome-extension://{bridge.extension_id()}/"]), 2)

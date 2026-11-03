@@ -40,7 +40,7 @@ export function sfPlatform(platform: NodeJS.Platform, arch: string): { os: strin
 	return os && cpu ? { os, arch: cpu } : null;
 }
 
-/** Places sf is looked for, in order: WA_SF, next to the writeragent binary, under the agent dir. Never PATH
+/** Places sf is looked for, in order: JW_SF, next to the jiawriter binary, under the agent dir. Never PATH
  * (Salesforce's CLI is also called `sf`). */
 export function sfCandidates(
 	cfg: SearchConfig,
@@ -75,12 +75,12 @@ export function locateSf(
 	// First that exists.
 	const found = candidates.find((c) => exists(c));
 	// Missing everywhere.
-	if (!found) throw new Error(t("sf.missing", { paths: candidates.join("、") || "WA_SF" }));
+	if (!found) throw new Error(t("sf.missing", { paths: candidates.join("、") || "JW_SF" }));
 	// The binary.
 	return found;
 }
 
-/** Driver-model variables sf reads (SF_URL, SF_KEY, SF_MODEL, SF_API), all empty: WriterAgent runs sf
+/** Driver-model variables sf reads (SF_URL, SF_KEY, SF_MODEL, SF_API), all empty: JiaWriter runs sf
  * without a model for now (the user, 2026-11-01). Empty values also stop sf's rag.env from filling
  * them, so sf makes no model call; it then searches the first results page and fetches pages with its
  * deterministic rules. Model hook: to drive sf with a model later, return the main model's
@@ -91,7 +91,7 @@ export function sfModelOff(): Record<string, string> {
 }
 
 /** Where a release sf keeps its state, all under <agentDir>/sf: the bundled Python with its packages, unpacked
- * once on first run (no download), PyApp's cache, and search_fetch's own state (pacing, caches); its pages go through WriterAgent's
+ * once on first run (no download), PyApp's cache, and search_fetch's own state (pacing, caches); its pages go through JiaWriter's
  * browser host: the socket on Linux and macOS, the port file (port and token) on Windows. PYTHONUTF8=1
  * makes sf read, write and print UTF-8 (Windows defaults to the ANSI code page). */
 export function sfStateEnv(agentDir: string, platform: NodeJS.Platform = process.platform): Record<string, string> {

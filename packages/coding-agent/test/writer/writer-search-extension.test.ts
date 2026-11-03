@@ -34,17 +34,17 @@ let cwd = "";
 beforeEach(() => {
 	// Real path: macOS temp folders are symlinks (/var → /private/var), and sf reports the real cwd.
 	cwd = realpathSync(mkdtempSync(join(tmpdir(), "wa-search-")));
-	vi.stubEnv("WA_LANG", "zh");
-	vi.stubEnv("WA_KEY", "sk-main-test-1");
+	vi.stubEnv("JW_LANG", "zh");
+	vi.stubEnv("JW_KEY", "sk-main-test-1");
 	// Own agent folder: the browser bridge looked up by auto is the test's, not this machine's.
-	vi.stubEnv("WA_DIR", join(cwd, "agent"));
+	vi.stubEnv("JW_DIR", join(cwd, "agent"));
 	for (const k of [
-		"WA_SEARCH",
-		"WA_SF",
-		"WA_SEARCH_KEY",
-		"WA_SEARCH_BLOCK",
-		"WA_ENGINES",
-		"WA_SEARCH_PAGES",
+		"JW_SEARCH",
+		"JW_SF",
+		"JW_SEARCH_KEY",
+		"JW_SEARCH_BLOCK",
+		"JW_ENGINES",
+		"JW_SEARCH_PAGES",
 		"SF_URL",
 		"SF_KEY",
 		"SF_MODEL",
@@ -141,25 +141,38 @@ function sfLog(): Record<string, unknown>[] {
 }
 
 describe.skipIf(UNIX_ONLY)("writer-search over sf", () => {
-	it("searches and fetches through sf without a driver model, even with a ready main model", async () => {
-		// sf backend with the fake binary.
-		vi.stubEnv("WA_SEARCH", "sf");
-		vi.stubEnv("WA_SF", fakeSf());
+	it("fetches through sf without a driver model, even with a ready main model, and no longer searches with it", async () => {
+		// sf as the default with the fake binary.
+		vi.stubEnv("JW_SEARCH", "sf");
+		vi.stubEnv("JW_SF", fakeSf());
+		vi.stubGlobal(
+			"fetch",
+			async () =>
+				new Response(
+					JSON.stringify({
+						code: 0,
+						data: { results: [{ title: "T", url: "https://a.example/x", snippet: "" }] },
+					}),
+					{
+						status: 200,
+					},
+				),
+		);
 		const map = tools();
-		// Search in print mode; a query starting with "-" stays a query.
-		const s = await run(map, "web_search", { query: "-温州", fresh: "day" });
-		expect(s.text).toContain("检索结果（sf，1 条）：-温州");
-		expect(s.text).toContain("https://news.example.com/a（2026-10-31）");
-		expect(s.text).not.toContain("提示：");
-		// Fetch interactively.
-		const f = await run(map, "web_fetch", { url: "https://news.example.com/a" }, true);
-		expect(f.text.split("\n")[0]).toBe("网页正文（sf）：https://news.example.com/a");
+		// A search says that sf no longer searches and runs as auto (AnySearch here).
+		const s = await run(map, "web_search", { query: "-温州" });
+		expect(s.text).toContain("sf 不再用于检索，只用于 web_fetch；本次检索按 auto 处理。");
+		expect(s.details.backend).toBe("anysearch");
+		// Fetch in print mode (the default method is sf), then interactively with method sf.
+		const p = await run(map, "web_fetch", { url: "https://news.example.com/a" });
+		expect(p.text.split("\n")[0]).toBe("网页正文（sf）：https://news.example.com/a");
+		const f = await run(map, "web_fetch", { url: "https://news.example.com/a", method: "sf" }, true);
 		expect(f.text).toContain("正文内容");
 		expect(f.details).toMatchObject({ date: "2026-10-31", backend: "sf" });
-		// What sf received.
+		// What sf received: fetch only, no model, no human in print mode.
 		const [a, b] = sfLog();
 		expect(a).toEqual({
-			argv: ["search", "--json", "--pages=1", "--fresh=day", "--", "-温州"],
+			argv: ["fetch", "--json", "--", "https://news.example.com/a"],
 			cwd,
 			url: "",
 			model: "",
@@ -169,16 +182,16 @@ describe.skipIf(UNIX_ONLY)("writer-search over sf", () => {
 		});
 		expect(b).toMatchObject({ argv: ["fetch", "--json", "--", "https://news.example.com/a"], noHuman: "" });
 	});
+
 	it("clears the user's SF_* too, so sf makes no model call", async () => {
 		// The user's own driver model in the environment.
-		vi.stubEnv("WA_SEARCH", "sf");
-		vi.stubEnv("WA_SF", fakeSf());
+		vi.stubEnv("JW_SF", fakeSf());
 		vi.stubEnv("SF_URL", "https://cheap.example.com/v1");
 		vi.stubEnv("SF_KEY", "sk-cheap");
 		vi.stubEnv("SF_MODEL", "flash");
-		// Works with no main model either.
+		// Works with no main model either; sf chosen by the model.
 		setWriterModel({ kind: "none" });
-		await run(tools(), "web_search", { query: "q" });
+		await run(tools(), "web_fetch", { url: "https://news.example.com/a", method: "sf" });
 		// sf saw all four cleared.
 		expect(sfLog()[0]).toMatchObject({ url: "", key: "", model: "", api: "" });
 	});
@@ -314,7 +327,9 @@ describe("writer-search over the browser", () => {
 			const map = tools();
 			// auto finds the connected extension.
 			const s = await run(map, "web_search", { query: "温州", max_results: 20 });
-			expect(s.text.split("\n")[0]).toBe("检索结果（浏览器（Bing 3 页、Google 3 页），6 条）：温州");
+			// The search time first, then the report.
+			expect(s.text.split("\n")[0]).toMatch(/^检索时间：\d{4}-\d{2}-\d{2} \d{2}:\d{2} \w+, /);
+			expect(s.text.split("\n")[1]).toBe("检索结果（浏览器（Bing 3 页、Google 3 页），6 条）：温州");
 			expect(s.details.backend).toBe("browser");
 			// The marker that the extension was seen.
 			expect(existsSync(join(cwd, "agent", "browser", "seen"))).toBe(true);
@@ -351,19 +366,26 @@ describe("writer-search over the browser", () => {
 				),
 		);
 		const s = await run(tools(), "web_search", { query: "q" });
-		expect(s.text.split("\n")[0]).toBe(
-			"Chrome 里的 WriterAgent 扩展没有连接，本次改用 AnySearch。安装扩展的步骤见 /browser。",
+		expect(s.text.split("\n")[1]).toBe(
+			"Chrome 里的 JiaWriter 扩展没有连接，本次改用 AnySearch。安装扩展的步骤见 /browser。",
 		);
 		expect(s.details.backend).toBe("anysearch");
-		vi.stubEnv("WA_SEARCH", "browser");
-		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("Chrome 里的 WriterAgent 扩展没有连接");
+		// The model asked for the browser: it learns that it cannot be used now.
+		await expect(run(tools(), "web_search", { query: "q", method: "browser" })).rejects.toThrow(
+			"browser 方式现在不可用",
+		);
+		// The model asked for AnySearch: no note.
+		const a = await run(tools(), "web_search", { query: "q", method: "anysearch" });
+		expect(a.text.split("\n")[1]).toContain("检索结果（anysearch");
+		vi.stubEnv("JW_SEARCH", "browser");
+		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("Chrome 里的 JiaWriter 扩展没有连接");
 	});
 });
 
 describe("writer-search over AnySearch", () => {
 	it("reports results with dates, applies the blocklist and hides a 402 body", async () => {
 		// Default backend; one blocked host.
-		vi.stubEnv("WA_SEARCH_BLOCK", "spam.example");
+		vi.stubEnv("JW_SEARCH_BLOCK", "spam.example");
 		const calls: string[] = [];
 		const replies = [
 			new Response(
@@ -392,14 +414,14 @@ describe("writer-search over AnySearch", () => {
 		expect(calls[0]).toBe("https://api.anysearch.com/v1/search");
 		// Quota exhausted: the body never surfaces.
 		const err = await run(map, "web_fetch", { url: "https://a.example/x" }).catch((e: Error) => e);
-		expect((err as Error).message).toBe("AnySearch 匿名额度已用完，可设置 WA_SEARCH_KEY 后重试。");
+		expect((err as Error).message).toBe("AnySearch 匿名额度已用完，可设置 JW_SEARCH_KEY 后重试。");
 	});
 	it("rejects a bad backend, an empty query and a non-http URL", async () => {
 		// Unknown backend.
-		vi.stubEnv("WA_SEARCH", "exa");
-		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("WA_SEARCH 只能是");
+		vi.stubEnv("JW_SEARCH", "exa");
+		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("JW_SEARCH 只能是");
 		// Empty query and file URL.
-		vi.stubEnv("WA_SEARCH", "");
+		vi.stubEnv("JW_SEARCH", "");
 		await expect(run(tools(), "web_search", { query: "  " })).rejects.toThrow("请提供检索词");
 		await expect(run(tools(), "web_fetch", { url: "file:///etc/passwd" })).rejects.toThrow("只能抓取 http(s) 网址");
 	});

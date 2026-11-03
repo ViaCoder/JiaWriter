@@ -1,4 +1,4 @@
-// WriterAgent page script: find the element a click or typing should land on and return its box in
+// JiaWriter page script: find the element a click or typing should land on and return its box in
 // viewport pixels. window.__sfArgs picks it by one of: wfId (remembered by observe.js, next_link.js or
 // more_button.js), ref (a result remembered by serp.js), or selectors (CSS, first visible match) with an
 // optional text pattern. Remembered elements live in window.__waEls of the extension's isolated world.

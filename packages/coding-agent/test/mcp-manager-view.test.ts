@@ -12,10 +12,10 @@ function rendered(view: McpManagerView): string {
 	return stripAnsi(view.render(80).join("\n"));
 }
 
-// WriterAgent: these tests read the upstream English hint text; the interface defaults to Chinese
+// JiaWriter: these tests read the upstream English hint text; the interface defaults to Chinese
 // (vitest restores stubbed variables after each test, so the stub runs before each one).
 beforeEach(() => {
-	vi.stubEnv("WA_LANG", "en");
+	vi.stubEnv("JW_LANG", "en");
 });
 
 describe("MCP manager status screen", () => {

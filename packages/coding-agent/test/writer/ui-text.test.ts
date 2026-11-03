@@ -17,8 +17,8 @@ import { UI_ZH, uiText } from "../../src/writer/ui-text.ts";
 let agent = "";
 beforeEach(() => {
 	agent = mkdtempSync(join(tmpdir(), "wa-uilang-"));
-	vi.stubEnv("WA_DIR", agent);
-	vi.stubEnv("WA_LANG", "");
+	vi.stubEnv("JW_DIR", agent);
+	vi.stubEnv("JW_LANG", "");
 });
 afterEach(() => {
 	rmSync(agent, { recursive: true, force: true });
@@ -26,26 +26,26 @@ afterEach(() => {
 });
 
 describe("currentLang / savedLang / setUiLang", () => {
-	it("uses WA_LANG first, then the /lang choice, then Chinese", () => {
+	it("uses JW_LANG first, then the /lang choice, then Chinese", () => {
 		// Nothing set: Chinese.
 		expect([currentLang(), savedLang()]).toEqual(["zh", undefined]);
 		// /lang en is saved and used.
 		setUiLang("en");
 		expect(JSON.parse(readFileSync(uiSettingsPath(), "utf-8"))).toEqual({ lang: "en" });
-		expect([currentLang(), t("wa.set")]).toEqual(["en", "set"]);
-		// WA_LANG wins.
-		vi.stubEnv("WA_LANG", "zh");
+		expect([currentLang(), t("jw.set")]).toEqual(["en", "set"]);
+		// JW_LANG wins.
+		vi.stubEnv("JW_LANG", "zh");
 		expect(currentLang()).toBe("zh");
 	});
 	it("reads the file once per agent folder and ignores a broken or unknown value", () => {
 		// A broken file in another agent folder.
 		const other = mkdtempSync(join(tmpdir(), "wa-uilang2-"));
 		writeFileSync(join(other, "writer-settings.json"), "{");
-		vi.stubEnv("WA_DIR", other);
+		vi.stubEnv("JW_DIR", other);
 		expect(savedLang()).toBeUndefined();
 		// An unknown value.
 		writeFileSync(join(agent, "writer-settings.json"), JSON.stringify({ lang: "fr" }));
-		vi.stubEnv("WA_DIR", agent);
+		vi.stubEnv("JW_DIR", agent);
 		expect([savedLang(), currentLang()]).toEqual([undefined, "zh"]);
 		rmSync(other, { recursive: true, force: true });
 	});
@@ -58,12 +58,12 @@ describe("uiText", () => {
 		expect(uiText("Press {key} to show full startup help.", { key: "ctrl+o" })).toBe(
 			"按 ctrl+o 查看完整的启动帮助。",
 		);
-		expect(uiText("Quit {app}", { app: "writeragent" })).toBe("退出 writeragent");
+		expect(uiText("Quit {app}", { app: "jiawriter" })).toBe("退出 jiawriter");
 		expect(uiText("A new upstream hint")).toBe("A new upstream hint");
 		// English.
-		vi.stubEnv("WA_LANG", "en");
+		vi.stubEnv("JW_LANG", "en");
 		expect(uiText("to expand")).toBe("to expand");
-		expect(uiText("Quit {app}", { app: "writeragent" })).toBe("Quit writeragent");
+		expect(uiText("Quit {app}", { app: "jiawriter" })).toBe("Quit jiawriter");
 	});
 	it("uses full-width punctuation in every Chinese entry", () => {
 		// No ASCII sentence punctuation next to Chinese characters (file extensions such as .md excepted).

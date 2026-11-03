@@ -14,7 +14,7 @@ import {
 import { readSearchEnv } from "../../src/writer/websearch/core.ts";
 
 // Chinese messages.
-beforeEach(() => vi.stubEnv("WA_LANG", "zh"));
+beforeEach(() => vi.stubEnv("JW_LANG", "zh"));
 // Restore.
 afterEach(() => vi.unstubAllEnvs());
 
@@ -43,8 +43,8 @@ function fakeFetch(...replies: (Response | Error)[]) {
 // No real waiting.
 const noSleep = async () => {};
 // Config with a key and one without.
-const withKey = readSearchEnv({ WA_SEARCH_KEY: "sk-test-4711", WA_SEARCH_URL: "https://any.example" }).config;
-const anon = readSearchEnv({ WA_SEARCH_URL: "https://any.example" }).config;
+const withKey = readSearchEnv({ JW_SEARCH_KEY: "sk-test-4711", JW_SEARCH_URL: "https://any.example" }).config;
+const anon = readSearchEnv({ JW_SEARCH_URL: "https://any.example" }).config;
 
 describe("retryAfterMs and statusError", () => {
 	it("bounds the back-off and maps statuses to messages", () => {

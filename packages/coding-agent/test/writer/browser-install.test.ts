@@ -33,11 +33,11 @@ afterEach(() => {
 });
 
 describe("hostManifest", () => {
-	it("names the program and allows only the WriterAgent extension", () => {
-		expect(JSON.parse(hostManifest("/opt/wa/writeragent"))).toEqual({
+	it("names the program and allows only the JiaWriter extension", () => {
+		expect(JSON.parse(hostManifest("/opt/wa/jiawriter"))).toEqual({
 			name: HOST_NAME,
-			description: "WriterAgent browser host",
-			path: "/opt/wa/writeragent",
+			description: "JiaWriter browser host",
+			path: "/opt/wa/jiawriter",
 			type: "stdio",
 			allowed_origins: [`chrome-extension://${EXTENSION_ID}/`],
 		});
@@ -76,12 +76,12 @@ describe("ensureHost", () => {
 			platform: "linux" as const,
 			home: join(dir, "h"),
 			agentDir: join(dir, "a"),
-			program: { binary: "/x/writeragent" },
+			program: { binary: "/x/jiawriter" },
 		};
 		const first = ensureHost(opts);
 		const file = join(dir, "h", ".config/google-chrome/NativeMessagingHosts", `${HOST_NAME}.json`);
 		expect(first).toEqual([file]);
-		expect(JSON.parse(readFileSync(file, "utf-8")).path).toBe("/x/writeragent");
+		expect(JSON.parse(readFileSync(file, "utf-8")).path).toBe("/x/jiawriter");
 		// Unchanged: nothing written.
 		expect(ensureHost(opts)).toEqual([]);
 		// Source checkout: launcher (owner-only, executable) plus the manifest pointing at it.
@@ -103,7 +103,7 @@ describe("ensureHost", () => {
 			platform: "win32" as const,
 			home: dir,
 			agentDir: join(dir, "a"),
-			program: { binary: "C:\\wa\\writeragent.exe" },
+			program: { binary: "C:\\wa\\jiawriter.exe" },
 			runReg,
 		};
 		const file = join(dir, "a", "browser", `${HOST_NAME}.json`);

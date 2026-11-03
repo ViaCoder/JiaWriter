@@ -25,6 +25,7 @@ import {
 	type TuiMode,
 	type WarningSettings,
 } from "../../../core/settings-manager.ts";
+import { brandText } from "../../../writer/brand.ts";
 import {
 	getSettingsListTheme,
 	parseAutoThemeSetting,
@@ -820,7 +821,7 @@ export class SettingsSelectorComponent extends Container {
 		items.splice(skillCommandsIndex + 1, 0, {
 			id: "show-hardware-cursor",
 			label: "Show hardware cursor",
-			description: "Use the terminal cursor instead of Pi's drawn cursor",
+			description: brandText("Use the terminal cursor instead of Pi's drawn cursor"),
 			currentValue: config.showHardwareCursor ? "true" : "false",
 			values: ["true", "false"],
 		});

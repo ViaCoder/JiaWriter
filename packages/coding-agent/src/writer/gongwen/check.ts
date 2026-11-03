@@ -5,7 +5,7 @@
  * corpus medians and p25–p75 ranges of seven genres. Only "hard conflicts" (a wrong genre) count as errors.
  *
  * License: this file is a change to that skill and is under the PolyForm Noncommercial License 1.0.0
- * (https://polyformproject.org/licenses/noncommercial/1.0.0), not under WriterAgent's MIT license; the full
+ * (https://polyformproject.org/licenses/noncommercial/1.0.0), not under JiaWriter's MIT license; the full
  * terms are in skills/writer/zh/lieflat-gongwen/LICENSE.
  */
 

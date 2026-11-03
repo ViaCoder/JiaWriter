@@ -1,8 +1,9 @@
 /**
  * web_search through the user's Chrome, the way a person searches: open the engine's home page,
  * accept a consent dialog by clicking it, click the search box, type the query, press Enter, read
- * each results page (scrolling) and click "Next" for the following page. Bing is used first, then
- * Google; each gives 3–5 pages. The merged results are ranked locally (rank.ts).
+ * each results page (scrolling) and click "Next" for the following page. The model picks the engines
+ * (Bing, Google, Baidu, Sogou); each gives 3–5 pages. The merged results are ranked locally (rank.ts).
+ * A verification page is handed to the person at the screen for a bounded time (waitForPerson).
  */
 
 // Engine definitions and link decoding.
@@ -22,10 +23,22 @@ export interface BrowserDeps {
 	pace: (key: string, gapMs: number) => Promise<void>;
 	// A person is at the screen (interactive mode): challenges may be handed to them.
 	interactive: boolean;
-	// Progress lines for the interface.
-	notify?: (text: string) => void;
+	// Verification progress for the interface.
+	notify?: (event: VerifyEvent) => void;
+	// True once the tool call was cancelled (Esc): waits end at once.
+	aborted?: () => boolean;
 	// Tabs opened for this session carry this tag.
 	run: string;
+}
+
+/** A verification step shown to the user: started (seconds to wait), seconds left, passed, or given up. */
+export interface VerifyEvent {
+	// What happened.
+	kind: "verify" | "verify_left" | "verify_ok" | "verify_timeout";
+	// On which engine, or "page" for a page web_fetch reads.
+	engine: EngineName | "page";
+	// Seconds (wait length, or seconds left).
+	seconds?: number;
 }
 
 /** Timing of the browser backend (ms). */
@@ -36,8 +49,23 @@ export interface BrowserTiming {
 	hostGapMs: number;
 	// Page load wait.
 	loadMs: number;
-	// Longest wait for a person to clear a challenge.
+	// Longest wait for a person to clear a challenge (JW_VERIFY_WAIT; 0: no wait).
 	humanWaitMs: number;
+}
+
+/** Default and largest JW_VERIFY_WAIT, in seconds. */
+export const VERIFY_WAIT_DEFAULT_S = 90;
+export const VERIFY_WAIT_MAX_S = 300;
+
+/** How long an engine is left alone after a verification that was not cleared (ms). */
+export const VERIFY_COOLDOWN_MS = 30 * 60_000;
+
+/** JW_VERIFY_WAIT in ms: whole seconds 0–300, else the default. */
+export function verifyWaitMs(raw: string | undefined): number {
+	// A number of seconds.
+	const n = Number((raw ?? "").trim());
+	if ((raw ?? "").trim() === "" || !Number.isFinite(n) || n < 0) return VERIFY_WAIT_DEFAULT_S * 1000;
+	return Math.round(Math.min(n, VERIFY_WAIT_MAX_S)) * 1000;
 }
 
 /** Default timing. */
@@ -72,6 +100,10 @@ export interface BrowserSearchOptions {
 	timing: BrowserTiming;
 	// Engine definitions (tests point them at local pages).
 	specs?: Record<EngineName, EngineSpec>;
+	// Engines resting after an uncleared verification (skipped this time).
+	resting?: ReadonlySet<EngineName>;
+	// Clock for the time filters (tests fix it).
+	nowMs?: number;
 }
 
 /** Outcome of one engine. */
@@ -152,24 +184,44 @@ async function awaitResults(deps: BrowserDeps, tab: number, engine: EngineName):
 	return rep;
 }
 
-/** Hand a challenge to the person at the screen and wait until results show (interactive mode only). */
+/** Poll interval while a person clears a challenge (ms). */
+const VERIFY_POLL_MS = 1500;
+
+/**
+ * Hand a challenge to the person at the screen and wait until results show. Interactive mode only; the
+ * wait is bounded by waitMs, ends at once on Esc, and reports start, 30 s left, success or timeout.
+ */
 async function waitForPerson(
 	deps: BrowserDeps,
 	tab: number,
 	engine: EngineName,
 	waitMs: number,
+	// What counts as cleared: results on a results page, or the check gone from the home page.
+	until: "results" | "clear" = "results",
 ): Promise<SerpReport | null> {
-	// Nobody to ask in print mode.
-	if (!deps.interactive) return null;
+	// Nobody to ask in print mode, or waiting switched off.
+	if (!deps.interactive || waitMs <= 0) return null;
 	// The tab to the front, and a note in the interface.
 	await deps.call("activate", { tab }, 10_000).catch(() => {});
-	deps.notify?.(`verification:${engine}`);
-	// Poll every two seconds.
-	for (let waited = 0; waited < waitMs; waited += 2000) {
-		await deps.sleep(2000);
+	deps.notify?.({ kind: "verify", engine, seconds: Math.round(waitMs / 1000) });
+	// Poll until results show, the time is up, or the call is cancelled.
+	let warned = waitMs <= 30_000;
+	for (let waited = 0; waited < waitMs; waited += VERIFY_POLL_MS) {
+		if (deps.aborted?.()) throw new Error("aborted");
+		await deps.sleep(VERIFY_POLL_MS);
+		if (deps.aborted?.()) throw new Error("aborted");
 		const rep = await readSerp(deps, tab, engine).catch(() => null);
-		if (rep && rep.results.length > 0) return rep;
+		if (rep && (until === "results" ? rep.results.length > 0 : !rep.challenge)) {
+			deps.notify?.({ kind: "verify_ok", engine });
+			return rep;
+		}
+		// One reminder when 30 seconds are left.
+		if (!warned && waitMs - waited - VERIFY_POLL_MS <= 30_000) {
+			warned = true;
+			deps.notify?.({ kind: "verify_left", engine, seconds: 30 });
+		}
 	}
+	deps.notify?.({ kind: "verify_timeout", engine });
 	return null;
 }
 
@@ -188,6 +240,10 @@ export async function searchEngine(
 	let stopped = "";
 	let pages = 0;
 	let serp: SerpTab | null = null;
+	// Results already counted on a page that loads more in place.
+	let seen = 0;
+	// Resting after an uncleared verification: skipped, with the reason for the model.
+	if (opts.resting?.has(engine)) return { engine, hits, pages, stopped: "verification (resting)", serp: null };
 	// Not too soon after the last query to this engine.
 	await deps.pace(`engine:${engine}`, opts.timing.engineGapMs);
 	// The home page in a new tab.
@@ -202,9 +258,18 @@ export async function searchEngine(
 	try {
 		// A look at the page before acting.
 		await pause(deps, 900, 2200);
+		// A verification before anything else: the person first.
+		let first = await readSerp(deps, tab, engine);
+		if (first.challenge && first.results.length === 0) {
+			const cleared = await waitForPerson(deps, tab, engine, opts.timing.humanWaitMs, "clear");
+			if (!cleared) {
+				await deps.call("close", { tab }, 10_000).catch(() => {});
+				return { engine, hits, pages, stopped: "verification", serp: null };
+			}
+			first = await readSerp(deps, tab, engine);
+		}
 		// Consent dialog: click accept.
-		const first = await readSerp(deps, tab, engine);
-		if (first.consent) {
+		if (first.consent && spec.consent.length > 0) {
 			await deps.call(
 				"human_click",
 				{ tab, target: { selectors: spec.consent }, load_ms: opts.timing.loadMs },
@@ -216,7 +281,8 @@ export async function searchEngine(
 		const typed = (await deps.call(
 			"human_type",
 			{ tab, target: { selectors: spec.box }, text: query, enter: true, load_ms: opts.timing.loadMs },
-			opts.timing.loadMs + 60_000,
+			// Load time, plus up to 1.5 s per character typed.
+			opts.timing.loadMs + 30_000 + [...query].length * 1500,
 		)) as InputReply;
 		if (!typed.typed) return { engine, hits, pages, stopped: "no search box", serp: null };
 		// Enter did not submit: the search button.
@@ -231,7 +297,7 @@ export async function searchEngine(
 		// A time filter: the same results address with the engine's filter parameter.
 		if (opts.fresh) {
 			const now = await readSerp(deps, tab, engine);
-			const filtered = withFresh(now.url, engine, opts.fresh);
+			const filtered = withFresh(now.url, engine, opts.fresh, opts.nowMs);
 			if (filtered !== now.url)
 				await deps.call(
 					"navigate",
@@ -243,6 +309,7 @@ export async function searchEngine(
 		for (let p = 1; p <= opts.pages; p++) {
 			// Wait for the results; a challenge goes to the person.
 			let rep = await awaitResults(deps, tab, engine);
+			// (Result text can mention such words: results on the page mean there is no wall.)
 			if (rep.challenge && rep.results.length === 0) {
 				const solved = await waitForPerson(deps, tab, engine, opts.timing.humanWaitMs);
 				if (!solved) {
@@ -255,25 +322,42 @@ export async function searchEngine(
 				stopped = p === 1 ? "no results" : "";
 				break;
 			}
-			// Collect this page's results.
+			// Collect this page's results (a page that loads more in place lists the earlier ones again).
 			const refs: Record<string, number> = {};
-			for (const r of rep.results) {
+			const fresh = spec.infinite ? rep.results.filter((r) => r.r >= seen) : rep.results;
+			seen = rep.results.length;
+			if (fresh.length === 0) break;
+			for (const r of rep.results) refs[resultTarget(r.u)] = r.r;
+			for (const r of fresh) {
 				const url = resultTarget(r.u);
-				refs[url] = r.r;
 				hits.push({ engine, pos: hits.length, url, title: r.t, snippet: r.s });
 			}
 			pages = p;
 			serp = { engine, tab, url: rep.url, refs };
 			// Read the page like a person: a few wheel turns.
 			await deps.call("human_scroll", { tab, steps: 2 + Math.floor(deps.random() * 2) }, 30_000);
-			// Last page wanted, or no next page.
+			// Last page wanted.
 			if (p === opts.pages) break;
-			if (!rep.next) break;
+			// More results in place: read down to the bottom, as a person does, and let them load.
+			if (spec.infinite) {
+				await deps.call("human_scroll", { tab, steps: 5, px: 900 }, 60_000);
+				// Up to about six seconds for the new results to appear.
+				for (let i = 0; i < 8; i++) {
+					await deps.sleep(700);
+					if ((await readSerp(deps, tab, engine)).results.length > seen) break;
+				}
+				continue;
+			}
+			// A pager drawn only near the bottom: read further down, then look again.
+			if (!rep.next) {
+				await deps.call("human_scroll", { tab, steps: 3, px: 800 }, 30_000);
+				if (!(await readSerp(deps, tab, engine)).next) break;
+			}
 			await pause(deps, 800, 2500);
 			// Click "Next".
 			const nx = (await deps.call(
 				"human_click",
-				{ tab, target: { selectors: spec.next }, load_ms: opts.timing.loadMs },
+				{ tab, target: { selectors: spec.next, text: spec.nextText }, load_ms: opts.timing.loadMs },
 				opts.timing.loadMs + 30_000,
 			)) as InputReply;
 			if (!nx.navigated) break;
@@ -295,7 +379,11 @@ export async function browserSearch(
 ): Promise<{ ranked: RankedHit[]; outcomes: EngineOutcome[] }> {
 	// One engine after another, as a person would.
 	const outcomes: EngineOutcome[] = [];
-	for (const e of opts.engines) outcomes.push(await searchEngine(deps, e, query, opts));
+	for (const e of opts.engines) {
+		outcomes.push(await searchEngine(deps, e, query, opts));
+		// Esc: no further engine.
+		if (deps.aborted?.()) break;
+	}
 	// Ranked merge.
 	return {
 		ranked: rankHits(

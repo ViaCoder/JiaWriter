@@ -9,7 +9,7 @@
     sf.py bridge <install|status> [--json]        (set up / check the Chrome extension bridge)
     sf.py bridge-host <origin>                    (internal: started by Chrome via native messaging)
 
-WriterAgent (WA_SF) runs `sf search` / `sf fetch` as a child process; this CLI is the one
+JiaWriter (JW_SF) runs `sf search` / `sf fetch` as a child process; this CLI is the one
 and only invocation surface.
 
 Each command imports its modules inside its handler: `sf browser status` must not pay

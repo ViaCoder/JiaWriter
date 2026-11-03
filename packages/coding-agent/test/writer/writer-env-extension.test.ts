@@ -12,6 +12,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import writerEnvExtension from "../../src/extensions/writer-env/index.ts";
 // Cache helpers.
 import { loadDetectCache, type ReasoningSupport, saveDetectCache } from "../../src/writer/api-detect.ts";
+// The shared clock offset.
+import { clockOffset, setClockOffset } from "../../src/writer/clock.ts";
 // Shared startup state.
 import {
 	buildProviderConfig,
@@ -26,6 +28,7 @@ const dirs: string[] = [];
 afterEach(() => {
 	// Initial state.
 	setWriterModel({ kind: "none" });
+	setClockOffset(0);
 	// Delete temp directories.
 	for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
@@ -94,13 +97,13 @@ function fakePi(level = "max") {
 }
 
 describe("writer-env extension", () => {
-	it("registers nothing when WA_* is not ready", () => {
+	it("registers nothing when JW_* is not ready", () => {
 		// Fake API.
 		const { pi, providers, handlers } = fakePi();
 		// Run the factory with the default "none" state.
 		writerEnvExtension(pi as never);
-		// No provider, no handler.
-		expect([providers.length, Object.keys(handlers).length]).toEqual([0, 0]);
+		// No provider; only the time handlers, which every model gets.
+		expect([providers.length, Object.keys(handlers).sort()]).toEqual([0, ["after_provider_response", "context"]]);
 	});
 
 	it("registers the wa provider and clamps only wa requests", () => {
@@ -110,10 +113,10 @@ describe("writer-env extension", () => {
 		const { pi, providers, handlers, ctx } = fakePi();
 		// Run the factory.
 		writerEnvExtension(pi as never);
-		// Provider "wa" registered.
-		expect(providers.map(([name]) => name)).toEqual(["wa"]);
+		// Provider "jw" registered.
+		expect(providers.map(([name]) => name)).toEqual(["jw"]);
 		// A wa request is clamped below the window.
-		const out = handlers.before_provider_request({ payload: { max_tokens: 128_000, messages: [] } }, ctx("wa")) as {
+		const out = handlers.before_provider_request({ payload: { max_tokens: 128_000, messages: [] } }, ctx("jw")) as {
 			max_tokens: number;
 		};
 		// Lowered.
@@ -138,7 +141,7 @@ describe("writer-env extension", () => {
 					errorMessage: "400 Unsupported value for output_config.effort: max",
 				},
 			},
-			ctx("wa"),
+			ctx("jw"),
 		);
 		// The session moved to high, the nearest supported level.
 		expect(session.level).toBe("high");
@@ -165,7 +168,7 @@ describe("writer-env extension", () => {
 		// A network error has nothing to do with reasoning.
 		handlers.message_end(
 			{ message: { role: "assistant", stopReason: "error", errorMessage: "fetch failed" } },
-			ctx("wa"),
+			ctx("jw"),
 		);
 		// Another provider's reasoning error.
 		handlers.message_end(
@@ -179,3 +182,50 @@ describe("writer-env extension", () => {
 
 // All five levels.
 const ALL_LEVELS = ["low", "medium", "high", "xhigh", "max"];
+
+describe("writer-env time notes", () => {
+	it("starts every user message with the local time it was sent", () => {
+		// Factory with the default state.
+		const { pi, handlers } = fakePi();
+		writerEnvExtension(pi as never);
+		// One user and one assistant message.
+		const messages = [
+			{ role: "user", content: "写一篇综述", timestamp: Date.UTC(2026, 10, 3, 10, 42) },
+			{ role: "assistant", content: [{ type: "text", text: "好" }], timestamp: Date.UTC(2026, 10, 3, 10, 43) },
+		];
+		const out = handlers.context({ type: "context", messages }, {}) as { messages: { content: unknown }[] };
+		expect(String(out.messages[0].content)).toMatch(/^\[Sent 2026-11-03 \d{2}:\d{2} Tuesday, [^\]]+\]\n写一篇综述$/);
+		expect(out.messages[1]).toBe(messages[1]);
+	});
+
+	it("corrects the time by the server's Date header once, and tells the user when it is off by two minutes or more", () => {
+		// A server ten minutes ahead.
+		const { pi, handlers, notes } = fakePi();
+		writerEnvExtension(pi as never);
+		const ahead = new Date(Date.now() + 10 * 60_000).toUTCString();
+		const ui = { hasUI: true, ui: { notify: (m: string) => notes.push(m) } };
+		handlers.after_provider_response({ type: "after_provider_response", status: 200, headers: { Date: ahead } }, ui);
+		expect(Math.round(clockOffset() / 60_000)).toBe(10);
+		expect(notes).toEqual([
+			"本机时钟和模型服务器相差约 10 分钟，已按服务器时间告诉模型当前时间。请检查系统的时间设置。",
+		]);
+		// Measured once: a later header changes nothing.
+		handlers.after_provider_response(
+			{ type: "after_provider_response", status: 200, headers: { date: new Date().toUTCString() } },
+			ui,
+		);
+		expect([Math.round(clockOffset() / 60_000), notes.length]).toEqual([10, 1]);
+	});
+
+	it("keeps the machine time when the difference is small", () => {
+		// Five seconds is network delay and rounding.
+		const { pi, handlers, notes } = fakePi();
+		writerEnvExtension(pi as never);
+		const ui = { hasUI: true, ui: { notify: (m: string) => notes.push(m) } };
+		handlers.after_provider_response(
+			{ type: "after_provider_response", status: 200, headers: { date: new Date(Date.now() + 5000).toUTCString() } },
+			ui,
+		);
+		expect([clockOffset(), notes.length]).toEqual([0, 0]);
+	});
+});

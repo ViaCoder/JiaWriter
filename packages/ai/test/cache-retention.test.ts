@@ -505,7 +505,7 @@ describe("Cache Retention (PI_CACHE_RETENTION)", () => {
 		});
 
 		it.each([
-			// WriterAgent: "deepseek-v4-flash" is not in the v1.4.0 catalog (the entry was undefined), so it is dropped.
+			// JiaWriter: "deepseek-v4-flash" is not in the v1.4.0 catalog (the entry was undefined), so it is dropped.
 			MODELS.opencode["deepseek-v4-pro"],
 			MODELS.opencode["kimi-k2.5"],
 			MODELS.opencode["kimi-k2.6"],

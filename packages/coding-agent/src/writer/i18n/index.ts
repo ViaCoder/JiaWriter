@@ -1,5 +1,5 @@
 /**
- * WriterAgent i18n layer for tool output and the interface: Chinese by default. The language is WA_LANG
+ * JiaWriter i18n layer for tool output and the interface: Chinese by default. The language is JW_LANG
  * when set, else the one chosen with /lang (<agentDir>/writer-settings.json), else Chinese.
  */
 
@@ -17,7 +17,7 @@ import { type MessageKey, zh } from "./zh.ts";
 /** Supported output languages. */
 export type WriterLang = "zh" | "en";
 
-/** Language from a WA_LANG value: English for "en" or "en-…", Chinese otherwise. */
+/** Language from a JW_LANG value: English for "en" or "en-…", Chinese otherwise. */
 export function resolveLang(value: string | undefined): WriterLang {
 	// Normalized value ("" when unset).
 	const v = (value ?? "").trim().toLowerCase();
@@ -51,10 +51,10 @@ export function savedLang(): WriterLang | undefined {
 	return cached.lang;
 }
 
-/** The current language: WA_LANG when set, else the /lang choice, else Chinese. */
+/** The current language: JW_LANG when set, else the /lang choice, else Chinese. */
 export function currentLang(): WriterLang {
 	// Environment first.
-	const env = (process.env.WA_LANG ?? "").trim();
+	const env = (process.env.JW_LANG ?? "").trim();
 	if (env !== "") return resolveLang(env);
 	return savedLang() ?? "zh";
 }

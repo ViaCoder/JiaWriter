@@ -48,10 +48,8 @@ describe("buildSystemPrompt", () => {
 				skills: [],
 			});
 
-			// WriterAgent: writing assistant preamble.
-			expect(defaultPrompt.startsWith("You are an expert writing assistant operating inside WriterAgent")).toBe(
-				true,
-			);
+			// JiaWriter: writing assistant preamble.
+			expect(defaultPrompt.startsWith("You are an expert writing assistant operating inside JiaWriter")).toBe(true);
 			expect(customPrompt.startsWith("You are Exact.\n\n<cwd>")).toBe(true);
 		});
 
@@ -80,7 +78,7 @@ describe("buildSystemPrompt", () => {
 	describe("default tools", () => {
 		test("includes all default tools when snippets are provided", () => {
 			const prompt = buildSystemPrompt({
-				// WriterAgent: snippets for the six default writing tools plus bash, which is not a default.
+				// JiaWriter: snippets for the six default writing tools plus bash, which is not a default.
 				toolSnippets: {
 					read: "Read file contents",
 					bash: "Execute bash commands",
@@ -95,7 +93,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			// WriterAgent: every default tool is listed and bash is not.
+			// JiaWriter: every default tool is listed and bash is not.
 			for (const name of ["read", "write", "edit", "ls", "find", "grep"]) expect(prompt).toContain(`- ${name}:`);
 			expect(prompt).not.toContain("- bash:");
 		});
@@ -121,7 +119,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			// WriterAgent: documentation pointers for WriterAgent, still resolved under absolute base paths.
+			// JiaWriter: documentation pointers for JiaWriter, still resolved under absolute base paths.
 			expect(prompt).toContain("- Resolve docs/... under Additional docs, not under the current working directory");
 			expect(prompt).toContain("environment variables (docs/environment-variables.md)");
 		});

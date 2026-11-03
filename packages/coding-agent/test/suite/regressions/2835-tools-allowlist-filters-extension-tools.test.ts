@@ -75,7 +75,7 @@ describe("regression #2835: tool allowlists filter extension tools", () => {
 				.sort(),
 		).toEqual(["dynamic_tool", "read"]);
 		expect(session.getActiveToolNames().sort()).toEqual(["dynamic_tool", "read"]);
-		// WriterAgent: writing-oriented summary for the read tool.
+		// JiaWriter: writing-oriented summary for the read tool.
 		expect(session.systemPrompt).toContain(
 			"- read: Read reference materials, drafts and other files (text and images)",
 		);

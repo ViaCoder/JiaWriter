@@ -4,6 +4,8 @@
 
 // Test API.
 import { describe, expect, it } from "vitest";
+// Engine definitions.
+import { ENGINES } from "../../src/writer/browser/engines.ts";
 // Modules under test.
 import {
 	awaitContent,
@@ -20,6 +22,9 @@ import {
 	DEFAULT_TIMING,
 	type SerpTab,
 	searchEngine,
+	VERIFY_WAIT_DEFAULT_S,
+	type VerifyEvent,
+	verifyWaitMs,
 } from "../../src/writer/browser/search.ts";
 // Document fixtures.
 import { makeDocx, makePdf, wp } from "./doc-fixtures.ts";
@@ -37,6 +42,12 @@ interface EngineScript {
 	noBox?: boolean;
 	// Enter does not submit.
 	enterDead?: boolean;
+	// A verification page already on the home page (cleared after `solveAfter` looks).
+	homeChallenge?: boolean;
+	// The pager is drawn only after reading further down.
+	lazyNext?: boolean;
+	// Results load in place when scrolled to the bottom (pages counts the loads).
+	infinite?: boolean;
 }
 
 /** A fake extension for search: every call is logged as "op" or "op:detail". */
@@ -44,19 +55,23 @@ function fakeSearch(scripts: Record<string, EngineScript>, interactive = false) 
 	// Call log.
 	const log: string[] = [];
 	// Tab id → engine and page shown (0 = home).
-	const tabs = new Map<number, { engine: string; page: number; looks: number }>();
+	const tabs = new Map<number, { engine: string; page: number; looks: number; scrolled: boolean }>();
 	let nextTab = 1;
 	// Pacing keys.
 	const paced: string[] = [];
 	// Interface notes.
-	const notes: string[] = [];
+	const notes: VerifyEvent[] = [];
+	// Set to true to act as Esc.
+	const esc = { on: false };
+	// Timeouts given to the typing calls.
+	const typeMs: number[] = [];
 	const deps: BrowserDeps = {
-		call: async (op, args) => {
+		call: async (op, args, ms) => {
 			const tab = args.tab as number;
 			const st = tabs.get(tab);
 			if (op === "open") {
-				const engine = String(args.url).includes("bing") ? "bing" : "google";
-				tabs.set(nextTab, { engine, page: 0, looks: 0 });
+				const engine = ["bing", "baidu", "sogou"].find((e) => String(args.url).includes(e)) ?? "google";
+				tabs.set(nextTab, { engine, page: 0, looks: 0, scrolled: false });
 				log.push(`open:${engine}`);
 				return { tab: nextTab++ };
 			}
@@ -67,21 +82,25 @@ function fakeSearch(scripts: Record<string, EngineScript>, interactive = false) 
 					return JSON.stringify({
 						results: [],
 						next: false,
-						challenge: false,
+						challenge: !!sc.homeChallenge && st.looks <= (sc.solveAfter ?? Number.POSITIVE_INFINITY),
 						consent: !!sc.consent,
 						url: `https://${st.engine}/`,
 					});
 				if (sc.challenge && st.looks <= (sc.solveAfter ?? Number.POSITIVE_INFINITY))
 					return JSON.stringify({ results: [], next: false, challenge: true, consent: false, url: "" });
-				const results = [0, 1].map((i) => ({
-					u: `https://site${i}.example.com/${st.engine}/p${st.page}`,
-					t: `芯片 ${st.engine} ${st.page}-${i}`,
-					s: "出口管制",
-					r: i,
-				}));
+				// An infinite page lists every load so far; a paged one only the current page.
+				const shown = sc.infinite ? Array.from({ length: st.page }, (_, k) => k + 1) : [st.page];
+				const results = shown.flatMap((pg, k) =>
+					[0, 1].map((i) => ({
+						u: `https://site${i}.example.com/${st.engine}/p${pg}`,
+						t: `芯片 ${st.engine} ${pg}-${i}`,
+						s: "出口管制",
+						r: k * 2 + i,
+					})),
+				);
 				return JSON.stringify({
 					results,
-					next: st.page < sc.pages,
+					next: st.page < sc.pages && (!sc.lazyNext || st.scrolled),
 					challenge: false,
 					consent: false,
 					url: `https://${st.engine}/search?p=${st.page}`,
@@ -89,21 +108,25 @@ function fakeSearch(scripts: Record<string, EngineScript>, interactive = false) 
 			}
 			if (op === "human_type" && st) {
 				log.push(`type:${args.text}`);
+				typeMs.push(ms ?? 0);
 				if (scripts[st.engine].noBox) return { typed: false };
 				if (scripts[st.engine].enterDead) return { typed: true, navigated: false };
 				st.page = 1;
 				return { typed: true, navigated: true, newTab: null };
 			}
 			if (op === "human_click" && st) {
-				const target = args.target as { selectors: string[] };
-				const what =
-					target.selectors.join(" ").includes("pnnext") || target.selectors.join(" ").includes("sb_pagN")
-						? "next"
-						: target.selectors.join(" ").includes("consent") || target.selectors.includes("#bnp_btn_accept")
-							? "consent"
-							: "submit";
+				const target = args.target as { selectors: string[]; text?: string };
+				if (target.text) log.push(`text:${target.text}`);
+				const what = /pnnext|sb_pagN|#page a|sogou_next/.test(target.selectors.join(" "))
+					? "next"
+					: target.selectors.join(" ").includes("consent") || target.selectors.includes("#bnp_btn_accept")
+						? "consent"
+						: "submit";
 				log.push(`click:${what}`);
-				if (what === "next") st.page++;
+				if (what === "next") {
+					st.page++;
+					st.scrolled = false;
+				}
 				if (what === "submit") st.page = 1;
 				return { clicked: true, navigated: what !== "consent", newTab: null };
 			}
@@ -111,6 +134,16 @@ function fakeSearch(scripts: Record<string, EngineScript>, interactive = false) 
 				log.push(`navigate:${args.url}`);
 				return {};
 			}
+			if (op === "human_scroll" && st && args.px === 800) st.scrolled = true;
+			// A scroll to the bottom loads the next batch of an infinite page.
+			if (
+				op === "human_scroll" &&
+				st &&
+				args.px === 900 &&
+				scripts[st.engine].infinite &&
+				st.page < scripts[st.engine].pages
+			)
+				st.page++;
 			log.push(op);
 			return true;
 		},
@@ -121,9 +154,10 @@ function fakeSearch(scripts: Record<string, EngineScript>, interactive = false) 
 		},
 		interactive,
 		notify: (n) => notes.push(n),
+		aborted: () => esc.on,
 		run: "t",
 	};
-	return { deps, log, paced, notes };
+	return { deps, log, paced, notes, esc, typeMs };
 }
 
 /** Options with no real waits. */
@@ -198,7 +232,10 @@ describe("searchEngine / browserSearch", () => {
 		const f = fakeSearch({ bing: { pages: 3, challenge: true, solveAfter: 10 }, google: { pages: 3 } }, true);
 		const o = await searchEngine(f.deps, "bing", "q", { ...opts(3), engines: ["bing"] });
 		expect(f.log).toContain("activate");
-		expect(f.notes).toEqual(["verification:bing"]);
+		expect(f.notes).toEqual([
+			{ kind: "verify", engine: "bing", seconds: VERIFY_WAIT_DEFAULT_S },
+			{ kind: "verify_ok", engine: "bing" },
+		]);
 		expect(o.pages).toBe(3);
 	});
 
@@ -380,5 +417,122 @@ describe("browserFetch", () => {
 		await expect(browserFetch(doc.deps, "http://192.168.77.1/", [], DEFAULT_TIMING, refuse)).rejects.toThrow(
 			/refused/,
 		);
+	});
+});
+
+describe("verifyWaitMs", () => {
+	it("reads JW_VERIFY_WAIT as whole seconds, 0–300, with 90 by default", () => {
+		expect(verifyWaitMs(undefined)).toBe(90_000);
+		expect(verifyWaitMs("")).toBe(90_000);
+		expect(verifyWaitMs("0")).toBe(0);
+		expect(verifyWaitMs("45")).toBe(45_000);
+		expect(verifyWaitMs("999")).toBe(300_000);
+		expect(verifyWaitMs("-1")).toBe(90_000);
+		expect(verifyWaitMs("soon")).toBe(90_000);
+	});
+});
+
+describe("verification waits", () => {
+	it("gives up after the configured wait with a 30-second reminder, and reports it", async () => {
+		// Never solved; a 60 s wait.
+		const f = fakeSearch({ bing: { pages: 3, challenge: true } }, true);
+		const o = await searchEngine(f.deps, "bing", "q", {
+			...opts(3),
+			engines: ["bing"],
+			timing: { ...DEFAULT_TIMING, humanWaitMs: 60_000 },
+		});
+		expect(o.stopped).toBe("verification");
+		expect(f.notes).toEqual([
+			{ kind: "verify", engine: "bing", seconds: 60 },
+			{ kind: "verify_left", engine: "bing", seconds: 30 },
+			{ kind: "verify_timeout", engine: "bing" },
+		]);
+	});
+
+	it("does not wait at all with JW_VERIFY_WAIT=0", async () => {
+		// Interactive, but waiting is off.
+		const f = fakeSearch({ bing: { pages: 3, challenge: true, solveAfter: 2 } }, true);
+		const o = await searchEngine(f.deps, "bing", "q", {
+			...opts(3),
+			engines: ["bing"],
+			timing: { ...DEFAULT_TIMING, humanWaitMs: 0 },
+		});
+		expect([o.stopped, f.notes.length]).toEqual(["verification", 0]);
+	});
+
+	it("ends the wait at once on Esc and searches no further engine", async () => {
+		// Esc pressed while the person is asked.
+		const f = fakeSearch({ bing: { pages: 3, challenge: true }, google: { pages: 3 } }, true);
+		const notify = f.deps.notify;
+		f.deps.notify = (ev) => {
+			notify?.(ev);
+			if (ev.kind === "verify") f.esc.on = true;
+		};
+		const out = await browserSearch(f.deps, "q", { ...opts(3), engines: ["bing", "google"] });
+		expect(out.outcomes.map((o) => [o.engine, o.stopped])).toEqual([["bing", "aborted"]]);
+		expect(f.log).not.toContain("open:google");
+	});
+
+	it("waits for a verification shown on the home page before typing", async () => {
+		// Cleared after a few looks.
+		const f = fakeSearch({ baidu: { pages: 3, homeChallenge: true, solveAfter: 3 } }, true);
+		const o = await searchEngine(f.deps, "baidu", "国务院 政策", { ...opts(3), engines: ["baidu"] });
+		expect(f.notes[0]).toEqual({ kind: "verify", engine: "baidu", seconds: VERIFY_WAIT_DEFAULT_S });
+		expect(f.log).toContain("type:国务院 政策");
+		expect(o.pages).toBe(3);
+	});
+
+	it("skips a resting engine without opening it", async () => {
+		// Bing rests after an earlier uncleared verification.
+		const f = fakeSearch({ bing: { pages: 3 }, baidu: { pages: 3 } });
+		const out = await browserSearch(f.deps, "q", {
+			...opts(3),
+			engines: ["bing", "baidu"],
+			resting: new Set(["bing"] as const),
+		});
+		expect(out.outcomes.map((o) => [o.engine, o.stopped, o.pages])).toEqual([
+			["bing", "verification (resting)", 0],
+			["baidu", "", 3],
+		]);
+		expect(f.log).not.toContain("open:bing");
+	});
+});
+
+describe("paging and typing", () => {
+	it("reads further down when the pager is drawn late, and clicks Next by its label", async () => {
+		// A pager drawn late (Baidu selectors).
+		const f = fakeSearch({ baidu: { pages: 3, lazyNext: true } });
+		const o = await searchEngine(f.deps, "baidu", "q", { ...opts(3), engines: ["baidu"] });
+		expect(o.pages).toBe(3);
+		expect(f.log).toContain("text:^\\s*下一页");
+	});
+
+	it("gives typing more time for longer queries", async () => {
+		// 4 characters and 20 characters.
+		const f = fakeSearch({ bing: { pages: 1 } });
+		await searchEngine(f.deps, "bing", "abcd", { ...opts(3), engines: ["bing"] });
+		await searchEngine(f.deps, "bing", "a".repeat(20), { ...opts(3), engines: ["bing"] });
+		expect(f.typeMs).toEqual([DEFAULT_TIMING.loadMs + 30_000 + 4 * 1500, DEFAULT_TIMING.loadMs + 30_000 + 20 * 1500]);
+	});
+});
+
+describe("pages that load more in place", () => {
+	it("scrolls to the bottom for each further page and counts only the new results", async () => {
+		// Sogou-like: two loads available, three pages asked for.
+		const f = fakeSearch({ sogou: { pages: 2, infinite: true } });
+		const o = await searchEngine(f.deps, "sogou", "q", {
+			...opts(3),
+			engines: ["sogou"],
+			specs: { ...ENGINES, sogou: { ...ENGINES.sogou, infinite: true } },
+		});
+		expect(o.pages).toBe(2);
+		expect(o.hits.map((h) => h.url)).toEqual([
+			"https://site0.example.com/sogou/p1",
+			"https://site1.example.com/sogou/p1",
+			"https://site0.example.com/sogou/p2",
+			"https://site1.example.com/sogou/p2",
+		]);
+		// No Next click on such a page.
+		expect(f.log.some((l) => l === "click:next")).toBe(false);
 	});
 });

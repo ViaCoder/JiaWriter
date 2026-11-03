@@ -75,7 +75,7 @@ describe("createAgentSession session manager defaults", () => {
 			agentDir,
 			model: model!,
 			sessionManager,
-			// WriterAgent: bash is off by default; this test exercises it.
+			// JiaWriter: bash is off by default; this test exercises it.
 			tools: ["+bash"],
 		});
 
@@ -104,7 +104,7 @@ describe("createAgentSession session manager defaults", () => {
 			agentDir,
 			model: model!,
 			thinkingLevel: "high",
-			// WriterAgent: bash is off by default; this test exercises it.
+			// JiaWriter: bash is off by default; this test exercises it.
 			tools: ["+bash"],
 		});
 		expect(session.sessionFile).toBeTruthy();

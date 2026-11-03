@@ -1,6 +1,6 @@
 // Unit tests for src/writer/i18n (resolveLang, t, the message tables).
 
-// Test API; stubEnv restores WA_LANG.
+// Test API; stubEnv restores JW_LANG.
 import { afterEach, describe, expect, it, vi } from "vitest";
 // English table.
 import { en } from "../../src/writer/i18n/en.ts";
@@ -9,7 +9,7 @@ import { resolveLang, t } from "../../src/writer/i18n/index.ts";
 // Chinese table.
 import { zh } from "../../src/writer/i18n/zh.ts";
 
-// Undo WA_LANG changes.
+// Undo JW_LANG changes.
 afterEach(() => vi.unstubAllEnvs());
 
 describe("resolveLang", () => {
@@ -32,13 +32,13 @@ describe("t", () => {
 		// A missing variable stays as {name}.
 		expect(t("style.hits", {}, "zh")).toContain("{count}");
 	});
-	it("follows WA_LANG when no language is passed", () => {
+	it("follows JW_LANG when no language is passed", () => {
 		// English from the environment.
-		vi.stubEnv("WA_LANG", "en");
+		vi.stubEnv("JW_LANG", "en");
 		// English text.
 		expect(t("style.clean")).toBe("Check passed: no hits.");
 		// Chinese from the environment.
-		vi.stubEnv("WA_LANG", "zh");
+		vi.stubEnv("JW_LANG", "zh");
 		// Chinese text.
 		expect(t("style.clean")).toBe("检查通过：没有命中。");
 	});

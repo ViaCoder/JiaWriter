@@ -1,7 +1,7 @@
 /**
  * Automatic export: at the end of each run, the Markdown drafts the agent wrote or edited in that run
  * are exported to .docx with the default profile. Notes, outlines, reference copies and drafts the
- * model already exported after its last change are left alone. WA_AUTO_EXPORT=off turns it off.
+ * model already exported after its last change are left alone. JW_AUTO_EXPORT=off turns it off.
  */
 
 // Paths.
@@ -23,10 +23,10 @@ export interface RunMessage {
 // File names that are working material, not a draft: notes, materials, outlines, plans, to-do lists.
 const NOT_DRAFT = /笔记|素材|大纲|提纲|计划|待办|notes?\b|outline|todo|plan\b|readme|changelog/i;
 
-/** True unless WA_AUTO_EXPORT is off, 0, false or no. */
+/** True unless JW_AUTO_EXPORT is off, 0, false or no. */
 export function autoExportEnabled(env: NodeJS.ProcessEnv): boolean {
 	// Off switches.
-	return !/^(off|0|false|no)$/i.test((env.WA_AUTO_EXPORT ?? "").trim());
+	return !/^(off|0|false|no)$/i.test((env.JW_AUTO_EXPORT ?? "").trim());
 }
 
 /** True for a Markdown file in the working folder that reads as a draft. */

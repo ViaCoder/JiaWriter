@@ -1,28 +1,28 @@
 /**
- * WriterAgent model configuration from environment variables.
- * Pure functions only: reading and checking WA_* values, building URLs,
+ * JiaWriter model configuration from environment variables.
+ * Pure functions only: reading and checking JW_* values, building URLs,
  * clamping the output budget and writing the Chinese setup hint.
  */
 
-/** Provider name under which the WA_* model is registered. */
-export const WA_PROVIDER = "wa";
-/** Context window used when WA_CTX is not set. */
+/** Provider name under which the JW_* model is registered. */
+export const JW_PROVIDER = "jw";
+/** Context window used when JW_CTX is not set. */
 export const DEFAULT_CONTEXT_WINDOW = 128_000;
-/** Output limit used when WA_OUT is not set. */
+/** Output limit used when JW_OUT is not set. */
 export const DEFAULT_MAX_OUTPUT = 128_000;
 /** Tokens kept free between input and output so a request never overflows. */
 export const OUTPUT_SAFETY_MARGIN = 1_024;
 /** Smallest output budget ever requested, even when the input is very large. */
 export const MIN_OUTPUT_TOKENS = 256;
 
-/** Reasoning levels a user can choose with WA_REASONING; "off" turns reasoning off. */
+/** Reasoning levels a user can choose with JW_REASONING; "off" turns reasoning off. */
 export const WRITER_REASONING_CHOICES = ["off", "low", "medium", "high", "xhigh", "max"] as const;
-/** One WA_REASONING value. */
+/** One JW_REASONING value. */
 export type WriterReasoning = (typeof WRITER_REASONING_CHOICES)[number];
-/** Level used when WA_REASONING is not set (the same default pi uses). */
+/** Level used when JW_REASONING is not set (the same default pi uses). */
 export const DEFAULT_REASONING: WriterReasoning = "medium";
 
-/** The three APIs WriterAgent can talk to. */
+/** The three APIs JiaWriter can talk to. */
 export type WriterApi = "anthropic-messages" | "openai-responses" | "openai-completions";
 /** All supported API names, in the order the detector tries them. */
 export const WRITER_APIS: readonly WriterApi[] = ["anthropic-messages", "openai-responses", "openai-completions"];
@@ -33,7 +33,7 @@ export interface WriterEnvConfig {
 	root: string;
 	/** Model name sent to the API. */
 	model: string;
-	/** API chosen by WA_API, or undefined to detect it. */
+	/** API chosen by JW_API, or undefined to detect it. */
 	api?: WriterApi;
 	/** Context window in tokens. */
 	contextWindow: number;
@@ -43,9 +43,9 @@ export interface WriterEnvConfig {
 	reasoning: WriterReasoning;
 }
 
-/** Result of reading the WA_* variables. */
+/** Result of reading the JW_* variables. */
 export interface WriterEnvReadResult {
-	/** True when any WA_* model variable is set (the user chose this configuration path). */
+	/** True when any JW_* model variable is set (the user chose this configuration path). */
 	present: boolean;
 	/** Required variables that are missing. */
 	missing: string[];
@@ -56,9 +56,9 @@ export interface WriterEnvReadResult {
 }
 
 /** Required variables, in the order they are reported. */
-const REQUIRED_VARS = ["WA_URL", "WA_KEY", "WA_MODEL"] as const;
-/** Every variable that marks the WA_* configuration as present. */
-const MODEL_VARS = ["WA_URL", "WA_KEY", "WA_MODEL", "WA_API", "WA_CTX", "WA_OUT"] as const;
+const REQUIRED_VARS = ["JW_URL", "JW_KEY", "JW_MODEL"] as const;
+/** Every variable that marks the JW_* configuration as present. */
+const MODEL_VARS = ["JW_URL", "JW_KEY", "JW_MODEL", "JW_API", "JW_CTX", "JW_OUT"] as const;
 
 /** Return the trimmed value of a variable, or undefined when it is unset or blank. */
 function readVar(env: NodeJS.ProcessEnv, name: string): string | undefined {
@@ -116,7 +116,7 @@ export function providerBaseUrl(root: string, api: WriterApi): string {
 	return `${root}/v1`;
 }
 
-/** Read and check the WA_* model variables. */
+/** Read and check the JW_* model variables. */
 export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 	// The configuration path is in use when any model variable is set.
 	const present = MODEL_VARS.some((name) => readVar(env, name) !== undefined);
@@ -127,32 +127,32 @@ export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 	// Nothing set at all: the user configures models another way (models.json or /login).
 	if (!present) return { present, missing: [], errors };
 	// The URL, when set, must be an http(s) address.
-	const url = readVar(env, "WA_URL");
+	const url = readVar(env, "JW_URL");
 	// Check the URL format.
 	if (url !== undefined && !/^https?:\/\/[^\s/]+/i.test(url)) {
 		// Explain the expected form.
-		errors.push(`WA_URL 必须是 http:// 或 https:// 开头的地址，当前值：${url}`);
+		errors.push(`JW_URL 必须是 http:// 或 https:// 开头的地址，当前值：${url}`);
 	}
 	// The API name, when set, must be one of the three supported values.
-	const apiRaw = readVar(env, "WA_API");
+	const apiRaw = readVar(env, "JW_API");
 	// Accept only known names.
 	const api =
 		apiRaw !== undefined && (WRITER_APIS as readonly string[]).includes(apiRaw) ? (apiRaw as WriterApi) : undefined;
 	// Report an unknown API name.
 	if (apiRaw !== undefined && api === undefined) {
 		// List the valid choices.
-		errors.push(`WA_API 只能是 ${WRITER_APIS.join(" / ")}，当前值：${apiRaw}（不设置则自动检测）`);
+		errors.push(`JW_API 只能是 ${WRITER_APIS.join(" / ")}，当前值：${apiRaw}（不设置则自动检测）`);
 	}
 	// Context window and output limit, with defaults.
-	const contextWindow = readPositiveInt(env, "WA_CTX", DEFAULT_CONTEXT_WINDOW, errors);
+	const contextWindow = readPositiveInt(env, "JW_CTX", DEFAULT_CONTEXT_WINDOW, errors);
 	// Output limit.
-	const maxTokens = readPositiveInt(env, "WA_OUT", DEFAULT_MAX_OUTPUT, errors);
+	const maxTokens = readPositiveInt(env, "JW_OUT", DEFAULT_MAX_OUTPUT, errors);
 	// The interface language, when set, must be zh or en.
-	const lang = readVar(env, "WA_LANG");
+	const lang = readVar(env, "JW_LANG");
 	// Report other values.
-	if (lang !== undefined && lang !== "zh" && lang !== "en") errors.push(`WA_LANG 只能是 zh 或 en，当前值：${lang}`);
+	if (lang !== undefined && lang !== "zh" && lang !== "en") errors.push(`JW_LANG 只能是 zh 或 en，当前值：${lang}`);
 	// Reasoning level, when set, must be one of the choices.
-	const reasoningRaw = readVar(env, "WA_REASONING");
+	const reasoningRaw = readVar(env, "JW_REASONING");
 	// Default, a known level, or undefined for an unknown value.
 	const reasoning =
 		reasoningRaw === undefined
@@ -162,7 +162,7 @@ export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 				: undefined;
 	// Report an unknown level.
 	if (reasoning === undefined)
-		errors.push(`WA_REASONING 只能是 ${WRITER_REASONING_CHOICES.join(" / ")}，当前值：${reasoningRaw}`);
+		errors.push(`JW_REASONING 只能是 ${WRITER_REASONING_CHOICES.join(" / ")}，当前值：${reasoningRaw}`);
 	// Any problem: no configuration.
 	if (missing.length > 0 || errors.length > 0) return { present, missing, errors };
 	// Everything checked: build the configuration (url and model are set here).
@@ -172,7 +172,7 @@ export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 		errors,
 		config: {
 			root: normalizeBaseUrl(url as string),
-			model: readVar(env, "WA_MODEL") as string,
+			model: readVar(env, "JW_MODEL") as string,
 			api,
 			contextWindow,
 			maxTokens,
@@ -252,16 +252,16 @@ export function formatSetupHint(missing: string[], errors: string[], platform: N
 	// Lines of the message.
 	const lines: string[] = [];
 	// Headline.
-	lines.push("WriterAgent 需要通过环境变量配置模型。");
+	lines.push("JiaWriter 需要通过环境变量配置模型。");
 	// Missing variables, if any.
 	if (missing.length > 0) lines.push(`缺少：${missing.join("、")}`);
 	// Invalid values, one per line.
 	for (const error of errors) lines.push(`格式错误：${error}`);
 	// Example values; the key stays a placeholder.
 	const examples: [string, string][] = [
-		["WA_URL", "https://api.example.com"],
-		["WA_KEY", "<你的 API key>"],
-		["WA_MODEL", "<模型名>"],
+		["JW_URL", "https://api.example.com"],
+		["JW_KEY", "<你的 API key>"],
+		["JW_MODEL", "<模型名>"],
 	];
 	// Show commands only for the variables that need attention, or all required ones.
 	const wanted = missing.length > 0 ? examples.filter(([name]) => missing.includes(name)) : examples;
@@ -291,7 +291,7 @@ export function formatSetupHint(missing: string[], errors: string[], platform: N
 	}
 	// Optional variables.
 	lines.push(
-		"可选：WA_API（不设置则自动检测）、WA_CTX、WA_OUT（默认都是 128000）、WA_REASONING（off / low / medium / high / xhigh / max，默认 medium，不支持时自动改用最接近的档位）、WA_LANG（zh / en）。",
+		"可选：JW_API（不设置则自动检测）、JW_CTX、JW_OUT（默认都是 128000）、JW_REASONING（off / low / medium / high / xhigh / max，默认 medium，不支持时自动改用最接近的档位）、JW_LANG（zh / en）。",
 	);
 	// Join into one message.
 	return lines.join("\n");

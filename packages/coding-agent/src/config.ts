@@ -436,7 +436,7 @@ export function getExportTemplateDir(): string {
 }
 
 /**
- * WriterAgent: built-in writing skills (one folder per language: zh/, en/).
+ * JiaWriter: built-in writing skills (one folder per language: zh/, en/).
  * - For Bun binary: writer-skills/ next to executable
  * - For Node.js and source: skills/writer/ in the package
  */
@@ -447,7 +447,7 @@ export function getWriterSkillsDir(): string {
 	return join(getPackageDir(), "skills", "writer");
 }
 
-/** WriterAgent: the Chrome extension folder (chrome-extension/ next to the binary, the search_fetch copy in a source checkout). */
+/** JiaWriter: the Chrome extension folder (chrome-extension/ next to the binary, the search_fetch copy in a source checkout). */
 export function getWriterExtensionDir(): string {
 	if (isBunBinary) {
 		return join(getPackageDir(), "chrome-extension");
@@ -579,6 +579,8 @@ interface PackageJson {
 	piConfig?: {
 		name?: string;
 		configDir?: string;
+		// JiaWriter: display name of a release package ("JiaWriter"); the command stays name.
+		title?: string;
 	};
 }
 
@@ -597,29 +599,30 @@ try {
 const piConfigName: string | undefined = pkg.piConfig?.name;
 export const PACKAGE_NAME: string = pkg.name || "@earendil-works/pi-coding-agent";
 export const APP_NAME: string = piConfigName || "pi";
-export const APP_TITLE: string = piConfigName ? APP_NAME : "π";
+// JiaWriter: a release package shows its title (scripts/writer-brand.mjs).
+export const APP_TITLE: string = pkg.piConfig?.title || (piConfigName ? APP_NAME : "π");
 export const CONFIG_DIR_NAME: string = pkg.piConfig?.configDir || ".pi";
 export const VERSION: string = pkg.version || "0.0.0";
 
-// WriterAgent: short public names for the config and session directory variables.
-// Name of the variable that overrides the config directory (default ~/.writeragent/agent).
-export const ENV_AGENT_DIR = "WA_DIR";
+// JiaWriter: short public names for the config and session directory variables.
+// Name of the variable that overrides the config directory (default ~/.jiawriter/agent).
+export const ENV_AGENT_DIR = "JW_DIR";
 // Name of the variable that overrides the session storage directory.
-export const ENV_SESSION_DIR = "WA_SESSION_DIR";
+export const ENV_SESSION_DIR = "JW_SESSION_DIR";
 // Upstream name for the config directory, still read so upstream tests stay isolated.
 export const LEGACY_ENV_AGENT_DIR = "PI_CODING_AGENT_DIR";
 // Upstream name for the session directory, read for the same reason.
 export const LEGACY_ENV_SESSION_DIR = "PI_CODING_AGENT_SESSION_DIR";
 
-/** WriterAgent: release builds (brand "writeragent") never self-update; upstream self-update installs pi from pi.dev. */
+/** JiaWriter: release builds (brand "jiawriter") never self-update; upstream self-update installs pi from pi.dev. */
 export function selfUpdateSupported(appName: string = APP_NAME): boolean {
 	// Only the upstream brand keeps the self-update path.
-	return appName !== "writeragent";
+	return appName !== "jiawriter";
 }
 
-/** Read a directory variable: the WriterAgent name first, then the upstream name. */
+/** Read a directory variable: the JiaWriter name first, then the upstream name. */
 export function readEnvDir(name: string, legacyName: string): string | undefined {
-	// Take the short WriterAgent variable when it holds a non-empty value.
+	// Take the short JiaWriter variable when it holds a non-empty value.
 	const primary = process.env[name];
 	// A set, non-empty primary value wins.
 	if (primary) return primary;
@@ -645,7 +648,7 @@ export function getShareViewerUrl(gistId: string): string {
 
 /** Get the agent config directory (e.g., ~/.pi/agent/) */
 export function getAgentDir(): string {
-	// WriterAgent: WA_DIR first, then the upstream PI_CODING_AGENT_DIR.
+	// JiaWriter: JW_DIR first, then the upstream PI_CODING_AGENT_DIR.
 	const envDir = readEnvDir(ENV_AGENT_DIR, LEGACY_ENV_AGENT_DIR);
 	if (envDir) {
 		return expandTildePath(envDir);

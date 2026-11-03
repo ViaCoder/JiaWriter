@@ -1,11 +1,11 @@
 #!/usr/bin/env node
-// WriterAgent: screenshots for the Chinese install guide (使用说明.html). Starts Chrome for Testing
+// JiaWriter: screenshots for the Chinese install guide (使用说明.html). Starts Chrome for Testing
 // headless with a Chinese interface and a temp profile, opens chrome://extensions, marks the control
 // to click with a red frame and a step number, and saves three PNGs:
 //   1-devmode.png  the 开发者模式 switch      2-load.png  the 加载未打包的扩展程序 button
-//   3-loaded.png   the WriterAgent card once the extension is loaded
+//   3-loaded.png   the JiaWriter card once the extension is loaded
 // Usage: node scripts/writer-guide-shots.mjs <chrome-for-testing> <out-dir>
-// Nothing touches the user's Chrome; the extension is copied to /tmp/writeragent/chrome-extension so the
+// Nothing touches the user's Chrome; the extension is copied to /tmp/jiawriter/chrome-extension so the
 // card shows a neutral path.
 
 // Chrome process.
@@ -24,7 +24,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // The extension in the repository.
 const EXT_SRC = join(ROOT, "search_fetch/src/search_fetch/extension");
 // Neutral copy shown on the card.
-const EXT_SHOWN = "/tmp/writeragent/chrome-extension";
+const EXT_SHOWN = "/tmp/jiawriter/chrome-extension";
 
 /** A pause. */
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

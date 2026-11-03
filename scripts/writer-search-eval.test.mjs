@@ -23,7 +23,7 @@ import {
 } from "./writer-search-eval.mjs";
 
 // Chinese messages from the shared i18n layer.
-process.env.WA_LANG = "zh";
+process.env.JW_LANG = "zh";
 
 test("todayTaipei uses the Asia/Taipei calendar date", () => {
 	// 2026-10-31 20:00 UTC is already 1 November in Taipei.
@@ -97,8 +97,8 @@ test("runSearchEval writes raw.json and table.md and survives a backend that can
 		const raw = JSON.parse(readFileSync(join(dir, "raw.json"), "utf-8"));
 		assert.equal(raw.raw.sf.searches[0].error, "sf missing");
 		assert.equal(readFileSync(join(dir, "table.md"), "utf-8").trim(), table);
-		// A bad WA_SEARCH stops before any request.
-		await assert.rejects(runSearchEval(dir, ["anysearch"], { WA_SEARCH: "exa" }, makeOps), /WA_SEARCH/);
+		// A bad JW_SEARCH stops before any request.
+		await assert.rejects(runSearchEval(dir, ["anysearch"], { JW_SEARCH: "exa" }, makeOps), /JW_SEARCH/);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

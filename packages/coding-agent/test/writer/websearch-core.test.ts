@@ -32,19 +32,21 @@ describe("readSearchEnv", () => {
 			blocklist: [],
 			engines: ["bing", "google"],
 			pages: 3,
+			verifyWaitMs: 90_000,
 		});
 	});
 	it("reads every variable and reports an unknown backend", () => {
 		// All set.
 		const { config } = readSearchEnv({
-			WA_SEARCH: " SF ",
-			WA_SEARCH_URL: "http://h/",
-			WA_SEARCH_KEY: "k",
-			WA_SF: "/x/sf",
-			WA_SEARCH_TIMEOUT: "60",
-			WA_SEARCH_BLOCK: "Spam.example, .junk.example",
-			WA_ENGINES: "google",
-			WA_SEARCH_PAGES: "9",
+			JW_SEARCH: " SF ",
+			JW_SEARCH_URL: "http://h/",
+			JW_SEARCH_KEY: "k",
+			JW_SF: "/x/sf",
+			JW_SEARCH_TIMEOUT: "60",
+			JW_SEARCH_BLOCK: "Spam.example, .junk.example",
+			JW_ENGINES: "google",
+			JW_SEARCH_PAGES: "9",
+			JW_VERIFY_WAIT: "45",
 		});
 		// Parsed.
 		expect(config).toEqual({
@@ -56,14 +58,15 @@ describe("readSearchEnv", () => {
 			blocklist: ["spam.example", "junk.example"],
 			engines: ["google"],
 			pages: 5,
+			verifyWaitMs: 45_000,
 		});
 		// The browser backends are known; pages below 3 become 3.
-		expect(readSearchEnv({ WA_SEARCH: "browser", WA_SEARCH_PAGES: "1" }).config).toMatchObject({
+		expect(readSearchEnv({ JW_SEARCH: "browser", JW_SEARCH_PAGES: "1" }).config).toMatchObject({
 			backend: "browser",
 			pages: 3,
 		});
 		// Unknown backend.
-		expect(readSearchEnv({ WA_SEARCH: "exa", WA_LANG: "zh" }).errors[0]).toContain("「exa」");
+		expect(readSearchEnv({ JW_SEARCH: "exa", JW_LANG: "zh" }).errors[0]).toContain("「exa」");
 	});
 });
 

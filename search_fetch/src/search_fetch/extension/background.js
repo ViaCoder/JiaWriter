@@ -1,13 +1,13 @@
-// WriterAgent browser helper — service worker of the Chrome extension.
-// The local host (the writeragent program, or `sf bridge-host`, started by Chrome through native
+// JiaWriter browser helper — service worker of the Chrome extension.
+// The local host (the jiawriter program, or `sf bridge-host`, started by Chrome through native
 // messaging) sends commands {id, op, ...}; this worker opens pages in a dedicated window of THIS
 // Chrome, runs the fixed scripts in ops/ on them, and answers {id, ok, result} or {id, ok:false, error}.
 // No code strings are ever evaluated: every page script is a static file shipped here.
 // Clicks, typing and scrolling go through chrome.debugger's Input domain, so pages receive the same
 // trusted events a person's mouse and keyboard produce; nothing else of the protocol is used.
 
-// Native messaging host name (must match the host manifest the writeragent program writes).
-const HOST = "com.writeragent.browser";
+// Native messaging host name (must match the host manifest the jiawriter program writes).
+const HOST = "com.jiawriter.browser";
 // Protocol version reported to the host.
 const VERSION = "2.0.0";
 // Page scripts that may be run (file names in ops/ without .js).
@@ -227,37 +227,90 @@ async function withInput(tabId, fn) {
   }
 }
 
-// Move the pointer from its last position to (x, y) along a slightly curved path.
-async function moveMouse(send, tabId, x, y) {
-  // Start: last position, else a point near the top left area.
-  const from = mouse.get(tabId) || { x: rand(80, 400), y: rand(80, 300) };
-  // A control point off the straight line makes the path curve a little.
-  const cx = (from.x + x) / 2 + rand(-80, 80);
-  const cy = (from.y + y) / 2 + rand(-60, 60);
-  // More steps for longer distances.
-  const dist = Math.hypot(x - from.x, y - from.y);
-  const steps = Math.max(8, Math.min(30, Math.round(dist / 25)));
-  // Quadratic Bézier points.
+// Minimum-jerk easing: slow start, faster middle, slow arrival, as a hand moves.
+function ease(t) {
+  return t * t * t * (10 - 15 * t + 6 * t * t);
+}
+
+// One curved stroke from `from` to (x, y): a cubic Bézier bent to a random side, eased, with a small
+// tremor that fades near the end. Positions are whole pixels, as a real mouse reports them.
+async function stroke(send, from, x, y) {
+  // Distance and direction.
+  const dx = x - from.x, dy = y - from.y;
+  const dist = Math.hypot(dx, dy);
+  if (dist < 1) return;
+  // The normal of the line, and how far the path bends off it (more for longer moves, random side).
+  const nx = -dy / dist, ny = dx / dist;
+  const bend = dist * rand(0.08, 0.3) * (Math.random() < 0.5 ? -1 : 1);
+  // Two control points along the line, both pushed off it (the second less, so the end straightens).
+  const c1 = { x: from.x + dx * rand(0.2, 0.4) + nx * bend, y: from.y + dy * rand(0.2, 0.4) + ny * bend };
+  const c2 = { x: from.x + dx * rand(0.6, 0.85) + nx * bend * rand(0.2, 0.6), y: from.y + dy * rand(0.6, 0.85) + ny * bend * rand(0.2, 0.6) };
+  // Steps: more for longer moves, never the same count twice in a row.
+  const steps = Math.max(10, Math.min(70, Math.round(dist / rand(12, 22))));
+  let last = { x: Math.round(from.x), y: Math.round(from.y) };
   for (let i = 1; i <= steps; i++) {
-    const t = i / steps;
-    const px = (1 - t) * (1 - t) * from.x + 2 * (1 - t) * t * cx + t * t * x;
-    const py = (1 - t) * (1 - t) * from.y + 2 * (1 - t) * t * cy + t * t * y;
-    await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: px, y: py });
-    await sleep(rand(8, 22));
+    const t = ease(i / steps), u = 1 - t;
+    // Cubic Bézier point.
+    let px = u * u * u * from.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * x;
+    let py = u * u * u * from.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * y;
+    // Tremor of up to a pixel, gone at the end.
+    const tremor = (1 - i / steps) * 1.2;
+    px += rand(-tremor, tremor);
+    py += rand(-tremor, tremor);
+    const at = { x: Math.round(px), y: Math.round(py) };
+    // Same pixel: no event.
+    if (at.x !== last.x || at.y !== last.y) {
+      await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: at.x, y: at.y });
+      last = at;
+    }
+    // Event spacing like a 60–125 Hz mouse, with a rare short hitch.
+    await sleep(Math.random() < 0.04 ? rand(40, 90) : rand(7, 17));
+  }
+  // Land exactly on the target pixel.
+  if (last.x !== Math.round(x) || last.y !== Math.round(y)) await send("Input.dispatchMouseEvent", { type: "mouseMoved", x: Math.round(x), y: Math.round(y) });
+}
+
+// Move the pointer from its last position to (x, y) like a hand: a curved, eased stroke; on longer
+// moves now and then a small overshoot and a short correction back.
+async function moveMouse(send, tabId, x, y) {
+  // Start: last position, else a random resting point of the hand.
+  const from = mouse.get(tabId) || { x: Math.round(rand(80, 500)), y: Math.round(rand(80, 400)) };
+  const dist = Math.hypot(x - from.x, y - from.y);
+  if (dist > 200 && Math.random() < 0.25) {
+    // Past the target by 3–8 % of the way, then back.
+    const k = 1 + rand(0.03, 0.08);
+    const over = { x: from.x + (x - from.x) * k, y: from.y + (y - from.y) * k };
+    await stroke(send, from, over.x, over.y);
+    await sleep(rand(60, 180));
+    await stroke(send, over, x, y);
+  } else {
+    await stroke(send, from, x, y);
   }
   // Remember where the pointer is.
-  mouse.set(tabId, { x, y });
+  mouse.set(tabId, { x: Math.round(x), y: Math.round(y) });
+}
+
+// A small idle drift of the pointer (a resting hand), kept inside the viewport.
+async function drift(send, tabId) {
+  // Where it is now.
+  const at = mouse.get(tabId) || { x: Math.round(rand(400, 800)), y: Math.round(rand(300, 500)) };
+  // 15–120 px in a random direction.
+  const angle = rand(0, Math.PI * 2), len = rand(15, 120);
+  const x = Math.max(20, Math.min(1180, at.x + Math.cos(angle) * len));
+  const y = Math.max(80, Math.min(760, at.y + Math.sin(angle) * len));
+  await moveMouse(send, tabId, x, y);
 }
 
 // Scroll by dy pixels with a few wheel notches at the pointer position.
 async function wheel(send, tabId, dy) {
   // Pointer position (the wheel acts on what is under it).
   const at = mouse.get(tabId) || { x: rand(400, 800), y: rand(300, 500) };
-  // Notches of about 100 px, like a mouse wheel.
+  // Notches of 100 px, as Chrome reports a mouse wheel.
   const notches = Math.max(1, Math.round(Math.abs(dy) / 100));
   for (let i = 0; i < notches; i++) {
-    await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: at.x, y: at.y, deltaX: 0, deltaY: Math.sign(dy) * rand(90, 120) });
-    await sleep(rand(30, 90));
+    await send("Input.dispatchMouseEvent", { type: "mouseWheel", x: at.x, y: at.y, deltaX: 0, deltaY: Math.sign(dy) * 100 });
+    // Notch spacing of a turned wheel.
+    await sleep(rand(35, 110));
   }
 }
 
@@ -316,26 +369,27 @@ function keyFields(ch) {
   return { key: ch };
 }
 
-// Type text into the focused field at a person's pace.
+// Type text into the focused field one character at a time, at a person's unhurried pace.
 async function typeText(send, text) {
-  // Characters, with CJK text committed in small chunks as an input method does.
+  // Characters (a CJK character is one input-method commit).
   const chars = [...text];
-  for (let i = 0; i < chars.length; ) {
+  for (let i = 0; i < chars.length; i++) {
     const ch = chars[i];
     if (/^[\x20-\x7e]$/.test(ch)) {
-      // A printable ASCII key: down (with its text) and up.
+      // A printable ASCII key: down (with its text), a short hold, up.
       const f = keyFields(ch);
       await send("Input.dispatchKeyEvent", { type: "keyDown", text: ch, unmodifiedText: ch, ...f });
+      await sleep(rand(30, 90));
       await send("Input.dispatchKeyEvent", { type: "keyUp", ...f });
-      i += 1;
     } else {
-      // One to three characters committed at once.
-      const n = Math.min(chars.length - i, 1 + Math.floor(Math.random() * 3));
-      await send("Input.insertText", { text: chars.slice(i, i + n).join("") });
-      i += n;
+      // Any other character: committed on its own, as an input method does.
+      await send("Input.insertText", { text: ch });
     }
-    // A pause between keys, longer now and then.
-    await sleep(Math.random() < 0.1 ? rand(250, 600) : rand(70, 190));
+    // The gap before the next key: 140–320 ms, a little longer after a space, and now and then a pause.
+    let gap = rand(140, 320);
+    if (ch === " ") gap *= rand(1.2, 1.6);
+    if (Math.random() < 0.12) gap += rand(450, 1100);
+    if (i < chars.length - 1) await sleep(gap);
   }
 }
 
@@ -461,6 +515,8 @@ const OPS = {
       // The turns.
       for (let i = 0; i < (msg.steps || 3); i++) {
         await wheel(send, msg.tab, msg.px || rand(300, 700));
+        // Reading time; the hand rests or drifts a little.
+        if (Math.random() < 0.6) await drift(send, msg.tab);
         await sleep(rand(600, 1600));
       }
     });

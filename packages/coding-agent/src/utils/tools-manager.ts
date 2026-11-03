@@ -81,7 +81,7 @@ function commandExists(cmd: string): boolean {
 }
 
 /**
- * WriterAgent: path of a pinned fd/rg shipped in the package's bin/ directory, or null.
+ * JiaWriter: path of a pinned fd/rg shipped in the package's bin/ directory, or null.
  * Release packages carry these copies so no tool is ever downloaded at run time.
  */
 export function getBundledToolPath(tool: "fd" | "rg", os: NodeJS.Platform = platform()): string | null {
@@ -91,7 +91,7 @@ export function getBundledToolPath(tool: "fd" | "rg", os: NodeJS.Platform = plat
 	if (!config) return null;
 	// Windows executables carry the .exe suffix.
 	const fileName = config.binaryName + (os === "win32" ? ".exe" : "");
-	// The binary sits in <package dir>/bin, next to the WriterAgent executable.
+	// The binary sits in <package dir>/bin, next to the JiaWriter executable.
 	const bundledPath = join(getPackageDir(), "bin", fileName);
 	// Return it only when the file is actually there.
 	return existsSync(bundledPath) ? bundledPath : null;
@@ -102,7 +102,7 @@ export function getToolPath(tool: "fd" | "rg"): string | null {
 	const config = TOOLS[tool];
 	if (!config) return null;
 
-	// WriterAgent: prefer the pinned copy shipped with the package.
+	// JiaWriter: prefer the pinned copy shipped with the package.
 	const bundledPath = getBundledToolPath(tool);
 	// Use it when present; otherwise continue with the upstream lookup order.
 	if (bundledPath) return bundledPath;

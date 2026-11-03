@@ -28,8 +28,11 @@ describe("ENGINES / parseEngines", () => {
 		expect(DEFAULT_ENGINES).toEqual(["bing", "google"]);
 		expect(ENGINES.bing.home).toBe("https://www.bing.com/");
 		expect(parseEngines(undefined)).toEqual(["bing", "google"]);
-		expect(parseEngines("google, bing, google, baidu")).toEqual(["google", "bing"]);
-		expect(parseEngines("baidu")).toEqual(["bing", "google"]);
+		expect(parseEngines("google, bing, google, baidu")).toEqual(["google", "bing", "baidu"]);
+		// All four engines, from JW_ENGINES text or the model's list; unknown names dropped.
+		expect(parseEngines("sogou")).toEqual(["sogou"]);
+		expect(parseEngines(["baidu", "yahoo", "sogou"])).toEqual(["baidu", "sogou"]);
+		expect(parseEngines("yahoo")).toEqual(["bing", "google"]);
 	});
 });
 
@@ -161,5 +164,40 @@ describe("isPrivateAddress / checkPublicUrl", () => {
 		await expect(
 			checkPublicUrl("https://x.example.com/", async () => Promise.reject(new Error("ENOTFOUND"))),
 		).resolves.toBeUndefined();
+	});
+});
+
+describe("withFresh for Baidu and Sogou", () => {
+	it("adds Baidu's gpc time range and Sogou's tsn window", () => {
+		// 2026-11-03T10:42:30Z in seconds.
+		const now = Date.UTC(2026, 10, 3, 10, 42, 30);
+		const end = Math.floor(now / 1000);
+		const b = new URL(withFresh("https://www.baidu.com/s?wd=q", "baidu", "week", now));
+		expect(b.searchParams.get("gpc")).toBe(`stf=${end - 7 * 86400},${end}|stftype=1`);
+		expect(new URL(withFresh("https://www.sogou.com/web?query=q", "sogou", "day", now)).searchParams.get("tsn")).toBe(
+			"1",
+		);
+		// Sogou has no year filter.
+		expect(withFresh("https://www.sogou.com/web?query=q", "sogou", "year", now)).toBe(
+			"https://www.sogou.com/web?query=q",
+		);
+	});
+
+	it("knows where Baidu's and Sogou's controls are", () => {
+		expect(ENGINES.baidu.box[0]).toBe("#chat-textarea");
+		expect(ENGINES.sogou.box[0]).toBe("#query");
+		expect([ENGINES.baidu.nextText, ENGINES.sogou.nextText]).toEqual(["^\\s*下一页", "^\\s*下一页"]);
+	});
+});
+
+describe("resultTarget for Google's AMP viewer", () => {
+	it("turns /amp/s/ into https and /amp/ into http", () => {
+		expect(resultTarget("https://www.google.com/amp/s/www.example.com/news/1.html")).toBe(
+			"https://www.example.com/news/1.html",
+		);
+		expect(resultTarget("https://www.google.com/amp/example.org/a")).toBe("http://example.org/a");
+		// Baidu's and Sogou's encrypted wrappers stay as they are.
+		expect(resultTarget("https://www.baidu.com/link?url=abc")).toBe("https://www.baidu.com/link?url=abc");
+		expect(ENGINES.sogou.infinite).toBe(true);
 	});
 });

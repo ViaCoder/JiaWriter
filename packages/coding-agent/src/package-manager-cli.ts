@@ -597,18 +597,18 @@ function parsePackageCommand(args: string[]): PackageCommandOptions | undefined 
 }
 
 function updateTargetIncludesSelf(target: UpdateTarget): boolean {
-	// WriterAgent: release builds never replace themselves with upstream pi.
+	// JiaWriter: release builds never replace themselves with upstream pi.
 	if (!selfUpdateSupported()) return false;
 	return target.type === "all" || target.type === "self";
 }
 
-/** WriterAgent: true when an update was meant to include the program itself. */
+/** JiaWriter: true when an update was meant to include the program itself. */
 export function updateTargetWantsSelf(target: UpdateTarget): boolean {
 	// "all" and "self" both cover the program.
 	return target.type === "all" || target.type === "self";
 }
 
-/** WriterAgent: true when args start a package command (install, remove, update, list). */
+/** JiaWriter: true when args start a package command (install, remove, update, list). */
 export function isPackageCommandInvocation(args: string[]): boolean {
 	// parsePackageCommand returns undefined for anything else.
 	return parsePackageCommand(args) !== undefined;
@@ -1061,10 +1061,10 @@ export async function handlePackageCommand(
 						console.log(chalk.green("Updated packages"));
 					}
 				}
-				// WriterAgent: explain why the program itself is not updated.
+				// JiaWriter: explain why the program itself is not updated.
 				if (!selfUpdateSupported() && updateTargetWantsSelf(target)) {
 					// Releases are published on GitHub.
-					console.log(chalk.yellow("WriterAgent 不支持自动更新程序本身，请从 GitHub Releases 下载新版本。"));
+					console.log(chalk.yellow("JiaWriter 不支持自动更新程序本身，请从 GitHub Releases 下载新版本。"));
 				}
 				if (updateTargetIncludesSelf(target)) {
 					const managedInstallRoot = getActiveManagedInstallRoot();

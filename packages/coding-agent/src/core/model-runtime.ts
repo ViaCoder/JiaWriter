@@ -25,6 +25,7 @@ import {
 	type DeferredCancelOptions,
 	type DeferredFetchOptions,
 	type DeferredHandle,
+	defaultProviderAuthContext,
 	getOpenCodeSessionHeaders,
 	type ImageApi,
 	type ImageModel,
@@ -69,6 +70,8 @@ import {
 } from "@earendil-works/pi-ai/utils/model-operations";
 import { getAgentDir } from "../config.ts";
 import { operationSignal, raceWithAbortSignal } from "../utils/abort.ts";
+// JiaWriter: keys held in memory instead of the environment.
+import { withSecretAuthContext } from "../writer/secrets.ts";
 import { AuthStorage as DefaultAuthStorage } from "./auth-storage.ts";
 import { ModelConfig } from "./model-config.ts";
 import { FileModelsStore, InMemoryCodingAgentModelsStore } from "./models-store.ts";
@@ -211,7 +214,12 @@ export class ModelRuntime implements Models {
 		this.modelNetworkEnabled = modelNetworkEnabled;
 		this.defaultBuiltins = new Map(providers.map((provider) => [provider.id, provider]));
 		for (const [providerId, provider] of this.defaultBuiltins) this.builtins.set(providerId, provider);
-		this.models = createModels({ credentials, modelsStore });
+		// JiaWriter: credential checks also see the keys held in memory (writer/secrets.ts).
+		this.models = createModels({
+			credentials,
+			modelsStore,
+			authContext: withSecretAuthContext(defaultProviderAuthContext()),
+		});
 		this.rebuildProviders();
 	}
 

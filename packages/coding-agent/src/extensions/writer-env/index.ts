@@ -1,5 +1,5 @@
 /**
- * Built-in WriterAgent extension: registers the "wa" provider built from WA_* variables,
+ * Built-in JiaWriter extension: registers the "jw" provider built from JW_* variables,
  * keeps every request's output limit inside the context window, and switches to the
  * nearest supported reasoning level when the server rejects the current one.
  */
@@ -10,8 +10,12 @@ import { clampThinkingLevel } from "@earendil-works/pi-ai";
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Rejected reasoning levels are remembered in the detection cache.
 import { markReasoningUnsupported } from "../../writer/api-detect.ts";
+// The time each user message carries, and the clock check.
+import { clockOffset, correction, setClockOffset, skewFromDate, withTimeNotes } from "../../writer/clock.ts";
 // Output clamp and the provider name.
-import { applyOutputClamp, WA_PROVIDER } from "../../writer/env-config.ts";
+import { applyOutputClamp, JW_PROVIDER } from "../../writer/env-config.ts";
+// Messages.
+import { t } from "../../writer/i18n/index.ts";
 // State prepared by main.ts at startup.
 import { buildProviderConfig, dropReasoningLevel, getWriterModel, setWriterModel } from "../../writer/writer-model.ts";
 
@@ -20,23 +24,40 @@ export const REASONING_ERROR = /reasoning|effort|thinking|budget/i;
 
 /** Extension factory. */
 export default function writerEnvExtension(pi: ExtensionAPI): void {
+	// Every model call: each user message carries the local time it was sent (the latest one is "now").
+	pi.on("context", (event) => ({ messages: withTimeNotes(event.messages, clockOffset()) }));
+	// The first model response with a Date header shows how far the machine clock is off.
+	let clockChecked = false;
+	pi.on("after_provider_response", (event, ctx) => {
+		if (clockChecked) return;
+		// Header names in any case.
+		const date = Object.entries(event.headers).find(([k]) => k.toLowerCase() === "date")?.[1];
+		const skew = skewFromDate(date, Date.now());
+		if (skew === undefined) return;
+		clockChecked = true;
+		// Two minutes or more: the model gets the server's time, and the user hears about it once.
+		const offset = correction(skew);
+		setClockOffset(offset);
+		if (offset !== 0 && ctx.hasUI)
+			ctx.ui.notify(t("clock.skew", { minutes: Math.round(Math.abs(offset) / 60_000) }), "warning");
+	});
 	// Result of the startup step in main.ts.
 	const state = getWriterModel();
-	// Nothing to register unless WA_* produced a ready configuration.
+	// Nothing to register unless JW_* produced a ready configuration.
 	if (state.kind !== "ready") return;
-	// Register the provider; its apiKey is the "$WA_KEY" reference, never the value.
-	pi.registerProvider(WA_PROVIDER, state.provider);
+	// Register the provider; its apiKey is the "$JW_KEY" reference, never the value.
+	pi.registerProvider(JW_PROVIDER, state.provider);
 	// Before each request, lower the output limit when the input leaves less room.
 	pi.on("before_provider_request", (event, ctx) => {
-		// Only requests to the WA_* model are adjusted.
-		if (ctx.model?.provider !== WA_PROVIDER) return undefined;
+		// Only requests to the JW_* model are adjusted.
+		if (ctx.model?.provider !== JW_PROVIDER) return undefined;
 		// A new payload, or undefined to keep the original one.
 		return applyOutputClamp(event.payload, state.api, state.contextWindow, state.maxTokens);
 	});
 	// After a failed reply, fall back to the nearest supported reasoning level.
 	pi.on("message_end", (event, ctx) => {
-		// Only the WA_* model.
-		if (ctx.model?.provider !== WA_PROVIDER) return;
+		// Only the JW_* model.
+		if (ctx.model?.provider !== JW_PROVIDER) return;
 		// The finished message.
 		const message = event.message as { role?: string; stopReason?: string; errorMessage?: string };
 		// Only assistant errors that name a reasoning parameter.
@@ -62,7 +83,7 @@ export default function writerEnvExtension(pi: ExtensionAPI): void {
 		// Share the new state.
 		setWriterModel({ ...now, reasoning, provider });
 		// Re-register; later calls take effect immediately.
-		pi.registerProvider(WA_PROVIDER, provider);
+		pi.registerProvider(JW_PROVIDER, provider);
 		// The model as pi will see it now.
 		const updatedModel = {
 			...ctx.model,

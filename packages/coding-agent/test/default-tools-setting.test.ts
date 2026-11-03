@@ -93,7 +93,7 @@ describe("defaultTools setting", () => {
 			},
 		]);
 
-		// WriterAgent: default tools are read, write, edit, ls, find, grep (bash is off by default).
+		// JiaWriter: default tools are read, write, edit, ls, find, grep (bash is off by default).
 		expect(session.getActiveToolNames().sort()).toEqual(["edit", "find", "grep", "inactive_tool", "ls", "read"]);
 		session.dispose();
 	});
@@ -176,7 +176,7 @@ describe("defaultTools setting", () => {
 			});
 		};
 
-		// WriterAgent: default tools are read, write, edit, ls, find, grep (bash is off by default).
+		// JiaWriter: default tools are read, write, edit, ls, find, grep (bash is off by default).
 		// bash plays the role of a tool outside the defaults.
 		const session = await createSession(["+bash"], { tools: ["+inactive_tool", "-write"] }, [inactiveTool]);
 		expect(session.getActiveToolNames().sort()).toEqual([
@@ -245,11 +245,11 @@ describe("defaultTools setting", () => {
 		// #10245
 		it("activates only tools newly added to defaultTools", async () => {
 			const session = await createFileSession();
-			// WriterAgent: default tools are read, write, edit, ls, find, grep (bash is off by default).
+			// JiaWriter: default tools are read, write, edit, ls, find, grep (bash is off by default).
 			expect(session.getActiveToolNames()).toEqual(["read", "write", "edit", "ls", "find", "grep"]);
 			session.setActiveToolsByName(["read", "edit", "write"]);
 
-			// WriterAgent: bash is the tool outside the defaults that gets newly added.
+			// JiaWriter: bash is the tool outside the defaults that gets newly added.
 			writeSettings({ defaultTools: ["+inactive_tool", "+bash"] });
 			await session.reload();
 			// grep was disabled during the session and is not newly added, so it stays off.
@@ -291,7 +291,7 @@ describe("defaultTools setting", () => {
 			const excluded = await createFileSession({ excludeTools: ["grep"] });
 			writeSettings({ defaultTools: ["+grep", "+inactive_tool"] });
 			await excluded.reload();
-			// WriterAgent: default tools are read, write, edit, ls, find, grep (bash is off by default).
+			// JiaWriter: default tools are read, write, edit, ls, find, grep (bash is off by default).
 			expect(excluded.getActiveToolNames().sort()).toEqual(["edit", "find", "inactive_tool", "ls", "read", "write"]);
 			excluded.dispose();
 		});
@@ -458,7 +458,7 @@ describe("defaultTools setting", () => {
 			const sessionManager = SessionManager.inMemory(tempDir);
 			sessionManager.appendMessage({ role: "user", content: "hi", timestamp: Date.now() });
 			const session = await resume(sessionManager);
-			// WriterAgent: default tools are read, write, edit, ls, find, grep (bash is off by default).
+			// JiaWriter: default tools are read, write, edit, ls, find, grep (bash is off by default).
 			expect(session.getActiveToolNames().sort()).toEqual([
 				"active_tool",
 				"edit",

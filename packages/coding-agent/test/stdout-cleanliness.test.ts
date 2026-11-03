@@ -102,7 +102,7 @@ describe("stdout cleanliness in non-interactive modes", () => {
 
 		expect(result.code).toBe(0);
 		expect(result.stdout).toBe("");
-		// WriterAgent: missing project packages are not installed automatically at startup (no network by default).
+		// JiaWriter: missing project packages are not installed automatically at startup (no network by default).
 		expect(result.stderr).not.toContain("changed 1 package in 471ms");
 		expect(result.stderr).toContain("Usage:");
 	});

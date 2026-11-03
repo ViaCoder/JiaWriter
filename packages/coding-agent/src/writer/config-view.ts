@@ -1,5 +1,5 @@
 /**
- * The read-only /wa page: each WriterAgent variable with its value in effect and where it comes from
+ * The read-only /jw page: each JiaWriter variable with its value in effect and where it comes from
  * (environment, detection, cache, /lang, default), keys only as set or unset, URLs without credentials,
  * and copy-ready commands for this platform with the key as a placeholder.
  */
@@ -35,43 +35,43 @@ function readEnv(env: NodeJS.ProcessEnv, name: string): string | undefined {
 /** Rows of the model group. */
 export function modelRows(env: NodeJS.ProcessEnv, state: WriterModelState, lang?: WriterLang): ConfigRow[] {
 	// Source labels.
-	const src = (k: "env" | "default" | "detect" | "cache" | "manual") => t(`wa.src.${k}`, {}, lang);
+	const src = (k: "env" | "default" | "detect" | "cache" | "manual") => t(`jw.src.${k}`, {}, lang);
 	const fromEnv = (name: string, fallback: string) => {
 		const v = readEnv(env, name);
 		return { name, value: v ?? fallback, source: v ? src("env") : src("default") };
 	};
-	// The API: from WA_API, detection or the detection cache.
+	// The API: from JW_API, detection or the detection cache.
 	const ready = state.kind === "ready" ? state : undefined;
 	const api = ready
 		? {
-				name: "WA_API",
+				name: "JW_API",
 				value: ready.api,
 				source: ready.source === "env" ? src("manual") : ready.source === "cache" ? src("cache") : src("detect"),
 			}
 		: {
-				name: "WA_API",
-				value: readEnv(env, "WA_API") ?? "-",
-				source: readEnv(env, "WA_API") ? src("manual") : src("detect"),
+				name: "JW_API",
+				value: readEnv(env, "JW_API") ?? "-",
+				source: readEnv(env, "JW_API") ? src("manual") : src("detect"),
 			};
 	// Reasoning: the level asked for and what the endpoint supports.
-	const reasoning = fromEnv("WA_REASONING", DEFAULT_REASONING);
-	if (ready) reasoning.value += t("wa.reasoningLevels", { levels: ready.reasoning.levels.join("/") || "-" }, lang);
+	const reasoning = fromEnv("JW_REASONING", DEFAULT_REASONING);
+	if (ready) reasoning.value += t("jw.reasoningLevels", { levels: ready.reasoning.levels.join("/") || "-" }, lang);
 	// All model rows.
 	return [
 		{
-			name: "WA_URL",
-			value: readEnv(env, "WA_URL") ? redactUrl(readEnv(env, "WA_URL") ?? "") : t("wa.unset", {}, lang),
-			source: src(readEnv(env, "WA_URL") ? "env" : "default"),
+			name: "JW_URL",
+			value: readEnv(env, "JW_URL") ? redactUrl(readEnv(env, "JW_URL") ?? "") : t("jw.unset", {}, lang),
+			source: src(readEnv(env, "JW_URL") ? "env" : "default"),
 		},
 		{
-			name: "WA_KEY",
-			value: t(readEnv(env, "WA_KEY") ? "wa.set" : "wa.unset", {}, lang),
-			source: src(readEnv(env, "WA_KEY") ? "env" : "default"),
+			name: "JW_KEY",
+			value: t(readEnv(env, "JW_KEY") ? "jw.set" : "jw.unset", {}, lang),
+			source: src(readEnv(env, "JW_KEY") ? "env" : "default"),
 		},
-		fromEnv("WA_MODEL", t("wa.unset", {}, lang)),
+		fromEnv("JW_MODEL", t("jw.unset", {}, lang)),
 		api,
-		fromEnv("WA_CTX", String(DEFAULT_CONTEXT_WINDOW)),
-		fromEnv("WA_OUT", String(DEFAULT_MAX_OUTPUT)),
+		fromEnv("JW_CTX", String(DEFAULT_CONTEXT_WINDOW)),
+		fromEnv("JW_OUT", String(DEFAULT_MAX_OUTPUT)),
 		reasoning,
 	];
 }
@@ -79,24 +79,24 @@ export function modelRows(env: NodeJS.ProcessEnv, state: WriterModelState, lang?
 /** Rows of the interface and search group. */
 export function otherRows(env: NodeJS.ProcessEnv, lang?: WriterLang): ConfigRow[] {
 	// Language: environment, /lang, or the default.
-	const langSource = readEnv(env, "WA_LANG") ? "wa.src.env" : savedLang() ? "wa.src.lang" : "wa.src.default";
-	const src = (name: string) => t(readEnv(env, name) ? "wa.src.env" : "wa.src.default", {}, lang);
+	const langSource = readEnv(env, "JW_LANG") ? "jw.src.env" : savedLang() ? "jw.src.lang" : "jw.src.default";
+	const src = (name: string) => t(readEnv(env, name) ? "jw.src.env" : "jw.src.default", {}, lang);
 	return [
-		{ name: "WA_LANG", value: currentLang(), source: t(langSource, {}, lang) },
-		{ name: "WA_SEARCH", value: readEnv(env, "WA_SEARCH") ?? "auto", source: src("WA_SEARCH") },
-		{ name: "WA_ENGINES", value: readEnv(env, "WA_ENGINES") ?? "bing,google", source: src("WA_ENGINES") },
-		{ name: "WA_SEARCH_PAGES", value: readEnv(env, "WA_SEARCH_PAGES") ?? "3", source: src("WA_SEARCH_PAGES") },
+		{ name: "JW_LANG", value: currentLang(), source: t(langSource, {}, lang) },
+		{ name: "JW_SEARCH", value: readEnv(env, "JW_SEARCH") ?? "auto", source: src("JW_SEARCH") },
+		{ name: "JW_ENGINES", value: readEnv(env, "JW_ENGINES") ?? "bing,google", source: src("JW_ENGINES") },
+		{ name: "JW_SEARCH_PAGES", value: readEnv(env, "JW_SEARCH_PAGES") ?? "3", source: src("JW_SEARCH_PAGES") },
 		{
-			name: "WA_SEARCH_URL",
-			value: redactUrl(readEnv(env, "WA_SEARCH_URL") ?? DEFAULT_ANYSEARCH_URL),
-			source: src("WA_SEARCH_URL"),
+			name: "JW_SEARCH_URL",
+			value: redactUrl(readEnv(env, "JW_SEARCH_URL") ?? DEFAULT_ANYSEARCH_URL),
+			source: src("JW_SEARCH_URL"),
 		},
 		{
-			name: "WA_SEARCH_KEY",
-			value: t(readEnv(env, "WA_SEARCH_KEY") ? "wa.set" : "wa.anonymous", {}, lang),
-			source: src("WA_SEARCH_KEY"),
+			name: "JW_SEARCH_KEY",
+			value: t(readEnv(env, "JW_SEARCH_KEY") ? "jw.set" : "jw.anonymous", {}, lang),
+			source: src("JW_SEARCH_KEY"),
 		},
-		{ name: "WA_SF", value: readEnv(env, "WA_SF") ?? t("wa.sfAuto", {}, lang), source: src("WA_SF") },
+		{ name: "JW_SF", value: readEnv(env, "JW_SF") ?? t("jw.sfAuto", {}, lang), source: src("JW_SF") },
 	];
 }
 
@@ -104,9 +104,9 @@ export function otherRows(env: NodeJS.ProcessEnv, lang?: WriterLang): ConfigRow[
 export function setupCommands(env: NodeJS.ProcessEnv, platform: NodeJS.Platform, lang?: WriterLang): string[] {
 	// Required variables with their current value or an example.
 	const pairs: [string, string][] = [
-		["WA_URL", readEnv(env, "WA_URL") ? redactUrl(readEnv(env, "WA_URL") ?? "") : "https://api.example.com"],
-		["WA_KEY", t("wa.keyPlaceholder", {}, lang)],
-		["WA_MODEL", readEnv(env, "WA_MODEL") ?? t("wa.modelPlaceholder", {}, lang)],
+		["JW_URL", readEnv(env, "JW_URL") ? redactUrl(readEnv(env, "JW_URL") ?? "") : "https://api.example.com"],
+		["JW_KEY", t("jw.keyPlaceholder", {}, lang)],
+		["JW_MODEL", readEnv(env, "JW_MODEL") ?? t("jw.modelPlaceholder", {}, lang)],
 	];
 	// PowerShell on Windows, POSIX shells elsewhere.
 	return platform === "win32"
@@ -137,20 +137,20 @@ export function formatWaConfig(
 	};
 	// The configuration problem, when there is one.
 	const problem =
-		state.kind === "error" ? [t("wa.problem", {}, lang), ...state.message.split("\n").map((l) => `  ${l}`), ""] : [];
+		state.kind === "error" ? [t("jw.problem", {}, lang), ...state.message.split("\n").map((l) => `  ${l}`), ""] : [];
 	return [
-		t("wa.title", {}, lang),
+		t("jw.title", {}, lang),
 		"",
 		...problem,
-		t("wa.groupModel", {}, lang),
+		t("jw.groupModel", {}, lang),
 		...block(modelRows(env, state, lang)),
 		"",
-		t("wa.groupOther", {}, lang),
+		t("jw.groupOther", {}, lang),
 		...block(otherRows(env, lang)),
 		"",
-		t(platform === "win32" ? "wa.groupSetupWin" : "wa.groupSetup", {}, lang),
+		t(platform === "win32" ? "jw.groupSetupWin" : "jw.groupSetup", {}, lang),
 		...setupCommands(env, platform, lang).map((l) => `  ${l}`),
 		"",
-		t("wa.close", {}, lang),
+		t("jw.close", {}, lang),
 	];
 }

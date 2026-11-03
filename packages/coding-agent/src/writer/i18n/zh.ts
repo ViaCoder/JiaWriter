@@ -1,5 +1,5 @@
 /**
- * Chinese messages for WriterAgent tool output (the default language).
+ * Chinese messages for JiaWriter tool output (the default language).
  * {name} marks a value filled in by t().
  */
 export const zh = {
@@ -94,11 +94,11 @@ export const zh = {
 	// URL not allowed.
 	"fetch.badUrl": "只能抓取 http(s) 网址：{url}",
 	// Unknown backend.
-	"search.badBackend": "WA_SEARCH 只能是 auto、browser、anysearch 或 sf，当前为「{value}」。",
+	"search.badBackend": "JW_SEARCH 只能是 auto、browser、anysearch 或 sf，当前为「{value}」。",
 	// AnySearch quota exhausted (402 body discarded).
-	"anysearch.quota": "AnySearch 匿名额度已用完，可设置 WA_SEARCH_KEY 后重试。",
+	"anysearch.quota": "AnySearch 匿名额度已用完，可设置 JW_SEARCH_KEY 后重试。",
 	// AnySearch key rejected.
-	"anysearch.auth": "AnySearch 拒绝了 key（HTTP {status}），请检查 WA_SEARCH_KEY。",
+	"anysearch.auth": "AnySearch 拒绝了 key（HTTP {status}），请检查 JW_SEARCH_KEY。",
 	// AnySearch rate limit after the single retry.
 	"anysearch.rate": "AnySearch 请求过于频繁（HTTP 429），请稍后再试。",
 	// AnySearch could not extract the page.
@@ -108,7 +108,7 @@ export const zh = {
 	// Network failure.
 	"anysearch.network": "无法连接 AnySearch：{reason}",
 	// sf not found.
-	"sf.missing": "找不到 search_fetch 的 sf 程序。请用 WA_SF 指定路径，或把它放在 {paths}。",
+	"sf.missing": "找不到 search_fetch 的 sf 程序。请用 JW_SF 指定路径，或把它放在 {paths}。",
 	// sf failed.
 	"sf.failed": "sf 运行失败（退出码 {code}）：{reason}",
 	// sf timed out.
@@ -122,7 +122,7 @@ export const zh = {
 	// Unchanged since the last import.
 	"import.unchanged": "- {source}：未改动，沿用 {out}",
 	// Scan without a text layer (there is no OCR).
-	"import.scanned": "- {source}：扫描件，没有文字层，WriterAgent 不做文字识别。请换成带文字层的 PDF 或 Word 文件。",
+	"import.scanned": "- {source}：扫描件，没有文字层，JiaWriter 不做文字识别。请换成带文字层的 PDF 或 Word 文件。",
 	// Unsupported type.
 	"import.unsupported": "- {source}：不支持这种文件，可导入 pdf、docx、txt、md、html。",
 	// Failure.
@@ -207,31 +207,31 @@ export const zh = {
 	// Blank body.
 	"skills.blankBody":
 		"## 动笔之前\n\n- \n\n## 结构\n\n- \n\n## 文风\n\n- \n\n## 收尾检查\n\n- 完稿后运行 style_check。",
-	// /wa page.
-	"wa.title": "WriterAgent 配置（只读，修改请设置环境变量）",
-	"wa.problem": "配置问题：",
-	"wa.groupModel": "模型",
-	"wa.groupOther": "界面与检索",
-	"wa.groupSetup": "设置命令（Linux / macOS；长期有效请写进 ~/.bashrc 或 ~/.zshrc）",
-	"wa.groupSetupWin": '设置命令（PowerShell，当前窗口有效；长期有效用 setx 变量名 "值"）',
-	"wa.src.env": "环境变量",
-	"wa.src.default": "默认值",
-	"wa.src.detect": "自动检测",
-	"wa.src.cache": "自动检测（缓存）",
-	"wa.src.manual": "手动指定（WA_API）",
-	"wa.src.lang": "/lang 设置",
-	"wa.set": "已设置",
-	"wa.unset": "未设置",
-	"wa.anonymous": "未设置（匿名调用）",
-	"wa.sfAuto": "未设置（在约定位置查找）",
-	"wa.reasoningLevels": "（可用：{levels}）",
-	"wa.keyPlaceholder": "<你的 API key>",
-	"wa.modelPlaceholder": "<模型名>",
-	"wa.close": "按任意键关闭",
+	// /jw page.
+	"jw.title": "JiaWriter 配置（只读，修改请设置环境变量）",
+	"jw.problem": "配置问题：",
+	"jw.groupModel": "模型",
+	"jw.groupOther": "界面与检索",
+	"jw.groupSetup": "设置命令（Linux / macOS；长期有效请写进 ~/.bashrc 或 ~/.zshrc）",
+	"jw.groupSetupWin": '设置命令（PowerShell，当前窗口有效；长期有效用 setx 变量名 "值"）',
+	"jw.src.env": "环境变量",
+	"jw.src.default": "默认值",
+	"jw.src.detect": "自动检测",
+	"jw.src.cache": "自动检测（缓存）",
+	"jw.src.manual": "手动指定（JW_API）",
+	"jw.src.lang": "/lang 设置",
+	"jw.set": "已设置",
+	"jw.unset": "未设置",
+	"jw.anonymous": "未设置（匿名调用）",
+	"jw.sfAuto": "未设置（在约定位置查找）",
+	"jw.reasoningLevels": "（可用：{levels}）",
+	"jw.keyPlaceholder": "<你的 API key>",
+	"jw.modelPlaceholder": "<模型名>",
+	"jw.close": "按任意键关闭",
 	// /lang.
 	"lang.choose": "界面语言",
 	"lang.saved": "界面语言已设为中文。命令说明和提示即时生效，内置 skill 在 /reload 后切换。",
-	"lang.envWins": "当前设置了 WA_LANG={value}，它优先于 /lang 的选择。",
+	"lang.envWins": "当前设置了 JW_LANG={value}，它优先于 /lang 的选择。",
 	"lang.bad": "可选语言：zh、en。",
 	// /sf.
 	"sf.cmdUsage": "用法：/sf status 或 /sf install，与 /browser 相同。",
@@ -239,9 +239,20 @@ export const zh = {
 	"browser.label": "浏览器（{detail}）",
 	"browser.engineLine": "{engine} {pages} 页",
 	"browser.stopped": "{engine} 读到第 {pages} 页后停止：{reason}",
-	"browser.fallback": "Chrome 里的 WriterAgent 扩展没有连接，本次改用 AnySearch。安装扩展的步骤见 /browser。",
-	"browser.notConnected": "Chrome 里的 WriterAgent 扩展没有连接。请打开 Chrome，并按 /browser 的说明加载扩展。",
-	"browser.verify": "{engine} 要求人机验证：Chrome 窗口已切到前台，请在窗口里完成验证，最多等待 {seconds} 秒。",
+	"browser.fallback": "Chrome 里的 JiaWriter 扩展没有连接，本次改用 AnySearch。安装扩展的步骤见 /browser。",
+	"browser.notConnected": "Chrome 里的 JiaWriter 扩展没有连接。请打开 Chrome，并按 /browser 的说明加载扩展。",
+	"browser.verify":
+		"{engine} 要求人机验证：Chrome 窗口已切到前台，请在窗口里完成验证，最多等待 {seconds} 秒（按 Esc 取消本次检索）。",
+	"browser.verifyLeft": "{engine} 的人机验证还剩 {seconds} 秒。",
+	"browser.verifyOk": "{engine} 的人机验证已通过，继续。",
+	"browser.verifyTimeout": "{engine} 的人机验证没有在时限内完成，已停止等待。",
+	"browser.reason.verification": "需要人机验证，未在时限内完成；30 分钟内不再使用这个引擎",
+	"browser.reason.resting": "最近一次人机验证没有完成，30 分钟内暂不使用",
+	"clock.skew": "本机时钟和模型服务器相差约 {minutes} 分钟，已按服务器时间告诉模型当前时间。请检查系统的时间设置。",
+	"search.time": "检索时间：{time}",
+	"search.methodUnavailable":
+		"browser 方式现在不可用：Chrome 里的 JiaWriter 扩展没有连接。可以改用 method=anysearch，或按 /browser 的说明连接扩展。",
+	"search.sfSearchGone": "sf 不再用于检索，只用于 web_fetch；本次检索按 auto 处理。",
 	"browser.connected": "Chrome 扩展已连接（扩展版本 {version}）。",
 	"browser.disconnected": "Chrome 扩展未连接。",
 	"browser.steps":

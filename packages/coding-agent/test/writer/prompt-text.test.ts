@@ -1,6 +1,6 @@
 // Unit tests for src/writer/prompt-text.ts and its use in buildSystemPrompt().
 
-// Test API; stubEnv restores WA_LANG.
+// Test API; stubEnv restores JW_LANG.
 import { afterEach, describe, expect, it, vi } from "vitest";
 // The prompt builder that uses the texts.
 import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
@@ -22,7 +22,7 @@ const SNIPPETS = Object.fromEntries([...DEFAULT_TOOLS, "bash"].map((name) => [na
 // Openings that would make a rule a prohibition instead of a positive instruction.
 const NEGATIVE_START = /^(do not|don't|never|avoid|no )/i;
 
-// Undo WA_LANG changes.
+// Undo JW_LANG changes.
 afterEach(() => vi.unstubAllEnvs());
 
 describe("writerLanguageRule", () => {
@@ -73,7 +73,7 @@ describe("rule texts", () => {
 	});
 });
 
-describe("buildSystemPrompt with the WriterAgent texts", () => {
+describe("buildSystemPrompt with the JiaWriter texts", () => {
 	/** Default prompt with the six writing tools and bash snippets available. */
 	function defaultPrompt(): string {
 		// Same call shape as the session uses.
@@ -92,15 +92,15 @@ describe("buildSystemPrompt with the WriterAgent texts", () => {
 	it("uses writing summaries for the default tools and leaves bash out", () => {
 		// Build the prompt.
 		const prompt = defaultPrompt();
-		// Each default tool shows the WriterAgent summary.
+		// Each default tool shows the JiaWriter summary.
 		for (const name of DEFAULT_TOOLS) expect(prompt).toContain(`- ${name}: ${WRITER_TOOL_SNIPPETS[name]}`);
 		// bash is not a default tool.
 		expect(prompt).not.toContain("- bash:");
 	});
 
-	it("follows WA_LANG and replaces the upstream concise rule", () => {
+	it("follows JW_LANG and replaces the upstream concise rule", () => {
 		// English interface.
-		vi.stubEnv("WA_LANG", "en");
+		vi.stubEnv("JW_LANG", "en");
 		// Build the prompt.
 		const prompt = defaultPrompt();
 		// Language rule and chat rule present; upstream rule gone.

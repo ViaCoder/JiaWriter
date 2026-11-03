@@ -1,7 +1,7 @@
 /**
- * The link between WriterAgent and the user's own Chrome.
+ * The link between JiaWriter and the user's own Chrome.
  *
- * - extension: the WriterAgent extension (search_fetch/src/search_fetch/extension) opens pages in a
+ * - extension: the JiaWriter extension (search_fetch/src/search_fetch/extension) opens pages in a
  *   dedicated window and sends trusted mouse and keyboard input.
  * - host: Chrome starts this program with the extension's origin as the first argument (native
  *   messaging: stdio frames of a 32-bit native-order length plus UTF-8 JSON). The host also listens
@@ -22,8 +22,8 @@ import { dirname, join } from "node:path";
 import type { Readable, Writable } from "node:stream";
 
 /** Native messaging host name (the extension's background.js connects to it). */
-export const HOST_NAME = "com.writeragent.browser";
-/** Chrome's id of the WriterAgent extension (fixed by the key in its manifest.json). */
+export const HOST_NAME = "com.jiawriter.browser";
+/** Chrome's id of the JiaWriter extension (fixed by the key in its manifest.json). */
 export const EXTENSION_ID = "mnoicnfoocibanokjfbpmbgpamlmdgje";
 /** Largest message the host may send to Chrome (Chrome's limit is 1 MB). */
 const MAX_TO_CHROME = 1024 * 1024;
@@ -232,7 +232,7 @@ export async function runHost(opts: HostOptions): Promise<void> {
 		const port = (server.address() as { port: number }).port;
 		writePrivate(opts.address.file, `${JSON.stringify({ port, token } satisfies TcpInfo)}\n`, 0o600);
 	}
-	log(`writeragent browser host listening (${opts.address.kind})`);
+	log(`jiawriter browser host listening (${opts.address.kind})`);
 
 	// Frames from Chrome until stdin ends.
 	await new Promise<void>((resolve) => {
@@ -267,11 +267,11 @@ export async function runHost(opts: HostOptions): Promise<void> {
 	}
 }
 
-/** Entry for `writeragent chrome-extension://…`: refuse other callers, then serve on stdio. */
+/** Entry for `jiawriter chrome-extension://…`: refuse other callers, then serve on stdio. */
 export async function hostMain(args: readonly string[], agentDir: string): Promise<number> {
 	// Only our extension may start the host.
 	if (args[0].replace(/\/+$/, "") !== `chrome-extension://${EXTENSION_ID}`) {
-		process.stderr.write(`writeragent: refusing native messaging caller ${args[0]}\n`);
+		process.stderr.write(`jiawriter: refusing native messaging caller ${args[0]}\n`);
 		return 2;
 	}
 	// Serve until Chrome goes away.

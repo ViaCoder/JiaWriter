@@ -1,6 +1,6 @@
 /**
- * Built-in WriterAgent extension: writing skills.
- * - Offers the built-in skills of the WA_LANG language (zh by default) that are turned on and not
+ * Built-in JiaWriter extension: writing skills.
+ * - Offers the built-in skills of the JW_LANG language (zh by default) that are turned on and not
  *   replaced by a user skill of the same name.
  * - /skills: list with on/off marks; turn one or all on or off, edit (built-ins are copied to the
  *   user's skills first), update from this session (shown as a diff), delete after a backup.

@@ -4,7 +4,7 @@
  * Chrome finds a host by its manifest: a JSON file in the NativeMessagingHosts folder of the
  * browser's profile root (Linux, macOS), or a file named by a registry value under
  * HKCU\Software\Google\Chrome\NativeMessagingHosts (Windows). The manifest names the program
- * to start (this writeragent executable) and the one extension allowed to start it.
+ * to start (this jiawriter executable) and the one extension allowed to start it.
  */
 
 // Running reg.exe and starting Chrome (no shell).
@@ -21,7 +21,7 @@ export function hostManifest(programPath: string): string {
 	// Fixed fields; only our extension may connect.
 	const manifest = {
 		name: HOST_NAME,
-		description: "WriterAgent browser host",
+		description: "JiaWriter browser host",
 		path: programPath,
 		type: "stdio",
 		allowed_origins: [`chrome-extension://${EXTENSION_ID}/`],
@@ -73,9 +73,9 @@ export interface EnsureHostOptions {
 	platform: NodeJS.Platform;
 	// User's home folder.
 	home: string;
-	// ~/.writeragent/agent.
+	// ~/.jiawriter/agent.
 	agentDir: string;
-	// The writeragent executable (release binary), or node plus the CLI script (source checkout).
+	// The jiawriter executable (release binary), or node plus the CLI script (source checkout).
 	program: { binary: string } | { node: string; cli: string };
 	// Runs reg.exe (tests replace it); returns the exit status.
 	runReg?: (args: string[]) => number;

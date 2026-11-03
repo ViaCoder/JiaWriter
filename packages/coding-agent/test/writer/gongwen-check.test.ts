@@ -274,13 +274,13 @@ describe("writer-gongwen extension", () => {
 });
 
 describe("bundled lieflat-gongwen skill", () => {
-	it("ships with its license and the WriterAgent adaptation", () => {
+	it("ships with its license and the JiaWriter adaptation", () => {
 		// Name and license.
 		expect(readSkillInfo(SKILL).name).toBe("lieflat-gongwen");
 		expect(readFileSync(join(SKILL, "LICENSE"), "utf-8")).toContain("PolyForm Noncommercial License 1.0.0");
 		const md = readFileSync(join(SKILL, "SKILL.md"), "utf-8");
 		// The adaptation section, the tool instead of Python, no placeholder rule.
-		expect(md).toContain("## 在 WriterAgent 里使用");
+		expect(md).toContain("## 在 JiaWriter 里使用");
 		expect(md).toContain("调用 `gongwen_check` 工具");
 		expect(md).not.toContain("python3 scripts/check_params.py");
 		expect(md).not.toContain("宁可占位");

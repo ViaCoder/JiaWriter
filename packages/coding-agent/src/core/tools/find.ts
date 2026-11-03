@@ -25,7 +25,7 @@ export function relativizeFindResultPath(
 
 const findSchema = Type.Object({
 	pattern: Type.String({
-		// WriterAgent: examples from writing projects.
+		// JiaWriter: examples from writing projects.
 		description: "Glob pattern to match files, e.g. '*.md', '**/*.docx', or '参考资料/**/*.pdf'",
 	}),
 	path: Type.Optional(Type.String({ description: "Directory to search in (default: current directory)" })),

@@ -1,6 +1,6 @@
-name: WriterAgent packages
+name: JiaWriter packages
 
-# WriterAgent: builds the six release packages and tests each on its own platform. The packages
+# JiaWriter: builds the six release packages and tests each on its own platform. The packages
 # are kept as this run's artifacts for download; nothing is tagged, released or published.
 on:
   push:
@@ -96,16 +96,16 @@ jobs:
         run: |
           set -euo pipefail
           cd packages/coding-agent/binaries
-          sha256sum writeragent-*.tar.gz writeragent-*.zip > SHA256SUMS
+          sha256sum jiawriter-*.tar.gz jiawriter-*.zip > SHA256SUMS
           cat SHA256SUMS
 
       - name: Upload packages
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: writeragent-packages
+          name: jiawriter-packages
           path: |
-            packages/coding-agent/binaries/writeragent-*.tar.gz
-            packages/coding-agent/binaries/writeragent-*.zip
+            packages/coding-agent/binaries/jiawriter-*.tar.gz
+            packages/coding-agent/binaries/jiawriter-*.zip
             packages/coding-agent/binaries/SHA256SUMS
           if-no-files-found: error
           retention-days: 14
@@ -137,7 +137,7 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: writeragent-packages
+          name: jiawriter-packages
           path: packages
 
       - name: Verify checksums and extract this platform's package
@@ -149,13 +149,13 @@ jobs:
           if command -v sha256sum >/dev/null; then sha256sum -c SHA256SUMS; else shasum -a 256 -c SHA256SUMS; fi
           mkdir -p ../extracted
           if [[ "${{ matrix.platform }}" == windows-* ]]; then
-            export ARCHIVE_PATH="$(cygpath -w "writeragent-${{ matrix.platform }}.zip")"
+            export ARCHIVE_PATH="$(cygpath -w "jiawriter-${{ matrix.platform }}.zip")"
             export DESTINATION_PATH="$(cygpath -w ../extracted)"
             powershell.exe -NoProfile -NonInteractive -Command 'Expand-Archive -LiteralPath $env:ARCHIVE_PATH -DestinationPath $env:DESTINATION_PATH -Force'
-            echo "binary=extracted/writeragent.exe" >> "${GITHUB_OUTPUT}"
+            echo "binary=extracted/jiawriter.exe" >> "${GITHUB_OUTPUT}"
           else
-            tar -xzf "writeragent-${{ matrix.platform }}.tar.gz" -C ../extracted
-            echo "binary=extracted/writeragent/writeragent" >> "${GITHUB_OUTPUT}"
+            tar -xzf "jiawriter-${{ matrix.platform }}.tar.gz" -C ../extracted
+            echo "binary=extracted/jiawriter/jiawriter" >> "${GITHUB_OUTPUT}"
           fi
 
       - name: Bundled tools run
@@ -176,7 +176,7 @@ jobs:
           test -f "${root}/chrome-extension/vendor/Readability.js"
           test -f "${root}/使用说明.html"
           test -d "${root}/参考资料"
-          grep -q '"name": "WriterAgent"' "${root}/chrome-extension/manifest.json"
+          grep -q '"name": "JiaWriter"' "${root}/chrome-extension/manifest.json"
           grep -q "加载未打包的扩展程序" "${root}/使用说明.html"
           test -f "${root}/writer-skills/zh/lieflat-gongwen/参数卡.md"
           test -f "${root}/writer-skills/en/lieflat-gongwen/SKILL.md"
@@ -189,12 +189,12 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          setx WA_SETX_CHECK "https://api.example.com"
+          setx JW_SETX_CHECK "https://api.example.com"
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          $v = [Environment]::GetEnvironmentVariable("WA_SETX_CHECK", "User")
+          $v = [Environment]::GetEnvironmentVariable("JW_SETX_CHECK", "User")
           if ($v -ne "https://api.example.com") { Write-Error "setx value not stored: $v"; exit 1 }
-          reg query HKCU\Environment /v WA_SETX_CHECK
-          [Environment]::SetEnvironmentVariable("WA_SETX_CHECK", $null, "User")
+          reg query HKCU\Environment /v JW_SETX_CHECK
+          [Environment]::SetEnvironmentVariable("JW_SETX_CHECK", $null, "User")
 
       # --version, --help, a print run against a local mock model, and an import/export round.
       - name: Offline smoke test
@@ -203,7 +203,7 @@ jobs:
         run: node scripts/writer-smoke.mjs "${{ steps.pkg.outputs.binary }}"
 
       # The bundled sf runs once in a throwaway state folder (the first run only unpacks the Python and
-      # packages built into it), with PYTHONUTF8=1 as WriterAgent starts it.
+      # packages built into it), with PYTHONUTF8=1 as JiaWriter starts it.
       - name: Bundled sf runs
         shell: bash
         env:
@@ -222,7 +222,7 @@ jobs:
           test -d "${state}/install"
           test -z "$(find "${state}/install" -type f \( -iname 'LICENSE*' -o -iname 'LICENCE*' -o -iname 'COPYING*' -o -iname 'NOTICE*' -o -iname '*-LICENSE*' \) ! -name '*.py' -print -quit)"
 
-      # The interactive interface in a pseudo-terminal (/wa, /skills, /lang in both languages).
+      # The interactive interface in a pseudo-terminal (/jw, /skills, /lang in both languages).
       - name: Interface check
         if: runner.os != 'Windows'
         timeout-minutes: 5

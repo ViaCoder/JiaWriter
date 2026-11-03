@@ -84,7 +84,9 @@ import {
 } from "./package-manager-cli.ts";
 import { isLocalPath, normalizePath, resolvePath } from "./utils/paths.ts";
 import { cleanupWindowsSelfUpdateQuarantine } from "./utils/windows-self-update.ts";
-// WriterAgent: the "wa" model from WA_* environment variables.
+// JiaWriter: the environment with the keys held in memory.
+import { withSecrets } from "./writer/secrets.ts";
+// JiaWriter: the "jw" model from JW_* environment variables.
 import { setupWriterModel } from "./writer/writer-model.ts";
 
 const EXTENSION_LOAD_FAILURE_HINT = `Hint: Start without extensions using "${APP_NAME} -ne".`;
@@ -592,7 +594,7 @@ export async function main(args: string[], options?: MainOptions) {
 	// Commands and startup selectors can load user-authored themes before runtime creation.
 	setThemeJsonValidator(validateThemeJson);
 	const extensionFactories = [...builtInExtensions, ...(options?.extensionFactories ?? [])];
-	// WriterAgent: startup network operations are off (version check, install report, model catalog
+	// JiaWriter: startup network operations are off (version check, install report, model catalog
 	// refresh, automatic package installs, fd/rg downloads). Explicit package commands (install, remove,
 	// update, list) are user requests and may use the network unless --offline is given.
 	const offlineMode = args.includes("--offline") || !isPackageCommandInvocation(args);
@@ -603,7 +605,7 @@ export async function main(args: string[], options?: MainOptions) {
 		// Read by the version check.
 		process.env.PI_SKIP_VERSION_CHECK = "1";
 	}
-	// WriterAgent: no install telemetry and no "pi" attribution headers unless PI_TELEMETRY is set.
+	// JiaWriter: no install telemetry and no "pi" attribution headers unless PI_TELEMETRY is set.
 	if (process.env.PI_TELEMETRY === undefined) process.env.PI_TELEMETRY = "0";
 
 	if (await runAuthCommand(args)) {
@@ -689,10 +691,10 @@ export async function main(args: string[], options?: MainOptions) {
 	validateForkFlags(parsed);
 	validateSessionIdFlags(parsed);
 
-	// WriterAgent: build the "wa" model from WA_* variables (no probing for --help).
+	// JiaWriter: build the "jw" model from JW_* variables (no probing for --help).
 	const writerModel = await setupWriterModel({
-		// Variables of this process.
-		env: process.env,
+		// Variables of this process, with the keys held in memory.
+		env: withSecrets(process.env),
 		// Holds the API detection cache.
 		agentDir,
 		// Selects the commands shown in the setup hint.
@@ -733,7 +735,7 @@ export async function main(args: string[], options?: MainOptions) {
 	// settings, resources, provider registrations, and models must be resolved only after
 	// the target session cwd is known. The startup-cwd settings manager is used only for
 	// sessionDir lookup during session selection.
-	// WriterAgent: WA_SESSION_DIR first, then the upstream PI_CODING_AGENT_SESSION_DIR.
+	// JiaWriter: JW_SESSION_DIR first, then the upstream PI_CODING_AGENT_SESSION_DIR.
 	const envSessionDir = readEnvDir(ENV_SESSION_DIR, LEGACY_ENV_SESSION_DIR);
 	const sessionDir =
 		(parsed.sessionDir ? normalizePath(parsed.sessionDir) : undefined) ??

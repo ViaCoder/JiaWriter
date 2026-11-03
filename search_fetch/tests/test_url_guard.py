@@ -669,7 +669,7 @@ def test_search_dash_query():
     os.chdir(_TMP)
     try:
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
-            # Argv shape with option-like query text after the separator, as WriterAgent's sfSearchArgs builds it.
+            # Argv shape with option-like query text after the separator, as JiaWriter's sfSearchArgs builds it.
             rc = cli.main(["search", "--engine=fixture", "--pages=1", "--json",
                            "--fresh=week", "--lang=-en", "--", "-site:example.org 报告"])
         check("search rc 0", rc == 0)

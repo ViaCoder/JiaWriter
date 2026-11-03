@@ -14,5 +14,5 @@ metadata:
 The skill and all its material are in Chinese, because the documents are Chinese.
 
 1. Read `../../zh/lieflat-gongwen/SKILL.md` (relative to this file) and follow it; every file it names is in that folder.
-2. Its section "在 WriterAgent 里使用" takes precedence over the rest of that file.
+2. Its section "在 JiaWriter 里使用" takes precedence over the rest of that file.
 3. Write the document in Chinese and talk to the user in the interface language.

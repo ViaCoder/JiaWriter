@@ -1,4 +1,4 @@
-// WriterAgent release packages carry pinned copies of fd and ripgrep (the user, 2026-11-01: latest
+// JiaWriter release packages carry pinned copies of fd and ripgrep (the user, 2026-11-01: latest
 // releases, SHA256-checked, no download at run time). This script puts the binary of one platform
 // into <package>/bin; license texts stay in the repository (the user, 2026-11-02). Archives are cached
 // in .tmp/tools-cache and checked against the pinned SHA256 on every use; a mismatch stops the build.

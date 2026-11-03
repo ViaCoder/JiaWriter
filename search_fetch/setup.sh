@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # search_fetch setup (one-click) — creates the venv + installs deps and PROVES the
-# tool imports cleanly by running the entry point WriterAgent spawns (sf.py, through home/sf).
+# tool imports cleanly by running the entry point JiaWriter spawns (sf.py, through home/sf).
 # A broken install therefore fails HERE, loudly, instead of inside a later web_search call.
 #
-# search_fetch is WriterAgent's WA_SEARCH=sf backend (a subprocess, WA_SF=<this dir>/home/sf);
+# search_fetch is JiaWriter's JW_SEARCH=sf backend (a subprocess, JW_SF=<this dir>/home/sf);
 # it uses no driver model (LLM) and needs no key.
 #
 # ALL runtime state lives INSIDE the package tree, under $SEARCH_FETCH_HOME (default
@@ -117,8 +117,8 @@ else
   echo "    ✓ rag.env present"
 fi
 
-# ── 5. Launcher for WriterAgent (WA_SF) + verify the entry point ─────────────
-# home/sf runs this source tree under the venv with this HOME; WriterAgent's WA_SF points here.
+# ── 5. Launcher for JiaWriter (JW_SF) + verify the entry point ─────────────
+# home/sf runs this source tree under the venv with this HOME; JiaWriter's JW_SF points here.
 cat > "$SEARCH_FETCH_HOME/sf" <<LAUNCH
 #!/bin/sh
 SEARCH_FETCH_HOME="$SEARCH_FETCH_HOME" exec "$PYBIN" "$DIR/sf.py" "\$@"
@@ -143,16 +143,16 @@ fi
 cat <<EOF
 
 ==> Setup complete in ${SECONDS}s.
-    WriterAgent wiring:
-      WA_SEARCH=sf
-      WA_SF=$SEARCH_FETCH_HOME/sf
+    JiaWriter wiring:
+      JW_SEARCH=sf
+      JW_SF=$SEARCH_FETCH_HOME/sf
 
     Direct self-test (no key needed):
       SEARCH_FETCH_HOME="$SEARCH_FETCH_HOME" "$PYBIN" "$DIR/sf.py" fetch '<url>'
       SEARCH_FETCH_HOME="$SEARCH_FETCH_HOME" "$PYBIN" "$DIR/sf.py" search '<query>' --pages 1
 
     Where things land:
-      • Per-call results → ./.search_fetchres/ in the CALLING directory (WriterAgent runs
+      • Per-call results → ./.search_fetchres/ in the CALLING directory (JiaWriter runs
         sf with cwd = the writing folder, so scrape records stay in that folder).
       • venv + launcher + extension copy + bridge socket + pacing + caches → $SEARCH_FETCH_HOME.
 EOF

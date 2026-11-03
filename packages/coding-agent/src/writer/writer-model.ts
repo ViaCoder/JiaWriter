@@ -1,5 +1,5 @@
 /**
- * WriterAgent startup: turn the WA_* variables into the "wa" provider.
+ * JiaWriter startup: turn the JW_* variables into the "jw" provider.
  * Called once from main.ts; the result is read by the built-in writer-env
  * extension (provider registration, output clamp, reasoning fallback) and by
  * sdk.ts (default model and thinking level).
@@ -22,9 +22,9 @@ import {
 // Variable parsing, URLs and the setup hint.
 import {
 	formatSetupHint,
+	JW_PROVIDER,
 	providerBaseUrl,
 	readWriterEnv,
-	WA_PROVIDER,
 	type WriterApi,
 	type WriterReasoning,
 } from "./env-config.ts";
@@ -74,7 +74,7 @@ export interface WriterModelReady {
 	maxTokens: number;
 	// Reasoning support of the endpoint.
 	reasoning: ReasoningSupport;
-	// Level asked for with WA_REASONING.
+	// Level asked for with JW_REASONING.
 	thinkingLevel: WriterReasoning;
 	// Detection cache file and key (for the runtime reasoning fallback).
 	cachePath: string;
@@ -85,7 +85,7 @@ export interface WriterModelReady {
 
 /** Outcome of the startup step. */
 export type WriterModelState =
-	// No WA_* variable set: the user configures models another way.
+	// No JW_* variable set: the user configures models another way.
 	| { kind: "none" }
 	// Variables checked but detection skipped (for --help).
 	| { kind: "skipped" }
@@ -173,11 +173,11 @@ export function buildProviderConfig(
 	// One chat model with the configured limits.
 	return {
 		// Shown in model lists.
-		name: "WriterAgent",
+		name: "JiaWriter",
 		// Endpoint base depends on the API.
 		baseUrl: providerBaseUrl(root, api),
-		// Read WA_KEY when each request is made.
-		apiKey: "$WA_KEY",
+		// Read JW_KEY when each request is made.
+		apiKey: "$JW_KEY",
 		// Wire API.
 		api,
 		// The single model.
@@ -201,9 +201,9 @@ export function buildProviderConfig(
 				input: ["text"],
 				// Cost tracking is not configured.
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-				// From WA_CTX.
+				// From JW_CTX.
 				contextWindow,
-				// From WA_OUT.
+				// From JW_OUT.
 				maxTokens,
 			},
 		],
@@ -217,12 +217,12 @@ export function formatDetectFailure(result: Extract<DetectResult, { ok: false }>
 		.map((o) => `${o.api}：${o.status === 0 ? "无响应" : `HTTP ${o.status}`}`)
 		.join("；");
 	// Wrong key.
-	if (result.reason === "auth") return `WA_KEY 无效或没有权限（${statuses}）。请检查 WA_KEY 和 WA_URL。`;
+	if (result.reason === "auth") return `JW_KEY 无效或没有权限（${statuses}）。请检查 JW_KEY 和 JW_URL。`;
 	// Nothing matched.
-	return `无法自动识别 WA_URL 的 API 类型（${statuses}）。请检查 WA_URL 和 WA_MODEL，或用 WA_API 手动指定：anthropic-messages / openai-responses / openai-completions。`;
+	return `无法自动识别 JW_URL 的 API 类型（${statuses}）。请检查 JW_URL 和 JW_MODEL，或用 JW_API 手动指定：anthropic-messages / openai-responses / openai-completions。`;
 }
 
-/** Read WA_*, decide the API type and reasoning support, prepare the provider; stores and returns the state. */
+/** Read JW_*, decide the API type and reasoning support, prepare the provider; stores and returns the state. */
 export async function setupWriterModel(options: SetupWriterModelOptions): Promise<WriterModelState> {
 	// Check the variables.
 	const read = readWriterEnv(options.env);
@@ -238,18 +238,18 @@ export async function setupWriterModel(options: SetupWriterModelOptions): Promis
 	// Key without the API key.
 	const cacheKey = detectCacheKey(root, model);
 	// The key, used only for the probes.
-	const key = options.env.WA_KEY?.trim() ?? "";
+	const key = options.env.JW_KEY?.trim() ?? "";
 	// Shared fields of every ready state.
 	const base = { root, model, contextWindow, maxTokens, thinkingLevel: requested, cachePath, cacheKey };
 	// Previous detection, if any.
 	const cached = loadDetectCache(cachePath, cacheKey);
-	// API type: WA_API, then cache, then probing.
+	// API type: JW_API, then cache, then probing.
 	let api: WriterApi;
 	// Where it came from.
 	let source: ApiSource;
 	// Response of the matching probe, used as the baseline for reasoning probes.
 	let baseline: { status: number; body: string } | undefined;
-	// 1. An explicit WA_API wins and needs no network.
+	// 1. An explicit JW_API wins and needs no network.
 	if (read.config.api) {
 		// Use it.
 		api = read.config.api;
@@ -290,7 +290,7 @@ export async function setupWriterModel(options: SetupWriterModelOptions): Promis
 			if (found === "auth")
 				return remember({
 					kind: "error",
-					message: "WA_KEY 无效或没有权限（检测推理档位时被拒绝）。请检查 WA_KEY 和 WA_URL。",
+					message: "JW_KEY 无效或没有权限（检测推理档位时被拒绝）。请检查 JW_KEY 和 JW_URL。",
 				});
 			// Use the result.
 			reasoning = found;
@@ -320,12 +320,12 @@ function remember(state: WriterModelState): WriterModelState {
 	return state;
 }
 
-/** Provider, model and initial thinking level for startup model selection, when WA_* is ready. */
+/** Provider, model and initial thinking level for startup model selection, when JW_* is ready. */
 export function getWriterDefaultModel():
 	| { provider: string; modelId: string; thinkingLevel: WriterReasoning }
 	| undefined {
 	// Only a ready configuration selects a model; pi clamps the level to the nearest supported one.
 	return current.kind === "ready"
-		? { provider: WA_PROVIDER, modelId: current.model, thinkingLevel: current.thinkingLevel }
+		? { provider: JW_PROVIDER, modelId: current.model, thinkingLevel: current.thinkingLevel }
 		: undefined;
 }

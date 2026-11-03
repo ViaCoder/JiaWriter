@@ -109,17 +109,17 @@ function runCli(dir: string, env: Record<string, string>): Promise<{ code: numbe
 	const childEnv: NodeJS.ProcessEnv = { ...process.env };
 	// Remove variables that could interfere.
 	for (const k of Object.keys(childEnv))
-		if (/^(WA_|PI_CODING_AGENT_|HTTPS?_PROXY$|https?_proxy$)/.test(k)) delete childEnv[k];
+		if (/^(JW_|PI_CODING_AGENT_|HTTPS?_PROXY$|https?_proxy$)/.test(k)) delete childEnv[k];
 	// Mock model, fixed API, no reasoning probes, isolated agent directory.
 	Object.assign(
 		childEnv,
 		{
-			WA_URL: baseUrl,
-			WA_KEY: SECRET,
-			WA_MODEL: "m1",
-			WA_API: "openai-completions",
-			WA_REASONING: "off",
-			WA_DIR: join(dir, ".agent"),
+			JW_URL: baseUrl,
+			JW_KEY: SECRET,
+			JW_MODEL: "m1",
+			JW_API: "openai-completions",
+			JW_REASONING: "off",
+			JW_DIR: join(dir, ".agent"),
 		},
 		env,
 	);
@@ -201,11 +201,11 @@ describe("writing checks end to end", () => {
 		// Stock phrase.
 		expect(history).toContain("〔套话〕综上所述");
 	}, 30_000);
-	it("follows WA_LANG=en for the word_count report", async () => {
+	it("follows JW_LANG=en for the word_count report", async () => {
 		// Ask for word_count with a target.
 		toolCall = { name: "word_count", args: { path: "draft.md", target: 100 } };
 		// Run in English.
-		const { code } = await runCli(draftDir(), { WA_LANG: "en" });
+		const { code } = await runCli(draftDir(), { JW_LANG: "en" });
 		// Success.
 		expect(code).toBe(0);
 		// English report in the second request: 草稿 2 + 16 + 8 Han characters = 26.

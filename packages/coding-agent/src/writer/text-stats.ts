@@ -1,5 +1,5 @@
 /**
- * Text statistics shared by the WriterAgent tools: positions, sentences, counts, sections and
+ * Text statistics shared by the JiaWriter tools: positions, sentences, counts, sections and
  * the comparison with a target length.
  */
 

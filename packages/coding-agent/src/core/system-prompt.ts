@@ -70,7 +70,7 @@ export function normalizeBuildSystemPromptOptions(input: BuildSystemPromptOption
 	return {
 		customPrompt: input.customPrompt,
 		forceSystemPrompt: input.forceSystemPrompt,
-		// WriterAgent: writing tools by default; bash stays off unless selected.
+		// JiaWriter: writing tools by default; bash stays off unless selected.
 		selectedTools: [...(input.selectedTools ?? ["read", "write", "edit", "ls", "find", "grep"])],
 		hiddenTools: [...(input.hiddenTools ?? [])],
 		toolSnippets: { ...(input.toolSnippets ?? {}) },
@@ -109,7 +109,7 @@ function buildRules(
 		rules.push(normalized);
 	};
 
-	// WriterAgent: the writing rules come first.
+	// JiaWriter: the writing rules come first.
 	for (const rule of WRITER_RULES) addRule(rule);
 
 	const hasBash = selectedTools.includes("bash");
@@ -129,13 +129,13 @@ function buildRules(
 	}
 
 	for (const name of selectedTools) {
-		// WriterAgent: writing-oriented guidelines replace the upstream ones for built-in tools.
+		// JiaWriter: writing-oriented guidelines replace the upstream ones for built-in tools.
 		for (const rule of WRITER_TOOL_GUIDELINES[name] ?? toolGuidelines[name] ?? []) addRule(rule);
 	}
 	for (const rule of promptGuidelines) addRule(rule);
-	// WriterAgent: reply language from WA_LANG (Chinese by default).
-	addRule(writerLanguageRule(process.env.WA_LANG));
-	// WriterAgent: concise chat, full-length documents (replaces "Be concise in your responses").
+	// JiaWriter: reply language from JW_LANG (Chinese by default).
+	addRule(writerLanguageRule(process.env.JW_LANG));
+	// JiaWriter: concise chat, full-length documents (replaces "Be concise in your responses").
 	addRule(WRITER_CHAT_RULE);
 	addRule("Show file paths clearly when working with files");
 	return rules.map((rule) => `- ${rule}`).join("\n");
@@ -169,9 +169,9 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 	if (customPrompt) {
 		promptSections.preamble = customPrompt;
 	} else {
-		// WriterAgent: writing assistant instead of coding assistant.
+		// JiaWriter: writing assistant instead of coding assistant.
 		promptSections.preamble = WRITER_PREAMBLE;
-		// WriterAgent: writing-oriented summaries replace the upstream ones for built-in tools.
+		// JiaWriter: writing-oriented summaries replace the upstream ones for built-in tools.
 		const snippetOf = (name: string): string | undefined =>
 			toolSnippets[name] ? (WRITER_TOOL_SNIPPETS[name] ?? toolSnippets[name]) : undefined;
 		const visibleTools = declaredTools.filter((name) => !!snippetOf(name));
@@ -179,7 +179,7 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 			visibleTools.length > 0 ? visibleTools.map((name) => `- ${name}: ${snippetOf(name)}`).join("\n") : "(none)";
 		promptSections.tools = `${tools}\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.`;
 		promptSections.rules = buildRules(declaredTools, toolGuidelines, promptGuidelines);
-		// WriterAgent: documentation pointers for WriterAgent itself.
+		// JiaWriter: documentation pointers for JiaWriter itself.
 		promptSections.docs = writerDocsSection(getReadmePath(), getDocsPath());
 	}
 

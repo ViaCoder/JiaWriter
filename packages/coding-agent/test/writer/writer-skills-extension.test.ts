@@ -26,8 +26,8 @@ import { styleCheck } from "../../src/writer/style/check.ts";
 let agent = "";
 beforeEach(() => {
 	agent = mkdtempSync(join(tmpdir(), "wa-skillext-"));
-	vi.stubEnv("WA_DIR", agent);
-	vi.stubEnv("WA_LANG", "zh");
+	vi.stubEnv("JW_DIR", agent);
+	vi.stubEnv("JW_LANG", "zh");
 });
 afterEach(() => {
 	rmSync(agent, { recursive: true, force: true });
@@ -121,15 +121,15 @@ describe("shipped skills", () => {
 });
 
 describe("resources_discover", () => {
-	it("offers the built-ins of WA_LANG that are turned on", () => {
+	it("offers the built-ins of JW_LANG that are turned on", () => {
 		// All nine in Chinese.
 		const { handlers } = load();
 		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(9);
 		expect(handlers.get("resources_discover")?.().skillPaths[0]).toBe(
 			join(getWriterSkillsDir(), "zh", "academic-writing"),
 		);
-		// English folder with WA_LANG=en.
-		vi.stubEnv("WA_LANG", "en");
+		// English folder with JW_LANG=en.
+		vi.stubEnv("JW_LANG", "en");
 		expect(handlers.get("resources_discover")?.().skillPaths[0]).toBe(
 			join(getWriterSkillsDir(), "en", "academic-writing"),
 		);

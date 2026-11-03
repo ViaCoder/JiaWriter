@@ -21,8 +21,8 @@ import { currentLang } from "../../src/writer/i18n/index.ts";
 let agent = "";
 beforeEach(() => {
 	agent = mkdtempSync(join(tmpdir(), "wa-uiext-"));
-	vi.stubEnv("WA_DIR", agent);
-	vi.stubEnv("WA_LANG", "");
+	vi.stubEnv("JW_DIR", agent);
+	vi.stubEnv("JW_LANG", "");
 });
 afterEach(() => {
 	rmSync(agent, { recursive: true, force: true });
@@ -91,7 +91,7 @@ describe("parseLangArg / ReadOnlyPage", () => {
 });
 
 describe("/lang", () => {
-	it("switches by argument or choice, refuses unknown names, and says when WA_LANG wins", async () => {
+	it("switches by argument or choice, refuses unknown names, and says when JW_LANG wins", async () => {
 		const cmd = commands().get("lang");
 		// By argument: the message is in the new language.
 		let x = ctx("tui");
@@ -111,26 +111,26 @@ describe("/lang", () => {
 		x = ctx("print");
 		await cmd?.handler("fr", x.c);
 		expect(x.notes).toEqual([{ text: "可选语言：zh、en。", type: "error" }]);
-		// WA_LANG set: saved, with a warning.
-		vi.stubEnv("WA_LANG", "zh");
+		// JW_LANG set: saved, with a warning.
+		vi.stubEnv("JW_LANG", "zh");
 		x = ctx("tui");
 		await cmd?.handler("en", x.c);
-		expect(x.notes).toEqual([{ text: "当前设置了 WA_LANG=zh，它优先于 /lang 的选择。", type: "warning" }]);
+		expect(x.notes).toEqual([{ text: "当前设置了 JW_LANG=zh，它优先于 /lang 的选择。", type: "warning" }]);
 		// Completions.
 		expect(commands().get("lang")?.getArgumentCompletions?.("e")).toEqual([{ value: "en", label: "en" }]);
 	});
 });
 
-describe("/wa", () => {
+describe("/jw", () => {
 	it("opens a full-screen page in the terminal and prints a note elsewhere, without the key", async () => {
-		const cmd = commands().get("wa");
-		vi.stubEnv("WA_KEY", "sk-secret-value");
+		const cmd = commands().get("jw");
+		vi.stubEnv("JW_KEY", "sk-secret-value");
 		// Terminal: the page.
 		let x = ctx("tui");
 		await cmd?.handler("", x.c);
 		const text = x.pages[0].render(200).join("\n");
-		expect(text.startsWith("WriterAgent 配置（只读，修改请设置环境变量）")).toBe(true);
-		expect(text).toContain("WA_KEY");
+		expect(text.startsWith("JiaWriter 配置（只读，修改请设置环境变量）")).toBe(true);
+		expect(text).toContain("JW_KEY");
 		expect(text).not.toContain("sk-secret");
 		// Print mode: a note.
 		x = ctx("print");

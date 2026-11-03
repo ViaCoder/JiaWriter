@@ -1,5 +1,5 @@
 /**
- * WriterAgent API type detection.
+ * JiaWriter API type detection.
  * One deliberately invalid request per API (an output limit of 0 and no messages):
  * the server rejects it while validating parameters, generates nothing and bills no tokens.
  */

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Hands-on check of WriterAgent's interactive interface in a pseudo-terminal (no tmux needed).
+"""Hands-on check of JiaWriter's interactive interface in a pseudo-terminal (no tmux needed).
 
 Starts the source build (pi-test.sh --no-env) with a throwaway HOME and agent folder, types
-/wa, /skills, /lang en, /skills and /wa, and looks for the expected Chinese and English text in
+/jw, /skills, /lang en, /skills and /jw, and looks for the expected Chinese and English text in
 the screen output (ANSI codes removed). Nothing outside the temp folder is read or written, no
 key is set, and no model is called. Prints one line per check and exits 1 when any check fails.
 Usage: python3 -I scripts/writer-tui-check.py [--debug] [program]
-  program: a built writeragent executable (default: the source build through pi-test.sh)
+  program: a built jiawriter executable (default: the source build through pi-test.sh)
 """
 
 # Pseudo-terminal, process control and timing.
@@ -94,8 +94,8 @@ def main():
     """Run the checks and print the results."""
     # Throwaway home and agent folder.
     tmp = tempfile.mkdtemp(prefix="wa-tui-")
-    env = {k: v for k, v in os.environ.items() if not k.startswith(("WA_", "PI_", "SF_"))}
-    env.update(HOME=tmp, WA_DIR=os.path.join(tmp, "agent"), TERM="xterm-256color", COLUMNS="120", LINES="40")
+    env = {k: v for k, v in os.environ.items() if not k.startswith(("JW_", "PI_", "SF_"))}
+    env.update(HOME=tmp, JW_DIR=os.path.join(tmp, "agent"), TERM="xterm-256color", COLUMNS="120", LINES="40")
     # The program to run, made absolute before the child changes folder.
     program = [a for a in sys.argv[1:] if a != "--debug"]
     if program and os.sep in program[0]:
@@ -120,14 +120,14 @@ def main():
         # Each step: what to type, how long to read, what must appear.
         steps = [
             (None, 12, ["中断", "命令", "按 "]),
-            ("/wa", 3, ["WriterAgent 配置（只读", "WA_KEY", "未设置", "按任意键关闭"]),
+            ("/jw", 3, ["JiaWriter 配置（只读", "JW_KEY", "未设置", "按任意键关闭"]),
             ("q", 2, []),
             ("/skills", 3, ["写作 skill（9 个）", "报告分析", "内置"]),
             ("\x1b", 2, []),
             ("/lang en", 3, ["Interface language set to English"]),
             ("/skills", 3, ["Writing skills (9)", "Report and analysis", "built-in"]),
             ("\x1b", 2, []),
-            ("/wa", 3, ["WriterAgent configuration (read-only", "not set", "Press any key to close"]),
+            ("/jw", 3, ["JiaWriter configuration (read-only", "not set", "Press any key to close"]),
             ("q", 2, []),
         ]
         for keys, seconds, wanted in steps:

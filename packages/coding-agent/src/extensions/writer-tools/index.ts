@@ -1,7 +1,7 @@
 /**
- * Built-in WriterAgent extension: the read-only writing checks style_check, word_count and
+ * Built-in JiaWriter extension: the read-only writing checks style_check, word_count and
  * readability_check. Each reads a text file or inline text and returns a report in the
- * WA_LANG language; none of them changes the text.
+ * JW_LANG language; none of them changes the text.
  */
 
 // Parameter schemas.

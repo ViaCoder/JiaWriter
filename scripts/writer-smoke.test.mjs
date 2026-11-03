@@ -1,5 +1,5 @@
 // Tests for scripts/writer-smoke.mjs (node:test): the mock server and the checks, driven by a fake
-// program that behaves like writeragent (or leaks the key). Loopback only.
+// program that behaves like jiawriter (or leaks the key). Loopback only.
 
 // Assertions.
 import assert from "node:assert/strict";
@@ -27,7 +27,7 @@ after(() => rmSync(dir, { recursive: true, force: true }));
 const HOST = (noisy) => `
 if (a[0] !== "chrome-extension://${EXTENSION_ID}/") process.exit(2);
 const fs = await import("node:fs"); const net = await import("node:net"); const path = await import("node:path");
-const dir = path.join(process.env.WA_DIR, "browser"); fs.mkdirSync(dir, { recursive: true });
+const dir = path.join(process.env.JW_DIR, "browser"); fs.mkdirSync(dir, { recursive: true });
 const win = process.platform === "win32"; const addr = path.join(dir, win ? "bridge.json" : "bridge.sock");
 const waiting = new Map(); let id = 0; let rest = Buffer.alloc(0);
 const server = net.createServer((s) => s.on("data", (c) => { const req = JSON.parse(String(c).split("\\n")[0]); const n = ++id;
@@ -44,29 +44,29 @@ process.stdin.on("end", () => server.close(() => { try { fs.unlinkSync(addr); } 
 
 /** A fake program: version, help, one Chat Completions request in print mode, and the host mode. */
 function fake(leak, noisyHost = false) {
-	// Node script answering like writeragent.
+	// Node script answering like jiawriter.
 	const p = join(dir, `${leak ? "leaky" : "good"}${noisyHost ? "-noisy" : ""}.mjs`);
 	writeFileSync(
 		p,
 		`const a = process.argv.slice(2);
 if (a[0]?.startsWith("chrome-extension://")) {${HOST(noisyHost)}}
 else if (a[0] === "--version") console.log("1.4.0");
-else if (a[0] === "--help") console.log("writeragent - AI writing assistant");
+else if (a[0] === "--help") console.log("jiawriter - AI writing assistant");
 else if (a[1] === "导入并导出") {
   const fs = await import("node:fs");
   fs.mkdirSync("参考资料/.parsed", { recursive: true });
   fs.writeFileSync("参考资料/.parsed/a.pdf.md", "Smoke reference text");
   fs.writeFileSync("d.docx", "PK fake");
   fs.writeFileSync("稿件.docx", "PK auto");
-  await fetch(process.env.WA_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.WA_KEY }, body: JSON.stringify({ max_tokens: 100, messages: [{ role: "tool", content: "✗ 领导讲话不用三级标题" }] }) });
+  await fetch(process.env.JW_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.JW_KEY }, body: JSON.stringify({ max_tokens: 100, messages: [{ role: "tool", content: "✗ 领导讲话不用三级标题" }] }) });
   console.log(${JSON.stringify(REPLY)});
 } else {
   const body = { max_tokens: 100, messages: [{ role: "system", content: "You are an expert writing assistant. <name>report-analysis</name> <name>lieflat-gongwen</name>" }],
     tools: ${JSON.stringify(TOOLS)}.map((name) => ({ type: "function", function: { name } })) };
-  const res = await fetch(process.env.WA_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.WA_KEY }, body: JSON.stringify(body) });
+  const res = await fetch(process.env.JW_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.JW_KEY }, body: JSON.stringify(body) });
   const text = await res.text();
   console.log(text.includes(${JSON.stringify(REPLY)}) ? ${JSON.stringify(REPLY)} : "no reply");
-  ${leak ? "console.error(process.env.WA_KEY);" : ""}
+  ${leak ? "console.error(process.env.JW_KEY);" : ""}
 }
 `,
 	);
@@ -147,9 +147,9 @@ test("the mock follows a script of tool calls before the plain reply", async () 
 });
 
 test("programPath makes a relative program path absolute and keeps a bare command", () => {
-	// CI passes extracted/writeragent/writeragent; the import round runs in another folder.
-	assert.equal(programPath("extracted/writeragent/writeragent"), resolve("extracted/writeragent/writeragent"));
-	assert.equal(programPath("extracted\\writeragent.exe"), resolve("extracted\\writeragent.exe"));
+	// CI passes extracted/jiawriter/jiawriter; the import round runs in another folder.
+	assert.equal(programPath("extracted/jiawriter/jiawriter"), resolve("extracted/jiawriter/jiawriter"));
+	assert.equal(programPath("extracted\\jiawriter.exe"), resolve("extracted\\jiawriter.exe"));
 	assert.equal(programPath("node"), "node");
 });
 
@@ -166,7 +166,7 @@ test("frame and frames round-trip messages and flag bytes that are not frames", 
 
 test("hostRound routes one request through a host and checks that it exits and refuses strangers", async () => {
 	// A well-behaved fake host in its own agent folder.
-	const env = { ...process.env, WA_DIR: join(dir, "host-agent") };
+	const env = { ...process.env, JW_DIR: join(dir, "host-agent") };
 	const rows = await hostRound(process.execPath, [fake(false)], env);
 	assert.deepEqual(rows.map(([name, ok]) => [name, ok]), [
 		["host listens", true],

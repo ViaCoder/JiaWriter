@@ -89,7 +89,7 @@ PAGE_DWELL = min(PAGE_DWELL_MAX, float(os.environ.get("SEARCH_FETCH_PAGE_DWELL",
 FETCH_DWELL = min(PAGE_DWELL_MAX, float(os.environ.get("SEARCH_FETCH_FETCH_DWELL", "4")))
 AI_CANDIDATE_LIMIT = int(os.environ.get("SEARCH_FETCH_CANDIDATE_LIMIT", "60"))
 # Fetch output bound (chars). The deterministic layer RENDERS + BOUNDS only; the caller's
-# writing model (WriterAgent) does ALL relevance filtering & summarising. ~24000 chars ≈ 6000 tokens,
+# writing model (JiaWriter) does ALL relevance filtering & summarising. ~24000 chars ≈ 6000 tokens,
 # a full long-form article; the FULL page is always saved to disk (_fit/_raw) regardless.
 FETCH_MAX_CHARS = int(os.environ.get("SEARCH_FETCH_FETCH_MAX_CHARS", "24000"))
 # Documents LINKED on a fetched page (…the report.pdf on its landing page) are downloaded,

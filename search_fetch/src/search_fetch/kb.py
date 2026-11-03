@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""kb.py — research knowledge base sidecar (inherited from WriterSuite; WriterAgent does not call it).
+"""kb.py — research knowledge base sidecar (inherited from WriterSuite; JiaWriter does not call it).
 
 A vector knowledge base instead of an LLM summarisation step: chunk the raw fetched corpus, embed every chunk with a
 mature multilingual embedding model (BAAI/bge-m3 via OpenRouter), and retrieve the
