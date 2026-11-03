@@ -134,6 +134,14 @@ function fakeSearch(scripts: Record<string, EngineScript>, interactive = false) 
 				log.push(`navigate:${args.url}`);
 				return {};
 			}
+			// Looking for Next on screen (not logged: it does not touch the page).
+			if (op === "find" && st) {
+				const sc = scripts[st.engine];
+				return {
+					found: st.page > 0 && st.page < sc.pages && !sc.infinite && (!sc.lazyNext || st.scrolled),
+					via: "ax",
+				};
+			}
 			if (op === "human_scroll" && st && args.px === 800) st.scrolled = true;
 			// A scroll to the bottom loads the next batch of an infinite page.
 			if (

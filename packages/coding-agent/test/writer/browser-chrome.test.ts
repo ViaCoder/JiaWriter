@@ -50,12 +50,15 @@ const EXT = resolve(__dirname, "../../../../search_fetch/src/search_fetch/extens
 const HOST_ENTRY = resolve(__dirname, "fixtures/browser-host.ts");
 
 /** One results page of a fake engine: two results, a tall spacer, and Next at the bottom while pages remain. */
-function serpPage(engine: "bing" | "google", base: string, q: string, page: number): string {
+function serpPage(engine: "bing" | "google" | "baidu", base: string, q: string, page: number): string {
 	// Result links point at the fixture articles.
 	const items = [1, 2]
 		.map((i) => {
 			const href = `${base}/article?e=${engine}&p=${page}&i=${i}`;
 			const title = `${q} ${engine} 第${page}页 结果${i}`;
+			if (engine === "baidu")
+				// Baidu (2026-11-03): the link is a /link?url= wrapper; the container's mu holds the real address.
+				return `<div class="result c-container" mu="${href}"><h3><a href="${base}/link?url=w${page}${i}">${title}</a></h3><div class="c-abstract">摘要 ${q} ${page}-${i}</div></div>`;
 			return engine === "bing"
 				? `<li class="b_algo"><h2><a href="${href}">${title}</a></h2><div class="b_caption"><p>摘要 ${q} ${page}-${i}</p></div></li>`
 				: `<div class="MjjYud"><a href="${href}"><h3>${title}</h3></a><div class="VwiC3b">摘要 ${q} ${page}-${i}</div></div>`;
@@ -63,13 +66,28 @@ function serpPage(engine: "bing" | "google", base: string, q: string, page: numb
 		.join("");
 	// Next link far below, so it must be scrolled into view.
 	const nextHref = `${base}/${engine}/search?q=${encodeURIComponent(q)}&page=${page + 1}`;
-	const next =
+	// Baidu's pager: hashed classes, and the label hidden from innerText (only textContent has it).
+	const baiduPager = `<div id="page"><a class="n prev_296JA disabled" href="#"><span style="display:none">上一页</span><svg width="18" height="18"></svg></a>${
 		page < 4
-			? engine === "bing"
-				? `<a class="sb_pagN" title="Next page" href="${nextHref}">下一页</a>`
-				: `<a id="pnnext" href="${nextHref}">下一页</a>`
-			: "";
-	const list = engine === "bing" ? `<ol id="b_results">${items}</ol>` : `<div id="search">${items}</div>`;
+			? `<a class="n next_d-g2R" href="${nextHref}"><span style="display:none">下一页</span><svg width="18" height="18"></svg></a>`
+			: ""
+	}</div>`;
+	const next =
+		engine === "baidu"
+			? baiduPager
+			: page < 4
+				? engine === "bing"
+					? `<a class="sb_pagN" title="Next page" href="${nextHref}">下一页</a>`
+					: `<a id="pnnext" href="${nextHref}">下一页</a>`
+				: "";
+	// Baidu also shows its own modules with placeholder mu hosts and no title link.
+	const module = `<div class="result-op c-container" mu="https://nourl.ubs.baidu.com/61344"><div>百度推荐</div></div>`;
+	const list =
+		engine === "bing"
+			? `<ol id="b_results">${items}</ol>`
+			: engine === "baidu"
+				? `<div id="content_left">${module}${items}</div>`
+				: `<div id="search">${items}</div>`;
 	return `<!doctype html><html><head><meta charset="utf-8"><title>${q}</title></head><body>${list}<div style="height:2400px"></div>${next}${RECORDER}</body></html>`;
 }
 
@@ -84,9 +102,14 @@ new MutationObserver((ms) => { for (const m of ms) navigator.sendBeacon("/log", 
   .observe(document.documentElement, { attributes: true, subtree: true });</script>`;
 
 /** Home page of a fake engine: a consent banner (Bing) and a search form. */
-function homePage(engine: "bing" | "google", base: string): string {
+function homePage(engine: "bing" | "google" | "baidu", base: string): string {
 	// Field names as on the real sites.
-	const field = engine === "bing" ? `<textarea id="sb_form_q" name="q"></textarea>` : `<textarea name="q"></textarea>`;
+	const field =
+		engine === "bing"
+			? `<textarea id="sb_form_q" name="q"></textarea>`
+			: engine === "baidu"
+				? `<textarea id="chat-textarea" name="wd"></textarea><button id="chat-submit-button" type="submit">搜索</button>`
+				: `<textarea name="q"></textarea>`;
 	const consent =
 		engine === "bing"
 			? `<div id="bnp"><button id="bnp_btn_accept" onclick="document.getElementById('bnp').remove()">接受</button></div>`
@@ -143,11 +166,16 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 				return;
 			}
 			res.setHeader("content-type", "text/html; charset=utf-8");
-			const m = /^\/(bing|google)\/(search)?$/.exec(u.pathname);
+			const m = /^\/(bing|google|baidu)\/(search)?$/.exec(u.pathname);
 			if (m && !m[2]) res.end(homePage(m[1] as "bing", base));
 			else if (m)
 				res.end(
-					serpPage(m[1] as "bing", base, u.searchParams.get("q") ?? "", Number(u.searchParams.get("page") ?? 1)),
+					serpPage(
+						m[1] as "bing",
+						base,
+						u.searchParams.get("q") ?? u.searchParams.get("wd") ?? "",
+						Number(u.searchParams.get("page") ?? 1),
+					),
 				);
 			else res.end(articlePage());
 		});
@@ -269,5 +297,38 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 		expect(pdf.content).toContain("report page two");
 		// Every tab of the run closes.
 		expect(await d.call("close_run", { run: "chrome-test" }, 10_000)).toBe(2);
+	}, 420_000);
+
+	it("finds Baidu's box and its hidden-label Next link on screen (accessibility tree), and keeps the real addresses from mu", async () => {
+		// Baidu pointed at the fixture server, with CSS selectors that match nothing: only the accessibility tree can find the controls.
+		const specs: Record<EngineName, EngineSpec> = {
+			...ENGINES,
+			baidu: { ...ENGINES.baidu, home: `${base}/baidu/`, box: ["#nope"], submit: ["#nope"], next: ["#nope"] },
+		};
+		// How each typing and click found its target.
+		const vias: string[] = [];
+		const base0 = deps();
+		const d: BrowserDeps = {
+			...base0,
+			call: async (op, args, ms) => {
+				const r = await base0.call(op, args, ms);
+				if (op === "human_type" || op === "human_click") vias.push(`${op}:${(r as { via?: string }).via}`);
+				return r;
+			},
+		};
+		const out = await browserSearch(d, "国务院 常务会议", {
+			engines: ["baidu"],
+			pages: 3,
+			timing: { ...DEFAULT_TIMING, engineGapMs: 0, hostGapMs: 0, loadMs: 15_000 },
+			specs,
+		});
+		// Three pages, two results each, every address the article itself (no /link wrapper, no module).
+		expect(out.outcomes.map((o) => [o.engine, o.pages, o.stopped])).toEqual([["baidu", 3, ""]]);
+		const urls = out.outcomes[0].hits.map((h) => h.url);
+		expect(urls).toHaveLength(6);
+		expect(urls.every((u) => u.startsWith(`${base}/article?e=baidu&`))).toBe(true);
+		// Typed into the box and clicked Next twice, all found on screen.
+		expect(vias).toEqual(["human_type:ax", "human_click:ax", "human_click:ax"]);
+		await d.call("close_run", { run: "chrome-test" }, 10_000);
 	}, 420_000);
 });

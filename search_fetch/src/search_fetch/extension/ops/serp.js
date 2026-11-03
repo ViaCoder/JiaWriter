@@ -42,8 +42,10 @@
       const a = box.querySelector("h3 a");
       if (!a || badged(box)) continue;
       const cap = box.querySelector("[class*='content-right'], [class*='summary'], .c-abstract, [class*='text_']");
-      // The container's mu attribute holds the real address behind Baidu's /link?url= wrapper.
-      add(a, one(a), one(cap), box.getAttribute("mu"));
+      // The container's mu attribute holds the real address behind Baidu's /link?url= wrapper; Baidu's own
+      // modules carry placeholder hosts there (nourl.*, *.recommend_list.*), which are left out.
+      const mu = box.getAttribute("mu") || "";
+      add(a, one(a), one(cap), /^https?:\/\/(nourl\.|[^/]*recommend_list\.)/.test(mu) ? "" : mu);
     }
   } else if (engine === "sogou") {
     // Sogou: div.vrwrap / div.rb blocks in .results, title link in h3.
@@ -72,9 +74,9 @@
     }
   }
   // Next-page control on screen.
-  const next = !!document.querySelector("a.sb_pagN, a[title='Next page'], a[title='下一页'], #pnnext, a[aria-label='Next page'], a[aria-label='下一页'], #sogou_next")
-    // Baidu and Sogou pagers: a link labelled 下一页.
-    || [...document.querySelectorAll("#page a, #pagebar_container a, .p a")].some((a) => /^\s*下一页/.test(a.innerText || ""));
+  const next = !!document.querySelector("a.sb_pagN, a[title='Next page'], a[title='下一页'], #pnnext, a[aria-label='Next page'], a[aria-label='下一页'], #sogou_next, #page a[class*='next']")
+    // Baidu and Sogou pagers: a link labelled 下一页 (Baidu's label has an empty innerText, so textContent too).
+    || [...document.querySelectorAll("#page a, #pagebar_container a, .p a")].some((a) => /^\s*下一页/.test(a.innerText || a.textContent || ""));
   // A bot check instead of results.
   const text = (document.body ? document.body.innerText : "").slice(0, 3000).toLowerCase();
   const challenge = /\/sorry\/|\/antispider/.test(location.pathname) || /^wappass\.baidu\.com$/.test(location.host) || !!document.querySelector("#captcha-form, form[action*='sorry'], #b_captcha, iframe[src*='captcha'], iframe[src*='challenges.cloudflare'], .g-recaptcha")

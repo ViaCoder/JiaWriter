@@ -18,7 +18,8 @@
   else for (const sel of a.selectors || []) { try { list.push(...document.querySelectorAll(sel)); } catch (_) { /* bad selector */ } }
   // Optional text filter on the visible label.
   const re = a.text ? new RegExp(a.text, "i") : null;
-  const label = (e) => ((e.innerText || e.value || e.getAttribute("aria-label") || e.getAttribute("title") || "") + "").trim();
+  // innerText can be empty while the label is there (Baidu's pager draws it so): textContent then.
+  const label = (e) => ((e.innerText || e.value || e.getAttribute("aria-label") || e.getAttribute("title") || e.textContent || "") + "").trim();
   // First match that is shown.
   const el = list.find((e) => shown(e) && (!re || re.test(label(e))));
   if (!el) return { found: false };

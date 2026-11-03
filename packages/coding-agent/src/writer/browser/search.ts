@@ -7,7 +7,7 @@
  */
 
 // Engine definitions and link decoding.
-import { ENGINES, type EngineName, type EngineSpec, resultTarget, withFresh } from "./engines.ts";
+import { AX, ENGINES, type EngineName, type EngineSpec, resultTarget, withFresh } from "./engines.ts";
 // Local ranking.
 import { type EngineHit, type RankedHit, rankHits } from "./rank.ts";
 
@@ -272,7 +272,7 @@ export async function searchEngine(
 		if (first.consent && spec.consent.length > 0) {
 			await deps.call(
 				"human_click",
-				{ tab, target: { selectors: spec.consent }, load_ms: opts.timing.loadMs },
+				{ tab, target: { ax: AX.consent, selectors: spec.consent }, load_ms: opts.timing.loadMs },
 				opts.timing.loadMs + 20_000,
 			);
 			await pause(deps, 800, 1600);
@@ -280,7 +280,7 @@ export async function searchEngine(
 		// Click the box, type, Enter.
 		const typed = (await deps.call(
 			"human_type",
-			{ tab, target: { selectors: spec.box }, text: query, enter: true, load_ms: opts.timing.loadMs },
+			{ tab, target: { ax: AX.box, selectors: spec.box }, text: query, enter: true, load_ms: opts.timing.loadMs },
 			// Load time, plus up to 1.5 s per character typed.
 			opts.timing.loadMs + 30_000 + [...query].length * 1500,
 		)) as InputReply;
@@ -289,7 +289,7 @@ export async function searchEngine(
 		if (!typed.navigated) {
 			const sub = (await deps.call(
 				"human_click",
-				{ tab, target: { selectors: spec.submit }, load_ms: opts.timing.loadMs },
+				{ tab, target: { ax: AX.submit, selectors: spec.submit }, load_ms: opts.timing.loadMs },
 				opts.timing.loadMs + 20_000,
 			)) as InputReply;
 			if (!sub.navigated) return { engine, hits, pages, stopped: "search did not start", serp: null };
@@ -334,8 +334,8 @@ export async function searchEngine(
 			}
 			pages = p;
 			serp = { engine, tab, url: rep.url, refs };
-			// Read the page like a person: a few wheel turns.
-			await deps.call("human_scroll", { tab, steps: 2 + Math.floor(deps.random() * 2) }, 30_000);
+			// Read the page like a person: three to five wheel turns with reading time between them.
+			await deps.call("human_scroll", { tab, steps: 3 + Math.floor(deps.random() * 3) }, 60_000);
 			// Last page wanted.
 			if (p === opts.pages) break;
 			// More results in place: read down to the bottom, as a person does, and let them load.
@@ -348,16 +348,22 @@ export async function searchEngine(
 				}
 				continue;
 			}
-			// A pager drawn only near the bottom: read further down, then look again.
-			if (!rep.next) {
+			// Is there a next page? Looked up on screen (accessibility tree), the page script's answer as a fallback;
+			// a pager drawn only near the bottom: read further down, then look again.
+			const nextTarget = { ax: AX.next, selectors: spec.next, text: spec.nextText };
+			const seesNext = async () =>
+				((await deps.call("find", { tab, target: nextTarget }, 30_000)) as { found?: boolean } | null)?.found ===
+				true;
+			if (!(await seesNext()) && !rep.next) {
 				await deps.call("human_scroll", { tab, steps: 3, px: 800 }, 30_000);
-				if (!(await readSerp(deps, tab, engine)).next) break;
+				if (!(await seesNext()) && !(await readSerp(deps, tab, engine)).next) break;
 			}
-			await pause(deps, 800, 2500);
+			// A moment before reaching for Next.
+			await pause(deps, 1500, 4000);
 			// Click "Next".
 			const nx = (await deps.call(
 				"human_click",
-				{ tab, target: { selectors: spec.next, text: spec.nextText }, load_ms: opts.timing.loadMs },
+				{ tab, target: nextTarget, load_ms: opts.timing.loadMs },
 				opts.timing.loadMs + 30_000,
 			)) as InputReply;
 			if (!nx.navigated) break;

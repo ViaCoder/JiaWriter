@@ -8,8 +8,8 @@
 
 // Native messaging host name (must match the host manifest the jiawriter program writes).
 const HOST = "com.jiawriter.browser";
-// Protocol version reported to the host.
-const VERSION = "2.0.0";
+// Version reported to the host: the manifest's, so the two never differ.
+const VERSION = chrome.runtime.getManifest().version;
 // Page scripts that may be run (file names in ops/ without .js).
 const SCRIPTS = new Set(["html", "meta", "probe", "observe", "results", "extent", "url", "scroll_bottom",
   "click_target", "type_target", "next_link", "more_button", "activity_install", "activity_last",
@@ -314,12 +314,91 @@ async function wheel(send, tabId, dy) {
   }
 }
 
+// Accessibility tree: what Chrome tells screen readers about the page — each element's role (text box,
+// button, link), the name it shows, a link's address — with its box on screen. Targets are found the way a
+// person reads the screen, without CSS selectors or page scripts.
+function axRole(n) {
+  return (n.role && n.role.value) || "";
+}
+function axName(n) {
+  return String((n.name && n.name.value) || "").trim();
+}
+function axProp(n, name) {
+  const p = (n.properties || []).find((q) => q.name === name);
+  return p && p.value ? p.value.value : undefined;
+}
+
+// True when link address u leads to the next results page of current address c: same site, same query,
+// and a larger page counter (first= Bing, start= Google, pn= Baidu, page= Sogou and others).
+function nextPageUrl(u, c) {
+  let a, b;
+  try { a = new URL(u); b = new URL(c); } catch (_) { return false; }
+  if (a.host !== b.host) return false;
+  // The same query words.
+  for (const k of ["q", "wd", "word", "query"]) if (a.searchParams.has(k) && b.searchParams.has(k) && a.searchParams.get(k) !== b.searchParams.get(k)) return false;
+  // A larger page counter.
+  for (const k of ["first", "start", "pn", "page"]) {
+    if (!a.searchParams.has(k)) continue;
+    const now = Number(b.searchParams.get(k) || (k === "page" || k === "first" ? 1 : 0));
+    return Number(a.searchParams.get(k)) > now;
+  }
+  return false;
+}
+
+// The on-screen box of an accessibility node (viewport pixels), or null.
+async function axBox(send, n) {
+  try {
+    const { model } = await send("DOM.getBoxModel", { backendNodeId: n.backendDOMNodeId });
+    const q = model.border, xs = [q[0], q[2], q[4], q[6]], ys = [q[1], q[3], q[5], q[7]];
+    const x = Math.min(...xs), y = Math.min(...ys);
+    return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+  } catch (_) {
+    return null;
+  }
+}
+
+// Find ax = {roles, name (pattern), pick: "largest", nextPage} in the accessibility tree; returns the
+// box like locate.js ({found, x, y, w, h, vw, vh}).
+async function axLocate(send, tabId, ax) {
+  const { nodes } = await send("Accessibility.getFullAXTree", {});
+  const tab = await chrome.tabs.get(tabId);
+  const { cssLayoutViewport: vp } = await send("Page.getLayoutMetrics", {});
+  const roles = new Set(ax.roles || []);
+  const re = ax.name ? new RegExp(ax.name, "i") : null;
+  // Candidates: by name first, then by address (next page), in page order.
+  const byName = [], byPage = [];
+  for (const n of nodes) {
+    if (n.ignored || n.backendDOMNodeId === undefined || !roles.has(axRole(n)) || axProp(n, "disabled")) continue;
+    if (!re || re.test(axName(n))) byName.push(n);
+    else if (ax.nextPage && nextPageUrl(String(axProp(n, "url") || ""), tab.url || "")) byPage.push(n);
+  }
+  let best = null;
+  for (const n of [...byName, ...byPage]) {
+    const box = await axBox(send, n);
+    if (!box || box.w < 2 || box.h < 2) continue;
+    if (ax.pick !== "largest") { best = box; break; }
+    if (!best || box.w * box.h > best.w * best.h) best = box;
+  }
+  return best ? { found: true, ...best, vw: vp.clientWidth, vh: vp.clientHeight } : { found: false };
+}
+
+// Where the target is now: the accessibility tree first (target.ax), CSS selectors only as a fallback.
+async function where(send, tabId, target) {
+  if (target.ax) {
+    const box = await axLocate(send, tabId, target.ax).catch(() => ({ found: false }));
+    if (box.found) return { ...box, via: "ax" };
+  }
+  if (!target.selectors && !target.wfId && target.ref === undefined) return { found: false };
+  const box = await runScript(tabId, "locate", target);
+  return box && box.found ? { ...box, via: target.ax ? "css" : "ref" } : { found: false };
+}
+
 // Bring the target into view with the wheel and return its box, or null when it is not on the page.
 async function reach(send, tabId, target) {
   // A few rounds of look, scroll, look again.
   for (let round = 0; round < 12; round++) {
     // Where is it now?
-    const box = await runScript(tabId, "locate", target);
+    const box = await where(send, tabId, target);
     if (!box || !box.found) return null;
     // Inside the viewport with a margin: done.
     if (box.y >= 70 && box.y + box.h <= box.vh - 50) return box;
@@ -329,7 +408,7 @@ async function reach(send, tabId, target) {
     await sleep(rand(250, 600));
   }
   // Still not in view: report its last box anyway (a fixed header may cover the margin).
-  const box = await runScript(tabId, "locate", target);
+  const box = await where(send, tabId, target);
   return box && box.found ? box : null;
 }
 
@@ -476,8 +555,13 @@ const OPS = {
       reg.tabs[nav.newTab] = { run: msg.run || "", created: Date.now() };
       await saveRegistry(reg);
     }
-    // The outcome.
-    return { clicked: true, ...nav };
+    // The outcome, with how the target was found (ax, css or ref).
+    return { clicked: true, via: box.via || "", ...nav };
+  },
+  // Only look for a target, without touching the page. {tab, target} → {found, via}.
+  async find(msg) {
+    const box = await withInput(msg.tab, (send) => where(send, msg.tab, msg.target || {}));
+    return { found: !!box.found, via: box.via || "" };
   },
   // Click the field, type text and optionally press Enter. {tab, target, text, enter, load_ms}.
   async human_type(msg) {
@@ -499,7 +583,7 @@ const OPS = {
     const nav = await watch.wait();
     if (!box) return { typed: false, navigated: false, newTab: null, timedOut: false };
     // The outcome.
-    return { typed: true, ...nav };
+    return { typed: true, via: box.via || "", ...nav };
   },
   // Press one key in the page. {tab, key, load_ms}.
   async human_key(msg) {

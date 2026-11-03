@@ -12,6 +12,30 @@ export const ALL_ENGINES: readonly EngineName[] = ["bing", "google", "baidu", "s
 /** Default engine order when neither the model nor JW_ENGINES picks (Bing first). */
 export const DEFAULT_ENGINES: readonly EngineName[] = ["bing", "google"];
 
+/** A control found the way a person reads the screen: Chrome's accessibility tree (role, shown name, link address). */
+export interface AxTarget {
+	// Accessibility roles that count.
+	roles: string[];
+	// Pattern for the shown name (case-insensitive).
+	name?: string;
+	// Several matches: the largest on screen.
+	pick?: "largest";
+	// A link to the next results page of the same query counts too, whatever its name.
+	nextPage?: boolean;
+}
+
+/** The controls of every engine, by role and shown name (the CSS selectors below are only a fallback). */
+export const AX: Record<"box" | "submit" | "consent" | "next", AxTarget> = {
+	// The search field: the largest text field.
+	box: { roles: ["combobox", "searchbox", "textbox"], pick: "largest" },
+	// The search button.
+	submit: { roles: ["button"], name: "^(搜索|百度一下|搜狗搜索|搜一下|Google 搜索|Google Search|Search)$" },
+	// The accept button of a cookie dialog.
+	consent: { roles: ["button"], name: "^(接受|全部接受|全部同意|同意|Accept|Accept all|I agree)$" },
+	// The next-page link, by its label or by where it leads.
+	next: { roles: ["link", "button"], name: "^(下一页|下页|Next|Next page)\\s*[>›»]?$", nextPage: true },
+};
+
 /** Where an engine's controls are. */
 export interface EngineSpec {
 	// Name.
@@ -55,7 +79,8 @@ export const ENGINES: Record<EngineName, EngineSpec> = {
 		box: ["#chat-textarea", "#kw", "textarea[name='wd']", "input[name='wd']"],
 		submit: ["#chat-submit-button", "#su"],
 		consent: [],
-		next: ["#page a.n", "#page a"],
+		// The next link's class is hashed (next_d-g2R on 2026-11-03), so it is matched by part; label checked too.
+		next: ["#page a[class*='next']", "#page a.n"],
 		nextText: "^\\s*下一页",
 	},
 	sogou: {
