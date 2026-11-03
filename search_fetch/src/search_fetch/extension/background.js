@@ -95,23 +95,28 @@ async function saveRegistry(reg) {
 }
 
 // The dedicated, unfocused window all pages open in (created on first use).
-async function dedicatedWindow(reg) {
+async function dedicatedWindow(reg, url = "about:blank") {
   // Reuse it while it exists.
   if (reg.windowId !== null) {
     try {
       await chrome.windows.get(reg.windowId);
-      return reg.windowId;
+      return { id: reg.windowId, created: false };
     } catch (_) {
       // It was closed by the user.
       reg.windowId = null;
     }
   }
-  // A normal window that does not take focus from the user's work.
-  const w = await chrome.windows.create({ url: "about:blank", focused: false, type: "normal", width: 1280, height: 900 });
+  // The window the user is working in, to hand focus back to it.
+  const prev = await chrome.windows.getLastFocused().catch(() => null);
+  // A normal window (not minimized: a minimized page stops drawing and reports itself hidden) that does not
+  // take focus from the user's work.
+  const w = await chrome.windows.create({ url, focused: false, type: "normal", state: "normal", width: 1280, height: 900 });
+  // Some window managers raise a new window anyway: give focus straight back, so it stays behind.
+  if (prev && prev.id !== undefined && prev.id !== w.id && prev.focused) await chrome.windows.update(prev.id, { focused: true }).catch(() => {});
   // Remember it.
   reg.windowId = w.id;
-  // Its id.
-  return w.id;
+  // Its id; the new window already shows url.
+  return { id: w.id, created: true };
 }
 
 // Wait until a tab finishes loading (resolves {timedOut} instead of failing on timeout).
@@ -374,12 +379,97 @@ async function axLocate(send, tabId, ax) {
   }
   let best = null;
   for (const n of [...byName, ...byPage]) {
-    const box = await axBox(send, n);
-    if (!box || box.w < 2 || box.h < 2) continue;
+    const found = await axBox(send, n);
+    if (!found || found.w < 2 || found.h < 2) continue;
+    // The node itself, so keyboard focus goes to exactly this control.
+    const box = { ...found, node: n.backendDOMNodeId };
     if (ax.pick !== "largest") { best = box; break; }
     if (!best || box.w * box.h > best.w * best.h) best = box;
   }
   return best ? { found: true, ...best, vw: vp.clientWidth, vh: vp.clientHeight } : { found: false };
+}
+
+// The results list as a person reads it: every heading that carries a link is one result (Google puts the
+// heading inside the link, Bing, Baidu and Sogou the link inside the heading). Title = the heading's name,
+// address = the link's, snippet = the other text shown in the same block. A block that shows an ad label on
+// its own is skipped. Returns [{u, t, s}] in page order.
+const AD_LABEL = /^(广告|推广|赞助|品牌广告|Ad|Ads|Sponsored)$/i;
+// In the extension's isolated world, from a redirect link up to the nearest block that states the real address:
+// an mu attribute (Baidu) or a data-url inside it (Sogou). Placeholder and search-page addresses do not count.
+const REAL_URL_FN = `function () {
+  const ok = (u) => /^https?:\\/\\//.test(u || "") && !/^https?:\\/\\/(nourl\\.|[^/]*recommend_list\\.|([^/]*\\.)?(sogou\\.com|so\\.html5\\.qq\\.com)\\/)/.test(u);
+  for (let e = this, i = 0; e && e !== document.body && i < 12; e = e.parentElement, i++) {
+    const mu = e.getAttribute && e.getAttribute("mu");
+    // A Baidu module of its own (note_lead and others carry a placeholder mu): not a result.
+    if (mu) return ok(mu) ? mu : "skip";
+    const d = e.querySelectorAll ? [...e.querySelectorAll("[data-url]")].map((x) => x.getAttribute("data-url")).find(ok) : "";
+    if (d) return d;
+  }
+  return "";
+}`;
+
+async function axResults(send, tabId) {
+  const { nodes } = await send("Accessibility.getFullAXTree", {});
+  const byId = new Map(nodes.map((n) => [n.nodeId, n]));
+  const up = (n) => (n && n.parentId ? byId.get(n.parentId) : null);
+  // Visible text under a node, in order (StaticText names).
+  const texts = (n, out = [], depth = 0) => {
+    if (!n || depth > 12) return out;
+    if (!n.ignored && axRole(n) === "StaticText" && axName(n)) out.push(axName(n));
+    for (const c of n.childIds || []) texts(byId.get(c), out, depth + 1);
+    return out;
+  };
+  const firstLink = (n, depth = 0) => {
+    if (!n || depth > 6) return null;
+    if (!n.ignored && axRole(n) === "link" && axProp(n, "url")) return n;
+    for (const c of n.childIds || []) { const l = firstLink(byId.get(c), depth + 1); if (l) return l; }
+    return null;
+  };
+  const out = [], seen = new Set();
+  for (const h of nodes) {
+    if (h.ignored || axRole(h) !== "heading") continue;
+    // The link around the heading, else the first link inside it.
+    let link = null, top = h;
+    for (let p = up(h), i = 0; p && i < 3; p = up(p), i++) if (axRole(p) === "link" && axProp(p, "url")) { link = p; top = p; break; }
+    if (!link) link = firstLink(h);
+    if (!link) continue;
+    const u = String(axProp(link, "url") || "");
+    const t = axName(h) || axName(link);
+    if (!/^https?:\/\//.test(u) || !t || seen.has(u)) continue;
+    // The block: two levels above the heading (or the link around it).
+    let block = top;
+    for (let i = 0; i < 2 && up(block); i++) block = up(block);
+    const words = texts(block);
+    if (words.some((w) => AD_LABEL.test(w.trim()))) continue;
+    const titleWords = new Set(texts(top));
+    const s = words.filter((w) => !titleWords.has(w)).join(" ").replace(/\s+/g, " ").trim().slice(0, 400);
+    seen.add(u);
+    out.push({ u, t: t.slice(0, 200), s, node: link.backendDOMNodeId });
+  }
+  // An engine's own /link redirects: the real address read from the result block (page code only here).
+  const page = await chrome.tabs.get(tabId).then((t) => new URL(t.url).host).catch(() => "");
+  const wrapped = out.filter((r) => {
+    try {
+      const u = new URL(r.u);
+      return u.pathname === "/link" && (u.host === page || /(^|\.)(baidu|sogou)\.com$/.test(u.hostname));
+    } catch (_) {
+      return false;
+    }
+  });
+  if (wrapped.length > 0) {
+    const { frameTree } = await send("Page.getFrameTree");
+    const { executionContextId } = await send("Page.createIsolatedWorld", { frameId: frameTree.frame.id, worldName: "jw-read" });
+    for (const r of wrapped) {
+      try {
+        const { object } = await send("DOM.resolveNode", { backendNodeId: r.node, executionContextId });
+        const v = await send("Runtime.callFunctionOn", { objectId: object.objectId, returnByValue: true, functionDeclaration: REAL_URL_FN });
+        if (v && v.result && v.result.value) r.u = v.result.value;
+      } catch (_) {
+        // Left as the redirect.
+      }
+    }
+  }
+  return out.filter((r) => r.u !== "skip").map(({ node: _node, ...r }) => r);
 }
 
 // Where the target is now: the accessibility tree first (target.ax), CSS selectors only as a fallback.
@@ -390,15 +480,15 @@ async function where(send, tabId, target) {
   }
   if (!target.selectors && !target.wfId && target.ref === undefined) return { found: false };
   const box = await runScript(tabId, "locate", target);
-  return box && box.found ? { ...box, via: target.ax ? "css" : "ref" } : { found: false };
+  return box && box.found ? { ...box, via: target.ax ? (target.selectors ? "css" : "script") : "ref" } : { found: false };
 }
 
 // Bring the target into view with the wheel and return its box, or null when it is not on the page.
 async function reach(send, tabId, target) {
-  // A few rounds of look, scroll, look again.
-  for (let round = 0; round < 12; round++) {
-    // Where is it now?
-    const box = await where(send, tabId, target);
+  // Where is it? (The whole accessibility tree is read once.)
+  let box = await where(send, tabId, target);
+  // Rounds of scroll and look again, enough for a long page that loaded more results.
+  for (let round = 0; round < 30; round++) {
     if (!box || !box.found) return null;
     // Inside the viewport with a margin: done.
     if (box.y >= 70 && box.y + box.h <= box.vh - 50) return box;
@@ -406,9 +496,11 @@ async function reach(send, tabId, target) {
     await wheel(send, tabId, Math.max(-700, Math.min(700, box.y + box.h / 2 - box.vh / 2)));
     // Let the page settle.
     await sleep(rand(250, 600));
+    // The same node's new box (cheap); a target without a node is looked up again.
+    const moved = box.node ? await axBox(send, { backendDOMNodeId: box.node }) : null;
+    box = moved ? { ...box, ...moved } : await where(send, tabId, target);
   }
   // Still not in view: report its last box anyway (a fixed header may cover the margin).
-  const box = await where(send, tabId, target);
   return box && box.found ? box : null;
 }
 
@@ -423,19 +515,68 @@ async function clickHere(send, tabId) {
 }
 
 // Move to the target and click it; null when the target is not on the page.
-async function clickTarget(send, tabId, target) {
+// True when the tab's window is the one in front: a mouse press cannot take focus from the user then.
+async function inFront(tabId) {
+  try {
+    const t = await chrome.tabs.get(tabId);
+    return !!(await chrome.windows.get(t.windowId)).focused;
+  } catch (_) {
+    return false;
+  }
+}
+
+// Give keyboard focus to the element under (x, y), or to the link, button or field around it, without a mouse
+// press (on GNOME a press raises the window, 2026-11-03; focus, keys, wheel and moves do not). Runs in an
+// isolated world of the extension, so the page's own scripts are not touched. Returns the focused tag or "".
+async function focusAt(send, x, y, node) {
+  // The control found on screen, else the element under the pointer.
+  const backendNodeId = node || (await send("DOM.getNodeForLocation", { x: Math.round(x), y: Math.round(y) })).backendNodeId;
+  const { frameTree } = await send("Page.getFrameTree");
+  const { executionContextId } = await send("Page.createIsolatedWorld", { frameId: frameTree.frame.id, worldName: "jw-input" });
+  const { object } = await send("DOM.resolveNode", { backendNodeId, executionContextId });
+  const r = await send("Runtime.callFunctionOn", {
+    objectId: object.objectId,
+    returnByValue: true,
+    functionDeclaration: "function () { const el = this.nodeType === 1 ? this : this.parentElement; const sel = 'a[href],button,input,textarea,select,[tabindex],[contenteditable=true],[role=button],[role=link],[role=textbox],[role=combobox]'; const t = (el && (el.closest(sel) || el.querySelector(sel))) || el; if (!t) return null; t.focus({ preventScroll: true }); if (document.activeElement !== t) return null; return { tag: t.tagName.toLowerCase(), href: t.tagName === 'A' ? t.href : '', blank: t.tagName === 'A' && (t.target === '_blank' || t.target === '_new') }; }",
+  });
+  return (r && r.result && r.result.value) || null;
+}
+
+// Move to the target and activate it; null when the target is not on the page. press: a link or button is
+// opened (false: a field only receives focus). With the window in front this is a mouse click; behind the
+// user's work it is the hover plus keyboard focus and Enter, so focus never leaves the user's window.
+async function clickTarget(send, tabId, target, press = true, track = {}) {
   // In view first.
+  track.stage = "reach";
   const box = await reach(send, tabId, target);
   if (!box) return null;
   // A point inside the box, away from the edges.
   const x = box.x + box.w * rand(0.3, 0.7);
   const y = box.y + box.h * rand(0.35, 0.65);
-  // Pointer there, a short hover, then the click.
+  // Pointer there and a short hover.
   await moveMouse(send, tabId, x, y);
   await sleep(rand(120, 350));
-  await clickHere(send, tabId);
-  // The box that was clicked.
-  return box;
+  // In front: the click.
+  if (await inFront(tabId)) {
+    await clickHere(send, tabId);
+    return { ...box, how: "click" };
+  }
+  // Behind: keyboard focus, then Enter on a link or button; nothing that could raise the window.
+  track.stage = "focus";
+  const f = await focusAt(send, x, y, box.node).catch(() => null);
+  if (!f) return { ...box, how: "unfocusable" };
+  if (press && !/^(input|textarea|select)$/.test(f.tag)) {
+    await sleep(rand(80, 220));
+    // A link that would open a new tab (which raises the window): opened in this tab instead.
+    if (f.blank && /^https?:/.test(f.href)) {
+      track.stage = "link";
+      await chrome.tabs.update(tabId, { url: f.href });
+      return { ...box, how: "link" };
+    }
+    track.stage = "enter";
+    await pressKey(send, "Enter");
+  }
+  return { ...box, how: "keyboard" };
 }
 
 // Key fields for one printable ASCII character.
@@ -489,6 +630,16 @@ async function pressKey(send, name) {
   await send("Input.dispatchKeyEvent", { type: "keyUp", ...up });
 }
 
+// Run an input operation, but answer with the stage it reached when it takes longer than the load wait plus
+// 45 s (the host stops waiting a little later): a slow page shows where the time went.
+async function withDeadline(msg, track, fn) {
+  const limit = (msg.load_ms || LOAD_TIMEOUT) + 45000;
+  return Promise.race([
+    fn(),
+    sleep(limit).then(() => ({ clicked: false, typed: false, navigated: false, newTab: null, timedOut: true, how: "timeout", stage: track.stage })),
+  ]);
+}
+
 // Base64 of bytes (chunked so large files do not overflow the argument list).
 function toBase64(bytes) {
   // Binary string in chunks.
@@ -509,12 +660,19 @@ const OPS = {
   async open(msg) {
     const reg = await registry();
     await reap(reg);
-    const windowId = await dedicatedWindow(reg);
-    const tab = await chrome.tabs.create({ windowId, url: msg.url, active: true });
+    const { id: windowId, created } = await dedicatedWindow(reg, msg.url);
+    // A new window shows the page already; otherwise a background tab that then becomes the window's active
+    // tab (creating an active tab raises the window on GNOME; switching tabs inside it does not).
+    let tab;
+    if (created) tab = (await chrome.tabs.query({ windowId }))[0];
+    else {
+      tab = await chrome.tabs.create({ windowId, url: msg.url, active: false });
+      await chrome.tabs.update(tab.id, { active: true });
+    }
     reg.tabs[tab.id] = { run: msg.run || "", created: Date.now() };
     await saveRegistry(reg);
     const w = await waitLoaded(tab.id, msg.load_ms);
-    return tabInfo(tab.id, w.timedOut);
+    return { ...(await tabInfo(tab.id, w.timedOut)), front: await inFront(tab.id) };
   },
   // Load url in an existing tab (a page turn).
   async navigate(msg) {
@@ -539,10 +697,13 @@ const OPS = {
   // Click the target (see ops/locate.js) with the mouse; reports navigation and a new tab.
   // {tab, target, load_ms} → {clicked, navigated, newTab, timedOut}.
   async human_click(msg) {
+    const track = { stage: "start" };
+    return withDeadline(msg, track, async () => {
     // Watch for the results of the click.
     const watch = watchNavigation(msg.tab, 4000, msg.load_ms);
     // Move and click.
-    const box = await withInput(msg.tab, (send) => clickTarget(send, msg.tab, msg.target || {}));
+    const box = await withInput(msg.tab, (send) => clickTarget(send, msg.tab, msg.target || {}, true, track));
+    track.stage = "wait";
     // Not on the page.
     if (!box) {
       await watch.wait();
@@ -556,7 +717,13 @@ const OPS = {
       await saveRegistry(reg);
     }
     // The outcome, with how the target was found (ax, css or ref).
-    return { clicked: true, via: box.via || "", ...nav };
+    if (box.how === "unfocusable") return { clicked: false, via: box.via || "", how: box.how, front: await inFront(msg.tab), ...nav };
+    return { clicked: true, via: box.via || "", how: box.how || "", front: await inFront(msg.tab), ...nav };
+    });
+  },
+  // The results list read from the accessibility tree. {tab} → {results: [{u, t, s}]}.
+  async ax_results(msg) {
+    return { results: await withInput(msg.tab, (send) => axResults(send, msg.tab)) };
   },
   // Only look for a target, without touching the page. {tab, target} → {found, via}.
   async find(msg) {
@@ -565,11 +732,15 @@ const OPS = {
   },
   // Click the field, type text and optionally press Enter. {tab, target, text, enter, load_ms}.
   async human_type(msg) {
+    const track = { stage: "start" };
+    return withDeadline(msg, track, async () => {
     // A submit may navigate.
     const watch = watchNavigation(msg.tab, msg.enter ? 6000 : 0, msg.load_ms);
     // Click into the field, pause, type, pause, Enter.
     const box = await withInput(msg.tab, async (send) => {
-      const b = await clickTarget(send, msg.tab, msg.target || {});
+      // Into the field: a click in front, keyboard focus behind (no Enter on the field itself).
+      const b = await clickTarget(send, msg.tab, msg.target || {}, false, track);
+      track.stage = "type";
       if (!b) return null;
       await sleep(rand(300, 700));
       await typeText(send, String(msg.text || ""));
@@ -583,7 +754,9 @@ const OPS = {
     const nav = await watch.wait();
     if (!box) return { typed: false, navigated: false, newTab: null, timedOut: false };
     // The outcome.
-    return { typed: true, via: box.via || "", ...nav };
+    if (box.how === "unfocusable") return { typed: false, via: box.via || "", how: box.how, front: await inFront(msg.tab), ...nav };
+    return { typed: true, via: box.via || "", how: box.how || "", front: await inFront(msg.tab), ...nav };
+    });
   },
   // Press one key in the page. {tab, key, load_ms}.
   async human_key(msg) {

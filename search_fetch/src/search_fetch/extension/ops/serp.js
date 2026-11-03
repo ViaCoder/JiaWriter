@@ -53,7 +53,11 @@
       const a = box.querySelector("h3 a");
       if (!a || badged(box)) continue;
       const cap = box.querySelector(".space-txt, .text-layout, .str_info, [class*='str-text'], p");
-      add(a, one(a), one(cap));
+      // A /link wrapper: the block's data-url holds the real address (2026-11-03); search pages and Sogou's own are skipped.
+      const real = /\/link$/.test(new URL(a.href, location.href).pathname)
+        ? [...box.querySelectorAll("[data-url]")].map((d) => d.getAttribute("data-url") || "").find((u) => /^https?:\/\//.test(u) && !/^https?:\/\/([^/]*\.)?(sogou\.com|so\.html5\.qq\.com)\//.test(u))
+        : "";
+      add(a, one(a), one(cap), real);
     }
   } else if (engine === "google") {
     // Google: the title is an h3 inside the result link.

@@ -20,6 +20,8 @@ import {
 	browserSearch,
 	clampPages,
 	DEFAULT_TIMING,
+	isWrapperLink,
+	mergeResults,
 	type SerpTab,
 	searchEngine,
 	VERIFY_WAIT_DEFAULT_S,
@@ -134,6 +136,8 @@ function fakeSearch(scripts: Record<string, EngineScript>, interactive = false) 
 				log.push(`navigate:${args.url}`);
 				return {};
 			}
+			// Nothing read on screen: the page script's results are used (not logged: it does not touch the page).
+			if (op === "ax_results") return { results: [] };
 			// Looking for Next on screen (not logged: it does not touch the page).
 			if (op === "find" && st) {
 				const sc = scripts[st.engine];
@@ -542,5 +546,59 @@ describe("pages that load more in place", () => {
 		]);
 		// No Next click on such a page.
 		expect(f.log.some((l) => l === "click:next")).toBe(false);
+	});
+});
+
+describe("mergeResults / isWrapperLink", () => {
+	it("knows Baidu's and Sogou's /link redirects only", () => {
+		expect(isWrapperLink("https://www.baidu.com/link?url=abc")).toBe(true);
+		expect(isWrapperLink("https://www.sogou.com/link?url=abc")).toBe(true);
+		expect(isWrapperLink("https://www.baidu.com/s?wd=q")).toBe(false);
+		expect(isWrapperLink("https://news.example.com/link")).toBe(false);
+		expect(isWrapperLink("not a url")).toBe(false);
+		// The results page's own /link (a mirror or a local copy of the engine).
+		expect(isWrapperLink("http://127.0.0.1:9/link?url=w", "http://127.0.0.1:9/baidu/search?wd=q")).toBe(true);
+		expect(isWrapperLink("http://127.0.0.1:9/link?url=w", "http://198.51.100.1/s")).toBe(false);
+	});
+
+	it("uses the page script's list only when nothing was read on screen", () => {
+		const script = [{ u: "https://a.example.com/1", t: "甲", s: "摘要", r: 0 }];
+		expect(mergeResults([], script)).toEqual({ results: [{ ...script[0], ref: 0 }], via: "script" });
+	});
+
+	it("keeps the on-screen list and swaps only redirects for the real address of the same title", () => {
+		const ax = [
+			{ u: "https://www.baidu.com/link?url=x1", t: "国务院 常务会议", s: "" },
+			{ u: "https://news.example.com/2", t: "第二条", s: "屏幕上的摘要" },
+			{ u: "https://www.sogou.com/link?url=x3", t: "没有对应的", s: "" },
+		];
+		const script = [
+			{ u: "https://www.gov.cn/1", t: "国务院常务会议", s: "脚本摘要", r: 4 },
+			{ u: "https://news.example.com/2", t: "第二条", s: "脚本摘要2", r: 5 },
+		];
+		expect(mergeResults(ax, script)).toEqual({
+			results: [
+				{ u: "https://www.gov.cn/1", t: "国务院 常务会议", s: "脚本摘要", r: 0, ref: 4 },
+				{ u: "https://news.example.com/2", t: "第二条", s: "屏幕上的摘要", r: 1, ref: 5 },
+				{ u: "https://www.sogou.com/link?url=x3", t: "没有对应的", s: "", r: 2, ref: undefined },
+			],
+			via: "ax",
+		});
+	});
+});
+
+describe("mergeResults title matching", () => {
+	it("matches a title with an extra label on one side, but never by containment below six characters", () => {
+		const ax = [
+			{ u: "https://www.baidu.com/link?url=a", t: "番茄炒蛋的家常做法 官方", s: "" },
+			{ u: "https://www.baidu.com/link?url=b", t: "做法", s: "" },
+		];
+		const script = [
+			{ u: "https://www.example.com/recipe", t: "番茄炒蛋的家常做法", s: "", r: 0 },
+			{ u: "https://www.example.com/other", t: "做法大全", s: "", r: 1 },
+		];
+		const out = mergeResults(ax, script, "https://www.baidu.com/s?wd=q").results;
+		expect(out[0].u).toBe("https://www.example.com/recipe");
+		expect(out[1].u).toBe("https://www.baidu.com/link?url=b");
 	});
 });

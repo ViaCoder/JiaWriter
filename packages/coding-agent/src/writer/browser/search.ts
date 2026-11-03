@@ -86,6 +86,8 @@ export interface SerpTab {
 	url: string;
 	// Real result address → data-wa-r tag of its link on that page.
 	refs: Record<string, number>;
+	// Real result address → its title (web_fetch finds the link on screen by it).
+	titles?: Record<string, string>;
 }
 
 /** Search options. */
@@ -118,12 +120,25 @@ export interface EngineOutcome {
 	stopped: string;
 	// Its last results page, kept open.
 	serp: SerpTab | null;
+	// Where its results were read: on screen (accessibility tree) or by the page script; "" when none.
+	read?: "ax" | "script" | "";
+}
+
+/** One result on a results page: address, title, snippet, position on the page, and the page script's tag of its link. */
+interface SerpResult {
+	u: string;
+	t: string;
+	s: string;
+	r: number;
+	ref?: number;
 }
 
 /** The serp.js report. */
 interface SerpReport {
 	// Results with link tag.
-	results: { u: string; t: string; s: string; r: number }[];
+	results: SerpResult[];
+	// Where the results were read: the accessibility tree, or the page script when it had none.
+	via?: "ax" | "script";
 	// A next-page link exists.
 	next: boolean;
 	// A bot check is shown.
@@ -171,6 +186,66 @@ async function readSerp(deps: BrowserDeps, tab: number, engine: EngineName): Pro
 		consent: !!r.consent,
 		url: r.url ?? "",
 	};
+}
+
+/** An engine's own /link redirect (Baidu, Sogou): a /link address on the results page's own site, or on baidu.com or
+ * sogou.com. Its real address is not in the accessibility tree. */
+export function isWrapperLink(url: string, pageUrl = ""): boolean {
+	try {
+		const u = new URL(url);
+		if (u.pathname !== "/link") return false;
+		const page = pageUrl ? new URL(pageUrl).host : "";
+		return u.host === page || /(^|\.)(baidu|sogou)\.com$/.test(u.hostname);
+	} catch {
+		return false;
+	}
+}
+
+/** Title text compared loosely (spaces and case ignored). */
+function sameTitle(t: string): string {
+	return t.replace(/\s+/g, "").toLowerCase();
+}
+
+/**
+ * The results as a person reads them: the accessibility tree first (heading + link + text beside it). The
+ * page script's reading is used only where it is needed: the real address behind a Baidu or Sogou /link
+ * redirect, its tag for clicking, and the whole list when the accessibility tree has no result.
+ */
+export function mergeResults(
+	ax: { u: string; t: string; s: string }[],
+	script: SerpResult[],
+	pageUrl = "",
+): { results: SerpResult[]; via: "ax" | "script" } {
+	// Nothing on screen: the page script's list.
+	if (ax.length === 0) return { results: script.map((r) => ({ ...r, ref: r.r })), via: "script" };
+	// The page script's results by title.
+	const byTitle = new Map(script.map((r) => [sameTitle(r.t), r]));
+	// The same title, or one containing the other (a label such as 官方 or an icon's text on one side only;
+	// six characters at least, so short titles never match by accident).
+	const find = (t: string): SerpResult | undefined => {
+		const k = sameTitle(t);
+		const exact = byTitle.get(k);
+		if (exact || k.length < 6) return exact;
+		return script.find((r) => {
+			const o = sameTitle(r.t);
+			return o.length >= 6 && (o.includes(k) || k.includes(o));
+		});
+	};
+	return {
+		results: ax.map((x, i) => {
+			const m = find(x.t);
+			return { u: isWrapperLink(x.u, pageUrl) && m ? m.u : x.u, t: x.t, s: x.s || m?.s || "", r: i, ref: m?.r };
+		}),
+		via: "ax",
+	};
+}
+
+/** Add the accessibility-tree reading to a results report (one look; results already shown). */
+async function readOnScreen(deps: BrowserDeps, tab: number, rep: SerpReport): Promise<SerpReport> {
+	const ax = (await deps.call("ax_results", { tab }, 30_000).catch(() => null)) as {
+		results?: { u: string; t: string; s: string }[];
+	} | null;
+	return { ...rep, ...mergeResults(ax?.results ?? [], rep.results, rep.url) };
 }
 
 /** Poll the results page until results or a challenge appear (results render after load). */
@@ -242,6 +317,8 @@ export async function searchEngine(
 	let serp: SerpTab | null = null;
 	// Results already counted on a page that loads more in place.
 	let seen = 0;
+	// Where the results were read.
+	let read: "ax" | "script" | "" = "";
 	// Resting after an uncleared verification: skipped, with the reason for the model.
 	if (opts.resting?.has(engine)) return { engine, hits, pages, stopped: "verification (resting)", serp: null };
 	// Not too soon after the last query to this engine.
@@ -322,18 +399,25 @@ export async function searchEngine(
 				stopped = p === 1 ? "no results" : "";
 				break;
 			}
+			// Read the results as shown on screen.
+			rep = await readOnScreen(deps, tab, rep);
+			read = rep.via ?? "";
 			// Collect this page's results (a page that loads more in place lists the earlier ones again).
 			const refs: Record<string, number> = {};
+			const titles: Record<string, string> = {};
 			const fresh = spec.infinite ? rep.results.filter((r) => r.r >= seen) : rep.results;
 			seen = rep.results.length;
 			if (fresh.length === 0) break;
-			for (const r of rep.results) refs[resultTarget(r.u)] = r.r;
+			for (const r of rep.results) {
+				if (r.ref !== undefined) refs[resultTarget(r.u)] = r.ref;
+				titles[resultTarget(r.u)] = r.t;
+			}
 			for (const r of fresh) {
 				const url = resultTarget(r.u);
 				hits.push({ engine, pos: hits.length, url, title: r.t, snippet: r.s });
 			}
 			pages = p;
-			serp = { engine, tab, url: rep.url, refs };
+			serp = { engine, tab, url: rep.url, refs, titles };
 			// Read the page like a person: three to five wheel turns with reading time between them.
 			await deps.call("human_scroll", { tab, steps: 3 + Math.floor(deps.random() * 3) }, 60_000);
 			// Last page wanted.
@@ -374,7 +458,7 @@ export async function searchEngine(
 	}
 	// A tab without results is closed; the last results page stays for web_fetch.
 	if (!serp) await deps.call("close", { tab }, 10_000).catch(() => {});
-	return { engine, hits, pages, stopped, serp };
+	return { engine, hits, pages, stopped, serp, read };
 }
 
 /** Search every engine in turn and rank the merged results. */

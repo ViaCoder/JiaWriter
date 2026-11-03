@@ -119,6 +119,30 @@ function homePage(engine: "bing" | "google" | "baidu", base: string): string {
 <script>document.querySelector("textarea").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); e.target.form.submit(); } });</script>${RECORDER}</body></html>`;
 }
 
+/** Sogou's home page (2026-11-03): one text field without a name, Enter submits. */
+function sogouHome(base: string): string {
+	return `<!doctype html><html><head><meta charset="utf-8"><title>sogou</title></head><body><form action="${base}/sogou/web"><input id="query" name="query" type="text" style="width:500px"></form>${RECORDER}</body></html>`;
+}
+
+/** Sogou's results page: /link wrappers with the real address in a data-url block, no pager, and two more
+ * results each time the page is scrolled to the bottom (three batches in all). */
+function sogouSerp(base: string, q: string): string {
+	return `<!doctype html><html><head><meta charset="utf-8"><title>${q}</title></head><body><div class="results"></div><div style="height:1600px"></div>
+<script>
+let batch = 0;
+function more() {
+  if (batch >= 3) return; batch++;
+  for (const i of [1, 2]) {
+    const d = document.createElement("div"); d.className = "vrwrap";
+    d.innerHTML = '<h3><a href="${base}/link?url=s' + batch + i + '">${q} 搜狗 第' + batch + '批 结果' + i + '</a></h3><div class="space-txt">摘要</div><div data-url="${base}/article?e=sogou&p=' + batch + '&i=' + i + '"></div>';
+    document.querySelector(".results").appendChild(d);
+  }
+}
+more();
+addEventListener("scroll", () => { if (innerHeight + scrollY >= document.documentElement.scrollHeight - 40) setTimeout(more, 300); });
+</script>${RECORDER}</body></html>`;
+}
+
 /** An article with navigation and footer noise. */
 function articlePage(): string {
 	// Readability should keep the paragraphs and drop the rest.
@@ -158,6 +182,16 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 					events.push(JSON.parse(body));
 					res.end();
 				});
+				return;
+			}
+			if (u.pathname === "/sogou/") {
+				res.setHeader("content-type", "text/html; charset=utf-8");
+				res.end(sogouHome(base));
+				return;
+			}
+			if (u.pathname === "/sogou/web") {
+				res.setHeader("content-type", "text/html; charset=utf-8");
+				res.end(sogouSerp(base, u.searchParams.get("query") ?? ""));
 				return;
 			}
 			if (u.pathname === "/doc.pdf") {
@@ -259,9 +293,9 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 			specs,
 		});
 		// Three pages each (Next was scrolled to and clicked), two results per page.
-		expect(out.outcomes.map((o) => [o.engine, o.pages, o.stopped])).toEqual([
-			["bing", 3, ""],
-			["google", 3, ""],
+		expect(out.outcomes.map((o) => [o.engine, o.pages, o.stopped, o.read])).toEqual([
+			["bing", 3, "", "ax"],
+			["google", 3, "", "ax"],
 		]);
 		expect(out.ranked).toHaveLength(12);
 		expect(out.ranked[0].title).toContain("芯片出口 rules");
@@ -323,12 +357,45 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 			specs,
 		});
 		// Three pages, two results each, every address the article itself (no /link wrapper, no module).
-		expect(out.outcomes.map((o) => [o.engine, o.pages, o.stopped])).toEqual([["baidu", 3, ""]]);
+		expect(out.outcomes.map((o) => [o.engine, o.pages, o.stopped, o.read])).toEqual([["baidu", 3, "", "ax"]]);
 		const urls = out.outcomes[0].hits.map((h) => h.url);
 		expect(urls).toHaveLength(6);
 		expect(urls.every((u) => u.startsWith(`${base}/article?e=baidu&`))).toBe(true);
 		// Typed into the box and clicked Next twice, all found on screen.
 		expect(vias).toEqual(["human_type:ax", "human_click:ax", "human_click:ax"]);
+		await d.call("close_run", { run: "chrome-test" }, 10_000);
+	}, 420_000);
+
+	it("reads Sogou's in-place loads by scrolling and keeps the real addresses from data-url", async () => {
+		// Sogou pointed at the fixture server; no selectors, so the box is found on screen.
+		const specs: Record<EngineName, EngineSpec> = {
+			...ENGINES,
+			sogou: { ...ENGINES.sogou, home: `${base}/sogou/`, box: ["#nope"] },
+		};
+		const vias: string[] = [];
+		const base0 = deps();
+		const d: BrowserDeps = {
+			...base0,
+			call: async (op, args, ms) => {
+				const r = await base0.call(op, args, ms);
+				if (op === "human_type") vias.push((r as { via?: string }).via ?? "");
+				return r;
+			},
+		};
+		const out = await browserSearch(d, "国务院 常务会议", {
+			engines: ["sogou"],
+			pages: 3,
+			timing: { ...DEFAULT_TIMING, engineGapMs: 0, hostGapMs: 0, loadMs: 15_000 },
+			specs,
+		});
+		// One reading round can load more than one batch (as on the real site: 8 → 24 after one scroll), so the
+		// rounds are two or three; every batch is read.
+		expect([out.outcomes[0].stopped, out.outcomes[0].read]).toEqual(["", "ax"]);
+		expect(out.outcomes[0].pages).toBeGreaterThanOrEqual(2);
+		const urls = out.outcomes[0].hits.map((h) => h.url);
+		expect(urls).toHaveLength(6);
+		expect(urls.every((u) => u.startsWith(`${base}/article?e=sogou&`))).toBe(true);
+		expect(vias).toEqual(["ax"]);
 		await d.call("close_run", { run: "chrome-test" }, 10_000);
 	}, 420_000);
 });

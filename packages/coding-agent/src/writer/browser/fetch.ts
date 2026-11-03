@@ -186,7 +186,7 @@ export async function browserFetch(
 	let tab = -1;
 	let leave: "back" | "close" = "close";
 	// A results page that shows this link: click it there.
-	const serp = serps.find((s) => s.refs[url] !== undefined);
+	const serp = serps.find((s) => s.refs[url] !== undefined || s.titles?.[url] !== undefined);
 	if (serp) {
 		try {
 			const info = (await deps.call("info", { tab: serp.tab }, 10_000)) as { url: string };
@@ -206,12 +206,25 @@ export async function browserFetch(
 						})
 					: {};
 			const hit = rep.results?.find((x) => resultTarget(x.u) === url);
-			if (hit) {
+			// The link found on screen by its title first, the page script's tag as a fallback.
+			const title = serp.titles?.[url];
+			if (hit || (title && info.url === serp.url)) {
 				await deps.sleep(Math.round(600 + deps.random() * 1400));
 				const r = (await deps.call(
 					"human_click",
-					{ tab: serp.tab, target: { ref: hit.r }, run: deps.run, load_ms: Math.min(timing.loadMs, PAGE_LOAD_MS) },
-					timing.loadMs + 30_000,
+					{
+						tab: serp.tab,
+						target: {
+							...(title
+								? { ax: { roles: ["link"], name: `^${title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}` } }
+								: {}),
+							ref: hit?.r,
+						},
+						run: deps.run,
+						load_ms: Math.min(timing.loadMs, PAGE_LOAD_MS),
+					},
+					// Finding a link far down a long results page takes a while.
+					timing.loadMs + 60_000,
 				)) as { clicked: boolean; navigated: boolean; newTab: number | null };
 				if (r.newTab !== null && r.newTab !== undefined) tab = r.newTab;
 				else if (r.navigated) {
