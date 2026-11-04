@@ -28,6 +28,8 @@ export const WRITER_RULES: readonly string[] = [
 	"Work in stages: confirm the purpose, audience and length, outline, draft, check the draft, then revise only the passages that need it",
 	// Output language and punctuation.
 	"Write the document mainly in Chinese, keep English only for terms that have no common Chinese form, and use full-width Chinese punctuation throughout, including next to English terms",
+	// Spaces (the user, 2026-11-04: spaces only between English words).
+	"Join Chinese characters, numbers and English terms directly, as in 使用GPT-5模型处理3类文件, and put a space only between two English words",
 	// Transitions.
 	"Use a transition only where the logic needs one, and connect sentences through their content",
 	// Openings and endings.

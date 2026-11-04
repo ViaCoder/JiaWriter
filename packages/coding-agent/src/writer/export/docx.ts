@@ -10,6 +10,7 @@ import {
 	AlignmentType,
 	convertMillimetersToTwip,
 	Document,
+	ExternalHyperlink,
 	Footer,
 	HeadingLevel,
 	LineRuleType,
@@ -51,10 +52,28 @@ function runFont(f: LevelFormat, text: string) {
 	};
 }
 
-/** One run of text in a level's format. */
-function textRun(text: string, f: LevelFormat, bold: boolean): TextRun {
-	// Size in half-points, black text.
-	return new TextRun({ text, bold: bold || f.bold, size: f.sizePt * 2, color: "000000", font: runFont(f, text) });
+/** Color of hyperlink text (Word's own hyperlink blue). */
+const LINK_COLOR = "0563C1";
+
+/** One run of text in a level's format; link text is blue and underlined like Word's hyperlinks. */
+function textRun(text: string, f: LevelFormat, bold: boolean, link = false): TextRun {
+	// Size in half-points, black text (blue for a link).
+	return new TextRun({
+		text,
+		bold: bold || f.bold,
+		size: f.sizePt * 2,
+		color: link ? LINK_COLOR : "000000",
+		...(link ? { underline: {} } : {}),
+		font: runFont(f, text),
+	});
+}
+
+/** A span as a run, or as a working hyperlink around its run. */
+function spanRun(s: Span, f: LevelFormat): TextRun | ExternalHyperlink {
+	// Plain text.
+	if (!s.link) return textRun(s.text, f, s.bold);
+	// The URL text, clickable in Word.
+	return new ExternalHyperlink({ link: s.link, children: [textRun(s.text, f, s.bold, true)] });
 }
 
 /** Paragraph spacing: fixed line height, nothing before or after. */
@@ -84,8 +103,14 @@ function paragraph(
 		alignment: ALIGN[f.align],
 		indent: indent(f),
 		spacing: spacing(profile),
-		children: spans.map((s) => textRun(s.text, f, s.bold)),
+		children: spans.map((s) => spanRun(s, f)),
 	});
+}
+
+/** An empty paragraph at the body's line height: the blank line after the title. */
+function blankLine(profile: ExportProfile): Paragraph {
+	// No runs; the exact line spacing gives it one line's height.
+	return new Paragraph({ spacing: spacing(profile), children: [] });
 }
 
 /** Style options for a heading level (outline in Word's navigation pane, same fonts as the runs). */
@@ -106,11 +131,12 @@ function styleFor(f: LevelFormat, profile: ExportProfile) {
 function children(blocks: Block[], profile: ExportProfile): (Paragraph | Table)[] {
 	// Levels.
 	const L = profile.levels;
-	// One element per block.
-	return blocks.map((b) => {
+	// One element per block (the title also brings the blank line after it).
+	return blocks.flatMap((b) => {
 		switch (b.kind) {
 			case "title":
-				return paragraph(b.spans, L.title, profile, HeadingLevel.TITLE);
+				// The user, 2026-11-04: a blank line between the title and the text that follows.
+				return [paragraph(b.spans, L.title, profile, HeadingLevel.TITLE), blankLine(profile)];
 			case "h1":
 				return paragraph(b.spans, L.h1, profile, HeadingLevel.HEADING_1);
 			case "h2":
@@ -229,6 +255,10 @@ export interface DocxAudit {
 	sizesPt: number[];
 	// Distinct exact line spacings in points.
 	lineSpacingsPt: number[];
+	// Hyperlinks in the body.
+	hyperlinks: number;
+	// Of those, links whose relationship has no external http(s) target (they would not open).
+	brokenLinks: number;
 }
 
 /** XML text → plain text. */
@@ -244,8 +274,11 @@ function xmlText(s: string): string {
 
 /** Check a finished .docx: hints, fonts, punctuation and quotes, sizes and line spacing. */
 export function auditDocx(bytes: Uint8Array): DocxAudit {
-	// The main part.
-	const xml = strFromU8(unzipSync(bytes, { filter: (f) => f.name === "word/document.xml" })["word/document.xml"]);
+	// The main part and its relationships (hyperlink targets).
+	const RELS = "word/_rels/document.xml.rels";
+	const files = unzipSync(bytes, { filter: (f) => f.name === "word/document.xml" || f.name === RELS });
+	const xml = strFromU8(files["word/document.xml"]);
+	const rels = files[RELS] ? strFromU8(files[RELS]) : "";
 	// Counters.
 	const a: DocxAudit = {
 		runs: 0,
@@ -256,7 +289,15 @@ export function auditDocx(bytes: Uint8Array): DocxAudit {
 		unpairedQuotes: 0,
 		sizesPt: [],
 		lineSpacingsPt: [],
+		hyperlinks: 0,
+		brokenLinks: 0,
 	};
+	// Each hyperlink needs an external http(s) relationship target.
+	for (const m of xml.matchAll(/<w:hyperlink [^>]*r:id="([^"]+)"/g)) {
+		a.hyperlinks++;
+		const rel = new RegExp(`<Relationship [^>]*Id="${m[1]}"[^>]*>`).exec(rels)?.[0] ?? "";
+		if (!/Target="https?:\/\/[^"]+"/.test(rel) || !/TargetMode="External"/.test(rel)) a.brokenLinks++;
+	}
 	// Size and spacing sets.
 	const sizes = new Set<number>();
 	const lines = new Set<number>();

@@ -87,6 +87,14 @@ Markdown drafts written or edited with `write` or `edit` in a run are exported t
 
 `export_document` and `/export-doc` first convert punctuation to Chinese full-width marks: ASCII marks become Chinese ones, and a `-`, `–` or `--` between Chinese characters becomes `—`; numbers, times, versions, URLs, e-mail addresses, code, links, abbreviations and word-internal hyphens keep their form. Quotes are paired per paragraph, and an unpaired quote is reported for its paragraph only.
 
+The export also does three more things:
+
+- **Symbols**: LaTeX (such as `$\rightarrow$`, `$x^2$`, `\(a \leq b\)`), HTML entities (such as `&rarr;`) and Markdown escapes (such as `\_`) become characters Word shows directly (→, x², ≤, _). A price such as `$100` is no formula. LaTeX commands without a matching character are kept and listed in the report.
+- **Spaces**: body text keeps spaces only between English words; there are none between Chinese and English or numbers, between Chinese characters, or around Chinese punctuation. Code keeps its spaces.
+- **Layout and links**: a blank line follows the title; links become hyperlinks that open in Word, shown as "title (URL)".
+
+The 参考文献 section at the end (also 参考资料, 资料来源, References and the like) is checked entry by entry: each needs a usable http(s) URL and a descriptive title (the page title, the publisher and the date), and the URL must be a page `web_fetch` opened in this session and got text from. Entries that fail are listed in the report; in interactive mode, URLs the automatic export at the end of a run finds unopened go back to the model, which opens each one: an entry stays when its page loads and matches the title, and is replaced with an opened source or removed otherwise. Each URL goes back once.
+
 The default profile `default-zh`:
 
 | Level | Chinese font | Size |

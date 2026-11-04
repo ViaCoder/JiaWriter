@@ -1,7 +1,8 @@
 /**
  * Markdown draft → document blocks for export: # title, ## / ### / #### headings levels 1–3,
  * paragraphs, list items, tables and code. Inline Markdown is reduced to plain text with bold
- * spans; links keep their text and URL as 文本（URL）.
+ * spans; links keep their text and URL as 文本（URL）, and the URL is a working hyperlink, as is
+ * every bare URL in the text.
  */
 
 /** One inline piece of a paragraph. */
@@ -10,6 +11,48 @@ export interface Span {
 	text: string;
 	// Bold (**…**).
 	bold: boolean;
+	// Target of a hyperlink (the piece is the URL itself).
+	link?: string;
+}
+
+// Private-use markers around a link's label and URL while bold is split.
+const LINK_OPEN = "";
+const LINK_MID = "";
+const LINK_CLOSE = "";
+// A bare http(s) URL, up to a space, a bracket or a Chinese mark.
+const BARE_URL = /https?:\/\/[^\s<>()（）　-〿＀-￯-]+/g;
+
+/** One piece of text → spans: links as label（URL） with the URL linked, bare URLs linked; ASCII marks after a bare URL stay text. */
+function linkSpans(text: string, bold: boolean): Span[] {
+	// Result.
+	const out: Span[] = [];
+	// Plain text before a link, split at bare URLs.
+	const plainText = (t: string) => {
+		let last = 0;
+		for (const m of t.matchAll(BARE_URL)) {
+			// Trailing ASCII punctuation belongs to the sentence.
+			const url = m[0].replace(/[.,;:!?'"]+$/, "");
+			const at = m.index ?? 0;
+			if (at > last) out.push({ text: t.slice(last, at), bold });
+			out.push({ text: url, bold, link: url });
+			last = at + url.length;
+		}
+		if (last < t.length) out.push({ text: t.slice(last), bold });
+	};
+	// Links marked as OPEN label MID url CLOSE.
+	const re = new RegExp(`${LINK_OPEN}([^${LINK_MID}]*)${LINK_MID}([^${LINK_CLOSE}]*)${LINK_CLOSE}`, "g");
+	let last = 0;
+	for (const m of text.matchAll(re)) {
+		const at = m.index ?? 0;
+		if (at > last) plainText(text.slice(last, at));
+		const [, label, url] = m;
+		// A link whose label is its URL shows the URL once; otherwise label（URL）.
+		if (label === url || label === "") out.push({ text: url, bold, link: url });
+		else out.push({ text: `${label}（`, bold }, { text: url, bold, link: url }, { text: "）", bold });
+		last = at + m[0].length;
+	}
+	if (last < text.length) plainText(text.slice(last));
+	return out;
 }
 
 /** One block of the document. */
@@ -22,22 +65,27 @@ export type Block =
 /** Heading kind by the number of # signs. */
 const HEADINGS: Readonly<Record<number, "title" | "h1" | "h2" | "h3">> = { 1: "title", 2: "h1", 3: "h2", 4: "h3" };
 
-/** Inline Markdown → spans: **bold** kept, links as 文本（URL）, other marks removed. */
+/** Inline Markdown → spans: **bold** kept, links as 文本（URL） with a working hyperlink, other marks removed. */
 export function parseInline(text: string): Span[] {
-	// Links and images to text (URL); emphasis with * or _ and inline code marks dropped.
+	// Images to their text; links marked for linkSpans; emphasis with * and inline code marks dropped.
 	const plain = text
 		.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, "$1")
-		.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label: string, url: string) =>
-			label === url ? url : `${label}（${url}）`,
-		)
+		.replace(/\[([^\]]*)\]\(([^)\s]+)\)/g, `${LINK_OPEN}$1${LINK_MID}$2${LINK_CLOSE}`)
 		.replace(/(^|[^*])\*(?!\*)([^*\n]+)\*(?!\*)/g, "$1$2")
 		.replace(/`([^`]*)`/g, "$1");
 	// Split on **; odd pieces are bold.
 	const parts = plain.split("**");
 	// An unclosed ** at the end stays as text with the piece after it.
 	if (parts.length % 2 === 0) parts.push(parts.splice(-2).join("**"));
-	// Non-empty pieces.
-	return parts.map((text, i) => ({ text, bold: i % 2 === 1 })).filter((s) => s.text !== "");
+	// Each piece split at links; non-empty spans, neighbors of the same weight joined unless one is a link.
+	const spans: Span[] = [];
+	for (const s of parts.flatMap((piece, i) => linkSpans(piece, i % 2 === 1))) {
+		const prev = spans.at(-1);
+		if (s.text === "") continue;
+		if (prev && !prev.link && !s.link && prev.bold === s.bold) prev.text += s.text;
+		else spans.push(s);
+	}
+	return spans;
 }
 
 /** Cells of one Markdown table row. */

@@ -166,6 +166,31 @@ export const en: Record<MessageKey, string> = {
 	"export.unpaired": "- Unpaired quote: {start}…",
 	// 待核实 marks.
 	"export.pending": 'The draft has {count} "待核实" mark(s); remove them or add the source in the finished draft.',
+	// Spaces.
+	"export.spaces":
+		"Spaces: kept only between English words, none between Chinese and English or numbers; {count} other space(s).",
+	// Symbols converted.
+	"export.symbols":
+		"Symbols: {count} LaTeX formula(s), HTML entities or escapes turned into characters Word shows directly (such as →, ×, ≤).",
+	// Symbols without a Unicode form.
+	"export.symbolsUnknown":
+		"{count} LaTeX command(s) have no matching character and were kept: {names}. Rewrite them as text or Unicode symbols in the draft.",
+	// Hyperlinks.
+	"export.links": "Hyperlinks: {links}, of which {broken} would not open.",
+	// Reference list.
+	"export.refs":
+		"References: {entries} entr(ies); {url} without a usable URL, {title} without a descriptive title, {opened} whose URL is no page opened in this session.",
+	// One reference with problems.
+	"export.refIssue": "- {start}…: {problems}",
+	// Reference problems.
+	"export.ref.url": "no usable http(s) URL",
+	"export.ref.title": "no descriptive title (name the page title, the publisher and the date)",
+	"export.ref.opened": "this URL was not opened with web_fetch in this session",
+	// Separator of a short list.
+	"export.listSep": "; ",
+	// Reference URLs for the model to open and test.
+	"export.testRefs":
+		"The export found {count} reference URL(s) this session has not opened yet:\n{urls}\nOpen each with web_fetch. Keep an entry when its page loads and matches the entry's title; otherwise replace it with a source you opened or remove the entry. The draft is exported again after the edit.",
 	// Skills list heading.
 	"skills.title": "Writing skills ({count}): arrows to choose, Enter to confirm, Esc to go back",
 	// New skill entry.

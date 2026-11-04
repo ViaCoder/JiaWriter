@@ -3,7 +3,13 @@
 // Test API.
 import { describe, expect, it } from "vitest";
 // Functions under test.
-import { countAsciiNextToHan, normalizePunct, pairQuotes } from "../../src/writer/export/punct.ts";
+import {
+	countAsciiNextToHan,
+	countLooseSpaces,
+	normalizePunct,
+	pairQuotes,
+	tightenSpaces,
+} from "../../src/writer/export/punct.ts";
 
 // Text only.
 const p = (s: string) => normalizePunct(s).text;
@@ -70,5 +76,29 @@ describe("countAsciiNextToHan", () => {
 		// Two hits; the decimal point and the URL do not count.
 		expect(countAsciiNextToHan("中文,English 3.5 见https://a.example 结束.")).toBe(2);
 		expect(countAsciiNextToHan("全部中文标点，没有问题。")).toBe(0);
+	});
+});
+
+describe("tightenSpaces", () => {
+	it("keeps one space between English words only", () => {
+		// Chinese next to English and numbers, Chinese next to Chinese, full-width and double spaces.
+		expect(tightenSpaces("使用 GPT-5 模型处理 3 类 文件")).toBe("使用GPT-5模型处理3类文件");
+		expect(tightenSpaces("见 New  York Times 报道，　共 100 km")).toBe("见New York Times报道，共100 km");
+		// Accented Latin and Greek count as Western; leading and trailing spaces go.
+		expect(tightenSpaces("  café au lait 与 α β 粒子  ")).toBe("café au lait与α β粒子");
+	});
+
+	it("leaves spaces inside inline code and decides at its edges by the code's characters", () => {
+		// Inside code untouched; "see `a b` here" keeps the spaces next to the code, Chinese drops them.
+		expect(tightenSpaces("运行 `npm run check` 命令")).toBe("运行`npm run check`命令");
+		expect(tightenSpaces("see `a b` here")).toBe("see `a b` here");
+	});
+});
+
+describe("countLooseSpaces", () => {
+	it("counts the spaces tightenSpaces would remove", () => {
+		// One at the start, three next to Chinese, one double space between English words.
+		expect(countLooseSpaces(" 使用 GPT 模型 New  York")).toBe(5);
+		expect(countLooseSpaces("使用GPT模型New York")).toBe(0);
 	});
 });

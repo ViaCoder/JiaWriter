@@ -36,21 +36,29 @@ function load() {
 	const tools = new Map<string, ToolDefinition>();
 	const commands = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
 	const handlers = new Map<string, (event: unknown, ctx: unknown) => void>();
-	// Fake API with the three methods the extension uses.
+	// Messages the extension sent to the session, with their options.
+	const sent: { message: { content: string }; options: unknown }[] = [];
+	// Fake API with the methods the extension uses.
 	const pi = {
 		registerTool: (t: ToolDefinition) => tools.set(t.name, t),
 		registerCommand: (name: string, o: { handler: (args: string, ctx: unknown) => Promise<void> }) =>
 			commands.set(name, o),
 		on: (name: string, h: (event: unknown, ctx: unknown) => void) => handlers.set(name, h),
+		sendMessage: (message: { content: string }, options: unknown) => sent.push({ message, options }),
 	} as unknown as ExtensionAPI;
 	writerDocsExtension(pi);
-	return { tools, commands, handlers };
+	return { tools, commands, handlers, sent };
 }
 
-/** Context with a notify recorder. */
-function ctx(notes: string[]) {
+/** Context with a notify recorder and a session branch of the given messages. */
+function ctx(notes: string[], branch: unknown[] = [], hasUI = true) {
 	// Only what the extension reads.
-	return { cwd, hasUI: true, ui: { notify: (m: string) => notes.push(m) } } as unknown as ExtensionToolContext;
+	return {
+		cwd,
+		hasUI,
+		ui: { notify: (m: string) => notes.push(m) },
+		sessionManager: { getBranch: () => branch.map((message) => ({ type: "message", message })) },
+	} as unknown as ExtensionToolContext;
 }
 
 /** Text of a tool result. */
@@ -175,6 +183,45 @@ describe("automatic import before each run and export after it", () => {
 		vi.stubEnv("JW_AUTO_EXPORT", "off");
 		await handlers.get("agent_end")?.({ type: "agent_end", messages }, ctx(notes));
 		expect(notes).toHaveLength(2);
+	});
+
+	it("hands reference URLs the session has not opened to the model once, in interactive sessions only", async () => {
+		const { handlers, sent } = load();
+		const notes: string[] = [];
+		// A draft citing two pages; the session opened only the second one.
+		writeFileSync(
+			join(cwd, "稿件.md"),
+			"# 题\n\n正文。\n\n## 参考文献\n\n1. [新华社：某项报道，2026年11月1日](https://example.com/a)\n2. [某机构年度报告，2026年](https://example.com/b)\n",
+		);
+		const branch = [
+			{
+				role: "assistant",
+				content: [{ type: "toolCall", id: "f1", name: "web_fetch", arguments: { url: "https://example.com/b" } }],
+			},
+			{
+				role: "toolResult",
+				toolCallId: "f1",
+				toolName: "web_fetch",
+				isError: false,
+				details: { url: "https://example.com/b", chars: 900 },
+			},
+		];
+		const messages = [call("1", "write", "稿件.md")];
+		// Print mode: the report only.
+		await handlers.get("agent_end")?.({ type: "agent_end", messages }, ctx(notes, branch, false));
+		expect(sent).toHaveLength(0);
+		// Interactive: one message for the model with the unopened URL, starting a turn.
+		await handlers.get("agent_end")?.({ type: "agent_end", messages }, ctx(notes, branch));
+		expect(notes.at(-1)).toContain(
+			"参考文献：2 条；缺可用网址 0 条，缺描述性标题 0 条，网址不是本次会话中打开过的网页 1 条。",
+		);
+		expect(sent).toHaveLength(1);
+		expect(sent[0].message.content).toContain("- https://example.com/a");
+		expect(sent[0].message.content).not.toContain("example.com/b");
+		expect(sent[0].options).toEqual({ triggerTurn: true });
+		// The same URL is not handed over again.
+		await handlers.get("agent_end")?.({ type: "agent_end", messages }, ctx(notes, branch));
+		expect(sent).toHaveLength(1);
 	});
 });
 

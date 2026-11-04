@@ -80,6 +80,30 @@ describe("buildDocx", () => {
 	});
 });
 
+describe("buildDocx: title spacing and hyperlinks", () => {
+	it("puts a blank line after the title and makes links work", async () => {
+		// Title, a paragraph with a link.
+		const bytes = await buildDocx(parseBlocks("# 大标题\n\n正文见[报道](https://a.example/n)。"), DEFAULT_ZH);
+		const xml = part(bytes, "word/document.xml");
+		// The paragraphs in order: title, an empty one at the body's exact line height, then the text.
+		const paras = xml.match(/<w:p>[\s\S]*?<\/w:p>|<w:p [\s\S]*?<\/w:p>/g) ?? [];
+		expect(paras[0]).toContain("大标题");
+		expect(paras[1]).not.toContain("<w:t");
+		expect(paras[1]).toContain('w:line="640"');
+		expect(paras[2]).toContain("正文见");
+		// The URL is a hyperlink with an external relationship, blue and underlined.
+		const id = /<w:hyperlink [^>]*r:id="([^"]+)"/.exec(xml)?.[1] ?? "";
+		expect(part(bytes, "word/_rels/document.xml.rels")).toMatch(
+			new RegExp(
+				`<Relationship [^>]*Id="${id}"[^>]*Target="https://a.example/n"[^>]*TargetMode="External"|<Relationship [^>]*Target="https://a.example/n"[^>]*Id="${id}"`,
+			),
+		);
+		expect(runsWith(xml, "https://a.example/n")[0] ?? xml).toMatch(/w:color w:val="0563C1"/);
+		const a = auditDocx(bytes);
+		expect([a.hyperlinks, a.brokenLinks]).toEqual([1, 0]);
+	});
+});
+
 describe("auditDocx", () => {
 	it("finds nothing to fix in a built file", async () => {
 		// The check of a clean export.
@@ -93,7 +117,16 @@ describe("auditDocx", () => {
 			unpairedQuotes: 0,
 			sizesPt: [18, 22],
 			lineSpacingsPt: [32],
+			hyperlinks: 0,
+			brokenLinks: 0,
 		});
+	});
+	it("counts hyperlinks and those without an external target", () => {
+		// A link whose relationship is missing would not open.
+		const a = auditDocx(
+			makeDocx('<w:p><w:hyperlink r:id="rId9"><w:r><w:t>https://a.example</w:t></w:r></w:hyperlink></w:p>'),
+		);
+		expect([a.hyperlinks, a.brokenLinks]).toEqual([1, 1]);
 	});
 	it("counts a missing hint, a missing font, ASCII marks next to Chinese and an unpaired quote", () => {
 		// Hand-made runs: no rPr at all; ASCII comma; an unpaired quote; an English run with an apostrophe.

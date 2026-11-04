@@ -6,16 +6,29 @@ import { describe, expect, it } from "vitest";
 import { parseBlocks, parseInline, punctMarkdown } from "../../src/writer/export/blocks.ts";
 
 describe("parseInline", () => {
-	it("keeps bold, writes links as 文本（URL）, drops other marks and keeps an unclosed **", () => {
+	it("keeps bold, writes links as 文本（URL） with the URL linked, drops other marks and keeps an unclosed **", () => {
 		// Bold, link, emphasis, code.
 		expect(parseInline("前**重点**后，见[通知](https://a.example/n)，*斜体*与`代码`")).toEqual([
 			{ text: "前", bold: false },
 			{ text: "重点", bold: true },
-			{ text: "后，见通知（https://a.example/n），斜体与代码", bold: false },
+			{ text: "后，见通知（", bold: false },
+			{ text: "https://a.example/n", bold: false, link: "https://a.example/n" },
+			{ text: "），斜体与代码", bold: false },
 		]);
-		// A bare link and an unclosed **.
+		// A link whose label is its URL, and an unclosed **.
 		expect(parseInline("[https://a.example](https://a.example) a**b")).toEqual([
-			{ text: "https://a.example a**b", bold: false },
+			{ text: "https://a.example", bold: false, link: "https://a.example" },
+			{ text: " a**b", bold: false },
+		]);
+	});
+
+	it("links bare URLs, leaving a sentence mark after them as text", () => {
+		// The final ASCII stop belongs to the sentence; a bold URL stays bold.
+		expect(parseInline("见https://a.example/x?q=1. 与**https://b.example**")).toEqual([
+			{ text: "见", bold: false },
+			{ text: "https://a.example/x?q=1", bold: false, link: "https://a.example/x?q=1" },
+			{ text: ". 与", bold: false },
+			{ text: "https://b.example", bold: true, link: "https://b.example" },
 		]);
 	});
 });

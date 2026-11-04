@@ -135,6 +135,8 @@ import { ensureTool, type ToolStatus } from "../../utils/tools-manager.ts";
 import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-check.ts";
 // JiaWriter: interface text in the chosen language.
 import { brandText } from "../../writer/brand.ts";
+// JiaWriter: the "Jia" logo for release packages.
+import { jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
 import { uiText } from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
@@ -1017,8 +1019,13 @@ export class InteractiveMode {
 			// its second line the first line of key hints. Terminals that cannot render the logo get a
 			// "Pi vX" line instead, with the key hints below it.
 			const showLogo = supportsPiLogo();
+			// JiaWriter: a release package shows the "Jia" logo and wordmark instead of pi's.
+			const jia = showsJiaLogo();
 			const withLogo = (hints: string) => {
-				if (!showLogo) return `${piWordmark()} ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
+				if (!showLogo)
+					return `${jia ? jiaWordmark() : piWordmark()} ${theme.fg("dim", `v${this.version}`)}\n${hints}`;
+				// JiaWriter: the 4-line "Jia" logo with the version after it and the key hints below.
+				if (jia) return jiaHeader(theme.fg("dim", `v${this.version}`), hints);
 				const [top, bottom] = piLogoLines();
 				return `${top} ${theme.fg("dim", `v${this.version}`)}\n${bottom} ${hints}`;
 			};
@@ -1082,7 +1089,8 @@ export class InteractiveMode {
 				1,
 				0,
 			);
-			if (showLogo) header.onLogoClick = (column, row) => playPiLogo3d(this.renderer, column, row);
+			// JiaWriter: the easter egg animates the pi logo, so the "Jia" logo has none.
+			if (showLogo && !jia) header.onLogoClick = (column, row) => playPiLogo3d(this.renderer, column, row);
 			this.builtInHeader = header;
 
 			// Setup UI layout

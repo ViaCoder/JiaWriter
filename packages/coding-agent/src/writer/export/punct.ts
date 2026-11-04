@@ -155,6 +155,40 @@ function locateUnpaired(text: string, count: number): number[] {
 	return [...stray, ...stack.map((x) => x.at)].sort((a, b) => a - b).slice(0, count);
 }
 
+/** A character that belongs to an English (Western) word or term: ASCII letters, digits and marks, accented Latin, Greek, Cyrillic. */
+const WESTERN = /[\x21-\x7eÀ-ɏͰ-ϿЀ-ӿ]/;
+
+/** Spaces of body text (the user, 2026-11-04: spaces only between English words, none between Chinese and English):
+ * a run of spaces stays as one space only with a Western character on both sides; every other space goes,
+ * including spaces at the start and end. Inline code keeps its spaces. */
+export function tightenSpaces(text: string): string {
+	// Code spans at odd positions, text between them at even ones.
+	const parts = text.split(/(`[^`]*`)/);
+	return parts
+		.map((part, i) =>
+			i % 2 === 1
+				? part
+				: part.replace(/[ \t 　]+/g, (m: string, at: number, whole: string) => {
+						// The characters on both sides, looking into the neighboring code span at the edges.
+						const before = at > 0 ? whole[at - 1] : (parts[i - 1]?.slice(-1) ?? "");
+						const after = at + m.length < whole.length ? whole[at + m.length] : (parts[i + 1]?.[0] ?? "");
+						return WESTERN.test(before) && WESTERN.test(after) ? " " : "";
+					}),
+		)
+		.join("");
+}
+
+/** Spaces that tightenSpaces would remove, counted in finished text (the export check). */
+export function countLooseSpaces(text: string): number {
+	// Same rule, counted instead of removed.
+	let n = 0;
+	text.replace(/[ \t 　]+/g, (m: string, at: number, whole: string) => {
+		if (!(WESTERN.test(whole[at - 1] ?? "") && WESTERN.test(whole[at + m.length] ?? "") && m === " ")) n++;
+		return m;
+	});
+	return n;
+}
+
 /** Count ASCII punctuation directly next to a Chinese character (the export check). */
 export function countAsciiNextToHan(text: string): number {
 	// ASCII punctuation with a Chinese character on either side.

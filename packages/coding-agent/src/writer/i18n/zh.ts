@@ -150,6 +150,29 @@ export const zh = {
 	"export.unpaired": "- 引号未配对：{start}……",
 	// 待核实 marks.
 	"export.pending": "稿件中有 {count} 处“待核实”，成稿里应删去或补上来源。",
+	// Spaces.
+	"export.spaces": "空格：只保留英文单词之间的空格，汉字与英文、数字之间不留空格；不合规的空格 {count} 处。",
+	// Symbols converted.
+	"export.symbols": "符号：已把 {count} 处 LaTeX 公式、HTML 实体或转义写法换成 Word 能直接显示的字符（如 →、×、≤）。",
+	// Symbols without a Unicode form.
+	"export.symbolsUnknown":
+		"有 {count} 个 LaTeX 命令没有对应的字符，原样保留：{names}。请在稿件里改成文字或 Unicode 符号。",
+	// Hyperlinks.
+	"export.links": "超链接：{links} 个，打不开的 {broken} 个。",
+	// Reference list.
+	"export.refs":
+		"参考文献：{entries} 条；缺可用网址 {url} 条，缺描述性标题 {title} 条，网址不是本次会话中打开过的网页 {opened} 条。",
+	// One reference with problems.
+	"export.refIssue": "- {start}……：{problems}",
+	// Reference problems.
+	"export.ref.url": "缺可用的 http(s) 网址",
+	"export.ref.title": "缺描述性标题（写明网页标题、发布机构和日期）",
+	"export.ref.opened": "本次会话没有用 web_fetch 打开过这个网址",
+	// Separator of a short list.
+	"export.listSep": "；",
+	// Reference URLs for the model to open and test.
+	"export.testRefs":
+		"导出时发现参考文献里有 {count} 个网址本次会话还没打开过：\n{urls}\n请用 web_fetch 逐个打开。能打开、内容与条目标题相符的保留；打不开或不相符的，换成打开过的来源，或删去这一条。改完稿件后会再次自动导出。",
 	// Skills list heading.
 	"skills.title": "写作 skill（{count} 个）：方向键选择，回车确认，Esc 返回",
 	// New skill entry.
