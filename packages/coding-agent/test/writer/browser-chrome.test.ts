@@ -22,7 +22,7 @@ import type { EngineSpec } from "../../src/writer/browser/engines.ts";
 import { ENGINES, type EngineName } from "../../src/writer/browser/engines.ts";
 import { browserFetch } from "../../src/writer/browser/fetch.ts";
 import { hostManifest } from "../../src/writer/browser/install.ts";
-import { type BrowserDeps, browserSearch, DEFAULT_TIMING } from "../../src/writer/browser/search.ts";
+import { type BrowserDeps, browserSearch, DEFAULT_TIMING, pageKind } from "../../src/writer/browser/search.ts";
 // A PDF to download.
 import { makePdf } from "./doc-fixtures.ts";
 
@@ -152,7 +152,126 @@ function articlePage(): string {
 			`<p>第${i + 1}段：商务部于2026年10月30日发布芯片出口管制的新规定，说明了适用范围和过渡期安排，并回答了企业关心的问题。</p>`,
 	).join("");
 	return `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>出口管制新规 - 示例新闻</title><meta property="article:published_time" content="2026-10-30T09:00:00+08:00"></head>
-<body><nav><a href="/">首页</a><a href="/x">导航链接</a></nav><article><h1>出口管制新规</h1>${paras}<p>原文见<a href="https://www.example.com/notice">公告</a>。</p></article><footer>版权所有 示例网站</footer></body></html>`;
+<style>.gone{display:none}</style>
+<body><nav><a href="/">首页</a><a href="/x">导航链接</a></nav><article><h1>出口管制新规</h1>${paras}<p style="display:none">隐藏文字甲</p><p class="gone">隐藏文字乙</p><p style="position:absolute;left:-9999px">隐藏文字丙</p><p style="font-size:0">隐藏文字丁</p><p style="opacity:0">隐藏文字戊</p><p style="visibility:hidden">隐藏文字己</p><!-- 隐藏文字庚 --><p>原文见<a href="https://www.example.com/notice">公告</a>。</p></article><footer>版权所有 示例网站</footer></body></html>`;
+}
+
+/** Every way of hiding text the page script knows (each must go), and text it must keep. */
+const HIDDEN_WAYS: readonly string[] = [
+	"font-size:0",
+	"font-size:1px",
+	"font-size:3px",
+	"zoom:0.01",
+	"transform:scale(0.01)",
+	"transform:scale(0)",
+	"position:absolute;left:-9999px",
+	"position:absolute;left:9999px",
+	"position:absolute;left:99999px",
+	"position:absolute;top:-9999px",
+	"position:absolute;top:9999px",
+	"position:absolute;top:99999px",
+	"position:absolute;transform:translateX(-99999px)",
+	"position:absolute;width:1px;height:1px;overflow:hidden",
+	"text-indent:-9999px",
+	"position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)",
+	"clip-path:inset(50%)",
+	"clip-path:circle(0)",
+	"color:transparent",
+	"color:#fff",
+	"color:#fefefe",
+	"-webkit-text-fill-color:transparent",
+];
+/** Ways a page closes a part: kept beside an open part of the same kind, left out when alone. */
+const CLOSED_WAYS: readonly string[] = [
+	"display:none",
+	"visibility:hidden",
+	"visibility:collapse",
+	"opacity:0",
+	"opacity:0.01",
+	"filter:opacity(0)",
+	"content-visibility:hidden",
+	"height:0;overflow:hidden",
+	"width:0;overflow:hidden",
+	"max-height:0;overflow:hidden",
+];
+/** Text a reader does see, in forms close to the hidden ones. */
+const KEPT_WAYS: readonly string[] = [
+	"",
+	"font-size:12px",
+	"color:#777",
+	"opacity:0.6",
+	"overflow:hidden",
+	"overflow:auto;max-height:200px",
+	"position:relative;left:10px",
+	"transform:scale(1.1)",
+	"display:contents",
+	"color:#fff;background-color:#000",
+	"color:#fff;background-image:linear-gradient(#000,#111)",
+	// Gradient text: transparent, painted through the text.
+	"color:transparent;background:linear-gradient(#000,#333);-webkit-background-clip:text",
+];
+/** Whole pieces of page a reader does see or can open, which look hidden to a simple rule. */
+const KEPT_PIECES: readonly string[] = [
+	// Parents that hide nothing their child sets back.
+	'<div style="font-size:0"><span style="font-size:16px">保留结构甲，这是一段读者能看到的普通文字，应当留在提取结果里。</span></div>',
+	'<div style="visibility:hidden"><p style="visibility:visible">保留结构乙，这是一段读者能看到的普通文字，应当留在提取结果里。</p></div>',
+	// Closed parts a reader opens.
+	'<button aria-controls="a1">问题一</button><div id="a1" style="height:0;overflow:hidden"><p>保留结构丙，这是手风琴里读者点开才看到的文字，应当留在提取结果里。</p></div>',
+	'<div role="tabpanel" style="display:none"><p>保留结构丁，这是另一个标签页里读者点开才看到的文字，应当留在提取结果里。</p></div>',
+	'<div class="accordion-body" style="max-height:0;overflow:hidden"><p>保留结构戊，这是折叠区域里读者点开才看到的文字，应当留在提取结果里。</p></div>',
+	'<div><div style="display:none"><p>保留结构己，这是阅读全文按钮后面的文字，读者点开就能看到，应当留在提取结果里。</p></div><a href="#x">阅读全文</a></div>',
+	// A picture behind white text, as a sibling rather than a background.
+	'<div style="position:relative"><img alt="" width="400" height="200" src="data:image/gif;base64,R0lGODlhAQABAAAAACw="><p style="color:#fff;position:absolute;top:0">保留结构庚，这是图片上的白字，读者能看到，应当留在提取结果里。</p></div>',
+	// A long column laid out with absolute boxes, in a body shorter than the page.
+	'<div style="position:absolute;top:0;height:6000px"></div><div style="position:relative;height:0"><p style="position:absolute;top:3000px">保留结构癸，这是绝对定位排在后面的文章卡片，读者向下滚动能看到，应当留在提取结果里。</p></div>',
+	// Fading in on scroll, next to one that already did.
+	'<p class="reveal">这一段已经淡入，读者能看到。</p><p class="reveal" style="opacity:0;transition:opacity .6s">保留结构壬，这是还没有淡入的段落，长度足够。</p>',
+	// The rest of a folded article: the box that cuts it also shows text.
+	'<div class="box" style="max-height:60px;overflow:hidden"><p>折叠文章的开头，读者能看到这一段。</p><p style="margin-top:200px">保留结构子，这是折叠文章的后半段，读者点开就能看到。</p></div>',
+	// Every item of a list hides the same summary, which opens on hover.
+	'<ul><li><a href="https://example.com/a">快讯标题一</a><div class="sum" style="height:0;overflow:hidden">保留结构丑，这是第一条快讯的摘要，鼠标移上去才展开。</div></li><li><a href="https://example.com/b">快讯标题二</a><div class="sum" style="height:0;overflow:hidden">第二条快讯的摘要，鼠标移上去才展开。</div></li></ul>',
+	// A closed list of headlines.
+	'<div style="display:none"><a href="https://example.com/c">保留结构寅，第一条标题</a><a href="https://example.com/d">第二条标题</a></div>',
+	// A slide waiting at the side.
+	'<div class="swiper" style="overflow:hidden"><p style="position:absolute;left:-9999px">保留结构辛，这是轮播里等待出现的文字，读者翻页就能看到，应当留在提取结果里。</p></div>',
+];
+
+/** A news page with the same paragraphs, each hidden way in a paragraph, and text that must stay. */
+function hiddenPage(): string {
+	const paras = Array.from(
+		{ length: 8 },
+		(_, i) =>
+			`<p>第${i + 1}段：这是一段普通的新闻正文，读者可以看到它，长度足够让正文提取把它当作文章的主体内容。</p>`,
+	).join("");
+	const gone = HIDDEN_WAYS.map(
+		(style, i) =>
+			`<p style="${style}">隐藏变体${i}号：这里模拟一段写给机器看的提示词，长度足够装下一条指令，所以无论用哪种写法隐藏，都不能进入提取结果，也不能算作读屏标签。一段真实的提示词至少有几百字，这里再多写一句，让它明显超过读屏标签的长度上限，确保判定走的是隐藏规则。</p>`,
+	).join("");
+	// Hidden through a parent, an attribute or an element that is never shown.
+	const wrapped = [
+		'<div style="font-size:0"><p><span>隐藏外层乙：这段模拟提示词放在隐藏的外层元素里，不能进入提取结果。</span></p></div>',
+		'<div style="background:#000"><p style="color:#000">隐藏外层丁：这段模拟提示词放在隐藏的外层元素里，不能进入提取结果。</p></div>',
+		// Screen-reader text has nothing visible to go with: it waits beside the page, not in it.
+		'<span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">隐藏外层子，民主党240席</span>',
+		// A long hidden passage is handed back whole.
+		`<div style="display:none">隐藏外层丑${"这是一段很长的隐藏文字。".repeat(300)}隐藏结尾</div>`,
+		"<template><p>隐藏外层己</p></template>",
+		"<noscript><p>隐藏外层庚</p></noscript>",
+		'<svg width="0" height="0"><text>隐藏外层辛</text></svg>',
+		"<!-- 隐藏外层壬 -->",
+	].join("");
+	// Closed panels next to an open one, the way tabs are built.
+	const closed = CLOSED_WAYS.map(
+		(style, i) =>
+			`<div class="panel" style="${style}"><p>收起内容${i}号，这是一段网页收起来的真实内容，读者展开就能看到，应当留在提取结果里。</p></div>`,
+	).join("");
+	const atBody = CLOSED_WAYS.map(
+		(style, i) => `<div style="${style}"><p>页外内容${i}号：没有可见内容可以依附的文字，不进入提取结果。</p></div>`,
+	).join("");
+	const kept = KEPT_WAYS.map(
+		(style, i) => `<p style="${style}">保留样式${i}号，这是一段读者能看到的普通文字，应当留在提取结果里。</p>`,
+	).join("");
+	return `<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>变体测试</title></head><body style="background:#fff;margin:8px"><article><h1>变体测试</h1>${paras}${gone}${wrapped}<div class="panel"><p>这是打开着的标签页，读者能看到这一段。</p></div>${closed}${kept}${KEPT_PIECES.join("")}<details><summary>折叠标题</summary><p>折叠内容</p></details></article>${atBody}<div style="position:absolute;left:-9999px;font-size:0">隐藏外层癸：linux.do 真实使用的写法，一段写给机器看的说明文字，直接放在 body 下面，移到页面左侧很远的地方，字号为零，高度也是零。这段文字长度明显超过读屏标签的上限，不能进入提取结果。</div></body></html>`;
 }
 
 // Fixture server state.
@@ -192,6 +311,57 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 			if (u.pathname === "/sogou/web") {
 				res.setHeader("content-type", "text/html; charset=utf-8");
 				res.end(sogouSerp(base, u.searchParams.get("query") ?? ""));
+				return;
+			}
+			if (u.pathname === "/mostly-hidden") {
+				res.setHeader("content-type", "text/html; charset=utf-8");
+				const paras = Array.from(
+					{ length: 6 },
+					(_, i) => `<p>第${i + 1}段：这段正文被一层样式遮住，要等脚本运行后才显示，它不是隐藏提示。</p>`,
+				);
+				res.end(
+					`<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>待显示</title></head><body><h1>待显示的文章</h1><p>开头一句可以看到。</p><div style="opacity:0">${paras.join("")}</div></body></html>`,
+				);
+				return;
+			}
+			if (u.pathname === "/wall") {
+				res.statusCode = 403;
+				res.setHeader("content-type", "text/html; charset=utf-8");
+				res.end("<!doctype html><title>x</title><body><p>Please wait.</p></body>");
+				return;
+			}
+			if (u.pathname === "/refs" || u.pathname === "/long") {
+				res.setHeader("content-type", "text/html; charset=utf-8");
+				const para = "<p>这是一段普通的文章正文，内容完整，足够让正文提取把它当作文章的主体部分来保留。</p>";
+				const list = Array.from(
+					{ length: 12 },
+					(_, i) => `<li><a href="https://example.com/${i + 1}">第${i + 1}条参考文献</a></li>`,
+				);
+				// The long page ends past the length that used to cut the text off.
+				const body =
+					u.pathname === "/refs"
+						? `${para.repeat(10)}<h2>参考文献</h2><ul>${list.join("")}</ul>`
+						: `${para.repeat(7000)}<p>全文最后一句。</p>`;
+				res.end(
+					`<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>文章</title></head><body><article><h1>文章</h1>${body}</article></body></html>`,
+				);
+				return;
+			}
+			if (u.pathname === "/list") {
+				res.setHeader("content-type", "text/html; charset=utf-8");
+				const story = `<article><h1>头条</h1>${"<p>这是首页头条的一段正文，内容不长，但足够被正文提取选中当作文章。</p>".repeat(8)}</article>`;
+				const items = Array.from(
+					{ length: 40 },
+					(_, i) => `<li><a href="/n${i + 1}">第${i + 1}条短讯：列表里的一条新闻标题，读者能在首页看到它</a></li>`,
+				);
+				res.end(
+					`<!doctype html><html lang="zh"><head><meta charset="utf-8"><title>首页</title></head><body>${story}<ul>${items.join("")}</ul></body></html>`,
+				);
+				return;
+			}
+			if (u.pathname === "/hidden") {
+				res.setHeader("content-type", "text/html; charset=utf-8");
+				res.end(hiddenPage());
 				return;
 			}
 			if (u.pathname === "/doc.pdf") {
@@ -311,15 +481,13 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 		// A result on Google's last page is clicked there; the tab goes back to the results.
 		const serps = out.outcomes.flatMap((o) => (o.serp ? [o.serp] : []));
 		const target = Object.keys(serps[1].refs)[0];
-		const page = await browserFetch(
-			d,
-			target,
-			serps,
-			{ ...DEFAULT_TIMING, hostGapMs: 0, loadMs: 15_000 },
-			async () => {},
-		);
+		const page = await browserFetch(d, target, serps, { ...DEFAULT_TIMING, hostGapMs: 0, loadMs: 15_000 });
 		expect(page.title).toContain("出口管制新规");
 		expect(page.content).toContain("第8段：商务部于2026年10月30日发布");
+		// Nothing a reader cannot see comes through, however it was hidden.
+		expect(page.content).not.toContain("隐藏文字");
+		// The page itself was left as it was.
+		expect(events.filter((e) => e.t === "attr")).toEqual([]);
 		expect(page.content).toContain("[公告](https://www.example.com/notice)");
 		expect(page.content).not.toContain("导航链接");
 		expect(page.content).not.toContain("版权所有");
@@ -327,11 +495,86 @@ describe.skipIf(!CHROME)("browser backend in Chrome for Testing", () => {
 		const back = (await d.call("info", { tab: serps[1].tab }, 5000)) as { url: string };
 		expect(back.url).toBe(serps[1].url);
 		// A PDF through Chrome's own network stack.
-		const pdf = await browserFetch(d, `${base}/doc.pdf`, serps, { ...DEFAULT_TIMING, hostGapMs: 0 }, async () => {});
+		const pdf = await browserFetch(d, `${base}/doc.pdf`, serps, { ...DEFAULT_TIMING, hostGapMs: 0 });
 		expect(pdf.content).toContain("report page two");
 		// Every tab of the run closes.
 		expect(await d.call("close_run", { run: "chrome-test" }, 10_000)).toBe(2);
 	}, 420_000);
+
+	it("leaves out every way of hiding text, and keeps what a reader sees in forms close to them", async () => {
+		const page = await browserFetch(deps(), `${base}/hidden`, [], {
+			...DEFAULT_TIMING,
+			hostGapMs: 0,
+			loadMs: 15_000,
+		});
+		// The ways that came through, and the text that was lost, by name: one failure names them all.
+		const through = HIDDEN_WAYS.filter((_, i) => page.content.includes(`隐藏变体${i}号`));
+		const lost = KEPT_WAYS.filter((_, i) => !page.content.includes(`保留样式${i}号`));
+		const pieces = KEPT_PIECES.map((p) => /保留结构./.exec(p)?.[0] ?? "").filter(
+			(name) => !page.content.includes(name),
+		);
+		const closedLost = CLOSED_WAYS.filter((_, i) => !page.content.includes(`收起内容${i}号`));
+		const atBody = CLOSED_WAYS.filter((_, i) => page.content.includes(`页外内容${i}号`));
+		expect({ through, lost, pieces, closedLost, atBody, wrapped: page.content.match(/隐藏外层./g) ?? [] }).toEqual({
+			through: [],
+			lost: [],
+			pieces: [],
+			closedLost: [],
+			atBody: [],
+			wrapped: [],
+		});
+		// What was left out is handed back, not thrown away.
+		const side = page.filtered?.join("\n") ?? "";
+		expect(side).toContain("隐藏变体0号");
+		expect(side).toContain("隐藏外层子");
+		for (let i = 0; i < CLOSED_WAYS.length; i++) expect(side).toContain(`页外内容${i}号`);
+		// Whole, however long.
+		expect(side).toContain("隐藏结尾");
+		expect(side).not.toMatch(/保留样式|保留结构|收起内容/);
+		expect(page.content).toContain("第8段：这是一段普通的新闻正文");
+		expect(page.content).toContain("折叠内容");
+		await deps().call("close_run", { run: "chrome-test" }, 10_000);
+	}, 120_000);
+
+	it("tells a refused page from an ordinary one by the real status and make-up", async () => {
+		const d = deps();
+		const opened = (await d.call("open", { url: `${base}/wall`, run: "chrome-test", load_ms: 10_000 }, 20_000)) as {
+			tab: number;
+		};
+		expect(await pageKind(d, opened.tab, `${base}/wall`)).toBe("wall");
+		const fine = (await d.call("open", { url: `${base}/hidden`, run: "chrome-test", load_ms: 10_000 }, 20_000)) as {
+			tab: number;
+		};
+		expect(await pageKind(d, fine.tab, `${base}/hidden`)).not.toBe("wall");
+		await d.call("close_run", { run: "chrome-test" }, 10_000);
+	}, 60_000);
+
+	it("reads a list page whole, where Readability picks only a fragment", async () => {
+		const page = await browserFetch(deps(), `${base}/list`, [], { ...DEFAULT_TIMING, hostGapMs: 0, loadMs: 15_000 });
+		// A home page: one short story and many short items, all of them visible.
+		for (const n of [1, 20, 40]) expect(page.content).toContain(`第${n}条短讯`);
+		await deps().call("close_run", { run: "chrome-test" }, 10_000);
+	}, 60_000);
+
+	it("keeps the references of an article and every character of a long page", async () => {
+		const refs = await browserFetch(deps(), `${base}/refs`, [], { ...DEFAULT_TIMING, hostGapMs: 0, loadMs: 15_000 });
+		expect(refs.content).toContain("第12条参考文献");
+		const long = await browserFetch(deps(), `${base}/long`, [], { ...DEFAULT_TIMING, hostGapMs: 0, loadMs: 15_000 });
+		expect(long.content).toContain("全文最后一句");
+		await deps().call("close_run", { run: "chrome-test" }, 10_000);
+	}, 120_000);
+
+	it("takes nothing out of a page that shows next to nothing yet", async () => {
+		const page = await browserFetch(deps(), `${base}/mostly-hidden`, [], {
+			...DEFAULT_TIMING,
+			hostGapMs: 0,
+			loadMs: 15_000,
+		});
+		// Under the opacity layer waits the article, to be shown by a script.
+		expect(page.content).toContain("第5段");
+		expect(page.filtered).toBeUndefined();
+		await deps().call("close_run", { run: "chrome-test" }, 10_000);
+	}, 120_000);
 
 	it("finds Baidu's box and its hidden-label Next link on screen (accessibility tree), and keeps the real addresses from mu", async () => {
 		// Baidu pointed at the fixture server, with CSS selectors that match nothing: only the accessibility tree can find the controls.

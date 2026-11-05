@@ -15,15 +15,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SessionManager } from "../../src/core/session-manager.ts";
 // Extensions under test.
 import writerDocsExtension from "../../src/extensions/writer-docs/index.ts";
+import writerRewindExtension from "../../src/extensions/writer-rewind/index.ts";
 import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
 import writerTopicExtension from "../../src/extensions/writer-topic/index.ts";
+// Snapshots.
+import { readSnapshots, storeDir } from "../../src/writer/rewind/rewind.ts";
 // The current topic.
 import { currentTopic, setCurrentTopic } from "../../src/writer/topic/current.ts";
 // Harness with the faux provider.
 import { createHarness, getToolResult, type Harness } from "../suite/harness.ts";
 
 const URL_A = "https://a.example/news";
-const TOOLS = ["topic_open", "web_search", "web_fetch", "material_add", "write", "edit", "read", "import_document"];
+const TOOLS = [
+	"draft_restore",
+	"topic_open",
+	"web_search",
+	"web_fetch",
+	"material_add",
+	"write",
+	"edit",
+	"read",
+	"import_document",
+];
 
 describe("a writing topic", () => {
 	let harness: Harness | undefined;
@@ -54,7 +67,7 @@ describe("a writing topic", () => {
 	/** A harness with the three extensions. */
 	async function setup(sessionManager?: SessionManager): Promise<Harness> {
 		return createHarness({
-			extensionFactories: [writerTopicExtension, writerSearchExtension, writerDocsExtension],
+			extensionFactories: [writerTopicExtension, writerSearchExtension, writerDocsExtension, writerRewindExtension],
 			initialActiveToolNames: TOOLS,
 			sessionManager,
 		});
@@ -100,6 +113,10 @@ describe("a writing topic", () => {
 		expect(page.length).toBeGreaterThan(40_000);
 		expect(page).toContain(URL_A);
 		expect(readFileSync(join(topic, "素材.md"), "utf-8")).toContain("巴黎市政府");
+		// The research carries no remark on how reliable it is (the user, 2026-11-05).
+		const said = JSON.stringify(harness.session.messages.filter((m) => m.role === "toolResult"));
+		expect(said).not.toMatch(/不可信|untrusted/);
+		expect(page).not.toMatch(/不可信|untrusted/);
 		// The refused call came first: only the second record is there.
 		const results = harness.session.messages.filter((m) => m.role === "toolResult" && m.toolName === "material_add");
 		expect(results.map((r) => (r as { isError?: boolean }).isError)).toEqual([true, false]);
@@ -108,6 +125,34 @@ describe("a writing topic", () => {
 		expect(existsSync(join(topic, "稿件", "初稿.docx"))).toBe(true);
 		expect(readdirSync(join(topic, "网页")).some((f) => f.endsWith(".docx"))).toBe(false);
 		expect(getToolResult(harness, "web_fetch").details).toMatchObject({ topicDir: topic });
+	});
+
+	it("saves the materials file before a change, so going back covers it", async () => {
+		harness = await setup();
+		const material = {
+			kind: "data",
+			time: "2025年",
+			region: "苏州",
+			industry: "纺织",
+			indicator: "产值",
+			value: "1亿",
+			file: "年鉴.pdf",
+			page: "3",
+		};
+		harness.setResponses([
+			call("topic_open", { name: "主题乙" }),
+			call("material_add", { items: [material] }),
+			call("material_add", { items: [material] }),
+			fauxAssistantMessage("好"),
+			call("material_add", { items: [material] }),
+			fauxAssistantMessage("好"),
+		]);
+		await harness.session.prompt("第一轮");
+		await harness.session.prompt("第二轮");
+		const file = join(harness.tempDir, "主题乙", "素材.md");
+		const snapshots = readSnapshots(storeDir(agentDir, harness.tempDir)).filter((s) => s.file === file);
+		// One per user message: the first records that the file did not exist.
+		expect(snapshots.map((s) => s.blob === null)).toEqual([true, false]);
 	});
 
 	it("archives into a dated folder when the model never opened a topic", async () => {

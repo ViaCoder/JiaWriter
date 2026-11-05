@@ -453,6 +453,9 @@ export interface InteractiveModeOptions {
 	terminal?: Terminal;
 }
 
+/** How long a second Ctrl+C counts as the second press (ms); long enough to read the hint first. */
+const CTRL_C_EXIT_WINDOW_MS = 2000;
+
 export class InteractiveMode {
 	private runtimeHost: AgentSessionRuntime;
 	private renderer: TuiMainScreen | TuiAltScreen;
@@ -1036,7 +1039,7 @@ export class InteractiveMode {
 			const expandedInstructions = () =>
 				[
 					hint("app.interrupt", "to interrupt"),
-					hint("app.clear", "to clear"),
+					hint("app.clear", "to interrupt or clear"),
 					rawKeyHint(`${keyText("app.clear")} twice`, "to exit"),
 					hint("app.exit", "to exit (empty)"),
 					hint("app.suspend", "to suspend"),
@@ -4260,14 +4263,27 @@ export class InteractiveMode {
 	// Key handlers
 	// =========================================================================
 
+	/**
+	 * JiaWriter: the same as Claude Code. One press interrupts whatever is running; with nothing running the
+	 * first press clears the input and says how to leave, and a second press exits.
+	 */
 	private handleCtrlC(): void {
-		const now = Date.now();
-		if (now - this.lastSigintTime < 500) {
-			void this.shutdown();
-		} else {
-			this.clearEditor();
-			this.lastSigintTime = now;
+		const session = this.session;
+		if (session.isStreaming || session.isBashRunning || session.isCompacting || session.isRetrying) {
+			// The escape handler of the moment knows what is running; a press right after must not exit.
+			this.defaultEditor.onEscape?.();
+			if (session.isCompacting) session.abortCompaction();
+			this.lastSigintTime = 0;
+			return;
 		}
+		const now = Date.now();
+		if (now - this.lastSigintTime < CTRL_C_EXIT_WINDOW_MS) {
+			void this.shutdown();
+			return;
+		}
+		this.clearEditor();
+		this.lastSigintTime = now;
+		this.showStatus(uiText("Press {key} again to exit", { key: keyText("app.clear") }));
 	}
 
 	private handleCtrlD(): void {

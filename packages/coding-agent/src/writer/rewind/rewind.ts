@@ -8,7 +8,16 @@
 // Hash of the working folder.
 import { createHash } from "node:crypto";
 // Files.
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, statSync } from "node:fs";
+import {
+	appendFileSync,
+	copyFileSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	statSync,
+} from "node:fs";
 // Paths.
 import { dirname, join } from "node:path";
 
@@ -32,6 +41,8 @@ export interface Snapshot {
 const RESTORE_TAG = "restore";
 /** The list of snapshots. */
 const INDEX = "index.jsonl";
+/** How long a store stays after its last snapshot (ms). */
+const KEEP_MS = 30 * 86_400_000;
 
 /** Store of a working folder: several sessions there see each other's snapshots, and forks keep theirs. */
 export function storeDir(agentDir: string, cwd: string): string {
@@ -96,4 +107,17 @@ export function restoreSnapshot(store: string, snapshot: Snapshot, now = Date.no
 export function versionsOf(snapshots: readonly Snapshot[], file: string): Snapshot[] {
 	// A "did not exist" state is no version of the text.
 	return snapshots.filter((s) => s.file === file && s.blob !== null);
+}
+
+/** Remove the stores of working folders with no snapshot for a month. */
+export function pruneStores(agentDir: string, now: number): void {
+	// No store yet.
+	const root = join(agentDir, "rewind");
+	if (!existsSync(root)) return;
+	for (const name of readdirSync(root)) {
+		// The list changes with every snapshot; a store without one is leftover.
+		const index = join(root, name, INDEX);
+		if (!existsSync(index) || now - statSync(index).mtimeMs > KEEP_MS)
+			rmSync(join(root, name), { recursive: true, force: true });
+	}
 }

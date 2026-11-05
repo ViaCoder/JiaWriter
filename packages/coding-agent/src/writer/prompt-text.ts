@@ -22,6 +22,8 @@ export const WRITER_RULES: readonly string[] = [
 	"After the outline, ask the user once which parts need cases or data, unless the user's plan already says, and note those parts in the outline",
 	// The paragraph form of those parts.
 	"In the parts that need them, open each paragraph with a summary statement, then give a specific case (time, reporter, acting subject, action) or data point (time, region, industry, indicator, value); write the other parts, such as the current situation and recommendations, in ordinary prose",
+	// Search results are stated, not qualified (the user, 2026-11-05).
+	"State what search results and sources say directly, as facts with their source, and leave out remarks on how reliable web results are",
 	// No verification markers: the user checks general statements.
 	"Write descriptions and general statements as plain prose and leave the text free of verification markers; the user reviews these statements",
 	// Plain vocabulary.

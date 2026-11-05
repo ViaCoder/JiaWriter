@@ -17,7 +17,7 @@ import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../s
 // The prompt builder that shows snippets and guidelines.
 import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 // Extension under test.
-import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
+import writerSearchExtension, { abortable } from "../../src/extensions/writer-search/index.ts";
 // Browser host and frames.
 import { bridgeAddress, decodeFrames, encodeFrame, HOST_NAME, runHost } from "../../src/writer/browser/bridge.ts";
 // Chrome's host folder of this system.
@@ -337,12 +337,13 @@ describe("writer-search over the browser", () => {
 			const f = await run(map, "web_fetch", { url: "https://news.example.com/google-3" });
 			expect(f.text.split("\n")[0]).toBe("网页正文（browser）：温州新闻");
 			expect(f.details).toMatchObject({ backend: "browser", date: "2026-11-01" });
-			expect(host.ops.slice(-9)).toEqual([
+			expect(host.ops.slice(-10)).toEqual([
 				"info",
 				"run:serp",
 				"human_click",
 				"run:probe",
 				"run:probe",
+				"run:features",
 				"human_scroll",
 				"run:article",
 				"run:meta",
@@ -441,5 +442,42 @@ describe("writer-search prompt text", () => {
 		expect(prompt).toContain("- web_search: Search the web for sources");
 		expect(prompt).toContain("- web_fetch: Fetch a web page");
 		expect(prompt).toContain("cite");
+	});
+});
+
+describe("writer-search prompt rules", () => {
+	it("prefers renowned international press, and carries no remark on the reliability of web text", () => {
+		const { map } = (() => {
+			const map = new Map<string, ToolDefinition>();
+			writerSearchExtension({
+				on: () => undefined,
+				registerCommand: () => undefined,
+				registerTool: (t: ToolDefinition) => map.set(t.name, t),
+			} as unknown as ExtensionAPI);
+			return { map };
+		})();
+		const text = [...map.values()].map((t) => [t.description, ...(t.promptGuidelines ?? [])].join("\n")).join("\n");
+		expect(text).toContain("internationally renowned news organizations");
+		expect(text).toContain("Reuters, AP, AFP");
+		expect(text).not.toMatch(/untrusted|as material|follow only/i);
+	});
+});
+
+describe("abortable", () => {
+	it("ends a slow request the moment the call is cancelled", async () => {
+		const stop = new AbortController();
+		const never = new Promise<string>(() => undefined);
+		const out = abortable(never, stop.signal);
+		stop.abort();
+		await expect(out).rejects.toThrow("aborted");
+	});
+
+	it("passes results and failures through, and refuses after a cancel", async () => {
+		const stop = new AbortController();
+		await expect(abortable(Promise.resolve("好"), stop.signal)).resolves.toBe("好");
+		await expect(abortable(Promise.reject(new Error("坏")), stop.signal)).rejects.toThrow("坏");
+		await expect(abortable(Promise.resolve("无信号"))).resolves.toBe("无信号");
+		stop.abort();
+		await expect(abortable(Promise.resolve("晚了"), stop.signal)).rejects.toThrow("aborted");
 	});
 });

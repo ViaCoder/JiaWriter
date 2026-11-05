@@ -68,6 +68,13 @@ describe("write on a draft", () => {
 		expect(JSON.stringify(refused)).toContain("edit");
 	});
 
+	it("sees a draft named the way the tools accept it", async () => {
+		// The same file with the @ prefix the tools strip.
+		harness?.setResponses([write("@初稿.md", "第二版"), fauxAssistantMessage("好")]);
+		await harness?.session.prompt("第二段改短");
+		expect(draft()).toBe("第一版");
+	});
+
 	it("lets a rewrite the user asked for through at once", async () => {
 		harness?.setResponses([write("初稿.md", "第二版"), fauxAssistantMessage("好")]);
 		await harness?.session.prompt("全文重写一遍");

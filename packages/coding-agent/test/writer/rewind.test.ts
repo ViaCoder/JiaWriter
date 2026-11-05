@@ -2,7 +2,7 @@
 // over the real write and edit tools.
 
 // Temp files.
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import writerRewindExtension, { userTurns } from "../../src/extensions/writer-rewind/index.ts";
 // Functions under test.
 import {
+	pruneStores,
 	readSnapshots,
 	restoreSnapshot,
 	storeDir,
@@ -80,6 +81,21 @@ describe("snapshot store", () => {
 		expect(readFileSync(file, "utf-8")).toBe("二");
 		restoreSnapshot(store, created as NonNullable<typeof created>);
 		expect(existsSync(file)).toBe(false);
+	});
+});
+
+describe("pruneStores", () => {
+	it("removes stores with no snapshot for a month and keeps the others", () => {
+		const fresh = storeDir(dir, "/new");
+		const old = storeDir(dir, "/old");
+		takeSnapshot(fresh, join(dir, "a.md"), "u1");
+		takeSnapshot(old, join(dir, "b.md"), "u1");
+		const day = 86_400_000;
+		utimesSync(join(old, "index.jsonl"), new Date(Date.now() - 31 * day), new Date(Date.now() - 31 * day));
+		pruneStores(dir, Date.now());
+		expect([existsSync(fresh), existsSync(old)]).toEqual([true, false]);
+		// No store at all is fine.
+		pruneStores(join(dir, "none"), Date.now());
 	});
 });
 

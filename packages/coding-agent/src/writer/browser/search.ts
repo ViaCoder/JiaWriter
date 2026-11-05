@@ -6,10 +6,12 @@
  * A verification page is handed to the person at the screen for a bounded time (waitForPerson).
  */
 
-// Engine definitions and link decoding.
 import { AX, ENGINES, type EngineName, type EngineSpec, resultTarget, withFresh } from "./engines.ts";
 // Local ranking.
 import { type EngineHit, type RankedHit, rankHits } from "./rank.ts";
+// Engine definitions and link decoding.
+// Telling a wall from a page by its make-up.
+import { classifyPage, type PageFeatures, type PageKind } from "./wall.ts";
 
 /** What the browser driver needs from its surroundings (tests replace every part). */
 export interface BrowserDeps {
@@ -25,6 +27,10 @@ export interface BrowserDeps {
 	interactive: boolean;
 	// Verification progress for the interface.
 	notify?: (event: VerifyEvent) => void;
+	// Whether this site may hold the work for a person now: once a run per site.
+	claimHold?: (site: string) => boolean;
+	// Seconds left of a wait for a person, shown while it lasts; 0 ends the display.
+	countdown?: (seconds: number) => void;
 	// True once the tool call was cancelled (Esc): waits end at once.
 	aborted?: () => boolean;
 	// Tabs opened for this session carry this tag.
@@ -34,7 +40,7 @@ export interface BrowserDeps {
 /** A verification step shown to the user: started (seconds to wait), seconds left, passed, or given up. */
 export interface VerifyEvent {
 	// What happened.
-	kind: "verify" | "verify_left" | "verify_ok" | "verify_timeout";
+	kind: "verify" | "verify_left" | "verify_ok" | "verify_timeout" | "verify_gone";
 	// On which engine, or "page" for a page web_fetch reads.
 	engine: EngineName | "page";
 	// Seconds (wait length, or seconds left).
@@ -54,7 +60,7 @@ export interface BrowserTiming {
 }
 
 /** Default and largest JW_VERIFY_WAIT, in seconds. */
-export const VERIFY_WAIT_DEFAULT_S = 90;
+export const VERIFY_WAIT_DEFAULT_S = 180;
 export const VERIFY_WAIT_MAX_S = 300;
 
 /** How long an engine is left alone after a verification that was not cleared (ms). */
@@ -70,10 +76,11 @@ export function verifyWaitMs(raw: string | undefined): number {
 
 /** Default timing. */
 export const DEFAULT_TIMING: BrowserTiming = {
-	engineGapMs: 20_000,
-	hostGapMs: 6_000,
+	// The user, 2026-11-05: longer gaps, so detection does not interrupt the work.
+	engineGapMs: 45_000,
+	hostGapMs: 20_000,
 	loadMs: 30_000,
-	humanWaitMs: 90_000,
+	humanWaitMs: VERIFY_WAIT_DEFAULT_S * 1000,
 };
 
 /** A results page left open so web_fetch can click its links. */
@@ -259,45 +266,106 @@ async function awaitResults(deps: BrowserDeps, tab: number, engine: EngineName):
 	return rep;
 }
 
-/** Poll interval while a person clears a challenge (ms). */
-const VERIFY_POLL_MS = 1500;
+/** Poll interval while a person clears a challenge (ms): slow, so the check is left alone while they work. */
+const VERIFY_POLL_MS = 3000;
+/** Longest wait while the person is at the window: whoever is working on it is not cut off (ms). */
+const VERIFY_ENGAGED_MS = 300_000;
 
 /**
- * Hand a challenge to the person at the screen and wait until results show. Interactive mode only; the
- * wait is bounded by waitMs, ends at once on Esc, and reports start, 30 s left, success or timeout.
+ * Hand a page to the person at the screen and wait until cleared() has an answer. Interactive mode only. The
+ * wait is bounded: it ends on Esc or Ctrl+C, when the tab is closed, or at waitMs, and grows up to
+ * VERIFY_ENGAGED_MS while the tab's window is in front. A tab left unsolved stays open for the person.
+ * Each site holds the work once a run, so a run does not stop again and again.
  */
-async function waitForPerson(
+export async function holdForPerson<T>(
+	deps: BrowserDeps,
+	tab: number,
+	engine: EngineName | "page",
+	waitMs: number,
+	cleared: () => Promise<T | null>,
+	site: string = engine,
+): Promise<T | null> {
+	// Nobody to ask in print mode, or waiting switched off.
+	if (!deps.interactive || waitMs <= 0) return null;
+	// This run has waited for this site already.
+	if (deps.claimHold && !deps.claimHold(site)) return null;
+	// The tab to the front, and a note in the interface.
+	await deps.call("activate", { tab }, 10_000).catch(() => {});
+	deps.notify?.({ kind: "verify", engine, seconds: Math.round(waitMs / 1000) });
+	deps.countdown?.(Math.round(waitMs / 1000));
+	let deadline = waitMs;
+	let warned = waitMs <= 30_000;
+	try {
+		for (let waited = 0; waited < deadline; waited += VERIFY_POLL_MS) {
+			if (deps.aborted?.()) throw new Error("aborted");
+			await deps.sleep(VERIFY_POLL_MS);
+			if (deps.aborted?.()) throw new Error("aborted");
+			// A tab or window the person closed ends the wait at once.
+			const info = (await deps.call("info", { tab }, 5000).then(
+				(r) => r ?? {},
+				() => null,
+			)) as { front?: boolean } | null;
+			if (deps.aborted?.()) throw new Error("aborted");
+			if (!info) {
+				deps.notify?.({ kind: "verify_gone", engine });
+				return null;
+			}
+			const done = await cleared().catch(() => null);
+			if (done) {
+				deps.notify?.({ kind: "verify_ok", engine });
+				return done;
+			}
+			// Someone at the window keeps at least a minute in hand.
+			const passed = waited + VERIFY_POLL_MS;
+			if (info.front) deadline = Math.max(deadline, Math.min(VERIFY_ENGAGED_MS, passed + 60_000));
+			deps.countdown?.(Math.round((deadline - passed) / 1000));
+			// One reminder when 30 seconds are left.
+			if (!warned && deadline - passed <= 30_000) {
+				warned = true;
+				deps.notify?.({ kind: "verify_left", engine, seconds: 30 });
+			}
+		}
+		deps.notify?.({ kind: "verify_timeout", engine });
+		return null;
+	} finally {
+		deps.countdown?.(0);
+	}
+}
+
+/** Hold a results or home page for the person: cleared means results, or the check gone from the page. */
+function waitForPerson(
 	deps: BrowserDeps,
 	tab: number,
 	engine: EngineName,
 	waitMs: number,
-	// What counts as cleared: results on a results page, or the check gone from the home page.
 	until: "results" | "clear" = "results",
 ): Promise<SerpReport | null> {
-	// Nobody to ask in print mode, or waiting switched off.
-	if (!deps.interactive || waitMs <= 0) return null;
-	// The tab to the front, and a note in the interface.
-	await deps.call("activate", { tab }, 10_000).catch(() => {});
-	deps.notify?.({ kind: "verify", engine, seconds: Math.round(waitMs / 1000) });
-	// Poll until results show, the time is up, or the call is cancelled.
-	let warned = waitMs <= 30_000;
-	for (let waited = 0; waited < waitMs; waited += VERIFY_POLL_MS) {
-		if (deps.aborted?.()) throw new Error("aborted");
-		await deps.sleep(VERIFY_POLL_MS);
-		if (deps.aborted?.()) throw new Error("aborted");
-		const rep = await readSerp(deps, tab, engine).catch(() => null);
-		if (rep && (until === "results" ? rep.results.length > 0 : !rep.challenge)) {
-			deps.notify?.({ kind: "verify_ok", engine });
-			return rep;
-		}
-		// One reminder when 30 seconds are left.
-		if (!warned && waitMs - waited - VERIFY_POLL_MS <= 30_000) {
-			warned = true;
-			deps.notify?.({ kind: "verify_left", engine, seconds: 30 });
-		}
+	return holdForPerson(deps, tab, engine, waitMs, async () => {
+		const rep = await readSerp(deps, tab, engine);
+		return (until === "results" ? rep.results.length > 0 : !rep.challenge) ? rep : null;
+	});
+}
+
+/** What kind of page a tab shows, from its make-up; a page that cannot be read counts as the page. */
+export async function pageKind(deps: BrowserDeps, tab: number, asked: string): Promise<PageKind> {
+	// One short read: ordinary pages pay nothing more.
+	try {
+		const f = JSON.parse(String(await deps.call("run", { tab, script: "features" }, 15_000))) as PageFeatures;
+		return classifyPage(f, asked);
+	} catch {
+		return "page";
 	}
-	deps.notify?.({ kind: "verify_timeout", engine });
-	return null;
+}
+
+/** The person's turn when the tab shows a wall; anything else goes on at once. */
+async function ifWall(
+	deps: BrowserDeps,
+	tab: number,
+	engine: EngineName,
+	asked: string,
+	waitMs: number,
+): Promise<SerpReport | null> {
+	return (await pageKind(deps, tab, asked)) === "wall" ? waitForPerson(deps, tab, engine, waitMs) : null;
 }
 
 /** Search one engine like a person; never throws for page trouble (the reason goes to stopped). */
@@ -334,15 +402,13 @@ export async function searchEngine(
 	const tab = opened.tab;
 	try {
 		// A look at the page before acting.
-		await pause(deps, 900, 2200);
+		await pause(deps, 1800, 4400);
 		// A verification before anything else: the person first.
 		let first = await readSerp(deps, tab, engine);
 		if (first.challenge && first.results.length === 0) {
 			const cleared = await waitForPerson(deps, tab, engine, opts.timing.humanWaitMs, "clear");
-			if (!cleared) {
-				await deps.call("close", { tab }, 10_000).catch(() => {});
-				return { engine, hits, pages, stopped: "verification", serp: null };
-			}
+			// The tab stays open: the person may finish after the wait.
+			if (!cleared) return { engine, hits, pages, stopped: "verification", serp: null };
 			first = await readSerp(deps, tab, engine);
 		}
 		// Consent dialog: click accept.
@@ -352,7 +418,7 @@ export async function searchEngine(
 				{ tab, target: { ax: AX.consent, selectors: spec.consent }, load_ms: opts.timing.loadMs },
 				opts.timing.loadMs + 20_000,
 			);
-			await pause(deps, 800, 1600);
+			await pause(deps, 1600, 3200);
 		}
 		// Click the box, type, Enter.
 		const typed = (await deps.call(
@@ -361,15 +427,18 @@ export async function searchEngine(
 			// Load time, plus up to 1.5 s per character typed.
 			opts.timing.loadMs + 30_000 + [...query].length * 1500,
 		)) as InputReply;
-		if (!typed.typed) return { engine, hits, pages, stopped: "no search box", serp: null };
+		// No box on the page: when a wall stands in the way, a person clears it or searches by hand.
+		if (!typed.typed && !(await ifWall(deps, tab, engine, spec.home, opts.timing.humanWaitMs)))
+			return { engine, hits, pages, stopped: "no search box", serp: null };
 		// Enter did not submit: the search button.
-		if (!typed.navigated) {
+		if (typed.typed && !typed.navigated) {
 			const sub = (await deps.call(
 				"human_click",
 				{ tab, target: { ax: AX.submit, selectors: spec.submit }, load_ms: opts.timing.loadMs },
 				opts.timing.loadMs + 20_000,
 			)) as InputReply;
-			if (!sub.navigated) return { engine, hits, pages, stopped: "search did not start", serp: null };
+			if (!sub.navigated && !(await ifWall(deps, tab, engine, spec.home, opts.timing.humanWaitMs)))
+				return { engine, hits, pages, stopped: "search did not start", serp: null };
 		}
 		// A time filter: the same results address with the engine's filter parameter.
 		if (opts.fresh) {
@@ -395,6 +464,9 @@ export async function searchEngine(
 				}
 				rep = solved;
 			}
+			// Nothing on the first page: a wall the page script did not name goes to the person, a real "no results" on.
+			if (rep.results.length === 0 && p === 1)
+				rep = (await ifWall(deps, tab, engine, spec.home, opts.timing.humanWaitMs)) ?? rep;
 			if (rep.results.length === 0) {
 				stopped = p === 1 ? "no results" : "";
 				break;
@@ -443,7 +515,7 @@ export async function searchEngine(
 				if (!(await seesNext()) && !(await readSerp(deps, tab, engine)).next) break;
 			}
 			// A moment before reaching for Next.
-			await pause(deps, 1500, 4000);
+			await pause(deps, 5000, 12_000);
 			// Click "Next".
 			const nx = (await deps.call(
 				"human_click",

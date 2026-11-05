@@ -38,6 +38,10 @@ export interface FetchResult {
 	content: string;
 	// Publication date or relative-time marker ("" when unknown).
 	date: string;
+	// Text left out because a reader of the page cannot see it (browser method).
+	filtered?: string[];
+	// The text may not be the page asked for: a wall of some kind (browser method).
+	unsure?: boolean;
 }
 
 /** Plugin configuration from JW_SEARCH* and JW_SF. */
@@ -168,6 +172,18 @@ export function urlDate(url: string): string {
 	return c ? `${c[1]}-${c[2]}-${c[3]}` : "";
 }
 
+// Characters a reader cannot see: zero-width and bidirectional marks, variation selectors, the BOM and the
+// tag block U+E0000–U+E0FFF. They can hide or reorder words in what a program reads.
+const INVISIBLE =
+	// biome-ignore lint/suspicious/noMisleadingCharacterClass: separate characters, none meant to combine with the next.
+	/[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFE00-\uFE0F\uFEFF]|\uDB40[\uDC00-\uDFFF]/g;
+
+/** Web text without HTML comments and characters a reader cannot see, from every backend. */
+export function cleanWebText(text: string): string {
+	// Comments first: they may span lines.
+	return text.replace(/<!--[\s\S]*?-->/g, "").replace(INVISIBLE, "");
+}
+
 /** Clean a backend's raw results: http(s) only, blocked hosts dropped, duplicates removed, dates filled in, snippets bounded. */
 export function normalizeResults(
 	raw: readonly SearchResult[],
@@ -188,10 +204,10 @@ export function normalizeResults(
 		if (seen.has(key) || isBlocked(hostOf(r.url), blocklist)) continue;
 		seen.add(key);
 		// Snippet in one line, bounded.
-		const snippet = r.snippet.replace(/\s+/g, " ").trim().slice(0, MAX_SNIPPET_CHARS);
+		const snippet = cleanWebText(r.snippet).replace(/\s+/g, " ").trim().slice(0, MAX_SNIPPET_CHARS);
 		// Date from the backend, else from the title/snippet, else from the URL path.
 		out.push({
-			title: r.title.trim() || r.url,
+			title: cleanWebText(r.title).trim() || r.url,
 			url: r.url,
 			snippet,
 			date: r.date || findDate(`${r.title} ${snippet}`) || urlDate(r.url),
@@ -203,7 +219,7 @@ export function normalizeResults(
 	return out;
 }
 
-/** The web_search report: heading, numbered results, the untrusted-content notice. */
+/** The web_search report: heading and numbered results. */
 export function formatSearch(
 	query: string,
 	backend: string,
@@ -226,21 +242,17 @@ export function formatSearch(
 			lang,
 		),
 	);
-	// Heading, notice, results.
-	return [
-		t("search.title", { backend, count: results.length, query }, lang),
-		t("search.untrusted", {}, lang),
-		...items,
-	].join("\n");
+	// Heading, results.
+	return [t("search.title", { backend, count: results.length, query }, lang), ...items].join("\n");
 }
 
-/** The web_fetch report: heading with source and date, the untrusted notice, the bounded text. */
+/** The web_fetch report: heading with source and date, then the bounded text. */
 export function formatFetch(page: FetchResult, backend: string, lang?: WriterLang): string {
 	// Bounded text.
 	const clipped = page.content.length > MAX_FETCH_CHARS;
 	// Text the model receives.
 	const body = clipped ? page.content.slice(0, MAX_FETCH_CHARS) : page.content;
-	// Heading, notice, text, and a note when clipped.
+	// Heading, text, and a note when clipped.
 	return [
 		t(
 			"fetch.title",
@@ -252,7 +264,6 @@ export function formatFetch(page: FetchResult, backend: string, lang?: WriterLan
 			},
 			lang,
 		),
-		t("search.untrusted", {}, lang),
 		"",
 		body.trim(),
 		...(clipped ? ["", t("fetch.clipped", { chars: MAX_FETCH_CHARS }, lang)] : []),

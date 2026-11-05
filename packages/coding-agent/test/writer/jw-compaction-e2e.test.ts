@@ -5,7 +5,7 @@
 // Child process for the CLI.
 import { spawn } from "node:child_process";
 // Temp directories.
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 // Local HTTP mock.
 import { createServer, type Server } from "node:http";
 // OS temp directory.
@@ -23,8 +23,9 @@ const cliPath = resolve(__dirname, "../../src/cli.ts");
 const sourceResolverUrl = pathToFileURL(resolve(__dirname, "../../src/experimental/source-resolver.ts")).href;
 // Key the mock accepts.
 const SECRET = "sk-jw-compact-4711";
-// Window of the test: the long messages below pass the compaction threshold on the third.
-const CTX = 40_000;
+// Window of the test: the messages below pass the compaction threshold on the third. It is small because
+// the messages travel on the command line, which Windows limits to about 32000 characters.
+const CTX = 8000;
 
 /** One request the mock answered. */
 interface Seen {
@@ -93,7 +94,12 @@ async function run(): Promise<{ code: number | null; out: string }> {
 		JW_EFFORT: "high",
 		JW_AUTO_EXPORT: "off",
 	});
-	const page = "城市绿化研究资料".repeat(1500);
+	// A small window needs small kept and reserved parts too.
+	writeFileSync(
+		join(dir, "settings.json"),
+		JSON.stringify({ compaction: { reserveTokens: 1000, keepRecentTokens: 2000 } }),
+	);
+	const page = "城市绿化研究资料".repeat(300);
 	const out = await new Promise<{ code: number | null; out: string }>((done, reject) => {
 		const child = spawn(
 			process.execPath,

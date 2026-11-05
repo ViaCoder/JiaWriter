@@ -12,14 +12,17 @@ import {
 	browserFetch,
 	docKind,
 	documentText,
+	looksWrong,
 	type Probe,
 	pageVerdict,
 } from "../../src/writer/browser/fetch.ts";
+// The wait for a person.
 import {
 	type BrowserDeps,
 	browserSearch,
 	clampPages,
 	DEFAULT_TIMING,
+	holdForPerson,
 	isWrapperLink,
 	mergeResults,
 	type SerpTab,
@@ -330,7 +333,6 @@ function fakeFetch(probes: Probe[], extra: { serpUrl?: string; newTab?: boolean;
 	return { deps, log };
 }
 
-const ok = async () => {};
 const content: Probe = {
 	title: "t",
 	textLen: 900,
@@ -378,12 +380,14 @@ describe("browserFetch", () => {
 
 	it("clicks a result on the open results page, reads it, and goes back", async () => {
 		const f = fakeFetch([content], { serpUrl: serp.url });
-		const page = await browserFetch(f.deps, "https://news.example.com/a", [serp], DEFAULT_TIMING, ok);
+		const page = await browserFetch(f.deps, "https://news.example.com/a", [serp], DEFAULT_TIMING);
 		expect(page).toEqual({
 			url: "https://news.example.com/a",
 			title: "标题",
 			content: "# 标题\n\n正文",
 			date: "2026-10-31",
+			// The fake article is short: the model hears it may not be the page.
+			unsure: true,
 		});
 		expect(f.log).toEqual([
 			"info",
@@ -391,6 +395,7 @@ describe("browserFetch", () => {
 			"human_click",
 			"run:probe",
 			"run:probe",
+			"run:features",
 			"human_scroll",
 			"run:article",
 			"run:meta",
@@ -400,18 +405,18 @@ describe("browserFetch", () => {
 
 	it("closes the tab a result link opened, and opens other addresses in a new tab", async () => {
 		const nt = fakeFetch([content], { serpUrl: serp.url, newTab: true });
-		await browserFetch(nt.deps, "https://news.example.com/a", [serp], DEFAULT_TIMING, ok);
+		await browserFetch(nt.deps, "https://news.example.com/a", [serp], DEFAULT_TIMING);
 		expect(nt.log.at(-1)).toBe("close");
 		const other = fakeFetch([content], { serpUrl: "https://bing/elsewhere" });
-		await browserFetch(other.deps, "https://news.example.com/a", [serp], DEFAULT_TIMING, ok);
+		await browserFetch(other.deps, "https://news.example.com/a", [serp], DEFAULT_TIMING);
 		expect(other.log.slice(0, 2)).toEqual(["info", "open"]);
 		expect(other.log.at(-1)).toBe("close");
 	});
 
-	it("reports a lasting bot check, downloads documents, and applies the address policy", async () => {
+	it("reports a lasting bot check and downloads documents", async () => {
 		const blocked = fakeFetch([wall]);
-		await expect(browserFetch(blocked.deps, "https://x.example.com/", [], DEFAULT_TIMING, ok)).rejects.toThrow(
-			/blocked/,
+		await expect(browserFetch(blocked.deps, "https://x.example.com/", [], DEFAULT_TIMING)).rejects.toThrow(
+			/需要人工处理|needs a person/,
 		);
 		expect(blocked.log.at(-1)).toBe("close");
 		const doc = fakeFetch([content]);
@@ -420,27 +425,142 @@ describe("browserFetch", () => {
 			"https://x.example.com/files/%E6%8A%A5%E5%91%8A.pdf",
 			[],
 			DEFAULT_TIMING,
-			ok,
 		);
 		expect(pdf.title).toBe("报告.pdf");
 		expect(pdf.content).toContain("second page text");
 		expect(doc.log).toEqual(["download"]);
-		const refuse = async () => Promise.reject(new Error("local network address refused"));
-		await expect(browserFetch(doc.deps, "http://192.168.77.1/", [], DEFAULT_TIMING, refuse)).rejects.toThrow(
-			/refused/,
-		);
+	});
+});
+
+describe("working with the person at the screen", () => {
+	/** A fake tab: answers from the lists given, one per poll, the last one repeating. */
+	function fakeTab(over: { features?: unknown; info?: () => unknown; probe?: Probe } = {}) {
+		const log: string[] = [];
+		const notes: VerifyEvent[] = [];
+		const counts: number[] = [];
+		let slept = 0;
+		const deps: BrowserDeps = {
+			call: async (op, args) => {
+				log.push(op === "run" ? `run:${args.script}` : op);
+				if (op === "info") return over.info ? over.info() : {};
+				if (op === "run" && args.script === "features") return JSON.stringify(over.features);
+				if (op === "run" && args.script === "probe") return JSON.stringify(over.probe ?? content);
+				return null;
+			},
+			sleep: async (ms) => {
+				slept += ms;
+			},
+			random: () => 0.5,
+			pace: async () => {},
+			interactive: true,
+			notify: (e) => notes.push(e),
+			countdown: (s) => counts.push(s),
+			run: "t",
+		};
+		return { deps, log, notes, counts, slept: () => slept };
+	}
+	const wallPage = { url: "https://a.example/x", status: 403, elements: 33, links: 0, textLen: 0 };
+	const normalPage = { url: "https://a.example/x", status: 200, elements: 1200, links: 200, textLen: 9000 };
+	const timing = { ...DEFAULT_TIMING, humanWaitMs: 60_000 };
+
+	it("reads an ordinary page without waiting for anyone", async () => {
+		const f = fakeTab({ features: normalPage });
+		expect(await awaitContent(f.deps, 1, timing, "https://a.example/x")).toBe("content");
+		expect(f.notes).toEqual([]);
+		expect(f.log).not.toContain("activate");
+		// Two looks a second apart, as before.
+		expect(f.slept()).toBeLessThanOrEqual(1000);
+	});
+
+	it("calls the person to a wall at once, even one full of words", async () => {
+		// A page with plenty of text reads as content; its make-up says otherwise.
+		const f = fakeTab({ features: wallPage });
+		expect(await awaitContent(f.deps, 1, timing, "https://a.example/x")).toBe("challenge");
+		expect(f.log).toContain("activate");
+		expect(f.notes[0]).toEqual({ kind: "verify", engine: "page", seconds: 60 });
+		// The wait ended with the display cleared.
+		expect(f.counts.at(-1)).toBe(0);
+	});
+
+	it("goes on from an empty page that is no wall, without calling anyone", async () => {
+		const f = fakeTab({
+			features: { ...normalPage, elements: 30, links: 0, textLen: 0 },
+			probe: { ...content, textLen: 0, excerpt: "" },
+		});
+		expect(await awaitContent(f.deps, 1, timing, "https://a.example/x")).toBe("blank");
+		expect(f.notes).toEqual([]);
+	});
+
+	it("stops at once when the person closes the tab", async () => {
+		const f = fakeTab({
+			info: () => {
+				throw new Error("no tab");
+			},
+		});
+		const out = await holdForPerson(f.deps, 1, "bing", 60_000, async () => null);
+		expect(out).toBeNull();
+		expect(f.notes.map((n) => n.kind)).toEqual(["verify", "verify_gone"]);
+		expect(f.slept()).toBe(3000);
+	});
+
+	it("gives a person at the window more time, up to the limit, and no more", async () => {
+		const f = fakeTab({ info: () => ({ front: true }) });
+		await holdForPerson(f.deps, 1, "bing", 60_000, async () => null);
+		expect(f.slept()).toBe(300_000);
+		const away = fakeTab({ info: () => ({ front: false }) });
+		await holdForPerson(away.deps, 1, "bing", 60_000, async () => null);
+		expect(away.slept()).toBe(60_000);
+	});
+
+	it("waits once per site in a run", async () => {
+		const seen = new Set<string>();
+		const claimHold = (site: string) => {
+			if (seen.has(site)) return false;
+			seen.add(site);
+			return true;
+		};
+		const f = fakeTab();
+		f.deps.claimHold = claimHold;
+		await holdForPerson(f.deps, 1, "page", 3000, async () => null, "a.example");
+		await holdForPerson(f.deps, 2, "page", 3000, async () => null, "a.example");
+		await holdForPerson(f.deps, 3, "page", 3000, async () => null, "b.example");
+		expect(f.notes.filter((n) => n.kind === "verify")).toHaveLength(2);
+	});
+
+	it("keeps the page for the person after the wait", async () => {
+		const blocked = fakeFetch([wall], { interactive: true });
+		await expect(
+			browserFetch(blocked.deps, "https://x.example.com/", [], { ...DEFAULT_TIMING, humanWaitMs: 3000 }),
+		).rejects.toThrow(/需要人工处理|needs a person/);
+		expect(blocked.log).not.toContain("close");
+	});
+});
+
+describe("looksWrong", () => {
+	const long = "字".repeat(4000);
+	const short = "这是一段足够长的页面文字。".repeat(30);
+
+	it("catches next to nothing, and a short page with no word of the title", () => {
+		expect(looksWrong("标题", "", "太短")).toBe(true);
+		expect(looksWrong("巴黎 新增绿地", "别的页面", short)).toBe(true);
+	});
+
+	it("accepts a matching page, a long page, and a page with no title to compare", () => {
+		expect(looksWrong("巴黎 新增绿地", "", `巴黎${short}`)).toBe(false);
+		expect(looksWrong("巴黎 新增绿地", "", long)).toBe(false);
+		expect(looksWrong(undefined, "", short)).toBe(false);
 	});
 });
 
 describe("verifyWaitMs", () => {
-	it("reads JW_VERIFY_WAIT as whole seconds, 0–300, with 90 by default", () => {
-		expect(verifyWaitMs(undefined)).toBe(90_000);
-		expect(verifyWaitMs("")).toBe(90_000);
+	it("reads JW_VERIFY_WAIT as whole seconds, 0–300, with 180 by default", () => {
+		expect(verifyWaitMs(undefined)).toBe(180_000);
+		expect(verifyWaitMs("")).toBe(180_000);
 		expect(verifyWaitMs("0")).toBe(0);
 		expect(verifyWaitMs("45")).toBe(45_000);
 		expect(verifyWaitMs("999")).toBe(300_000);
-		expect(verifyWaitMs("-1")).toBe(90_000);
-		expect(verifyWaitMs("soon")).toBe(90_000);
+		expect(verifyWaitMs("-1")).toBe(180_000);
+		expect(verifyWaitMs("soon")).toBe(180_000);
 	});
 });
 

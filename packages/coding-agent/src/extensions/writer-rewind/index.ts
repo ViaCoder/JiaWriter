@@ -7,6 +7,8 @@
 
 // Whether a restored file is there.
 import { existsSync } from "node:fs";
+// The materials file of a topic.
+import { join } from "node:path";
 // Parameter schemas.
 import { Type } from "typebox";
 // Agent directory.
@@ -23,6 +25,7 @@ import { exportDraft } from "../../writer/export/export.ts";
 import { t } from "../../writer/i18n/index.ts";
 // Snapshots.
 import {
+	pruneStores,
 	readSnapshots,
 	restoreSnapshot,
 	type Snapshot,
@@ -31,6 +34,9 @@ import {
 	undoTargets,
 	versionsOf,
 } from "../../writer/rewind/rewind.ts";
+// The current topic and its materials file.
+import { currentTopic } from "../../writer/topic/current.ts";
+import { MATERIAL_FILE } from "../../writer/topic/topic.ts";
 
 /** Longest message shown in the list (characters). */
 const LABEL_CHARS = 60;
@@ -67,13 +73,25 @@ export default function writerRewindExtension(pi: ExtensionAPI): void {
 	/** Store of the working folder. */
 	const store = (ctx: ExtensionContext) => storeDir(getAgentDir(), ctx.cwd);
 
+	// Snapshots older than a month leave by themselves.
+	pi.on("session_start", (event) => {
+		if (event.reason === "startup") pruneStores(getAgentDir(), Date.now());
+	});
+
 	// Before a file changes. A snapshot that fails must not stop the writing.
 	pi.on("tool_call", (event, ctx) => {
-		if (!isToolCallEventType("write", event) && !isToolCallEventType("edit", event)) return;
+		// The file this call will change: a draft, or the topic's materials.
+		const topic = currentTopic();
+		const file =
+			isToolCallEventType("write", event) || isToolCallEventType("edit", event)
+				? resolveToCwd(event.input.path, ctx.cwd)
+				: event.toolName === "material_add" && topic
+					? join(topic, MATERIAL_FILE)
+					: undefined;
 		const turn = userTurns(ctx).at(-1);
-		if (!turn) return;
+		if (!file || !turn) return;
 		try {
-			takeSnapshot(store(ctx), resolveToCwd(event.input.path, ctx.cwd), turn.id);
+			takeSnapshot(store(ctx), file, turn.id);
 		} catch {
 			// Going back to this change will be unavailable; the change itself goes ahead.
 		}

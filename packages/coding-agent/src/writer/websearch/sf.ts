@@ -120,6 +120,8 @@ export function sfChildEnv(
 	const env: NodeJS.ProcessEnv = { ...sfStateEnv(agentDir, platform), ...base, ...sfModelOff() };
 	// Print mode: a captcha must not wait for a person.
 	if (!interactive) env.SEARCH_FETCH_NO_HUMAN = "1";
+	// Every address may be read, the local network too (the user, 2026-11-05: "allow all visit").
+	env.SEARCH_FETCH_ALLOW_PRIVATE = "1";
 	// The environment.
 	return env;
 }

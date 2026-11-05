@@ -7,24 +7,15 @@
 
 // Message types.
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
+// Token estimate of a whole message.
+import { estimateTokens } from "../core/compaction/compaction.ts";
 // Output messages.
 import { t } from "./i18n/index.ts";
-// Token estimates.
-import { estimateTextTokens } from "./token-estimate.ts";
 
 /** Share of the context window the messages may use; the rest holds the system prompt, tools and the reply. */
 export const CONTEXT_SHARE = 0.85;
 /** Smallest size a result is clipped to (tokens). */
 const MIN_RESULT_TOKENS = 500;
-
-/** Tokens of a message's text blocks and of the whole message. */
-function textOf(message: AgentMessage): string {
-	// Plain strings and text blocks; images are left to the upstream estimate.
-	const content = (message as { content?: unknown }).content;
-	if (typeof content === "string") return content;
-	if (!Array.isArray(content)) return "";
-	return content.map((b: { type?: string; text?: string }) => (b.type === "text" ? (b.text ?? "") : "")).join("");
-}
 
 /** The largest size every result may keep so that the sizes add up to at most room. */
 export function resultCap(sizes: readonly number[], room: number): number {
@@ -55,7 +46,8 @@ function clipResult(message: AgentMessage, tokens: number, cap: number): AgentMe
 /** messages with their largest tool results clipped so the request fits budget tokens; the same array when it fits. */
 export function fitToolResults(messages: AgentMessage[], budget: number): AgentMessage[] {
 	// Size of each message, and of the tool results alone.
-	const sizes = messages.map((m) => estimateTextTokens(textOf(m)));
+	// Tool-call arguments count: a whole draft can sit in a write call.
+	const sizes = messages.map((m) => estimateTokens(m));
 	const total = sizes.reduce((a, b) => a + b, 0);
 	if (total <= budget) return messages;
 	const results = messages.flatMap((m, i) => (m.role === "toolResult" ? [sizes[i]] : []));

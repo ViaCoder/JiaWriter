@@ -7,10 +7,18 @@ import type { Message, Model } from "@earendil-works/pi-ai";
 // Test API.
 import { describe, expect, it } from "vitest";
 // Upstream functions changed for JiaWriter.
-import { type CompactionPreparation, splitForSummary } from "../../src/core/compaction/compaction.ts";
+import type { CompactionPreparation } from "../../src/core/compaction/compaction.ts";
 import { serializeConversation } from "../../src/core/compaction/utils.ts";
-import { isWriterOverflow, localCompaction, localSummary } from "../../src/writer/compact-fallback.ts";
+import { isAuthFailure, isWriterOverflow, localCompaction, localSummary } from "../../src/writer/compact-fallback.ts";
 import { fitToolResults, resultCap } from "../../src/writer/context-fit.ts";
+import {
+	isSummaryOverflow,
+	shortenMessage,
+	splitForSummary,
+	summarizeInParts,
+	summarizeTurnStart,
+	summaryLimit,
+} from "../../src/writer/summary-parts.ts";
 import { estimateTextTokens, weightedChars, wideCount } from "../../src/writer/token-estimate.ts";
 // Functions under test.
 import { compactionErrorText } from "../../src/writer/ui-text.ts";
@@ -91,6 +99,21 @@ describe("fitToolResults", () => {
 	});
 });
 
+describe("fitToolResults counts the whole request", () => {
+	it("sees a draft inside a tool call", () => {
+		// The call holds 9000 tokens, the result 2000: together over 8000, though the text blocks are not.
+		const call = {
+			role: "assistant",
+			content: [
+				{ type: "toolCall", id: "1", name: "write", arguments: { path: "a.md", content: "字".repeat(9000) } },
+			],
+		} as unknown as AgentMessage;
+		const page = result("字".repeat(2000));
+		const fitted = fitToolResults([call, page], 8000);
+		expect(JSON.stringify(fitted[1]).length).toBeLessThan(1500);
+	});
+});
+
 describe("splitForSummary", () => {
 	const model = { provider: "jw", contextWindow: 10_000 } as Model<string>;
 
@@ -109,6 +132,123 @@ describe("splitForSummary", () => {
 		]);
 		// Tool results are cut to 2000 characters by serialization, so these fit one part.
 		expect(splitForSummary([result("字".repeat(90_000)), result("字".repeat(90_000))], model)).toHaveLength(1);
+	});
+});
+
+describe("summaries in smaller parts", () => {
+	const model = { provider: "jw", contextWindow: 10_000 } as Model<string>;
+	const usage = {
+		input: 1,
+		output: 1,
+		cacheRead: 0,
+		cacheWrite: 0,
+		totalTokens: 2,
+		cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+	};
+	const tooLarge = () => new Error("Summarization failed: prompt is too long: 9 tokens > 1 maximum");
+	/** A summarizer that takes at most max characters, and records what it was given. */
+	const taking = (max: number) => {
+		const seen: { chars: number; previous?: string }[] = [];
+		const summarize = async (part: AgentMessage[], previous?: string) => {
+			const chars = JSON.stringify(part).length;
+			if (chars > max) throw tooLarge();
+			seen.push({ chars, previous });
+			return { text: `摘要${seen.length}`, usage };
+		};
+		return { seen, summarize };
+	};
+	const messages = Array.from({ length: 6 }, (_, i) => user(`${i}${"字".repeat(3000)}`));
+
+	it("sizes a part from the window", () => {
+		expect(summaryLimit(model)).toBe(7000);
+	});
+
+	it("shortens a message in any content form, and leaves others alone", () => {
+		expect(shortenMessage(user("一二三四"), 0.5)).toMatchObject({ content: "一二" });
+		const blocks = shortenMessage(result("一二三四"), 0.5) as { content: { text: string }[] };
+		expect(blocks.content[0].text).toBe("一二");
+		const none = { role: "custom" } as unknown as AgentMessage;
+		expect(shortenMessage(none, 0.5)).toBe(none);
+	});
+
+	it("shortens one message larger than a part while splitting", () => {
+		const parts = splitForSummary([user("字".repeat(9000))], model, 3000);
+		expect(parts).toHaveLength(1);
+		expect(JSON.stringify(parts[0]).length).toBeLessThan(3500);
+	});
+
+	it("tells an overflow of the jw model from other failures", () => {
+		expect(isSummaryOverflow(tooLarge(), model)).toBe(true);
+		expect(isSummaryOverflow(new Error("Summarization failed: 请求超长"), model)).toBe(true);
+		expect(isSummaryOverflow(new Error("Turn prefix summarization failed: prompt is too long"), model)).toBe(true);
+		expect(isSummaryOverflow(new Error("Summarization failed: 余额不足"), model)).toBe(false);
+		expect(isSummaryOverflow(tooLarge(), { provider: "anthropic", contextWindow: 10 } as Model<string>)).toBe(false);
+		expect(isSummaryOverflow("text", model)).toBe(false);
+	});
+
+	it("goes smaller after a rejection, passing the summary along and redoing nothing", async () => {
+		// Parts of 7000 tokens are too much; 3500 fit one message each.
+		const { seen, summarize } = taking(4000);
+		const out = await summarizeInParts(messages, model, "旧摘要", summarize);
+		expect(seen).toHaveLength(6);
+		expect(seen[0].previous).toBe("旧摘要");
+		expect(seen[5].previous).toBe("摘要5");
+		expect(out.text).toBe("摘要6");
+		// Every summary's usage counts.
+		expect(out.usage.input).toBe(6);
+	});
+
+	it("keeps parts already done when a later part is rejected", async () => {
+		// The first part fits; the third message on is rejected once.
+		let calls = 0;
+		const done: number[] = [];
+		const out = await summarizeInParts(messages, model, undefined, async (part) => {
+			calls++;
+			if (calls === 2) throw tooLarge();
+			done.push(part.length);
+			return { text: "摘要", usage };
+		});
+		expect(out.text).toBe("摘要");
+		// Two in the first part; the other four again, smaller.
+		expect(done.reduce((a, b) => a + b, 0)).toBe(6);
+	});
+
+	it("gives up after three smaller tries, and at once on other failures", async () => {
+		let calls = 0;
+		await expect(
+			summarizeInParts(messages, model, undefined, async () => {
+				calls++;
+				throw tooLarge();
+			}),
+		).rejects.toThrow("too long");
+		expect(calls).toBe(4);
+		calls = 0;
+		await expect(
+			summarizeInParts(messages, model, undefined, async () => {
+				calls++;
+				throw new Error("Summarization failed: 余额不足");
+			}),
+		).rejects.toThrow("余额不足");
+		expect(calls).toBe(1);
+	});
+
+	it("keeps the latest part of a turn start that does not fit", async () => {
+		const seen: AgentMessage[][] = [];
+		const out = await summarizeTurnStart(messages, model, async (part) => {
+			if (part.length > 1) throw tooLarge();
+			seen.push(part);
+			return { text: "摘要", usage };
+		});
+		expect(out.text).toBe("摘要");
+		expect(seen[0][0]).toEqual(messages[5]);
+		let calls = 0;
+		await expect(
+			summarizeTurnStart(messages, model, async () => {
+				calls++;
+				throw tooLarge();
+			}),
+		).rejects.toThrow();
+		expect(calls).toBe(4);
 	});
 });
 
@@ -144,6 +284,15 @@ describe("localSummary and localCompaction", () => {
 		expect([out.firstKeptEntryId, out.tokensBefore]).toEqual(["e1", 99]);
 		expect(out.details).toMatchObject({ localFallback: true, modifiedFiles: ["b.md"] });
 		expect(out.summary).toContain("b.md");
+	});
+});
+
+describe("isAuthFailure", () => {
+	it("reads a refused key", () => {
+		for (const text of ["401 Unauthorized", "403 forbidden", "invalid api key", "Summarization failed: 认证失败"])
+			expect(isAuthFailure(text)).toBe(true);
+		for (const text of ["500 server error", "prompt is too long", "4010 tokens"])
+			expect(isAuthFailure(text)).toBe(false);
 	});
 });
 

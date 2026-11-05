@@ -11,7 +11,7 @@ const HOST = "com.jiawriter.browser";
 // Version reported to the host: the manifest's, so the two never differ.
 const VERSION = chrome.runtime.getManifest().version;
 // Page scripts that may be run (file names in ops/ without .js).
-const SCRIPTS = new Set(["html", "meta", "probe", "observe", "results", "extent", "url", "scroll_bottom",
+const SCRIPTS = new Set(["features", "html", "meta", "probe", "observe", "results", "extent", "url", "scroll_bottom",
   "click_target", "type_target", "next_link", "more_button", "activity_install", "activity_last",
   "locate", "serp", "article"]);
 // Scripts that need a vendored library injected first.
@@ -177,7 +177,7 @@ async function tabInfo(tabId, timedOut) {
   // Current state.
   const t = await chrome.tabs.get(tabId);
   // Id, final URL, title and whether the load wait ran out.
-  return { tab: tabId, url: t.url || "", title: t.title || "", timedOut: !!timedOut };
+  return { tab: tabId, url: t.url || "", title: t.title || "", timedOut: !!timedOut, front: !!t.active && (await chrome.windows.get(t.windowId)).focused };
 }
 
 // Close tabs that outlived TAB_MAX_AGE.
@@ -820,7 +820,9 @@ const OPS = {
   // Bring a tab to the front so a person can solve a challenge in it.
   async activate(msg) {
     const t = await chrome.tabs.update(msg.tab, { active: true });
-    await chrome.windows.update(t.windowId, { focused: true });
+    // Out of a minimized state, to the front; where the desktop refuses that, the task bar entry flashes.
+    await chrome.windows.update(t.windowId, { state: "normal" }).catch(() => {});
+    await chrome.windows.update(t.windowId, { focused: true, drawAttention: true });
     return true;
   },
 };

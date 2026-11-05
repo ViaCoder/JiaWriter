@@ -172,6 +172,15 @@ export function archivePage(
 	return archive(dir, "page", TOPIC_DIRS.web, page.title || page.url, `${head}${page.content}\n`, page.url, asked);
 }
 
+/** Keep the text left out of a page beside its archive file, so a misjudged passage is never lost. */
+export function archiveFiltered(dir: string, pageFile: string, filtered: readonly string[]): string {
+	// A hidden folder: searches through the archive do not pick it up by accident.
+	const file = join(TOPIC_DIRS.web, ".过滤", basename(pageFile));
+	mkdirSync(join(dir, TOPIC_DIRS.web, ".过滤"), { recursive: true });
+	writeFileSync(join(dir, file), `${filtered.join("\n\n")}\n`);
+	return file;
+}
+
 /** Addresses archived in a topic, normalized for comparison: where each page ended and what was asked for. */
 export function archivedUrls(dir: string): string[] {
 	// The pages of the index.

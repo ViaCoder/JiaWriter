@@ -35,6 +35,12 @@ export function isWriterOverflow(message: { provider?: string; stopReason?: stri
 	return WRITER_OVERFLOW.some((p) => p.test(message.errorMessage ?? ""));
 }
 
+/** True for a refused key: the next request would fail the same way, so a local summary only loses detail. */
+export function isAuthFailure(message: string): boolean {
+	// Status codes and the usual wording.
+	return /\b40[13]\b|unauthorized|forbidden|invalid.{0,12}(api.?)?key|鉴权|认证失败|密钥/i.test(message);
+}
+
 /** Text of a user or assistant message. */
 function messageText(message: AgentMessage): string {
 	// Strings and text blocks.

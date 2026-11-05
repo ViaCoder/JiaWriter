@@ -41,7 +41,7 @@ describe("AgentSession virtual models", () => {
 		const harness = await createHarness({
 			...options,
 			models: [
-				{ id: "small", contextWindow: 1000 },
+				{ id: "small", contextWindow: 1500 }, // JiaWriter: 1500 instead of 1000, for the longer writing system prompt.
 				{ id: "large", contextWindow: 50_000, maxTokens: 4000, reasoning: true },
 			],
 			tools: [echoTool],
@@ -53,7 +53,7 @@ describe("AgentSession virtual models", () => {
 						id: "auto",
 						name: "Auto",
 						thinkingLevels: ["low", "high"],
-						contextWindow: 1000,
+						contextWindow: 1500,
 						route(request, ctx) {
 							requests.push(request);
 							return route(request, ctx);

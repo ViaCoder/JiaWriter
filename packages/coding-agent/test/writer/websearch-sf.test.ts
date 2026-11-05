@@ -115,11 +115,13 @@ describe("sfModelOff / sfStateEnv / sfChildEnv", () => {
 			JW_KEY: "w",
 			...sfModelOff(),
 			SEARCH_FETCH_NO_HUMAN: "1",
+			SEARCH_FETCH_ALLOW_PRIVATE: "1",
 		});
 		// Windows children get the port file.
 		expect(sfChildEnv({}, true, "/a", "win32").SEARCH_FETCH_BRIDGE_FILE).toBe(join("/a", "browser", "bridge.json"));
 		// Interactive; the parent's SEARCH_FETCH_HOME wins.
 		expect(sfChildEnv({ A: "1", SEARCH_FETCH_HOME: "/mine" }, true, "/a")).toEqual({
+			SEARCH_FETCH_ALLOW_PRIVATE: "1",
 			...sfStateEnv("/a"),
 			A: "1",
 			SEARCH_FETCH_HOME: "/mine",

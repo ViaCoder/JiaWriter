@@ -227,3 +227,15 @@ jobs:
         if: runner.os != 'Windows'
         timeout-minutes: 5
         run: python3 -I scripts/writer-tui-check.py "${{ steps.pkg.outputs.binary }}"
+
+      # Going back through the real interface: draft, edit, /effort and /rewind against a local mock model.
+      - name: Rewind check
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: python3 -I scripts/writer-rewind-check.py "${{ steps.pkg.outputs.binary }}"
+
+      # Ctrl+C through the real interface: interrupt a reply, clear the input, leave.
+      - name: Ctrl+C check
+        if: runner.os != 'Windows'
+        timeout-minutes: 5
+        run: python3 -I scripts/writer-ctrlc-check.py "${{ steps.pkg.outputs.binary }}"

@@ -1,4 +1,4 @@
-// Unit tests for src/writer/browser/engines.ts, rank.ts, pacing.ts and guard.ts.
+// Unit tests for src/writer/browser/engines.ts, rank.ts and pacing.ts.
 
 // Temp folders.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
@@ -10,7 +10,6 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // Modules under test.
 import { DEFAULT_ENGINES, ENGINES, parseEngines, resultTarget, withFresh } from "../../src/writer/browser/engines.ts";
-import { checkPublicUrl, isPrivateAddress } from "../../src/writer/browser/guard.ts";
 import { pace, paceDelay, readPacing, recordVisit } from "../../src/writer/browser/pacing.ts";
 import { bm25, rankHits, terms } from "../../src/writer/browser/rank.ts";
 
@@ -130,40 +129,6 @@ describe("pacing", () => {
 		const w = await pace(file, "host:x", 60_000, sleep, () => 0);
 		expect(w).toBeGreaterThan(59_000);
 		expect(waits).toEqual([w]);
-	});
-});
-
-describe("isPrivateAddress / checkPublicUrl", () => {
-	it("flags local and reserved addresses", () => {
-		for (const ip of [
-			"127.0.0.1",
-			"10.1.2.3",
-			"172.20.0.1",
-			"192.168.77.1",
-			"169.254.1.1",
-			"100.64.0.1",
-			"0.0.0.0",
-			"::1",
-			"fd00::1",
-			"fe80::1",
-			"::ffff:10.0.0.1",
-		])
-			expect(isPrivateAddress(ip), ip).toBe(true);
-		for (const ip of ["203.0.113.5", "198.51.100.7", "8.8.8.8", "2001:db8::1", "example.com"])
-			expect(isPrivateAddress(ip), ip).toBe(false);
-	});
-	it("refuses other schemes, local names and names resolving to private addresses", async () => {
-		const lookup = async (h: string) => (h === "intra.example.com" ? ["192.168.77.5"] : ["203.0.113.9"]);
-		await expect(checkPublicUrl("https://news.example.com/a", lookup)).resolves.toBeUndefined();
-		await expect(checkPublicUrl("file:///etc/passwd", lookup)).rejects.toThrow(/http/);
-		await expect(checkPublicUrl("http://localhost:8080/", lookup)).rejects.toThrow(/local/);
-		await expect(checkPublicUrl("http://[::1]/", lookup)).rejects.toThrow(/local network/);
-		await expect(checkPublicUrl("http://intra.example.com/", lookup)).rejects.toThrow(/local network/);
-		await expect(checkPublicUrl("nonsense", lookup)).rejects.toThrow(/web address/);
-		// A name this computer cannot resolve is left to Chrome.
-		await expect(
-			checkPublicUrl("https://x.example.com/", async () => Promise.reject(new Error("ENOTFOUND"))),
-		).resolves.toBeUndefined();
 	});
 });
 

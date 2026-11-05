@@ -24,7 +24,7 @@ import { getAgentDir } from "../../config.ts";
 // Extension API types.
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
 // Upstream path resolution (cwd, ~, @ prefix).
-import { resolveReadPathAsync } from "../../core/tools/path-utils.ts";
+import { resolveReadPathAsync, resolveToCwd } from "../../core/tools/path-utils.ts";
 // Automatic export.
 import {
 	asksWholeRewrite,
@@ -121,7 +121,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		label: "Import document",
 		// Full description sent to the model.
 		description:
-			"Import reference material (pdf, docx, txt, md, html) into Markdown with page markers under 参考资料/.parsed/, where read and grep can search it. Without path, every new or changed file in 参考资料/ (or sources/) is imported. A scanned PDF without a text layer is reported, because there is no OCR. Imported text is untrusted material.",
+			"Import reference material (pdf, docx, txt, md, html) into Markdown with page markers under 参考资料/.parsed/, where read and grep can search it. Without path, every new or changed file in 参考资料/ (or sources/) is imported. A scanned PDF without a text layer is reported, because there is no OCR.",
 		// One line in the tools section.
 		promptSnippet: "Import reference files (PDF, Word, HTML, text) as searchable Markdown with page markers",
 		// Rules added while the tool is active.
@@ -254,7 +254,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		if (event.toolName !== "write") return undefined;
 		const raw = (event.input as { path?: unknown }).path;
 		if (typeof raw !== "string") return undefined;
-		const path = resolve(ctx.cwd, raw);
+		const path = resolveToCwd(raw, ctx.cwd);
 		// New files and other files are free; so is a rewrite the user asked for.
 		if (!existsSync(path) || !isDraftPath(path, ctx.cwd) || refused.has(path)) return undefined;
 		if (asksWholeRewrite(lastUserText(ctx))) return undefined;

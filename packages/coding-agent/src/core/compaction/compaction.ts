@@ -26,7 +26,8 @@ import type {
 import { completeSimple } from "@earendil-works/pi-ai/compat";
 // JiaWriter: the provider name and token estimates for Chinese text.
 import { JW_PROVIDER } from "../../writer/env-config.ts";
-import { estimateTextTokens, weightedChars } from "../../writer/token-estimate.ts";
+import { summarizeInParts, summarizeTurnStart } from "../../writer/summary-parts.ts";
+import { weightedChars } from "../../writer/token-estimate.ts";
 import { convertToLlm } from "../messages.ts";
 import {
 	buildSessionProjection,
@@ -947,31 +948,6 @@ Create a concise checkpoint of the user's request and the progress shown above. 
 
 Only summarize information explicitly present above. Do not infer or recreate later messages.`;
 
-/** Share of the context window one summary request may use for the conversation (JiaWriter). */
-const SUMMARY_INPUT_SHARE = 0.7;
-/** Most summary requests for one compaction (JiaWriter); older parts beyond this are dropped. */
-const MAX_SUMMARY_PARTS = 8;
-
-/** JiaWriter: messages in order, grouped so each group's serialized text fits one summary request. */
-export function splitForSummary(messages: AgentMessage[], model: Model<any>): AgentMessage[][] {
-	const limit = Math.floor(model.contextWindow * SUMMARY_INPUT_SHARE);
-	// Only the JW_* model, and only with a window to size by; other models keep one request.
-	if (model.provider !== JW_PROVIDER || limit <= 0) return [messages];
-	const parts: AgentMessage[][] = [[]];
-	let size = 0;
-	for (const message of messages) {
-		// The size the summary request will see: long tool output is already cut by serialization.
-		const tokens = estimateTextTokens(serializeConversation(convertToLlm([message])));
-		if (size + tokens > limit && (parts.at(-1)?.length ?? 0) > 0) {
-			parts.push([]);
-			size = 0;
-		}
-		parts.at(-1)?.push(message);
-		size += tokens;
-	}
-	return parts.slice(-MAX_SUMMARY_PARTS);
-}
-
 /**
  * Generate summaries for compaction using prepared data.
  * Returns CompactionResult - SessionManager adds uuid/parentUuid when saving.
@@ -1004,11 +980,10 @@ export async function compact(
 		fileOps,
 	} = preparation;
 
-	// JiaWriter: history larger than one request is summarized in parts, each updating the summary before it.
-	const summarizeHistory = async (): Promise<{ text: string; usage: Usage }> => {
-		let result: { text: string; usage: Usage } | undefined;
-		for (const part of splitForSummary(messagesToSummarize, model)) {
-			const next = await generateSummaryWithUsage(
+	// JiaWriter: history larger than one request goes in parts, smaller again when the model rejects one.
+	const summarizeHistory = () =>
+		summarizeInParts(messagesToSummarize, model, previousSummary, (part, previous) =>
+			generateSummaryWithUsage(
 				part,
 				model,
 				undefined,
@@ -1016,18 +991,15 @@ export async function compact(
 				headers,
 				signal,
 				customInstructions,
-				result?.text ?? previousSummary,
+				previous,
 				thinkingLevel,
 				streamFn,
 				env,
 				retry,
 				callbacks,
 				sessionId,
-			);
-			result = result ? { text: next.text, usage: combineUsage(result.usage, next.usage) } : next;
-		}
-		return result as { text: string; usage: Usage };
-	};
+			),
+		);
 
 	// Generate summaries and merge into one
 	let summary: string;
@@ -1041,19 +1013,22 @@ export async function compact(
 			historyText = historyResult.text;
 			historyUsage = historyResult.usage;
 		}
-		const turnPrefixResult = await generateTurnPrefixSummary(
-			turnPrefixMessages,
-			model,
-			apiKey,
-			headers,
-			env,
-			signal,
-			thinkingLevel,
-			streamFn,
-			retry,
-			callbacks,
-			sessionId,
-			customInstructions,
+		// JiaWriter: the start of a split turn gets smaller the same way.
+		const turnPrefixResult = await summarizeTurnStart(turnPrefixMessages, model, (part) =>
+			generateTurnPrefixSummary(
+				part,
+				model,
+				apiKey,
+				headers,
+				env,
+				signal,
+				thinkingLevel,
+				streamFn,
+				retry,
+				callbacks,
+				sessionId,
+				customInstructions,
+			),
 		);
 		// Merge into single summary
 		summary = `${historyText}\n\n---\n\n**Turn Context (split turn):**\n\n${turnPrefixResult.text}`;

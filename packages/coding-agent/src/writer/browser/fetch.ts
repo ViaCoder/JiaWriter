@@ -9,13 +9,14 @@
 import { docxToPages } from "../docs/docx-read.ts";
 import { pdfPages } from "../docs/import.ts";
 // Dates in metadata.
+// Output messages.
+import { t } from "../i18n/index.ts";
 import { type FetchResult, findDate } from "../websearch/core.ts";
 // Real addresses behind result links.
 import { resultTarget } from "./engines.ts";
 // Address policy.
-import { checkPublicUrl } from "./guard.ts";
 // Driver dependencies, timing and open results pages.
-import type { BrowserDeps, BrowserTiming, SerpTab } from "./search.ts";
+import { type BrowserDeps, type BrowserTiming, holdForPerson, pageKind, type SerpTab } from "./search.ts";
 
 /** The probe.js snapshot. */
 export interface Probe {
@@ -51,7 +52,7 @@ const SETTLE_MS = 12_000;
 /** Longest wait for a bot check to clear by itself (ms). */
 const CHALLENGE_MS = 45_000;
 /** How long a challenge page may try to clear itself (Cloudflare-style checks) before a person is asked (ms). */
-const SELF_CLEAR_MS = 8_000;
+const SELF_CLEAR_MS = 4_000;
 /** Longest wait for Chrome's load event when opening, clicking or going back (ms): busy news sites keep
  * loading ads long after the text is there, and awaitContent watches the text itself. */
 const PAGE_LOAD_MS = 10_000;
@@ -100,12 +101,20 @@ export async function awaitContent(
 	deps: BrowserDeps,
 	tab: number,
 	timing: BrowserTiming,
+	asked = "",
 ): Promise<"content" | "challenge" | "blank"> {
+	// Each site waits for a person once a run.
+	const site = URL.canParse(asked) ? new URL(asked).hostname : "page";
 	// Deadlines start when each state is first seen.
 	let blankSince = -1;
 	let chalSince = -1;
-	let handed = false;
 	let lastLen = -1;
+	const person = deps.interactive && timing.humanWaitMs > 0;
+	// The page is fit to read: reads as content and is no wall by its make-up.
+	const clear = async () =>
+		pageVerdict(await probe(deps, tab)) === "content" && (await pageKind(deps, tab, asked)) !== "wall" ? true : null;
+	// The person's turn; false when the wait ended without the page clearing.
+	const hand = async () => person && !!(await holdForPerson(deps, tab, "page", timing.humanWaitMs, clear, site));
 	// Elapsed time by our own sleeps (tests use fake sleeps).
 	for (let t = 0; ; t += 1000) {
 		// Esc ends every wait at once.
@@ -113,38 +122,51 @@ export async function awaitContent(
 		const p = await probe(deps, tab);
 		const v = pageVerdict(p);
 		if (v === "content") {
-			// A cleared verification is reported once.
-			if (handed) {
-				handed = false;
-				deps.notify?.({ kind: "verify_ok", engine: "page" });
+			// Same text length twice in a row: settled. A wall can hold plenty of words, so its make-up decides.
+			if (p.textLen === lastLen || t >= SETTLE_MS) {
+				if ((await pageKind(deps, tab, asked)) !== "wall") return "content";
+				if (!(await hand())) return "challenge";
 			}
-			// Same text length twice in a row: settled.
-			if (p.textLen === lastLen || t >= SETTLE_MS) return "content";
 			lastLen = p.textLen;
 		} else if (v === "challenge") {
 			if (chalSince < 0) chalSince = t;
-			// Print mode: the page may clear itself within CHALLENGE_MS. Interactive mode (JW_VERIFY_WAIT > 0):
-			// after SELF_CLEAR_MS a person is asked, for the configured wait.
-			const person = deps.interactive && timing.humanWaitMs > 0;
-			if (person && !handed && t - chalSince >= SELF_CLEAR_MS) {
-				handed = true;
-				await deps.call("activate", { tab }, 10_000).catch(() => {});
-				deps.notify?.({ kind: "verify", engine: "page", seconds: Math.round(timing.humanWaitMs / 1000) });
-			}
-			const limit = person ? SELF_CLEAR_MS + timing.humanWaitMs : CHALLENGE_MS;
-			if (t - chalSince >= limit) {
-				if (handed) deps.notify?.({ kind: "verify_timeout", engine: "page" });
-				return "challenge";
+			// A page may clear itself: SELF_CLEAR_MS with a person to ask, CHALLENGE_MS without one.
+			if (t - chalSince >= (person ? SELF_CLEAR_MS : CHALLENGE_MS)) {
+				if (!(await hand())) return "challenge";
+				chalSince = -1;
 			}
 			// Content after a clearance starts fresh.
 			blankSince = -1;
 			lastLen = -1;
 		} else {
 			if (blankSince < 0) blankSince = t;
-			if (t - blankSince >= SETTLE_MS) return "blank";
+			if (t - blankSince >= SETTLE_MS) {
+				// An empty page: a person only when its make-up says wall.
+				if ((await pageKind(deps, tab, asked)) !== "wall") return "blank";
+				if (!(await hand())) return "challenge";
+				blankSince = -1;
+				lastLen = -1;
+			}
 		}
 		await deps.sleep(1000);
 	}
+}
+
+/** Fewest characters of a page that is read as the page itself. */
+const THIN_PAGE = 200;
+/** Above this many characters a page counts as the page, whatever its words. */
+const LONG_PAGE = 3000;
+
+/** True when what came back does not look like what was asked for: nearly nothing, or a short page with no
+ * word of the title the results page showed. This needs no knowledge of any particular wall. */
+export function looksWrong(expectedTitle: string | undefined, title: string, text: string): boolean {
+	// Nearly nothing.
+	if (text.trim().length < THIN_PAGE) return true;
+	if (!expectedTitle || text.length >= LONG_PAGE) return false;
+	// Words of the title, split at spaces and marks.
+	const words = expectedTitle.split(/[\s|_\-–—:：,，.。·、!！?？()（）《》"“”]+/).filter((w) => w.length >= 2);
+	const page = `${title} ${text}`.toLowerCase();
+	return words.length > 0 && !words.some((w) => page.includes(w.toLowerCase()));
 }
 
 /** Text of a downloaded document as Markdown pages. */
@@ -164,16 +186,13 @@ async function fetchDocument(deps: BrowserDeps, url: string, kind: "pdf" | "docx
 	return { url: got.url || url, title: name, content: text, date: "" };
 }
 
-/** Fetch one page; serps are the results pages still open (their links are clicked when they hold url); check is the address policy. */
+/** Fetch one page; serps are the results pages still open (their links are clicked when they hold url). */
 export async function browserFetch(
 	deps: BrowserDeps,
 	url: string,
 	serps: readonly SerpTab[],
 	timing: BrowserTiming,
-	check: (url: string) => Promise<void> = checkPublicUrl,
 ): Promise<FetchResult> {
-	// Public web addresses only.
-	await check(url);
 	// Documents by address go straight to the download.
 	const kind = docKind(url);
 	if (kind) {
@@ -184,7 +203,7 @@ export async function browserFetch(
 	await deps.pace(`host:${new URL(url).hostname}`, timing.hostGapMs);
 	// The tab to read, and how to leave it.
 	let tab = -1;
-	let leave: "back" | "close" = "close";
+	let leave: "back" | "close" | "keep" = "close";
 	// A results page that shows this link: click it there.
 	const serp = serps.find((s) => s.refs[url] !== undefined || s.titles?.[url] !== undefined);
 	if (serp) {
@@ -249,8 +268,12 @@ export async function browserFetch(
 	}
 	try {
 		// Content, a wall, or nothing.
-		const state = await awaitContent(deps, tab, timing);
-		if (state === "challenge") throw new Error(`blocked: ${url} shows a bot check`);
+		const state = await awaitContent(deps, tab, timing, url);
+		// A page still waiting for a person stays open for them; a later fetch finds it cleared.
+		if (state === "challenge" || state === "blank") {
+			leave = deps.interactive ? "keep" : "close";
+			if (state === "challenge") throw new Error(t("browser.blocked", { url }));
+		}
 		// Read like a person: a few wheel turns (lazy content loads too).
 		if (state === "content")
 			await deps.call("human_scroll", { tab, steps: 2 + Math.floor(deps.random() * 3) }, 40_000);
@@ -260,7 +283,14 @@ export async function browserFetch(
 			published: string;
 			markdown: string;
 			contentType: string;
+			filtered?: string[];
 		};
+		// What came back against what was asked for: no reason to stop, but the page stays and the model hears.
+		const unsure =
+			state === "content" &&
+			!docKind(url, art.contentType) &&
+			looksWrong(serp?.titles?.[url], art.title, art.markdown);
+		if (unsure && deps.interactive) leave = "keep";
 		const meta = JSON.parse(String(await deps.call("run", { tab, script: "meta" }, 20_000))) as {
 			pub: string;
 			final_url: string;
@@ -275,10 +305,14 @@ export async function browserFetch(
 			title: art.title,
 			content: art.markdown,
 			date: findDate(meta.pub || art.published || ""),
+			...(art.filtered?.length ? { filtered: art.filtered } : {}),
+			...(unsure ? { unsure } : {}),
 		};
 	} finally {
-		// Back to the results page, or close the tab.
-		if (leave === "back") {
+		// Back to the results page, or close the tab; a page for the person stays.
+		if (leave === "keep") {
+			// Closed with the session's other tabs at the end.
+		} else if (leave === "back") {
 			await deps.sleep(Math.round(500 + deps.random() * 1000));
 			await deps
 				.call("back", { tab, load_ms: Math.min(timing.loadMs, PAGE_LOAD_MS) }, timing.loadMs + 15_000)

@@ -18,6 +18,9 @@ const WINDOW = 128_000;
 /** One fetched page of Chinese text, the size web_fetch returns at most. */
 const PAGE = "城市绿化研究资料".repeat(3000);
 
+/** What only the model's own summary says (a local summary names the model's failure). */
+const MODEL_SUMMARY = "用户在写城市绿化报告。";
+
 /** Tokens as a server counts them: a Chinese character is about one token, other text about four characters. */
 function serverTokens(text: string): number {
 	const cjk = text.match(/[　-鿿＀-￯]/g)?.length ?? 0;
@@ -82,6 +85,53 @@ function brain(
 		log.batches = 0;
 		return fauxAssistantMessage("本轮资料已读完。");
 	};
+}
+
+/** A fake model whose real window is smaller than JW_CTX says: it rejects what does not fit, and summarizes. */
+function narrowModel(log: Log, realWindow: number) {
+	return (context: Context): AssistantMessage => {
+		const tokens = serverTokens(requestText(context));
+		if (tokens > realWindow) {
+			log.rejected++;
+			return fauxAssistantMessage("", {
+				stopReason: "error",
+				errorMessage: `prompt is too long: ${tokens} tokens > ${realWindow} maximum`,
+			});
+		}
+		if (isSummary(context)) {
+			log.summaries++;
+			return fauxAssistantMessage(MODEL_SUMMARY);
+		}
+		return fauxAssistantMessage("好的。");
+	};
+}
+
+/** Fifteen long turns (360000 real tokens), as an old session that compaction could not handle. */
+function seedLongSession(harness: Harness): void {
+	const now = Date.now();
+	for (let i = 0; i < 15; i++) {
+		harness.sessionManager.appendMessage({ role: "user", content: `问题${i}`, timestamp: now - 1000 + i });
+		harness.sessionManager.appendMessage({
+			...fauxAssistantMessage(PAGE, { timestamp: now - 900 + i }),
+			api: harness.getModel().api,
+			provider: harness.getModel().provider,
+			model: harness.getModel().id,
+		});
+	}
+	harness.session.agent.state.messages = harness.sessionManager.buildSessionContext().messages;
+}
+
+/** A harness with a long session and a model of the given real window. */
+async function narrowSetup(log: Log, realWindow: number): Promise<Harness> {
+	const harness = await setup(log, undefined, { retry: { enabled: false } });
+	harness.setResponses(Array.from({ length: 80 }, () => narrowModel(log, realWindow)));
+	seedLongSession(harness);
+	return harness;
+}
+
+/** The summaries the session holds. */
+function summaries(harness: Harness): string[] {
+	return harness.sessionManager.getEntries().flatMap((e) => (e.type === "compaction" ? [e.summary] : []));
 }
 
 /** A harness with the fake fetch tool and many copies of the fake model. */
@@ -240,5 +290,60 @@ describe("compaction on Chinese sessions", () => {
 		const last = harness.session.messages.at(-1) as AssistantMessage;
 		expect(last.stopReason).toBe("stop");
 		expect(log.rejected).toBe(0);
+	});
+
+	it("keeps the conversation as it is when the key is refused", async () => {
+		const log = newLog();
+		harness = await narrowSetup(log, WINDOW);
+		harness.setResponses([() => fauxAssistantMessage("", { stopReason: "error", errorMessage: "401 Unauthorized" })]);
+		await expect(harness.session.compact()).rejects.toThrow("401");
+		expect(summaries(harness)).toEqual([]);
+	});
+
+	describe("when JW_CTX is larger than the model's real window", () => {
+		it("repairs a long session by manual compaction in smaller batches", async () => {
+			const log = newLog();
+			harness = await narrowSetup(log, 60_000);
+			await harness.session.compact();
+			expect(summaries(harness)).toHaveLength(1);
+			// The model summarized: nothing came from the local fallback.
+			expect(summaries(harness)[0]).toContain(MODEL_SUMMARY);
+			expect(summaries(harness)[0]).not.toContain("本地摘要");
+			await harness.session.prompt("继续");
+			expect((harness.session.messages.at(-1) as AssistantMessage).stopReason).toBe("stop");
+		});
+
+		it("does the same for automatic compaction", async () => {
+			const log = newLog();
+			harness = await narrowSetup(log, 60_000);
+			await harness.session.prompt("继续");
+			expect(summaries(harness)[0]).toContain(MODEL_SUMMARY);
+			expect((harness.session.messages.at(-1) as AssistantMessage).stopReason).toBe("stop");
+		});
+
+		it("shortens one message larger than the model's window", async () => {
+			const log = newLog();
+			// Each message alone holds 24000 tokens.
+			harness = await narrowSetup(log, 20_000);
+			await harness.session.compact();
+			expect(summaries(harness)[0]).toContain(MODEL_SUMMARY);
+		});
+
+		it("stops after three smaller tries and keeps parts already summarized", async () => {
+			const log = newLog();
+			harness = await narrowSetup(log, 60_000);
+			await harness.session.compact();
+			// One rejection teaches the size: the later parts are sized right from the start.
+			expect(log.rejected).toBeLessThanOrEqual(3);
+		});
+
+		it("falls back to the local summary for a manual compaction too", async () => {
+			const log = newLog();
+			// Nothing of this size can hold a summary request.
+			harness = await narrowSetup(log, 3000);
+			await harness.session.compact();
+			expect(summaries(harness)[0]).toContain("本地摘要");
+			expect(log.rejected).toBe(4);
+		});
 	});
 });

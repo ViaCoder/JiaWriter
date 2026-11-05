@@ -15,6 +15,8 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	// Startup help, full form.
 	"to interrupt": "中断",
 	"to clear": "清空输入",
+	"to interrupt or clear": "中断或清空输入",
+	"Press {key} again to exit": "再按一次 {key} 退出",
 	"to exit": "退出",
 	"to exit (empty)": "退出（输入为空时）",
 	"to suspend": "挂起",

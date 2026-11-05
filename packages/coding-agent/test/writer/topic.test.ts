@@ -13,6 +13,7 @@ import { currentTopic, ensureTopic, setCurrentTopic, topicFromEntries } from "..
 import {
 	addMaterials,
 	archivedUrls,
+	archiveFiltered,
 	archivePage,
 	archiveSearch,
 	type Material,
@@ -109,6 +110,21 @@ describe("archive", () => {
 		expect(again).toBe(first);
 		expect(readFileSync(join(dir, first), "utf-8")).toContain("新");
 		expect(archivedUrls(dir)).toEqual(expect.arrayContaining(["a.example/final", "a.example/short"]));
+	});
+
+	it("keeps text left out of a page beside its archive file", () => {
+		const { dir } = openTopic(cwd, "t");
+		const file = archivePage(
+			dir,
+			{ url: "https://a.example/x", title: "T", date: "", content: "x" },
+			"https://a.example/x",
+			"m",
+			"时间",
+		);
+		const kept = archiveFiltered(dir, file, ["甲段", "乙段"]);
+		expect(readFileSync(join(dir, kept), "utf-8")).toBe("甲段\n\n乙段\n");
+		// Not one of the archive's own files.
+		expect(readIndex(dir)).toHaveLength(1);
 	});
 
 	it("skips an index line that cannot be read", () => {

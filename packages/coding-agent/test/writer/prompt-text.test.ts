@@ -58,6 +58,8 @@ describe("rule texts", () => {
 		// Cases or data only where the plan asks for them; the model asks once.
 		expect(text).toContain("ask the user once which parts need cases or data");
 		expect(text).toContain("current situation and recommendations, in ordinary prose");
+		// Search results are stated without remarks on their reliability.
+		expect(text).toContain("leave out remarks on how reliable web results are");
 		// No verification markers.
 		expect(text).toContain("free of verification markers");
 		// Chinese full-width punctuation.

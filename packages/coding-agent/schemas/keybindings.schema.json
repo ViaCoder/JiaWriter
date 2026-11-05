@@ -201,7 +201,7 @@
     },
     "app.clear": {
       "$ref": "#/$defs/KeybindingValue",
-      "description": "Clear editor"
+      "description": "Interrupt, or clear editor"
     },
     "app.exit": {
       "$ref": "#/$defs/KeybindingValue",
