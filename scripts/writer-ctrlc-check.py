@@ -70,7 +70,7 @@ def read_until(fd, wanted, seconds):
     return ANSI.sub("", out.decode("utf-8", "replace"))
 
 
-def exited(pid, seconds):
+def exited(pid, fd, seconds):
     """True when the child ended within `seconds`."""
     end = time.monotonic() + seconds
     while time.monotonic() < end:
@@ -80,7 +80,9 @@ def exited(pid, seconds):
             return True
         if done:
             return True
-        time.sleep(0.1)
+        # Reading: a program leaving still writes to the terminal, and a full one (small on macOS) would hold it.
+        read_until(fd, "", 0.1)
+        time.sleep(0.02)
     return False
 
 
@@ -113,32 +115,32 @@ def main():
         read_until(fd, "命令", 20)
         # One press interrupts a reply in progress.
         os.write(fd, "写点东西".encode("utf-8"))
-        time.sleep(0.5)
+        read_until(fd, "", 0.5)
         os.write(fd, b"\r")
         read_until(fd, "慢慢", 15)
         start = time.monotonic()
         os.write(fd, CTRL_C)
         check("回复中按一次就中断", dropped.wait(3))
         check(f"中断用时 {time.monotonic() - start:.1f} 秒，不超过 2 秒", time.monotonic() - start <= 2)
-        time.sleep(0.5)
-        check("中断后程序还在", not exited(pid, 0.5))
-        time.sleep(2.2)
+        read_until(fd, "", 0.5)
+        check("中断后程序还在", not exited(pid, fd, 0.5))
+        read_until(fd, "", 2.2)
         # Text is cleared; the program stays.
         os.write(fd, "一段草稿".encode("utf-8"))
-        time.sleep(0.5)
+        read_until(fd, "", 0.5)
         read_until(fd, "", 0.5)
         os.write(fd, CTRL_C)
         screen = read_until(fd, "再按一次", 3)
         check("第一次清空输入并提示退出方法", "再按一次" in screen)
-        time.sleep(2.3)
-        check("超过 2 秒不算第二次", not exited(pid, 0.2))
+        read_until(fd, "", 2.3)
+        check("超过 2 秒不算第二次", not exited(pid, fd, 0.2))
         # Empty input: a hint, then out, with a person's pause in between.
         os.write(fd, CTRL_C)
         # The same hint may already stand on the screen, so nothing need be redrawn.
         read_until(fd, "", 1)
-        check("空输入第一次不退出", not exited(pid, 0.1))
+        check("空输入第一次不退出", not exited(pid, fd, 0.1))
         os.write(fd, CTRL_C)
-        finished = exited(pid, 6)
+        finished = exited(pid, fd, 6)
         check("间隔 1 秒的第二次能退出", finished)
     finally:
         if not finished:
