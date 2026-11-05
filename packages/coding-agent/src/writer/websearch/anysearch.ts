@@ -15,6 +15,9 @@ export type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
 /** Sleep function (tests pass an instant one). */
 export type SleepFn = (ms: number) => Promise<void>;
 
+/** Most results AnySearch returns for one search. */
+export const ANYSEARCH_MAX = 10;
+
 /** Longest single back-off after a 429 (ms). */
 const MAX_BACKOFF_MS = 10_000;
 
@@ -95,13 +98,13 @@ export async function anysearchPost(
 export async function anysearchSearch(
 	cfg: SearchConfig,
 	query: string,
-	opts: { max: number; zone?: string; language?: string },
+	opts: { zone?: string; language?: string },
 	signal?: AbortSignal,
 	fetchFn: FetchFn = fetch,
 	sleep: SleepFn = realSleep,
 ): Promise<SearchResult[]> {
-	// Request body: 1–10 results, JSON format, optional region and language.
-	const body: Record<string, unknown> = { query, max_results: Math.max(1, Math.min(10, opts.max)), format: "json" };
+	// Request body: always the most it gives, so that enough is left after selecting; JSON, optional region and language.
+	const body: Record<string, unknown> = { query, max_results: ANYSEARCH_MAX, format: "json" };
 	if (opts.zone) body.zone = opts.zone;
 	if (opts.language) body.language = opts.language;
 	// The call.

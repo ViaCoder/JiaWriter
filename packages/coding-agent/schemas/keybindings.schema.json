@@ -259,6 +259,18 @@
       "$ref": "#/$defs/KeybindingValue",
       "description": "Restore queued messages"
     },
+    "app.message.sendNow": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Send queued messages and the draft now"
+    },
+    "app.message.sendNowChordStart": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "First key of the send-now chord, for terminals without ctrl+enter"
+    },
+    "app.message.sendNowChordEnd": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Second key of the send-now chord"
+    },
     "app.clipboard.pasteImage": {
       "$ref": "#/$defs/KeybindingValue",
       "description": "Paste files on macOS, images, or text from clipboard"

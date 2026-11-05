@@ -1,5 +1,5 @@
-// Functional tests: a draft is changed in place (the user, 2026-11-05). The write tool may create a draft,
-// but replacing one goes through only when the user asked for a rewrite.
+// Functional tests: a draft is changed in place (the user, 2026-11-05). The model is told before it writes,
+// through what it reads when it picks a tool; a whole text it has already produced is never turned down.
 
 // Temp files.
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
@@ -11,10 +11,12 @@ import { join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 // Test API.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+// What the model reads when it picks a tool.
+import { createEditToolDefinition } from "../../src/core/tools/edit.ts";
+import { createWriteToolDefinition } from "../../src/core/tools/write.ts";
 // Extension under test.
 import writerDocsExtension from "../../src/extensions/writer-docs/index.ts";
-// The word check.
-import { asksWholeRewrite } from "../../src/writer/docs/auto.ts";
+import { WRITER_TOOL_GUIDELINES, WRITER_TOOL_SNIPPETS } from "../../src/writer/prompt-text.ts";
 // Harness with the faux provider.
 import { createHarness, type Harness } from "../suite/harness.ts";
 
@@ -22,11 +24,16 @@ import { createHarness, type Harness } from "../suite/harness.ts";
 const write = (path: string, content: string) =>
 	fauxAssistantMessage([fauxToolCall("write", { path, content })], { stopReason: "toolUse" });
 
-describe("asksWholeRewrite", () => {
-	it("reads the words of a whole rewrite", () => {
-		for (const text of ["全文重写一遍", "请重新写", "Rewrite it", "推倒重来"])
-			expect(asksWholeRewrite(text)).toBe(true);
-		for (const text of ["第二段改短", "把数字改一下", "补一个案例"]) expect(asksWholeRewrite(text)).toBe(false);
+describe("guidance before writing", () => {
+	it("tells the model in the tool descriptions that an existing file is changed with edit", () => {
+		expect(createWriteToolDefinition("/tmp").description).toMatch(/already exists is changed with edit/);
+		expect(createWriteToolDefinition("/tmp").description).not.toMatch(/overwrites/);
+		expect(createEditToolDefinition("/tmp").description).toMatch(/however large the change/);
+	});
+
+	it("says the same in the writing rules", () => {
+		expect(WRITER_TOOL_SNIPPETS.write).toBe("Create a new document");
+		expect(WRITER_TOOL_GUIDELINES.write?.join(" ")).toMatch(/Every later change goes through edit/);
 	});
 });
 
@@ -52,43 +59,13 @@ describe("write on a draft", () => {
 		rmSync(agentDir, { recursive: true, force: true });
 	});
 
-	/** The draft's text. */
-	const draft = () => readFileSync(join(harness?.tempDir ?? "", "初稿.md"), "utf-8");
-	/** Whether the latest tool result failed. */
-	const lastFailed = () =>
-		harness?.session.messages.filter((m) => m.role === "toolResult").map((m) => (m as { isError?: boolean }).isError);
-
-	it("refuses to replace a draft, once, and says to use edit", async () => {
-		harness?.setResponses([write("初稿.md", "第二版"), write("初稿.md", "第三版"), fauxAssistantMessage("好")]);
-		await harness?.session.prompt("第二段改短");
-		// The first attempt is refused, the second goes through.
-		expect(lastFailed()).toEqual([false, true, false]);
-		expect(draft()).toBe("第三版");
-		const refused = harness?.session.messages.filter((m) => m.role === "toolResult")[1];
-		expect(JSON.stringify(refused)).toContain("edit");
-	});
-
-	it("sees a draft named the way the tools accept it", async () => {
-		// The same file with the @ prefix the tools strip.
-		harness?.setResponses([write("@初稿.md", "第二版"), fauxAssistantMessage("好")]);
-		await harness?.session.prompt("第二段改短");
-		expect(draft()).toBe("第一版");
-	});
-
-	it("lets a rewrite the user asked for through at once", async () => {
+	it("never turns down a text the model has already produced", async () => {
 		harness?.setResponses([write("初稿.md", "第二版"), fauxAssistantMessage("好")]);
-		await harness?.session.prompt("全文重写一遍");
-		expect(draft()).toBe("第二版");
-	});
-
-	it("leaves new files, notes and outlines alone", async () => {
-		harness?.setResponses([
-			write("第二篇.md", "新稿"),
-			write("大纲.md", "一"),
-			write("大纲.md", "二"),
-			fauxAssistantMessage("好"),
-		]);
-		await harness?.session.prompt("再写一篇");
-		expect(lastFailed()).toEqual([false, false, false, false]);
+		await harness?.session.prompt("第二段改短");
+		const failed = harness?.session.messages
+			.filter((m) => m.role === "toolResult")
+			.map((m) => (m as { isError?: boolean }).isError);
+		expect(failed).toEqual([false, false]);
+		expect(readFileSync(join(harness?.tempDir ?? "", "初稿.md"), "utf-8")).toBe("第二版");
 	});
 });

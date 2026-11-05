@@ -20,9 +20,12 @@ const mocks = vi.hoisted(() => ({
 			) => Promise<Buffer | undefined>
 		>(),
 	platform: vi.fn<() => NodeJS.Platform>(),
+	x11: vi.fn<(text: string, env: NodeJS.ProcessEnv) => Promise<boolean>>(),
 }));
 vi.mock("@earendil-works/pi-tui", () => ({ getNativeClipboard: mocks.getNativeClipboard }));
 vi.mock("../src/utils/clipboard-command.ts", () => ({ runClipboardCommand: mocks.command }));
+// The real one would take over the clipboard of the desktop these tests run on.
+vi.mock("../src/utils/x11-clipboard.ts", () => ({ copyViaX11: mocks.x11 }));
 vi.mock("node:os", async () => ({
 	...(await vi.importActual<typeof OsModule>("node:os")),
 	platform: mocks.platform,
@@ -90,6 +93,28 @@ describe("readClipboardText", () => {
 			expect(mocks.getNativeClipboard).not.toHaveBeenCalled();
 		});
 	}
+	test("owns the X selection itself when no helper program worked", async () => {
+		mocks.platform.mockReturnValue("linux");
+		vi.stubEnv("DISPLAY", ":0");
+		mocks.command.mockResolvedValue(undefined);
+		mocks.x11.mockResolvedValue(true);
+		await expect(copyToClipboard("选中的文字")).resolves.toBeUndefined();
+		expect(mocks.x11).toHaveBeenCalledExactlyOnceWith("选中的文字", process.env);
+	});
+	test("leaves the X selection to a helper program that worked", async () => {
+		mocks.platform.mockReturnValue("linux");
+		vi.stubEnv("DISPLAY", ":0");
+		mocks.command.mockResolvedValue(Buffer.alloc(0));
+		await copyToClipboard("text");
+		expect(mocks.x11).not.toHaveBeenCalled();
+	});
+	test("says what to install when no route worked", async () => {
+		mocks.platform.mockReturnValue("linux");
+		vi.stubEnv("DISPLAY", ":0");
+		mocks.command.mockResolvedValue(undefined);
+		mocks.x11.mockResolvedValue(false);
+		await expect(copyToClipboard("text")).rejects.toThrow("xclip");
+	});
 	test.each(["native text", "", null, undefined])("uses native X11 after command failures: %j", async (text) => {
 		mocks.platform.mockReturnValue("linux");
 		vi.stubEnv("DISPLAY", ":0");

@@ -10,7 +10,7 @@ import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 
 const writeSchema = Type.Object({
 	path: Type.String({ description: "Path to the file to write (relative or absolute)" }),
-	content: Type.String({ description: "Content to write to the file" }),
+	content: Type.String({ description: "Full content of the new file" }),
 });
 
 export const writeToolSystemPromptContribution = {
@@ -50,7 +50,7 @@ export function createWriteToolDefinition(
 		name: "write",
 		label: "write",
 		description:
-			"Write content to a file. Creates the file if it doesn't exist, overwrites if it does. Automatically creates parent directories.",
+			"Create a new file with the given content, along with its parent directories. A file that already exists is changed with edit, passage by passage; write replaces one only when the user asked to rewrite all of it.",
 		promptSnippet: writeToolSystemPromptContribution.snippet,
 		promptGuidelines: [...writeToolSystemPromptContribution.guidelines],
 		parameters: writeSchema,

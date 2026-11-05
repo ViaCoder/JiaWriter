@@ -47,7 +47,7 @@ import { withSecrets } from "../../writer/secrets.ts";
 import { ensureTopic } from "../../writer/topic/current.ts";
 import { archiveFiltered, archivePage, archiveSearch } from "../../writer/topic/topic.ts";
 // AnySearch backend.
-import { anysearchExtract, anysearchSearch } from "../../writer/websearch/anysearch.ts";
+import { ANYSEARCH_MAX, anysearchExtract, anysearchSearch } from "../../writer/websearch/anysearch.ts";
 // Configuration, normalization and reports.
 import {
 	cleanWebText,
@@ -312,6 +312,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		promptSnippet: "Search the web for sources, recent news and facts; returns titles, URLs, snippets and dates",
 		// Rules added while the tool is active.
 		promptGuidelines: [
+			// Whether to search at all is the user's call (the user, 2026-11-05).
+			"Search only when the user's request calls for it: the user asks for research or recent facts, or for cases and data the reference materials do not hold. When the user asks to write, revise or polish from what is already there, work from that without searching, and never search when the user says not to",
 			"Plan the searches for each question: pick the method and engines that fit it, and search again with a different query, engine or method when one result is not enough",
 			"Run searches and fetches one at a time: send a single web_search or web_fetch call in a message, read its result, then decide the next call",
 			"When choosing what to fetch and cite, prefer reports from internationally renowned news organizations such as Reuters, AP, AFP, Bloomberg, BBC, The New York Times, The Wall Street Journal and the Financial Times",
@@ -322,8 +324,10 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			"Add site:domain to reach an official or authoritative site (site:gov.cn, site:xinhuanet.com, site:reuters.com), and put an exact name or title in quotation marks",
 			"When results are few or off topic, rewrite the query with the official name, a synonym or a narrower term, or switch engine or method",
 			"When a page still waits for a human check after the wait, tell the user which site it is and that the page stays open in Chrome, and fetch or search it again when the user says it is done",
-			"Keep the source URL with every fact taken from search results for the 参考文献 section, and cite each case in the draft in the form 2026年10月31日《新华社》报道",
+			"Keep the source URL with every fact taken from search results for the 参考文献 section, and cite each case in the draft in the form 2026年10月31日《路透社》报道: work out from the address which outlet published the page and write its usual Chinese name, as 路透社 for reuters.com, never the address",
 			"Treat a fact as current only when its page shows the date",
+			"Read the whole result list before fetching and choose the pages yourself, judging each by its address and title: open reports from major international or national outlets and official sources that name a specific company, organisation or person or give authoritative data, and pass over forums, blogs, Q&A sites and reposts",
+			"When the list has nothing of that kind, search again: in English with zone intl for international cases, with an outlet added to the query (路透社 or Reuters, site:reuters.com on the browser method), or with the official name of the company or body",
 		],
 		// Argument schema.
 		parameters: Type.Object({
@@ -340,7 +344,9 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				}),
 			),
 			max_results: Type.Optional(
-				Type.Number({ description: `Number of results, 1–${MAX_RESULTS} (default ${DEFAULT_RESULTS})` }),
+				Type.Number({
+					description: `Browser method: number of results, 1–${MAX_RESULTS} (default ${DEFAULT_RESULTS}). AnySearch always gives all it has, up to ${ANYSEARCH_MAX}`,
+				}),
 			),
 			pages: Type.Optional(
 				Type.Number({ description: "Results pages per engine, 3–5 (browser backend, default 3)" }),
@@ -419,15 +425,11 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			} else {
 				// AnySearch.
 				await anysearchTurn();
-				raw = await anysearchSearch(
-					config,
-					params.query,
-					{ max, zone: params.zone, language: params.language },
-					signal,
-				);
+				raw = await anysearchSearch(config, params.query, { zone: params.zone, language: params.language }, signal);
 			}
 			// Cleaned results.
-			const results = normalizeResults(raw, config.blocklist, max);
+			// AnySearch gives all it found: the model chooses among them.
+			const results = normalizeResults(raw, config.blocklist, backend === "anysearch" ? raw.length : max);
 			// Report with the notes first.
 			const report = formatSearch(params.query, label, results);
 			// The search is kept in the topic folder; a full disk must not cost the result.

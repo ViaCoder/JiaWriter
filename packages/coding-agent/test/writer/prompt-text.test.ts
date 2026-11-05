@@ -53,7 +53,8 @@ describe("rule texts", () => {
 		// Cases come from materials or search with date and source.
 		expect(text).toContain("reference materials or from web search results");
 		// In the text: date and 《source》; URLs only at the end.
-		expect(text).toContain("2026年10月31日《法新社》报道");
+		expect(text).toContain("2026年10月31日《路透社》报道");
+		expect(text).toContain("never its web address such as reuters.com");
 		expect(text).toContain("URLs kept for the 参考文献 section");
 		// Cases or data only where the plan asks for them; the model asks once.
 		expect(text).toContain("ask the user once which parts need cases or data");

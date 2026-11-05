@@ -96,7 +96,8 @@ export const en: Record<MessageKey, string> = {
 	// No results.
 	"search.none": "No results for: {query}",
 	// web_fetch heading.
-	"fetch.title": "Page text ({backend}): {title}\nSource: {url}{date}",
+	"fetch.title": "Page text ({backend}): {title}\nAddress: {url}{date}{site}",
+	"fetch.site": "\nSite: {site}",
 	// Content clipped.
 	"fetch.clipped": "(text clipped to the first {chars} characters)",
 	// Missing query.
@@ -206,8 +207,6 @@ export const en: Record<MessageKey, string> = {
 	"topic.notArchived": "{url} was not opened in this topic yet: read it with web_fetch first",
 	"topic.itemProblem": "Item {n}: {problem}",
 	"topic.materialAdded": "Recorded {count}; {file} now holds {total}.",
-	"export.useEdit":
-		"{path} already has content: change the passages that need it with edit. If the user really asked for a complete rewrite, call write again.",
 	"rewind.pick": "Go back to before which message?",
 	"rewind.mode": "What goes back?",
 	"rewind.both": "Conversation and files ({count} files restored)",

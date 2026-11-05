@@ -12,7 +12,6 @@
  */
 
 // Whether a draft exists.
-import { existsSync } from "node:fs";
 // Copying a file into the topic.
 import { copyFile, mkdir } from "node:fs/promises";
 // Paths.
@@ -24,15 +23,9 @@ import { getAgentDir } from "../../config.ts";
 // Extension API types.
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
 // Upstream path resolution (cwd, ~, @ prefix).
-import { resolveReadPathAsync, resolveToCwd } from "../../core/tools/path-utils.ts";
+import { resolveReadPathAsync } from "../../core/tools/path-utils.ts";
 // Automatic export.
-import {
-	asksWholeRewrite,
-	autoExportEnabled,
-	editedDrafts,
-	isDraftPath,
-	type RunMessage,
-} from "../../writer/docs/auto.ts";
+import { autoExportEnabled, editedDrafts, type RunMessage } from "../../writer/docs/auto.ts";
 // Import.
 import { formatImport, importFile, importSources } from "../../writer/docs/import.ts";
 // Export.
@@ -55,18 +48,6 @@ function sessionOpened(ctx: ExtensionContext, extra: readonly unknown[] = []): s
 	// Pages archived in the topic were opened too, also in an earlier session.
 	const topic = currentTopic();
 	return [...openedUrls([...branch, ...extra]), ...(topic ? archivedUrls(topic) : [])];
-}
-
-/** Text of the latest user message on the session's active branch. */
-function lastUserText(ctx: ExtensionContext): string {
-	// Newest first.
-	for (const entry of [...ctx.sessionManager.getBranch()].reverse()) {
-		if (entry.type !== "message" || entry.message.role !== "user") continue;
-		const content = entry.message.content;
-		if (typeof content === "string") return content;
-		return content.map((b) => (b.type === "text" ? b.text : "")).join("");
-	}
-	return "";
 }
 
 /** Arguments of /export-doc: [path] [md|docx] [--profile=name] [--out=path]. */
@@ -161,7 +142,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 			"Fix every unpaired quote the export reports in the draft with edit, then export again",
 			"End a draft that uses sources with a 参考文献 section listing every source used in the text: one numbered entry per source, written as [descriptive title](full URL), where the title names the page's own title, the publisher and the date, and the URL is a page you opened with web_fetch and that loaded",
 			"Open every reference URL the export reports as not opened in this session with web_fetch; keep the entry when the page loads and matches its title, replace it with a source you opened or remove it otherwise, then export again",
-			"Write symbols as Unicode characters such as →, ×, ≤ and x² in the draft, and write formulas in plain text with these characters",
+			"Write symbols as Unicode characters such as ×, ≤ and x² in the draft, write formulas in plain text with these characters and without LaTeX, and join two steps or items with — instead of an arrow",
 		],
 		// Argument schema.
 		parameters: Type.Object({
@@ -239,27 +220,9 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		if (event.reason === "startup") void scan(ctx);
 	});
 
-	// Drafts whose whole replacement was refused in this run; a second attempt goes through, so a model
-	// that has good reason is never stuck.
-	const refused = new Set<string>();
-
 	// Before every run: files added since are imported before the model reads the folder.
 	pi.on("before_agent_start", async (_event, ctx) => {
-		refused.clear();
 		await scan(ctx);
-	});
-
-	// The user, 2026-11-05: a draft is changed in place, not generated again as a whole.
-	pi.on("tool_call", (event, ctx) => {
-		if (event.toolName !== "write") return undefined;
-		const raw = (event.input as { path?: unknown }).path;
-		if (typeof raw !== "string") return undefined;
-		const path = resolveToCwd(raw, ctx.cwd);
-		// New files and other files are free; so is a rewrite the user asked for.
-		if (!existsSync(path) || !isDraftPath(path, ctx.cwd) || refused.has(path)) return undefined;
-		if (asksWholeRewrite(lastUserText(ctx))) return undefined;
-		refused.add(path);
-		return { block: true, reason: t("export.useEdit", { path: raw }) };
 	});
 
 	// Reference URLs already handed to the model for testing, so each goes back only once.

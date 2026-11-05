@@ -190,6 +190,8 @@ export interface TuiAltScreenOptions {
 	onRightClickPaste?: () => void;
 	/** Automatically copy selected text to the clipboard on mouse release (default: true). */
 	copyOnSelect?: boolean;
+	/** What the flash says after a copy. */
+	copiedMessage?: string;
 	/**
 	 * Copy selected text to the system clipboard. Return `true` on success, an error message to
 	 * display on failure, or `false` for a generic error. When omitted, the selection is copied
@@ -250,6 +252,7 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 	private readonly openUrl?: (url: string) => void;
 	private readonly onRightClickPaste?: () => void;
 	private copyOnSelect: boolean;
+	private readonly copiedMessage: string;
 	private readonly copySelection?: (text: string) => Promise<boolean | string>;
 
 	constructor(
@@ -277,6 +280,7 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 		this.openUrl = options.openUrl;
 		this.onRightClickPaste = options.onRightClickPaste;
 		this.copyOnSelect = options.copyOnSelect ?? true;
+		this.copiedMessage = options.copiedMessage ?? "Copied!";
 		this.copySelection = options.copySelection;
 		this.addInputListener((data) => this.handleViewportInput(data));
 	}
@@ -1486,13 +1490,13 @@ export class TuiAltScreen extends TuiBase implements ViewportTUI {
 			const result = await this.copySelection(text);
 			const ok = result === true;
 			this.flash(
-				ok ? "Copied!" : typeof result === "string" ? result : "Copy failed",
+				ok ? this.copiedMessage : typeof result === "string" ? result : "Copy failed",
 				ok ? undefined : COPY_ERROR_FLASH_DURATION_MS,
 			);
 			return ok;
 		}
 		this.terminal.write(`\x1b]52;c;${Buffer.from(text).toString("base64")}\x07`);
-		this.flash("Copied!");
+		this.flash(this.copiedMessage);
 		return true;
 	}
 

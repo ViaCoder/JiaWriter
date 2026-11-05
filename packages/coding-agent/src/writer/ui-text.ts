@@ -32,6 +32,9 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"to run bash (no context)": "运行 shell 命令（不进上下文）",
 	"to queue follow-up": "排队发送下一条",
 	"to edit all queued messages": "编辑排队中的消息",
+	"Copied!": "已复制",
+	"to send queued messages now": "立即发送排队消息和草稿",
+	"{keys} to edit, {send} to send now": "{keys} 编辑，{send} 立即发送",
 	"to paste files on macOS, images, or text": "粘贴文件（macOS）、图片或文本",
 	"to attach": "附加文件",
 	// Startup help, compact form.

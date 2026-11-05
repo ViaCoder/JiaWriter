@@ -417,6 +417,24 @@ describe("writer-search over AnySearch", () => {
 		const err = await run(map, "web_fetch", { url: "https://a.example/x" }).catch((e: Error) => e);
 		expect((err as Error).message).toBe("AnySearch 匿名额度已用完，可设置 JW_SEARCH_KEY 后重试。");
 	});
+	it("asks AnySearch for all it has and hands every result to the model, which does the choosing", async () => {
+		const results = Array.from({ length: 10 }, (_, i) => ({
+			title: `T${i}`,
+			url: i % 2 ? `https://bbs.example.com/${i}` : `https://www.reuters.com/${i}`,
+			snippet: "",
+		}));
+		let body: { max_results?: number } = {};
+		vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+			body = JSON.parse(String(init.body));
+			return new Response(JSON.stringify({ code: 0, data: { results } }), { status: 200 });
+		});
+		const s = await run(tools(), "web_search", { query: "温州", max_results: 3 });
+		expect(body.max_results).toBe(10);
+		expect(s.text).toContain("检索结果（anysearch，10 条）：温州");
+		// In their order: nothing is ranked, dropped or marked for the model.
+		expect(s.text.indexOf("bbs.example.com/1")).toBeLessThan(s.text.indexOf("reuters.com/2"));
+		expect(s.text).toContain("bbs.example.com/9");
+	});
 	it("rejects a bad backend, an empty query and a non-http URL", async () => {
 		// Unknown backend.
 		vi.stubEnv("JW_SEARCH", "exa");

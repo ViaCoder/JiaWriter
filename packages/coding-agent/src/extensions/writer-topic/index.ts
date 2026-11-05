@@ -40,7 +40,7 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		// Rules added while the tool is active.
 		promptGuidelines: [
 			"When the user starts a writing topic, call topic_open once with a short name taken from the request, before the first search or draft, and use the same name to continue a topic",
-			`Work on a topic in this order: outline in ${TOPIC_DIRS.drafts}/大纲.md, confirm which parts need cases or data, search and fetch for those parts, record what you will use, compare ${MATERIAL_FILE} with the outline and search again for the gaps, then write the draft from ${MATERIAL_FILE}`,
+			`Work on a topic in this order: outline in ${TOPIC_DIRS.drafts}/大纲.md, confirm which parts need cases or data, and when the user's request calls for searching, search and fetch for those parts, record what you will use, compare ${MATERIAL_FILE} with the outline and search again for the gaps; then write the draft from ${MATERIAL_FILE} and what the user gave`,
 			`Read earlier results in ${TOPIC_DIRS.search}/ and ${TOPIC_DIRS.web}/ with read and grep, in place of searching or fetching the same thing again`,
 		],
 		// Argument schema.
@@ -78,8 +78,12 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 				Type.Object({
 					kind: Type.Union([Type.Literal("case"), Type.Literal("data")]),
 					time: Type.String({ description: "When it happened or the period of the figure" }),
-					reporter: Type.Optional(Type.String({ description: "Case: who reported it" })),
-					subject: Type.Optional(Type.String({ description: "Case: who acted" })),
+					reporter: Type.Optional(
+						Type.String({ description: "Case: the outlet's name, such as 路透社, never its web address" }),
+					),
+					subject: Type.Optional(
+						Type.String({ description: "Case: the named company, organisation or person who acted" }),
+					),
 					action: Type.Optional(Type.String({ description: "Case: what was done" })),
 					region: Type.Optional(Type.String({ description: "Data: region" })),
 					industry: Type.Optional(Type.String({ description: "Data: industry" })),

@@ -1,6 +1,7 @@
 /**
  * Symbols for Word: LaTeX math ($\rightarrow$, \(x^2\)), LaTeX commands written in the prose, HTML entities
- * (&rarr;, &#8594;) and Markdown escapes (\_) become the Unicode characters Word shows directly (→, x², _).
+ * (&rarr;, &#8594;) and Markdown escapes (\_) become the Unicode characters Word shows directly (x², _), and sideways
+ * arrows, however they are written, become —.
  * A $…$ pair counts as math only when it holds a command, ^, _ or braces, so prices such as $100 stay.
  * Inline code and URLs are kept as they are; commands without a Unicode form are kept and reported.
  */
@@ -17,24 +18,24 @@ export interface SymbolResult {
 
 /** LaTeX commands and their Unicode characters. */
 const COMMANDS: Readonly<Record<string, string>> = {
-	// Arrows.
-	rightarrow: "→",
-	to: "→",
-	longrightarrow: "→",
-	leftarrow: "←",
-	gets: "←",
-	longleftarrow: "←",
-	leftrightarrow: "↔",
-	Rightarrow: "⇒",
-	implies: "⇒",
-	Longrightarrow: "⇒",
-	Leftarrow: "⇐",
-	Leftrightarrow: "⇔",
-	iff: "⇔",
+	// Arrows between two things read as a dash in a Chinese document (the user, 2026-11-05); up and down keep their sense.
+	rightarrow: "—",
+	to: "—",
+	longrightarrow: "—",
+	leftarrow: "—",
+	gets: "—",
+	longleftarrow: "—",
+	leftrightarrow: "—",
+	Rightarrow: "—",
+	implies: "—",
+	Longrightarrow: "—",
+	Leftarrow: "—",
+	Leftrightarrow: "—",
+	iff: "—",
 	uparrow: "↑",
 	downarrow: "↓",
 	updownarrow: "↕",
-	mapsto: "↦",
+	mapsto: "—",
 	nearrow: "↗",
 	searrow: "↘",
 	// Relations.
@@ -221,14 +222,14 @@ const SUB: Readonly<Record<string, string>> = {
 
 /** HTML named entities a model writes into prose, and their characters. */
 const ENTITIES: Readonly<Record<string, string>> = {
-	rarr: "→",
-	larr: "←",
-	harr: "↔",
+	rarr: "—",
+	larr: "—",
+	harr: "—",
 	uarr: "↑",
 	darr: "↓",
-	rArr: "⇒",
-	lArr: "⇐",
-	hArr: "⇔",
+	rArr: "—",
+	lArr: "—",
+	hArr: "—",
 	times: "×",
 	divide: "÷",
 	plusmn: "±",
@@ -284,6 +285,9 @@ const ENTITIES: Readonly<Record<string, string>> = {
 	Sigma: "Σ",
 	Omega: "Ω",
 };
+
+// Sideways arrows as characters or typed with - and =.
+const ARROWS = /[ \t]*(?:[→←↔⇒⇐⇔⟶⟵⟷⟹⟸⟺➡⬅⮕↦]|-{1,2}>|={1,2}>)[ \t]*/g;
 
 // Private-use markers around the index of a kept span (code, URL).
 const OPEN = "\uE002";
@@ -371,6 +375,11 @@ export function fixSymbols(paragraph: string): SymbolResult {
 		converted++;
 		return latexToUnicode(body, unknown);
 	};
+	// A mistyped arrow, before the $…$ pass reads it as a short formula.
+	s = s.replace(/\$\/(?:to|rightarrow|Rightarrow|longrightarrow)\$/g, () => {
+		converted++;
+		return "—";
+	});
 	const plainMath = (m: string, body: string) => (/\s/.test(body) && !/[=+\-*/<>]/.test(body) ? m : math(m, body));
 	s = s
 		.replace(/\$\$([^$]+?)\$\$/g, math)
@@ -384,6 +393,11 @@ export function fixSymbols(paragraph: string): SymbolResult {
 		if (u === undefined || u === "") return m;
 		converted++;
 		return u;
+	});
+	// Arrows typed directly.
+	s = s.replace(ARROWS, () => {
+		converted++;
+		return "—";
 	});
 	// HTML entities: named, decimal and hexadecimal.
 	s = s.replace(/&(#\d{2,7}|#x[0-9A-Fa-f]{2,6}|[A-Za-z]{2,8});/g, (m, e: string) => {
@@ -402,6 +416,8 @@ export function fixSymbols(paragraph: string): SymbolResult {
 		converted++;
 		return c;
 	});
+	// An arrow from a numeric entity or &gt;, already counted as that entity.
+	s = s.replace(ARROWS, "—");
 	// Kept spans back.
 	const text = s.replace(new RegExp(`${OPEN}(\\d+)${CLOSE}`, "g"), (_m, i: string) => kept[Number(i)]);
 	return { text, converted, unknown };

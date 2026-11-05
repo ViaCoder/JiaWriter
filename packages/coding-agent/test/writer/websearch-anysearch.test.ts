@@ -124,14 +124,7 @@ describe("anysearchSearch and anysearchExtract", () => {
 				},
 			}),
 		);
-		const out = await anysearchSearch(
-			anon,
-			"温州",
-			{ max: 50, zone: "cn", language: "zh-CN" },
-			undefined,
-			f.fn,
-			noSleep,
-		);
+		const out = await anysearchSearch(anon, "温州", { zone: "cn", language: "zh-CN" }, undefined, f.fn, noSleep);
 		// Body: clamped count, json format, region, language.
 		expect(JSON.parse(String(f.calls[0].init.body))).toEqual({
 			query: "温州",

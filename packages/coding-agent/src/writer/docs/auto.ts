@@ -31,15 +31,6 @@ export function autoExportEnabled(env: NodeJS.ProcessEnv): boolean {
 	return !/^(off|0|false|no)$/i.test((env.JW_AUTO_EXPORT ?? "").trim());
 }
 
-// Words with which a user asks for a whole new text.
-const WHOLE_REWRITE = /重写|重新写|重新撰写|重新生成|全文改写|全部改写|整篇改写|推倒重来|rewrite|start over/i;
-
-/** True when the user's message asks for the whole text anew, so write may replace a draft. */
-export function asksWholeRewrite(text: string): boolean {
-	// Any of the words.
-	return WHOLE_REWRITE.test(text);
-}
-
 /** True for a Markdown file in the working folder that reads as a draft. */
 export function isDraftPath(path: string, cwd: string): boolean {
 	// Markdown only, not an export copy.

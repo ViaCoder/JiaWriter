@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { getNativeClipboard } from "@earendil-works/pi-tui";
 import { runClipboardCommand } from "./clipboard-command.ts";
 import { isWSL } from "./wsl.ts";
+import { copyViaX11 } from "./x11-clipboard.ts";
 
 const MAX_OSC52_ENCODED_LENGTH = 100_000;
 
@@ -118,6 +119,8 @@ export async function copyToClipboard(text: string): Promise<void> {
 			}
 		}
 	}
+	// No helper program on the machine, as on a fresh Ubuntu desktop: this process owns the selection itself.
+	if (!copied && p === "linux" && env.DISPLAY) copied = await copyViaX11(text, env);
 	let osc52Emitted = false;
 	if (!copied && p === "linux" && isWSL(env)) {
 		// Windows Terminal supports OSC 52; prefer it over the slower PowerShell round trip.

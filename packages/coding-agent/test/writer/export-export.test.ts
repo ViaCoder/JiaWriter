@@ -95,7 +95,7 @@ describe("exportDraft: symbols, spaces and references", () => {
 		// The text Word shows.
 		const xml = strFromU8(unzipSync(readFileSync(join(cwd, "稿件.docx")))["word/document.xml"]);
 		const text = (xml.match(/<w:t(?: [^>]*)?>[^<]*<\/w:t>/g) ?? []).map((t) => t.replace(/<[^>]+>/g, "")).join("");
-		expect(text).toContain("温度→升高，面积x²，A→B，使用GPT-5模型，见New York Times报道");
+		expect(text).toContain("温度—升高，面积x²，A—B，使用GPT-5模型，见New York Times报道");
 		expect([r.symbols, r.unknownSymbols, r.looseSpaces]).toEqual([4, ["\\foo"], 0]);
 		// References: a generic label not opened, one without a URL, one fine (www. and the trailing slash do not matter).
 		expect(r.refs).toEqual({
@@ -119,5 +119,38 @@ describe("exportDraft: symbols, spaces and references", () => {
 		);
 		expect(lines).toContain("有 1 个 LaTeX 命令没有对应的字符，原样保留：\\foo。请在稿件里改成文字或 Unicode 符号。");
 		expect(lines).toContain("超链接：2 个，打不开的 0 个。");
+	});
+
+	it("leaves no arrow or LaTeX in any kind of block of the document (the user, 2026-11-05)", async () => {
+		const draft = join(cwd, "箭头.md");
+		const arrow = "$\\to$";
+		writeFileSync(
+			draft,
+			[
+				`# 标题${arrow}甲`,
+				`## 二级$\\rightarrow$乙`,
+				`段落${arrow}乙，**加粗${arrow}丙**，*斜${arrow}丁*，$A \\to B$，甲→乙，甲 -> 乙，甲=>乙。`,
+				`- 列表${arrow}戊`,
+				`1. 编号${arrow}己`,
+				`> 引用${arrow}庚`,
+				`| 表头${arrow} | 乙 |\n| --- | --- |\n| 单元格${arrow}辛 | 壬 |`,
+			].join("\n\n"),
+		);
+		await exportDraft(draft, cwd, cwd);
+		const xml = strFromU8(unzipSync(readFileSync(join(cwd, "箭头.docx")))["word/document.xml"]);
+		const text = xml.replace(/<[^>]+>/g, "");
+		expect(text).not.toMatch(/[→⇒$]|\\to|-&gt;|=&gt;/);
+		for (const piece of [
+			"标题—甲",
+			"二级—乙",
+			"段落—乙",
+			"加粗—丙",
+			"A—B",
+			"列表—戊",
+			"编号—己",
+			"引用—庚",
+			"单元格—辛",
+		])
+			expect(text).toContain(piece);
 	});
 });

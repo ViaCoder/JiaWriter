@@ -7,9 +7,8 @@
  */
 
 import { Container, Text } from "@earendil-works/pi-tui";
-import { keyHint } from "../../../modes/interactive/components/keybinding-hints.ts";
 import { getLanguageFromPath, highlightCode, type Theme } from "../../../modes/interactive/theme/theme.ts";
-import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
+import type { ToolDefinition } from "../../extensions/types.ts";
 import { normalizeDisplayText, renderToolPath, replaceTabs, str } from "../render-utils.ts";
 
 type WriteHighlightCache = {
@@ -95,7 +94,6 @@ function trimTrailingEmptyLines(lines: string[]): string[] {
 }
 function formatWriteCall(
 	args: { path?: string; file_path?: string; content?: string } | undefined,
-	options: ToolRenderResultOptions,
 	theme: Theme,
 	cache: WriteHighlightCache | undefined,
 	cwd: string,
@@ -112,15 +110,9 @@ function formatWriteCall(
 		const renderedLines = lang
 			? (cache?.highlightedLines ?? highlightCode(replaceTabs(normalizeDisplayText(fileContent)), lang))
 			: normalizeDisplayText(fileContent).split("\n");
+		// Every line, as it arrives: a writer reads the text while the model produces it.
 		const lines = trimTrailingEmptyLines(renderedLines);
-		const totalLines = lines.length;
-		const maxLines = options.expanded ? lines.length : 10;
-		const displayLines = lines.slice(0, maxLines);
-		const remaining = lines.length - maxLines;
-		text += `\n\n${displayLines.map((line) => (lang ? line : theme.fg("toolOutput", replaceTabs(line)))).join("\n")}`;
-		if (remaining > 0) {
-			text += `${theme.fg("muted", `\n... (${remaining} more lines, ${totalLines} total,`)} ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`;
-		}
+		text += `\n\n${lines.map((line) => (lang ? line : theme.fg("toolOutput", replaceTabs(line)))).join("\n")}`;
 	}
 
 	return text;
@@ -156,15 +148,7 @@ export const writeRenderers: Pick<ToolDefinition<any, any>, "renderCall" | "rend
 		} else {
 			component.cache = undefined;
 		}
-		component.setText(
-			formatWriteCall(
-				renderArgs,
-				{ expanded: context.expanded, isPartial: context.isPartial },
-				theme,
-				component.cache,
-				context.cwd,
-			),
-		);
+		component.setText(formatWriteCall(renderArgs, theme, component.cache, context.cwd));
 		return component;
 	},
 	renderResult(result, _options, theme, context) {

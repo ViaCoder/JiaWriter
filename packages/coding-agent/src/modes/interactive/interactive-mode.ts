@@ -1058,6 +1058,7 @@ export class InteractiveMode {
 					rawKeyHint("!!", "to run bash (no context)"),
 					hint("app.message.followUp", "to queue follow-up"),
 					hint("app.message.dequeue", "to edit all queued messages"),
+					rawKeyHint(this.sendNowKeys(), "to send queued messages now"),
 					hint("app.clipboard.pasteImage", "to paste files on macOS, images, or text"),
 					rawKeyHint("drop files", "to attach"),
 				].join("\n");
@@ -2909,6 +2910,12 @@ export class InteractiveMode {
 				if (!customEditor.onPasteImage) {
 					customEditor.onPasteImage = () => this.defaultEditor.onPasteImage?.();
 				}
+				if (!customEditor.canSendNow) {
+					customEditor.canSendNow = () => this.defaultEditor.canSendNow?.() ?? false;
+				}
+				if (!customEditor.onEditQueued) {
+					customEditor.onEditQueued = () => this.defaultEditor.onEditQueued?.() ?? false;
+				}
 				if (!customEditor.onExtensionShortcut) {
 					customEditor.onExtensionShortcut = (data: string) => this.defaultEditor.onExtensionShortcut?.(data);
 				}
@@ -3053,7 +3060,8 @@ export class InteractiveMode {
 		// so they work correctly regardless of which editor is active
 		this.defaultEditor.onEscape = () => {
 			if (this.session.isStreaming) {
-				this.restoreQueuedMessagesToEditor({ abort: true });
+				// Like Claude Code: what was queued goes out right away; the draft stays in the editor.
+				void this.interruptAndSend("");
 			} else if (this.session.isBashRunning) {
 				this.session.abortBash();
 			} else if (this.isBashMode) {
@@ -3099,6 +3107,10 @@ export class InteractiveMode {
 		);
 		this.defaultEditor.onAction("app.message.followUp", () => this.handleFollowUp());
 		this.defaultEditor.onAction("app.message.dequeue", () => this.handleDequeue());
+		this.defaultEditor.onAction("app.message.sendNow", () => void this.handleSendNow());
+		this.defaultEditor.canSendNow = () =>
+			this.isBusy() || this.editor.getText().trim().length > 0 || this.session.pendingMessageCount > 0;
+		this.defaultEditor.onEditQueued = () => this.restoreQueuedMessagesToEditor() > 0;
 		this.defaultEditor.onAction("app.session.new", () => this.handleClearCommand());
 		this.defaultEditor.onAction("app.session.tree", () => this.showTreeSelector());
 		this.defaultEditor.onAction("app.session.fork", () => this.showUserMessageSelector());
@@ -4514,6 +4526,49 @@ export class InteractiveMode {
 		}
 	}
 
+	/** True while something runs that a new message would have to wait for. */
+	private isBusy(): boolean {
+		return this.session.isStreaming || this.session.isCompacting || this.session.isBashRunning;
+	}
+
+	/** The send-now chord as it is typed. */
+	private sendNowKeys(): string {
+		return `${this.getAppKeyDisplay("app.message.sendNowChordStart")} ${this.getAppKeyDisplay("app.message.sendNowChordEnd")}`;
+	}
+
+	/** Stop the reply, then send what was queued and the draft behind it. */
+	private async interruptAndSend(draft: string): Promise<void> {
+		// Emptied first, so the stopping run does not take them.
+		const { steering, followUp } = this.clearAllQueues();
+		this.updatePendingMessagesDisplay();
+		if (draft) this.editor.setText("");
+		await this.session.abort();
+		// In the order they were typed; the second waits for the first in the input queue.
+		for (const text of [[...steering, ...followUp].join("\n\n"), draft]) {
+			if (text.trim()) await this.defaultEditor.onSubmit?.(text);
+		}
+	}
+
+	/** Ctrl+Enter or Ctrl+X Ctrl+S: what is queued and the draft go out now, whatever is running. */
+	private async handleSendNow(): Promise<void> {
+		const draft = (this.editor.getExpandedText?.() ?? this.editor.getText()).trim();
+		// A running command stops; the draft stays, as Enter refuses it until the command has ended.
+		if (this.session.isBashRunning && !this.session.isStreaming) {
+			this.session.abortBash();
+			return;
+		}
+		// During compaction, or for a shell command, Enter already does the right thing: it queues.
+		if (this.session.isCompacting || this.isBashMode || !this.session.isStreaming) {
+			if (draft) {
+				this.editor.setText("");
+				await this.defaultEditor.onSubmit?.(draft);
+			}
+			if (this.session.isCompacting && !this.isBashMode) this.session.abortCompaction();
+			return;
+		}
+		await this.interruptAndSend(draft);
+	}
+
 	private handleDequeue(): void {
 		const restored = this.restoreQueuedMessagesToEditor();
 		if (restored === 0) {
@@ -4744,7 +4799,10 @@ export class InteractiveMode {
 				this.pendingMessagesContainer.addChild(new TruncatedText(text, 1, 0));
 			}
 			const dequeueHint = this.getAppKeyDisplay("app.message.dequeue");
-			const hintText = theme.fg("dim", `↳ ${dequeueHint} to edit all queued messages`);
+			const hintText = theme.fg(
+				"dim",
+				`↳ ${uiText("{keys} to edit, {send} to send now", { keys: `↑ / ${dequeueHint}`, send: this.sendNowKeys() })}`,
+			);
 			this.pendingMessagesContainer.addChild(new TruncatedText(hintText, 1, 0));
 		}
 	}
@@ -6654,7 +6712,7 @@ export class InteractiveMode {
 		try {
 			await copyToClipboard(text);
 			if (options.flashConfirmation && this.ui instanceof TuiAltScreen) {
-				this.ui.flash("Copied!");
+				this.ui.flash(uiText("Copied!"));
 			} else {
 				this.showStatus("Copied last agent message to clipboard");
 			}

@@ -12,7 +12,7 @@ metadata:
 ## 动笔之前
 
 - 先确认主题、读者、用途和篇幅；用户没有说明的，按常见做法定下来，并在回复里说明所作的设定。
-- 有参考资料时先用 import_document 导入，再用 grep 查找要用的事实；需要最新信息时用 web_search 和 web_fetch。
+- 有参考资料时先用 import_document 导入，再用 grep 查找要用的事实；用户要求检索，或需要资料里没有的最新信息时，用 web_search 和 web_fetch。
 
 ## 结构
 

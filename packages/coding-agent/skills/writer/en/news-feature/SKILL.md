@@ -11,7 +11,7 @@ metadata:
 
 ## Gathering facts
 
-- Search with web_search for the event name and the date, and read the original reports of authoritative outlets with web_fetch.
+- When the user asks for a search, or the piece needs news the materials do not hold, search with web_search for the event name and the date, and read the original reports of authoritative outlets with web_fetch.
 - Record the URL, outlet and publication date of every fact. Call a fact current only when its page shows the date.
 - When sources differ, follow authoritative outlets and official releases and name the source in the text.
 

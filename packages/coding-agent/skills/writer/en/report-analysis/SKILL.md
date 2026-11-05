@@ -12,7 +12,7 @@ metadata:
 ## Before writing
 
 - Confirm the readers (management, a supervising body, the team), the purpose and the length.
-- Import all reference files, list the questions the report must answer, and find evidence for each in the files and search results.
+- Import all reference files, list the questions the report must answer, and find evidence for each in the files; add search results when the user asks for a search or the files hold none.
 
 ## Structure
 

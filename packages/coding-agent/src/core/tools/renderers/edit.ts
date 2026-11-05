@@ -12,7 +12,7 @@ import type { Theme } from "../../../modes/interactive/theme/theme.ts";
 import type { ToolDefinition } from "../../extensions/types.ts";
 import type { EditToolDetails } from "../edit.ts";
 import { computeEditsDiff, type Edit, type EditDiffError, type EditDiffResult } from "../edit-diff.ts";
-import { renderToolPath, str } from "../render-utils.ts";
+import { normalizeDisplayText, renderToolPath, replaceTabs, str } from "../render-utils.ts";
 
 type EditPreview = EditDiffResult | EditDiffError;
 export type EditRenderState = {
@@ -80,6 +80,21 @@ function getRenderablePreviewInput(args: RenderableEditArgs | undefined): { path
 
 	return null;
 }
+/** The text of an edit while it is produced, old in red and new in green: the diff needs all of it first. */
+function formatLiveEdit(args: RenderableEditArgs | undefined, theme: Theme): string {
+	// One or several replacements, the last of them unfinished.
+	const edits: Array<Partial<Edit>> = Array.isArray(args?.edits) ? args.edits : args ? [args] : [];
+	const parts: string[] = [];
+	for (const edit of edits) {
+		if (typeof edit?.oldText === "string" && edit.oldText) {
+			parts.push(theme.fg("toolDiffRemoved", replaceTabs(normalizeDisplayText(edit.oldText))));
+		}
+		if (typeof edit?.newText === "string" && edit.newText) {
+			parts.push(theme.fg("toolDiffAdded", replaceTabs(normalizeDisplayText(edit.newText))));
+		}
+	}
+	return parts.join("\n\n");
+}
 function formatEditCall(args: RenderableEditArgs | undefined, theme: Theme, cwd: string): string {
 	const pathDisplay = renderToolPath(str(args?.file_path ?? args?.path), theme, cwd);
 	return `${theme.fg("toolTitle", theme.bold("edit"))} ${pathDisplay}`;
@@ -141,6 +156,11 @@ function buildEditCallComponent(
 	component.addChild(new Text(formatEditCall(args, theme, cwd), 0, 0));
 
 	if (!component.preview) {
+		const live = formatLiveEdit(args, theme);
+		if (live) {
+			component.addChild(new Spacer(1));
+			component.addChild(new Text(live, 0, 0));
+		}
 		return component;
 	}
 

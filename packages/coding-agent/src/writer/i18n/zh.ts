@@ -84,7 +84,8 @@ export const zh = {
 	// No results.
 	"search.none": "没有检索到结果：{query}",
 	// web_fetch heading.
-	"fetch.title": "网页正文（{backend}）：{title}\n来源：{url}{date}",
+	"fetch.title": "网页正文（{backend}）：{title}\n网址：{url}{date}{site}",
+	"fetch.site": "\n网站：{site}",
 	// Content clipped.
 	"fetch.clipped": "（正文过长，已截取前 {chars} 字）",
 	// Missing query.
@@ -186,7 +187,6 @@ export const zh = {
 	"topic.notArchived": "网址 {url} 还没有在本主题里打开过，请先用 web_fetch 读取",
 	"topic.itemProblem": "第{n}条：{problem}",
 	"topic.materialAdded": "已记录 {count} 条，{file} 共 {total} 条。",
-	"export.useEdit": "“{path}”已经有内容：请用 edit 修改需要改的段落。用户确实要求全文重写时，再次调用 write。",
 	"rewind.pick": "回退到哪条消息之前？",
 	"rewind.mode": "退回什么？",
 	"rewind.both": "对话和文件一起退回（恢复 {count} 个文件）",

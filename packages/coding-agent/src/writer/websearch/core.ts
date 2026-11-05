@@ -38,6 +38,8 @@ export interface FetchResult {
 	content: string;
 	// Publication date or relative-time marker ("" when unknown).
 	date: string;
+	// The site's own name when the page gives one.
+	site?: string;
 	// Text left out because a reader of the page cannot see it (browser method).
 	filtered?: string[];
 	// The text may not be the page asked for: a wall of some kind (browser method).
@@ -261,6 +263,7 @@ export function formatFetch(page: FetchResult, backend: string, lang?: WriterLan
 				title: page.title || page.url,
 				url: page.url,
 				date: page.date ? t("search.date", { date: page.date }, lang) : "",
+				site: page.site?.trim() ? t("fetch.site", { site: page.site.trim() }, lang) : "",
 			},
 			lang,
 		),

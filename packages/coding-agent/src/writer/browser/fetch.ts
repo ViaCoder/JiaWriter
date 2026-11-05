@@ -281,6 +281,7 @@ export async function browserFetch(
 		const art = JSON.parse(String(await deps.call("run", { tab, script: "article" }, 40_000))) as {
 			title: string;
 			published: string;
+			site: string;
 			markdown: string;
 			contentType: string;
 			filtered?: string[];
@@ -305,6 +306,7 @@ export async function browserFetch(
 			title: art.title,
 			content: art.markdown,
 			date: findDate(meta.pub || art.published || ""),
+			...(art.site ? { site: art.site } : {}),
 			...(art.filtered?.length ? { filtered: art.filtered } : {}),
 			...(unsure ? { unsure } : {}),
 		};

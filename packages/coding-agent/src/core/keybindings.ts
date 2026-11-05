@@ -72,6 +72,18 @@ const APP_KEYBINDINGS = {
 		defaultKeys: windowsKeybindings ? "alt+q" : "alt+up",
 		description: "Restore queued messages",
 	},
+	"app.message.sendNow": {
+		defaultKeys: "ctrl+enter",
+		description: "Send queued messages and the draft now",
+	},
+	"app.message.sendNowChordStart": {
+		defaultKeys: "ctrl+x",
+		description: "First key of the send-now chord, for terminals without ctrl+enter",
+	},
+	"app.message.sendNowChordEnd": {
+		defaultKeys: "ctrl+s",
+		description: "Second key of the send-now chord",
+	},
 	"app.clipboard.pasteImage": {
 		defaultKeys: windowsKeybindings ? "alt+v" : "ctrl+v",
 		description: "Paste files on macOS, images, or text from clipboard",

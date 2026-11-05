@@ -18,6 +18,7 @@ import {
 	InteractiveMode,
 } from "../src/modes/interactive/interactive-mode.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
+import { uiText } from "../src/writer/ui-text.ts";
 
 const clipboardMocks = vi.hoisted(() => ({
 	copyToClipboard: vi.fn<(text: string) => Promise<void>>(),
@@ -260,7 +261,7 @@ describe("InteractiveMode copy confirmation", () => {
 			expect(getLastAssistantText).not.toHaveBeenCalled();
 			expect(showStatus).not.toHaveBeenCalled();
 			expect(showError).not.toHaveBeenCalled();
-			expect(terminal.getViewport().some((line) => line.includes("Copied!"))).toBe(true);
+			expect(terminal.getViewport().some((line) => line.includes(uiText("Copied!")))).toBe(true);
 		} finally {
 			ui.stop();
 		}
@@ -302,7 +303,7 @@ describe("InteractiveMode copy confirmation", () => {
 			expect(getLastAssistantText).toHaveBeenCalledOnce();
 			expect(showStatus).not.toHaveBeenCalled();
 			expect(showError).not.toHaveBeenCalled();
-			expect(terminal.getViewport().some((line) => line.includes("Copied!"))).toBe(true);
+			expect(terminal.getViewport().some((line) => line.includes(uiText("Copied!")))).toBe(true);
 		} finally {
 			ui.stop();
 		}
@@ -334,7 +335,7 @@ describe("InteractiveMode copy confirmation", () => {
 			expect(clipboardMocks.copyToClipboard).toHaveBeenCalledWith("assistant response");
 			expect(showStatus).not.toHaveBeenCalled();
 			expect(showError).not.toHaveBeenCalled();
-			expect(terminal.getViewport().some((line) => line.includes("Copied!"))).toBe(true);
+			expect(terminal.getViewport().some((line) => line.includes(uiText("Copied!")))).toBe(true);
 		} finally {
 			ui.stop();
 		}

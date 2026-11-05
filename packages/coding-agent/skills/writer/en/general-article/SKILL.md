@@ -12,7 +12,7 @@ metadata:
 ## Before writing
 
 - Confirm the topic, readers, purpose and length; where the user leaves one open, choose the usual option and say so in the reply.
-- Import reference files with import_document first and find the facts you need with grep; use web_search and web_fetch for recent information.
+- Import reference files with import_document first and find the facts you need with grep; use web_search and web_fetch when the user asks for a search or needs recent information the files do not hold.
 
 ## Structure
 

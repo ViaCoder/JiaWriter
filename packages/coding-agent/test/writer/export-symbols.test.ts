@@ -8,7 +8,7 @@ import { fixSymbols, latexToUnicode } from "../../src/writer/export/symbols.ts";
 describe("latexToUnicode", () => {
 	it("turns commands, scripts, fractions, roots, degrees and text into Unicode", () => {
 		// Arrows, relations, operators and Greek.
-		expect(latexToUnicode("A \\rightarrow B \\Rightarrow C")).toBe("A→B⇒C");
+		expect(latexToUnicode("A \\rightarrow B \\Rightarrow C")).toBe("A—B—C");
 		expect(latexToUnicode("a \\leq b \\neq c \\times d \\pm e")).toBe("a≤b≠c×d±e");
 		expect(latexToUnicode("\\alpha + \\Delta \\approx \\infty")).toBe("α+Δ≈∞");
 		// Superscripts, subscripts, and the fallback when a character has no raised form.
@@ -36,7 +36,7 @@ describe("fixSymbols", () => {
 		const r = fixSymbols(
 			"甲$\\rightarrow$乙，$$E=mc^2$$，\\(a \\leq b\\)，\\[x_1\\]，丙\\to丁，&rarr;&times;&#8594;&#x2192;，snake\\_case",
 		);
-		expect(r.text).toBe("甲→乙，E=mc²，a≤b，x₁，丙→丁，→×→→，snake_case");
+		expect(r.text).toBe("甲—乙，E=mc²，a≤b，x₁，丙—丁，—×——，snake_case");
 		expect([r.converted, r.unknown]).toEqual([10, []]);
 	});
 
@@ -56,5 +56,16 @@ describe("fixSymbols", () => {
 		// $A$, $x + y$ and $v=s/t$ are math.
 		const r = fixSymbols("面积$A$与$x + y$成正比，$v=s/t$");
 		expect([r.text, r.converted]).toEqual(["面积A与x+y成正比，v=s/t", 3]);
+	});
+
+	it("writes sideways arrows as a dash, however they were typed (the user, 2026-11-05)", () => {
+		for (const text of ["甲$\\to$乙", "甲$/to$乙", "甲→乙", "甲 -> 乙", "甲=>乙", "甲⇒乙", "甲&rarr;乙"])
+			expect(fixSymbols(text).text).toBe("甲—乙");
+	});
+
+	it("keeps what is not an arrow in prose", () => {
+		expect(fixSymbols("`a -> b` 和 https://a.example/x->y").text).toBe("`a -> b` 和 https://a.example/x->y");
+		expect(fixSymbols("x>=1，y<=2").text).toBe("x>=1，y<=2");
+		expect(fixSymbols("销量$\\uparrow$").text).toBe("销量↑");
 	});
 });

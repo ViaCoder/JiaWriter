@@ -2,6 +2,9 @@ import { Editor, type EditorOptions, type EditorTheme, type TUI, visibleWidth } 
 import type { AppKeybinding, KeybindingsManager } from "../../../core/keybindings.ts";
 import type { StatusIndicator } from "./status-indicator.ts";
 
+/** How long the second key of a chord is awaited (ms). */
+const CHORD_MS = 1000;
+
 export type CustomEditorOptions = EditorOptions & {
 	/** Render working, compaction, summarization, and retry status in the editor's top border. */
 	embedWorkingStatus?: boolean;
@@ -22,6 +25,14 @@ export class CustomEditor extends Editor {
 	public onPasteImage?: () => void;
 	/** Handler for extension-registered shortcuts. Returns true if handled. */
 	public onExtensionShortcut?: (data: string) => boolean;
+	/** True while the send-now chord can do something; otherwise its first key keeps its own meaning at once. */
+	public canSendNow?: () => boolean;
+	/** Up on an empty editor: bring queued messages back for editing. True when there were any. */
+	public onEditQueued?: () => boolean;
+
+	// The first key of a chord in progress, and the timer that gives it its own meaning.
+	private chordKey: string | undefined;
+	private chordTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager, options?: CustomEditorOptions) {
 		super(tui, theme, options);
@@ -85,9 +96,49 @@ export class CustomEditor extends Editor {
 		this.actionHandlers.set(action, handler);
 	}
 
+	/** What a chord's first key does alone (Ctrl+X copies). */
+	private runChordKey(data: string): void {
+		for (const [action, handler] of this.actionHandlers) {
+			if (action !== "app.interrupt" && action !== "app.exit" && this.keybindings.matches(data, action)) {
+				handler();
+				return;
+			}
+		}
+	}
+
+	/** Follow the send-now chord. True when the key belonged to it. */
+	private followChord(data: string): boolean {
+		// Second key, or anything else.
+		if (this.chordKey !== undefined) {
+			const first = this.chordKey;
+			clearTimeout(this.chordTimer);
+			this.chordKey = undefined;
+			if (this.keybindings.matches(data, "app.message.sendNowChordEnd")) {
+				this.actionHandlers.get("app.message.sendNow")?.();
+				return true;
+			}
+			this.runChordKey(first);
+			return false;
+		}
+		// First key: wait for the second only when the chord can do something.
+		if (!this.keybindings.matches(data, "app.message.sendNowChordStart") || !this.canSendNow?.()) return false;
+		this.chordKey = data;
+		this.chordTimer = setTimeout(() => {
+			this.chordKey = undefined;
+			this.runChordKey(data);
+		}, CHORD_MS);
+		this.chordTimer.unref?.();
+		return true;
+	}
+
 	handleInput(data: string): void {
 		// Check extension-registered shortcuts first
 		if (this.onExtensionShortcut?.(data)) {
+			return;
+		}
+
+		// The send-now chord, which shares its first key with other actions
+		if (this.followChord(data)) {
 			return;
 		}
 
@@ -122,6 +173,16 @@ export class CustomEditor extends Editor {
 				return;
 			}
 			// Fall through to editor handling for delete-char-forward when not empty
+		}
+
+		// Up on an empty editor edits what is queued, before it steps through history
+		if (
+			this.keybindings.matches(data, "tui.editor.cursorUp") &&
+			this.getText().length === 0 &&
+			!this.isShowingAutocomplete() &&
+			this.onEditQueued?.()
+		) {
+			return;
 		}
 
 		// Explicit history bindings take precedence over app actions while the editor is focused.

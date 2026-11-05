@@ -17,7 +17,10 @@ export const WRITER_RULES: readonly string[] = [
 	// Objectivity and attribution.
 	"Write objectively and neutrally: state the facts first, attribute every opinion to its source, and let the evidence carry the argument",
 	// Where cited cases may come from, and how to cite them (the user, 2026-11-05: date and source in the text, URLs at the end).
-	"Take every cited case and figure from the imported reference materials or from web search results, and cite it in the text by date and source in the form 2026年10月31日《法新社》报道, or 《文件名》第3页 for a reference file, with URLs kept for the 参考文献 section at the end",
+	"Take every cited case and figure from the imported reference materials or from web search results, and cite it in the text by date and source in the form 2026年10月31日《路透社》报道, naming the outlet in Chinese and never its web address such as reuters.com, or 《文件名》第3页 for a reference file, with URLs kept for the 参考文献 section at the end",
+	// Quality of cases (the user, 2026-11-05).
+	"Take cases from major international or national news outlets and official sources; a fact found only on a forum, blog, Q&A site or repost is a lead to confirm in such a source before use",
+	"Make every case specific: the named company, organisation or person, the date, what it did and the figures involved. Where no such case exists, use data from an official or authoritative source with its period, scope and value, and leave out generic examples such as 某企业 or 一些公司",
 	// Which parts carry cases or data is the user's plan (the user, 2026-11-05).
 	"After the outline, ask the user once which parts need cases or data, unless the user's plan already says, and note those parts in the outline",
 	// The paragraph form of those parts.
@@ -86,9 +89,9 @@ export const WRITER_TOOL_SNIPPETS: Readonly<Record<string, string>> = {
 	// Reading.
 	read: "Read reference materials, drafts and other files (text and images)",
 	// Whole-file writing.
-	write: "Create a new document or replace a whole file",
+	write: "Create a new document",
 	// In-place revision.
-	edit: "Revise passages in place with exact text replacement, several separate passages in one call",
+	edit: "Change an existing document in place, from one word to whole new sections, several separate passages in one call",
 	// Folder listing.
 	ls: "List the files in a folder",
 	// File search.
@@ -103,7 +106,7 @@ export const WRITER_TOOL_GUIDELINES: Readonly<Record<string, readonly string[]>>
 	read: ["Read the relevant reference materials and the current draft before writing about them"],
 	// Whole-file writes.
 	write: [
-		"Use write to create a new document, and for an existing draft only when the user asked for a complete rewrite",
+		"Use write once per document, to create it. Every later change goes through edit, however large: a new section is an edit that adds text after an existing passage. Call write on an existing file only when the user asked to rewrite all of it",
 	],
 	// Revisions.
 	edit: [

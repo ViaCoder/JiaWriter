@@ -185,7 +185,7 @@ describe("reports", () => {
 	it("formats a fetched page and clips long text", () => {
 		// Short page.
 		const short = formatFetch({ url: "https://a.example/", title: "T", content: "正文", date: "" }, "sf", "zh");
-		expect(short).toBe("网页正文（sf）：T\n来源：https://a.example/\n\n正文");
+		expect(short).toBe("网页正文（sf）：T\n网址：https://a.example/\n\n正文");
 		// Long page.
 		const long = formatFetch(
 			{ url: "u", title: "", content: "字".repeat(MAX_FETCH_CHARS + 5), date: "" },
