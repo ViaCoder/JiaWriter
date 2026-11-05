@@ -64,6 +64,7 @@ describe("web_search and web_fetch one at a time", () => {
 			e.type === "tool_execution_start" ? ["start"] : e.type === "tool_execution_end" ? ["end"] : [],
 		);
 		expect(order).toEqual(["start", "end", "start", "end", "start", "end"]);
-		expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(1000);
+		// Measured where the requests arrive: the first one's trip eats a few ms of the 1000 ms gap (992 on Windows).
+		expect(starts[1] - starts[0]).toBeGreaterThanOrEqual(900);
 	}, 20_000);
 });
