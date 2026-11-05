@@ -137,7 +137,7 @@ import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-
 import { brandText } from "../../writer/brand.ts";
 // JiaWriter: the "Jia" logo for release packages.
 import { jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
-import { uiText } from "../../writer/ui-text.ts";
+import { compactionErrorText, uiText } from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
 import { AssistantMessageComponent } from "./components/assistant-message.ts";
@@ -3709,11 +3709,12 @@ export class InteractiveMode {
 					}
 					this.footer.invalidate();
 				} else if (event.errorMessage) {
+					// JiaWriter: the failure in the interface language.
+					const errorMessage = compactionErrorText(event.errorMessage);
 					if (event.reason === "manual") {
-						this.showError(event.errorMessage);
+						this.showError(errorMessage);
 					} else {
 						this.chatContainer.addChild(new Spacer(1));
-						const errorMessage = event.errorMessage;
 						this.chatContainer.addChild(new ThemedText(() => theme.fg("error", errorMessage), 1, 0));
 					}
 				}

@@ -74,7 +74,7 @@ export interface WriterModelReady {
 	maxTokens: number;
 	// Reasoning support of the endpoint.
 	reasoning: ReasoningSupport;
-	// Level asked for with JW_REASONING.
+	// Level asked for with JW_EFFORT.
 	thinkingLevel: WriterReasoning;
 	// Detection cache file and key (for the runtime reasoning fallback).
 	cachePath: string;

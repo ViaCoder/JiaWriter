@@ -60,6 +60,9 @@ import { stripFrontmatter } from "../utils/frontmatter.ts";
 import { processImage } from "../utils/image-process.ts";
 import { sleep } from "../utils/sleep.ts";
 import { normalizeToolResultImages } from "../utils/tool-result-images.ts";
+// JiaWriter: compaction fallback, overflow errors and the provider name.
+import { isWriterOverflow, localCompaction } from "../writer/compact-fallback.ts";
+import { JW_PROVIDER } from "../writer/env-config.ts";
 import { formatNoApiKeyFoundMessage, formatNoModelSelectedMessage } from "./auth-guidance.ts";
 import { type BashResult, executeBashWithOperations } from "./bash-executor.ts";
 import { generateBugReportSummary } from "./bug-report.ts";
@@ -3060,7 +3063,10 @@ export class AgentSession {
 			(!entriesAfterAssistant.some((entry) => entry.type === "compaction") &&
 				latestAssistantEdit?.replacement !== null);
 		const assistantUsageMatchesProjection = assistantIsProjected && !hasPostAssistantContextEdit;
-		const explicitOverflow = assistantMessage.stopReason === "error" && isContextOverflow(assistantMessage);
+		// JiaWriter: isWriterOverflow adds the errors of Chinese models and gateways.
+		const explicitOverflow =
+			assistantMessage.stopReason === "error" &&
+			(isContextOverflow(assistantMessage) || isWriterOverflow(assistantMessage));
 		const contextOverflow =
 			sameModel &&
 			((explicitOverflow && assistantRetainedForExplicitRecovery) ||
@@ -3219,13 +3225,18 @@ export class AgentSession {
 				details = extensionCompaction.details;
 			} else {
 				// Shared default summary generator, also used by manual compaction.
+				// JiaWriter: when the model cannot summarize, a local summary keeps the conversation going;
+				// without it the next request would go out as oversized as this one.
 				const compactResult = await this._runDefaultCompaction(
 					preparation,
 					model,
 					undefined,
 					abortController.signal,
 					reason,
-				);
+				).catch((error: unknown) => {
+					if (model.provider !== JW_PROVIDER || abortController?.signal.aborted) throw error;
+					return localCompaction(preparation, error instanceof Error ? error.message : String(error));
+				});
 				summary = compactResult.summary;
 				firstKeptEntryId = compactResult.firstKeptEntryId;
 				tokensBefore = compactResult.tokensBefore;
@@ -3769,6 +3780,8 @@ export class AgentSession {
 	private _isRetryableError(message: AssistantMessage): boolean {
 		// Context overflow is handled by compaction, not retry.
 		if (isContextOverflow(message, (this._modelForMessage(message) ?? this.model)?.contextWindow ?? 0)) return false;
+		// JiaWriter: an overflow the Chinese patterns name goes to compaction, not to a retry at the same size.
+		if (isWriterOverflow(message)) return false;
 		return isRetryableAssistantError(message);
 	}
 

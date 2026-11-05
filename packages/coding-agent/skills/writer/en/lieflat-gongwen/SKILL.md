@@ -1,6 +1,6 @@
 ---
 name: lieflat-gongwen
-description: "Chinese official-document writing (公文) based on corpus statistics: 调研报告, 领导讲话, 工作意见, 经验材料, 工作方案, 经验总结 and short 党建 experience pieces, with measurable parameters, outline formulas, title techniques and the gongwen_check self-check. Use it when the user asks for one of these documents or wants a draft to read like a 公文."
+description: For Chinese official documents (公文) such as 调研报告, 领导讲话 and 工作方案; the default genre.
 license: PolyForm-Noncommercial-1.0.0 (see ../../zh/lieflat-gongwen/LICENSE)
 metadata:
   title: Chinese official documents (lieflat-gongwen)

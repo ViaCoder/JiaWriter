@@ -1,6 +1,6 @@
 ---
 name: business-email
-description: Write business emails, notices, memos and meeting minutes. Use when the user asks for an email, a reply, a notice or minutes.
+description: For business emails, notices, memos and meeting minutes.
 metadata:
   title: Business email and memos
   style_packs: core-en

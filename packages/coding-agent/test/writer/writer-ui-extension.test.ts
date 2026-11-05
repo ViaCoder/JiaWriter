@@ -142,3 +142,57 @@ describe("/jw", () => {
 		]);
 	});
 });
+
+describe("/effort", () => {
+	/** The command over a fake session; supported is what the model can do. */
+	function effort(supported: string[], answers: (string | undefined)[] = []) {
+		const map = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
+		let level = "medium";
+		writerUiExtension({
+			registerCommand: (name: string, o: never) => map.set(name, o),
+			getThinkingLevel: () => level,
+			setThinkingLevel: (next: string) => {
+				level = supported.includes(next) ? next : (supported.at(-1) as string);
+			},
+		} as unknown as ExtensionAPI);
+		const notes: string[] = [];
+		const titles: string[] = [];
+		const context = {
+			hasUI: true,
+			ui: {
+				select: async (title: string) => {
+					titles.push(title);
+					return answers.shift();
+				},
+				notify: (m: string) => notes.push(m),
+			},
+		};
+		return { run: (args: string) => map.get("effort")?.handler(args, context), notes, titles, level: () => level };
+	}
+
+	it("sets a level given as an argument, in any case", async () => {
+		const e = effort(["off", "low", "medium", "high"]);
+		await e.run("HIGH");
+		expect([e.level(), e.notes]).toEqual(["high", ["思考强度已设为 high。"]]);
+	});
+
+	it("says so when the model takes the nearest level", async () => {
+		const e = effort(["off", "low", "medium", "high"]);
+		await e.run("max");
+		expect(e.level()).toBe("high");
+		expect(e.notes[0]).toContain("最接近的 high");
+	});
+
+	it("offers a choice without an argument, and refuses an unknown level", async () => {
+		const e = effort(["off", "low"], ["low", undefined]);
+		await e.run("");
+		expect(e.titles[0]).toContain("medium");
+		expect(e.level()).toBe("low");
+		// Leaving the menu changes nothing.
+		await e.run("");
+		expect(e.level()).toBe("low");
+		await e.run("turbo");
+		expect(e.notes.at(-1)).toContain("xhigh");
+		expect(e.level()).toBe("low");
+	});
+});

@@ -27,7 +27,7 @@ JiaWriter 是一个通用写作 agent，在终端里运行。它读取参考资�
 | `JW_API` | 接口类型：`anthropic-messages`、`openai-responses`、`openai-completions` | 自动检测 |
 | `JW_CTX` | 上下文窗口（token） | 128000 |
 | `JW_OUT` | 最大输出（token） | 128000 |
-| `JW_REASONING` | 推理档位：`off`、`low`、`medium`、`high`、`xhigh`、`max` | `medium` |
+| `JW_EFFORT` | 思考强度：`off`、`low`、`medium`、`high`、`xhigh`、`max`，模型不支持时自动用最接近的档位 | `medium` |
 | `JW_LANG` | 界面和工具输出的语言：`zh`、`en` | `zh` |
 | `JW_SEARCH` | 模型没有指定方式时的默认检索方式：`auto`、`browser`、`anysearch`；设为 `sf` 时，读网页默认用 sf | `auto` |
 | `JW_ENGINES` | 模型没有指定引擎时，浏览器检索依次使用的引擎，可选 `bing`、`google`、`baidu`、`sogou` | `bing,google` |
@@ -36,6 +36,7 @@ JiaWriter 是一个通用写作 agent，在终端里运行。它读取参考资�
 | `JW_AUTO_EXPORT` | 设为 `off` 时，每轮结束不再自动导出 docx | 开启 |
 | `JW_SEARCH_KEY` | AnySearch 的 key | 不设则匿名调用 |
 | `JW_SF` | search_fetch 程序的路径 | 在约定位置查找 |
+| `PROMPT_ADD` | 追加人设的文本文件路径，例如 `PROMPT_ADD='~/Downloads/glm.txt'`；内容接在人设之后，和人设在同一个 `<system_prompt>` 标签里 | 不追加 |
 
 设置方法（把示例值换成你自己的）：
 
@@ -61,12 +62,16 @@ JiaWriter 启动时把 `JW_KEY` 和 `JW_SEARCH_KEY` 读进内存，随即从自�
 | `web_search`、`web_fetch` | 联网检索和读取网页正文 |
 | `import_document` | 导入参考资料：PDF、Word（.docx）、HTML、txt、md |
 | `export_document` | 把 Markdown 稿件导出为 docx 或 md |
+| `topic_open`、`material_add` | 建立主题文件夹，记录带来源的案例和数据 |
+| `draft_restore` | 列出稿件保存过的版本，恢复其中一个 |
 
 ## 命令
 
 | 命令 | 作用 |
 |---|---|
 | `/jw` | 只读的配置页 |
+| `/effort [档位]` | 调整思考强度，不带参数时弹出选择（`/thinking`、Shift+Tab 也可以） |
+| `/rewind` | 回退到某条消息之前：对话和文件一起退回、只退回对话，或只退回文件 |
 | `/lang zh`、`/lang en` | 切换界面语言（设置了 `JW_LANG` 时以它为准） |
 | `/skills` | 管理写作 skill：启用、停用、编辑、用当前会话更新、删除（删除前先备份） |
 | `/skill-new` | 新建 skill：从当前会话生成、空白模板，或由模型按 skill-creator 编写 |
@@ -74,6 +79,17 @@ JiaWriter 启动时把 `JW_KEY` 和 `JW_SEARCH_KEY` 读进内存，随即从自�
 | `/import-doc [文件]` | 导入参考资料 |
 | `/export-doc <稿件.md> [md\|docx] [--profile=方案] [--out=路径]` | 导出稿件 |
 | `/sf status`、`/sf install` | 与 `/browser` 相同 |
+
+## 写作流程
+
+正常对话就行，下面这些都由模型完成，不用手动配置。
+
+- **主题文件夹**：你提出一个写作主题，模型就在写作文件夹下建一个同名文件夹，同名续用。里面有 `稿件/`（Markdown 和 docx）、`参考资料/`、`检索/`（每次搜索的结果）、`网页/`（抓到的完整正文，带网址、标题和日期）、`素材.md`（案例和数据）。检索和网页自动归档；模型没建文件夹时，归档到 `未命名主题-日期/`，内容不会丢。
+- **先调研后成稿**：列大纲，问你哪些部分需要案例或数据，针对这些部分逐个检索、抓取，记入素材，核对缺口后再写。素材的来源必须是打开过的网页或参考文件的页码。
+- **段落和来源**：需要案例或数据的部分，一段先写概述，再跟案例（时间、报道方、主体、行为）或数据（时间、地区、行业、指标、数值）；其他部分（如现状、对策建议）照常写。正文写“2026年10月31日《法新社》报道”，不放网址，文末“参考文献”列出全部来源的标题和网址。
+- **Markdown 优先**：稿件写进 Markdown 文件，之后的增删改查都在文件上局部进行。模型想整篇覆盖已有稿件时会被拦下，除非你说了要重写。
+- **回退**：每次改文件前自动保存一份。用 `/rewind` 退回，或直接说“退回上一版”。回退前的内容也会保存，回退本身可以撤销。
+- **长对话**：上下文快满时自动压缩。中文按实际大小估算；工具结果太大时，发给模型的部分会截断，全文仍在会话和主题文件夹里；模型摘要失败时用本地摘要接上，对话不会中断，这时较早的细节可能丢失，可用 `/tree` 回看。
 
 ## 参考资料
 
@@ -110,6 +126,8 @@ JiaWriter 不做文字识别（OCR）：没有文字层的扫描件会列在导�
 导出后程序会解开 docx 检查：每个含中文的文字段都带 `w:hint="eastAsia"` 和中文字体，统计紧邻汉字的英文标点和未配对的引号，并列出实际使用的字号和行距；稿件中出现“待核实”时会提示。
 
 ## 写作 skill
+
+skill 的正文用到时才读取，系统提示词里只有一句话的索引。写文档且没有指定文体时，默认用公文 skill（lieflat-gongwen），在 `/skills` 里停用后这条默认也随之取消。
 
 内置 9 个 skill，中英文各一套，按界面语言提供：通用文章、报告分析、新闻特稿、学术写作、商务邮件和备忘录、营销文案、叙事小说、skill-creator，以及公文写作 [lieflat-gongwen](https://github.com/larashero3-dotcom/lieflat-gongwen)。lieflat-gongwen 覆盖调研报告、领导讲话、工作意见、经验材料、工作方案、经验总结和千字级党建材料，参数来自公文语料统计，写完用 `gongwen_check` 工具自检；它的材料只有中文，英文界面也读中文目录。自己的 skill 放在 `~/.jiawriter/agent/skills/<名称>/SKILL.md`，同名时优先于内置版本。
 

@@ -11,6 +11,8 @@ import { truncateToWidth } from "@earendil-works/pi-tui";
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // The configuration page.
 import { formatWaConfig } from "../../writer/config-view.ts";
+// The levels /effort offers.
+import { WRITER_REASONING_CHOICES, type WriterReasoning } from "../../writer/env-config.ts";
 // Messages and the language setting.
 import { setUiLang, t, type WriterLang } from "../../writer/i18n/index.ts";
 // The keys held in memory (shown only as set or unset).
@@ -25,6 +27,12 @@ export function parseLangArg(arg: string): WriterLang | undefined {
 	if (a === "zh" || a === "中文" || a === "cn") return "zh";
 	if (a === "en" || a === "english" || a === "英文") return "en";
 	return undefined;
+}
+
+/** True for a level /effort accepts. */
+export function isEffort(level: string): level is WriterReasoning {
+	// The same choices as JW_EFFORT.
+	return (WRITER_REASONING_CHOICES as readonly string[]).includes(level);
 }
 
 /** A component that shows fixed lines and closes on any key. */
@@ -73,6 +81,33 @@ export default function writerUiExtension(pi: ExtensionAPI): void {
 			setUiLang(lang);
 			const env = process.env.JW_LANG?.trim();
 			ctx.ui.notify(env ? t("lang.envWins", { value: env }) : t("lang.saved"), env ? "warning" : "info");
+		},
+	});
+
+	// /effort: how hard the model thinks, the one setting worth changing during a conversation.
+	pi.registerCommand("effort", {
+		description: "Set the thinking intensity: /effort off, low, medium, high, xhigh or max",
+		getArgumentCompletions: (prefix) =>
+			WRITER_REASONING_CHOICES.filter((l) => l.startsWith(prefix)).map((l) => ({ value: l, label: l })),
+		handler: async (args, ctx) => {
+			// The argument, or a choice with the current level named.
+			let level: string | undefined = args.trim().toLowerCase();
+			if (!level && ctx.hasUI)
+				level = await ctx.ui.select(t("effort.choose", { level: pi.getThinkingLevel() }), [
+					...WRITER_REASONING_CHOICES,
+				]);
+			if (level === undefined) return;
+			if (!isEffort(level)) {
+				ctx.ui.notify(t("effort.bad", { levels: WRITER_REASONING_CHOICES.join(" / ") }), "error");
+				return;
+			}
+			// The model may not have this level: pi picks the nearest one, and the user hears which.
+			pi.setThinkingLevel(level);
+			const actual = pi.getThinkingLevel();
+			ctx.ui.notify(
+				actual === level ? t("effort.set", { level }) : t("effort.nearest", { level, actual }),
+				actual === level ? "info" : "warning",
+			);
 		},
 	});
 

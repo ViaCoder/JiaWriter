@@ -49,8 +49,11 @@ describe("buildSystemPrompt", () => {
 			});
 
 			// JiaWriter: writing assistant preamble.
-			expect(defaultPrompt.startsWith("You are an expert writing assistant operating inside JiaWriter")).toBe(true);
-			expect(customPrompt.startsWith("You are Exact.\n\n<cwd>")).toBe(true);
+			// JiaWriter: the persona stands in <system_prompt> (the user, 2026-11-05).
+			expect(
+				defaultPrompt.startsWith("<system_prompt>\nYou are an expert writing assistant operating inside JiaWriter"),
+			).toBe(true);
+			expect(customPrompt.startsWith("<system_prompt>\nYou are Exact.\n</system_prompt>\n\n<cwd>")).toBe(true);
 		});
 
 		test("preserves an exact forced prompt without sections", () => {

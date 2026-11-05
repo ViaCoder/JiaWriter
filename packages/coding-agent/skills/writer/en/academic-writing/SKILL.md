@@ -1,6 +1,6 @@
 ---
 name: academic-writing
-description: Write papers, literature reviews, proposals and abstracts. Use when the user asks for an academic paper, a literature review or a research article.
+description: For papers, literature reviews, proposals and abstracts.
 metadata:
   title: Academic writing
   style_packs: core-en

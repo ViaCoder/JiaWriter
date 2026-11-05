@@ -11,6 +11,12 @@
  *   once, to open and test with web_fetch.
  */
 
+// Whether a draft exists.
+import { existsSync } from "node:fs";
+// Copying a file into the topic.
+import { copyFile, mkdir } from "node:fs/promises";
+// Paths.
+import { basename, join, resolve } from "node:path";
 // Parameter schemas.
 import { Type } from "typebox";
 // Agent directory (~/.jiawriter/agent).
@@ -20,7 +26,13 @@ import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types
 // Upstream path resolution (cwd, ~, @ prefix).
 import { resolveReadPathAsync } from "../../core/tools/path-utils.ts";
 // Automatic export.
-import { autoExportEnabled, editedDrafts, type RunMessage } from "../../writer/docs/auto.ts";
+import {
+	asksWholeRewrite,
+	autoExportEnabled,
+	editedDrafts,
+	isDraftPath,
+	type RunMessage,
+} from "../../writer/docs/auto.ts";
 // Import.
 import { formatImport, importFile, importSources } from "../../writer/docs/import.ts";
 // Export.
@@ -29,6 +41,9 @@ import { exportDraft, formatExport } from "../../writer/export/export.ts";
 import { openedUrls, unopenedUrls } from "../../writer/export/refs.ts";
 // Output messages.
 import { t } from "../../writer/i18n/index.ts";
+// The topic folder.
+import { currentTopic } from "../../writer/topic/current.ts";
+import { archivedUrls, TOPIC_DIRS } from "../../writer/topic/topic.ts";
 
 /** URLs web_fetch opened with text on the session's active branch, plus those of the messages given. */
 function sessionOpened(ctx: ExtensionContext, extra: readonly unknown[] = []): string[] {
@@ -37,7 +52,21 @@ function sessionOpened(ctx: ExtensionContext, extra: readonly unknown[] = []): s
 		.getBranch()
 		.filter((e) => e.type === "message")
 		.map((e) => (e as { message: unknown }).message);
-	return openedUrls([...branch, ...extra]);
+	// Pages archived in the topic were opened too, also in an earlier session.
+	const topic = currentTopic();
+	return [...openedUrls([...branch, ...extra]), ...(topic ? archivedUrls(topic) : [])];
+}
+
+/** Text of the latest user message on the session's active branch. */
+function lastUserText(ctx: ExtensionContext): string {
+	// Newest first.
+	for (const entry of [...ctx.sessionManager.getBranch()].reverse()) {
+		if (entry.type !== "message" || entry.message.role !== "user") continue;
+		const content = entry.message.content;
+		if (typeof content === "string") return content;
+		return content.map((b) => (b.type === "text" ? b.text : "")).join("");
+	}
+	return "";
 }
 
 /** Arguments of /export-doc: [path] [md|docx] [--profile=name] [--out=path]. */
@@ -69,10 +98,19 @@ export function parseExportArgs(args: string): {
 export default function writerDocsExtension(pi: ExtensionAPI): void {
 	// Import one file (absolute path) or the reference folders.
 	async function runImport(path: string | undefined, cwd: string) {
-		// A file.
-		if (path?.trim()) return [await importFile(await resolveReadPathAsync(path, cwd), cwd)];
-		// The reference folders.
-		return importSources(cwd);
+		// A file: with a topic open, the original joins the topic's reference folder first.
+		const topic = currentTopic();
+		if (path?.trim()) {
+			const file = await resolveReadPathAsync(path, cwd);
+			if (!topic) return [await importFile(file, cwd)];
+			const refs = join(topic, TOPIC_DIRS.refs);
+			const copy = join(refs, basename(file));
+			await mkdir(refs, { recursive: true });
+			if (resolve(file) !== resolve(copy)) await copyFile(file, copy);
+			return [await importFile(copy, topic)];
+		}
+		// The reference folders, of the working folder and of the topic.
+		return [...(await importSources(cwd)), ...(topic && topic !== cwd ? await importSources(topic) : [])];
 	}
 
 	// import_document.
@@ -121,7 +159,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		promptGuidelines: [
 			"Write drafts in Markdown with # for the title and ## / ### / #### for heading levels 1–3; a draft written or edited in a run is exported to .docx automatically at its end, so run style_check before finishing, and use export_document for another format or profile",
 			"Fix every unpaired quote the export reports in the draft with edit, then export again",
-			"End a draft that uses sources with a 参考文献 section: one numbered entry per source, written as [descriptive title](full URL), where the title names the page's own title, the publisher and the date, and the URL is a page you opened with web_fetch and that loaded",
+			"End a draft that uses sources with a 参考文献 section listing every source used in the text: one numbered entry per source, written as [descriptive title](full URL), where the title names the page's own title, the publisher and the date, and the URL is a page you opened with web_fetch and that loaded",
 			"Open every reference URL the export reports as not opened in this session with web_fetch; keep the entry when the page loads and matches its title, replace it with a source you opened or remove it otherwise, then export again",
 			"Write symbols as Unicode characters such as →, ×, ≤ and x² in the draft, and write formulas in plain text with these characters",
 		],
@@ -187,7 +225,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 	function scan(ctx: ExtensionContext): Promise<void> {
 		scans = scans.then(async () => {
 			try {
-				const news = (await importSources(ctx.cwd)).filter((r) => r.status !== "unchanged");
+				const news = (await runImport(undefined, ctx.cwd)).filter((r) => r.status !== "unchanged");
 				if (news.length > 0 && ctx.hasUI) ctx.ui.notify(formatImport(news), "info");
 			} catch {
 				// A folder that cannot be read is skipped; import_document reports the reason.
@@ -201,9 +239,27 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		if (event.reason === "startup") void scan(ctx);
 	});
 
+	// Drafts whose whole replacement was refused in this run; a second attempt goes through, so a model
+	// that has good reason is never stuck.
+	const refused = new Set<string>();
+
 	// Before every run: files added since are imported before the model reads the folder.
 	pi.on("before_agent_start", async (_event, ctx) => {
+		refused.clear();
 		await scan(ctx);
+	});
+
+	// The user, 2026-11-05: a draft is changed in place, not generated again as a whole.
+	pi.on("tool_call", (event, ctx) => {
+		if (event.toolName !== "write") return undefined;
+		const raw = (event.input as { path?: unknown }).path;
+		if (typeof raw !== "string") return undefined;
+		const path = resolve(ctx.cwd, raw);
+		// New files and other files are free; so is a rewrite the user asked for.
+		if (!existsSync(path) || !isDraftPath(path, ctx.cwd) || refused.has(path)) return undefined;
+		if (asksWholeRewrite(lastUserText(ctx))) return undefined;
+		refused.add(path);
+		return { block: true, reason: t("export.useEdit", { path: raw }) };
 	});
 
 	// Reference URLs already handed to the model for testing, so each goes back only once.

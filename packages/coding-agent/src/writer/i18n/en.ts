@@ -189,6 +189,47 @@ export const en: Record<MessageKey, string> = {
 	// Separator of a short list.
 	"export.listSep": "; ",
 	// Reference URLs for the model to open and test.
+	"context.clipped":
+		"(Too long, clipped. The original has {chars} characters; use read or web_fetch to read a part of it again.)",
+	"compact.localTitle":
+		"Local summary: the model summary failed ({reason}). This text was assembled by the program, without the model's own reading.",
+	"compact.localPrevious": "Earlier summary:",
+	"compact.localRequests": "The user's requests, oldest first:",
+	"compact.localReply": "The model's last reply:",
+	"compact.localNotice":
+		"The model summary failed, so a local summary was used and the conversation can continue. Older details may be missing; /tree shows the full record.",
+	"topic.badName": 'The topic name "{name}" cannot be a folder name.',
+	"topic.opened": "Topic folder created: {dir}. Drafts go in {drafts}/.",
+	"topic.continued": "Continuing the topic folder: {dir}. Drafts go in {drafts}/.",
+	"topic.archived": "Archived: {path}",
+	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
+	"topic.missingFields": "missing {fields}",
+	"topic.missingPage": "no page for {file}",
+	"topic.missingSource": "no source: give url, or file and page",
+	"topic.notArchived": "{url} was not opened in this topic yet: read it with web_fetch first",
+	"topic.itemProblem": "Item {n}: {problem}",
+	"topic.materialAdded": "Recorded {count}; {file} now holds {total}.",
+	"export.useEdit":
+		"{path} already has content: change the passages that need it with edit. If the user really asked for a complete rewrite, call write again.",
+	"rewind.pick": "Go back to before which message?",
+	"rewind.mode": "What goes back?",
+	"rewind.both": "Conversation and files ({count} files restored)",
+	"rewind.talk": "Conversation only",
+	"rewind.files": "Files only ({count} files restored)",
+	"rewind.done": "Went back; {count} files restored. The message is back in the input box.",
+	"rewind.busy": "The model is replying: wait for it or press Esc, then go back.",
+	"rewind.none": "There is no message to go back to yet.",
+	"rewind.noVersions": "{path} has no saved versions.",
+	"rewind.version": "Version {n}: {time}, {size} bytes",
+	"rewind.badVersion": "No such version; choose 1 to {count}.",
+	"rewind.restored": "{path} is back at version {n}; the text before the restore is saved as a new version.",
+	"promptAdd.empty": "The file PROMPT_ADD points to is empty: {path}",
+	"promptAdd.unreadable": "The file PROMPT_ADD points to cannot be read: {path}",
+	"jw.promptAdd": "{path} ({chars} characters)",
+	"effort.choose": "Thinking intensity (now: {level})",
+	"effort.bad": "Thinking intensity must be {levels}.",
+	"effort.set": "Thinking intensity set to {level}.",
+	"effort.nearest": "This model does not support {level}; using the nearest, {actual}.",
 	"export.testRefs":
 		"The export found {count} reference URL(s) this session has not opened yet:\n{urls}\nOpen each with web_fetch. Keep an entry when its page loads and matches the entry's title; otherwise replace it with a source you opened or remove the entry. The draft is exported again after the edit.",
 	// Skills list heading.

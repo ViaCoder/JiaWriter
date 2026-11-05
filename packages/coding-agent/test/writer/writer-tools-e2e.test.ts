@@ -118,7 +118,7 @@ function runCli(dir: string, env: Record<string, string>): Promise<{ code: numbe
 			JW_KEY: SECRET,
 			JW_MODEL: "m1",
 			JW_API: "openai-completions",
-			JW_REASONING: "off",
+			JW_EFFORT: "off",
 			JW_DIR: join(dir, ".agent"),
 		},
 		env,

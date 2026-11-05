@@ -106,6 +106,19 @@ describe("writer-env extension", () => {
 		expect([providers.length, Object.keys(handlers).sort()]).toEqual([0, ["after_provider_response", "context"]]);
 	});
 
+	it("tells the user once when a local summary was used", () => {
+		// Ready state.
+		setWriterModel(readyState({ mode: "effort", levels: ALL_LEVELS }));
+		const { pi, handlers } = fakePi();
+		writerEnvExtension(pi as never);
+		const notes: string[] = [];
+		const ctx = { hasUI: true, ui: { notify: (m: string) => notes.push(m) } };
+		// A model summary says nothing; a local one does.
+		handlers.session_compact({ compactionEntry: { details: {} } }, ctx);
+		handlers.session_compact({ compactionEntry: { details: { localFallback: true } } }, ctx);
+		expect(notes).toHaveLength(1);
+	});
+
 	it("registers the wa provider and clamps only wa requests", () => {
 		// Ready state.
 		setWriterModel(readyState({ mode: "effort", levels: ALL_LEVELS }));

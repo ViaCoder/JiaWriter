@@ -1,6 +1,6 @@
 ---
 name: marketing-copy
-description: 写产品介绍、活动文案、宣传稿和社交媒体文案。用户要求写广告、推广或宣传材料时使用。
+description: 用于写产品介绍、活动文案、宣传稿和社交媒体文案。
 metadata:
   title: 营销文案
   style_packs: core-zh

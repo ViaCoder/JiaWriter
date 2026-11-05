@@ -16,7 +16,9 @@ import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 // Session entry type.
 import type { SessionEntry } from "../../src/core/session-manager.ts";
 // Skill loader.
-import { loadSkillsFromDir } from "../../src/core/skills.ts";
+import { formatSkillsForPrompt, loadSkillsFromDir } from "../../src/core/skills.ts";
+// The prompt builder.
+import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 // Extension under test.
 import writerSkillsExtension, { skillLabel } from "../../src/extensions/writer-skills/index.ts";
 // Style check for the shipped texts.
@@ -117,6 +119,44 @@ describe("shipped skills", () => {
 				expect([s.name, rep.hits.length, rep.negation.over]).toEqual([s.name, 0, false]);
 			}
 		}
+	});
+});
+
+describe("skills load only when needed", () => {
+	/** The built-in skills of a language. */
+	const shipped = (lang: string) =>
+		loadSkillsFromDir({ dir: join(getWriterSkillsDir(), lang), source: "path" }).skills;
+
+	it("keeps every description to one short sentence, and skill bodies out of the prompt", () => {
+		for (const lang of ["zh", "en"]) {
+			const skills = shipped(lang);
+			for (const s of skills) expect(s.description.length).toBeLessThanOrEqual(lang === "zh" ? 40 : 110);
+			const prompt = buildSystemPrompt({
+				cwd: "/work",
+				selectedTools: ["read"],
+				toolSnippets: { read: "x" },
+				skills,
+			});
+			// The index names the skill; its body stays in its file.
+			expect(prompt).toContain("lieflat-gongwen");
+			expect(prompt).not.toContain(readFileSync(skills[0].filePath, "utf-8").split("\n---\n")[1].slice(0, 200));
+			expect(prompt).not.toContain("公文写作 DNA");
+		}
+	});
+
+	it("leaves skill-creator out of the index, for /skill-new to call by name", () => {
+		const creator = shipped("zh").find((s) => s.name === "skill-creator");
+		expect(creator?.disableModelInvocation).toBe(true);
+		expect(formatSkillsForPrompt(shipped("zh"))).not.toContain("skill-creator");
+	});
+
+	it("makes the gongwen skill the default genre while it is on", () => {
+		const rule = "read the lieflat-gongwen skill first";
+		const build = (skills: ReturnType<typeof shipped>) =>
+			buildSystemPrompt({ cwd: "/work", selectedTools: ["read"], toolSnippets: { read: "x" }, skills });
+		expect(build(shipped("zh"))).toContain(rule);
+		// Turned off in /skills: it is no longer among the skills, and the rule goes with it.
+		expect(build(shipped("zh").filter((s) => s.name !== "lieflat-gongwen"))).not.toContain(rule);
 	});
 });
 

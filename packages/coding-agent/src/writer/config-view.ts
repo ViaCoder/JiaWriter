@@ -10,6 +10,8 @@ import { redactUrl } from "../core/bug-report.ts";
 import { DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_OUTPUT, DEFAULT_REASONING } from "./env-config.ts";
 // Messages and the language source.
 import { currentLang, savedLang, t, type WriterLang } from "./i18n/index.ts";
+// The persona addition, shown by path and size.
+import { promptAddPath, promptAddText } from "./prompt-add.ts";
 // Search defaults.
 import { DEFAULT_ANYSEARCH_URL } from "./websearch/core.ts";
 // Main-model state after startup.
@@ -54,7 +56,7 @@ export function modelRows(env: NodeJS.ProcessEnv, state: WriterModelState, lang?
 				source: readEnv(env, "JW_API") ? src("manual") : src("detect"),
 			};
 	// Reasoning: the level asked for and what the endpoint supports.
-	const reasoning = fromEnv("JW_REASONING", DEFAULT_REASONING);
+	const reasoning = fromEnv("JW_EFFORT", DEFAULT_REASONING);
 	if (ready) reasoning.value += t("jw.reasoningLevels", { levels: ready.reasoning.levels.join("/") || "-" }, lang);
 	// All model rows.
 	return [
@@ -97,6 +99,14 @@ export function otherRows(env: NodeJS.ProcessEnv, lang?: WriterLang): ConfigRow[
 			source: src("JW_SEARCH_KEY"),
 		},
 		{ name: "JW_SF", value: readEnv(env, "JW_SF") ?? t("jw.sfAuto", {}, lang), source: src("JW_SF") },
+		{
+			name: "PROMPT_ADD",
+			// The path and size only: the text is the user's own.
+			value: promptAddPath(env)
+				? t("jw.promptAdd", { path: promptAddPath(env) ?? "", chars: promptAddText(env).length }, lang)
+				: t("jw.unset", {}, lang),
+			source: src("PROMPT_ADD"),
+		},
 	];
 }
 

@@ -77,6 +77,8 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Select model (opens selector UI)": "选择模型（打开选择界面）",
 	"Navigate session tree (switch branches)": "浏览会话树（切换分支）",
 	"Set thinking level": "设置推理档位",
+	"Set the thinking intensity: /effort off, low, medium, high, xhigh or max":
+		"设置思考强度：/effort off、low、medium、high、xhigh 或 max",
 	"Enable/disable models for Ctrl+P cycling": "设置 Ctrl+P 轮换的模型",
 	"Export session (HTML default, or specify path: .html/.jsonl)": "导出会话（默认 HTML，也可指定 .html/.jsonl 路径）",
 	"Import and resume a session from a JSONL file": "从 JSONL 文件导入并继续会话",
@@ -117,4 +119,23 @@ export function uiText(text: string, vars: Readonly<Record<string, string>> = {}
 	const chosen = currentLang() === "zh" ? (UI_ZH[text] ?? text) : text;
 	// Placeholders, then the product name of a release package.
 	return brandText(chosen.replace(/\{(\w+)\}/g, (whole, name: string) => vars[name] ?? whole));
+}
+
+/** Upstream's compaction failure messages in Chinese, keeping the reason after the prefix. */
+export function compactionErrorText(message: string): string {
+	// English interface: as upstream wrote it.
+	if (currentLang() !== "zh") return message;
+	// Whole sentences first, then the prefixes.
+	return message
+		.replace(
+			/^Context overflow recovery failed after one compact-and-retry attempt\..*$/,
+			"压缩后内容仍然超出上下文，这条消息没有发送成功。请重新发送，或先开始新会话。",
+		)
+		.replace(
+			/^Truncated response recovery failed after one compact-and-retry attempt\.$/,
+			"回复被截断，压缩后重试仍未成功。请重新发送。",
+		)
+		.replace(/^Context overflow recovery failed: /, "超出上下文后的压缩失败：")
+		.replace(/^Auto-compaction failed: /, "自动压缩失败：")
+		.replace(/^Compaction failed: /, "压缩失败：");
 }

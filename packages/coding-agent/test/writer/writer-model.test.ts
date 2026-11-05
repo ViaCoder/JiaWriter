@@ -91,7 +91,7 @@ describe("setupWriterModel", () => {
 		const calls: string[] = [];
 		// Explicit API, reasoning off.
 		const s = await setup(
-			{ ...ENV, JW_API: "openai-completions", JW_REASONING: "off" },
+			{ ...ENV, JW_API: "openai-completions", JW_EFFORT: "off" },
 			agentDir(),
 			mockFetch({}, calls),
 		);
@@ -162,14 +162,14 @@ describe("setupWriterModel", () => {
 		expect(getWriterModel()).toBe(s);
 	});
 
-	it("skips reasoning probes when JW_REASONING is off", async () => {
+	it("skips reasoning probes when JW_EFFORT is off", async () => {
 		// Agent directory.
 		const dir = agentDir();
 		// Calls made.
 		const calls: string[] = [];
 		// Detection with reasoning off.
 		const s = (await setup(
-			{ ...ENV, JW_REASONING: "off" },
+			{ ...ENV, JW_EFFORT: "off" },
 			dir,
 			mockFetch({ "/v1/responses": 400 }, calls),
 		)) as WriterModelReady;
@@ -296,7 +296,7 @@ describe("buildProviderConfig, formatDetectFailure, getWriterDefaultModel", () =
 		expect(getWriterDefaultModel()).toBeUndefined();
 		// Ready via JW_API with reasoning off.
 		await setup(
-			{ ...ENV, JW_API: "openai-completions", JW_REASONING: "max" },
+			{ ...ENV, JW_API: "openai-completions", JW_EFFORT: "max" },
 			agentDir(),
 			mockFetch({ "/v1/chat/completions": 400 }, []),
 		);

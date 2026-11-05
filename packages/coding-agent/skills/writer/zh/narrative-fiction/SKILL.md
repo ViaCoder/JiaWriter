@@ -1,6 +1,6 @@
 ---
 name: narrative-fiction
-description: 写短篇小说、故事和叙事散文。用户要求写小说、故事、剧情或人物描写时使用。
+description: 用于写短篇小说、故事和叙事散文。
 metadata:
   title: 叙事小说
   style_packs: core-zh

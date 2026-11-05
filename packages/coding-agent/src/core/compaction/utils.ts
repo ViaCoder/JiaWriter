@@ -93,6 +93,9 @@ export function formatFileOperations(readFiles: string[], modifiedFiles: string[
 /** Maximum characters for a tool result in serialized summaries. */
 const TOOL_RESULT_MAX_CHARS = 2000;
 
+/** Maximum characters of one tool-call argument (JiaWriter: a whole draft in write is on disk already). */
+const TOOL_ARGUMENT_MAX_CHARS = 2000;
+
 /**
  * Truncate text to a maximum character length for summarization.
  * Keeps the beginning and appends a truncation marker.
@@ -131,7 +134,7 @@ export function serializeConversation(messages: Message[]): string {
 				if (block.type === "toolCall") {
 					const args = block.arguments as Record<string, unknown>;
 					const argsStr = Object.entries(args)
-						.map(([k, v]) => `${k}=${JSON.stringify(v)}`)
+						.map(([k, v]) => `${k}=${truncateForSummary(JSON.stringify(v) ?? "", TOOL_ARGUMENT_MAX_CHARS)}`)
 						.join(", ");
 					toolCalls.push(`${block.name}(${argsStr})`);
 				}

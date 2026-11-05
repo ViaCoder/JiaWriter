@@ -12,6 +12,8 @@ import type { ExtensionAPI } from "../../core/extensions/types.ts";
 import { markReasoningUnsupported } from "../../writer/api-detect.ts";
 // The time each user message carries, and the clock check.
 import { clockOffset, correction, setClockOffset, skewFromDate, withTimeNotes } from "../../writer/clock.ts";
+// Request size guard.
+import { CONTEXT_SHARE, fitToolResults } from "../../writer/context-fit.ts";
 // Output clamp and the provider name.
 import { applyOutputClamp, JW_PROVIDER } from "../../writer/env-config.ts";
 // Messages.
@@ -25,7 +27,12 @@ export const REASONING_ERROR = /reasoning|effort|thinking|budget/i;
 /** Extension factory. */
 export default function writerEnvExtension(pi: ExtensionAPI): void {
 	// Every model call: each user message carries the local time it was sent (the latest one is "now").
-	pi.on("context", (event) => ({ messages: withTimeNotes(event.messages, clockOffset()) }));
+	pi.on("context", (event, ctx) => {
+		const messages = withTimeNotes(event.messages, clockOffset());
+		// Tool results too large to compact away are clipped in the request (the session keeps them).
+		const window = ctx.model?.contextWindow ?? 0;
+		return { messages: window > 0 ? fitToolResults(messages, Math.floor(window * CONTEXT_SHARE)) : messages };
+	});
 	// The first model response with a Date header shows how far the machine clock is off.
 	let clockChecked = false;
 	pi.on("after_provider_response", (event, ctx) => {
@@ -45,6 +52,11 @@ export default function writerEnvExtension(pi: ExtensionAPI): void {
 	const state = getWriterModel();
 	// Nothing to register unless JW_* produced a ready configuration.
 	if (state.kind !== "ready") return;
+	// A summary built on this machine is worth a word: details the model summarized are missing.
+	pi.on("session_compact", (event, ctx) => {
+		const details = event.compactionEntry.details as { localFallback?: boolean } | undefined;
+		if (details?.localFallback && ctx.hasUI) ctx.ui.notify(t("compact.localNotice"), "warning");
+	});
 	// Register the provider; its apiKey is the "$JW_KEY" reference, never the value.
 	pi.registerProvider(JW_PROVIDER, state.provider);
 	// Before each request, lower the output limit when the input leaves less room.

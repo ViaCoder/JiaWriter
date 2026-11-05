@@ -1,6 +1,6 @@
 ---
 name: business-email
-description: 写商务邮件、通知、备忘录和会议纪要。用户要求写邮件、回函、通知或纪要时使用。
+description: 用于写商务邮件、通知、备忘录和会议纪要。
 metadata:
   title: 商务邮件和备忘录
   style_packs: core-zh

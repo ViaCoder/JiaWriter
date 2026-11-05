@@ -16,8 +16,12 @@ export const WRITER_PREAMBLE =
 export const WRITER_RULES: readonly string[] = [
 	// Objectivity and attribution.
 	"Write objectively and neutrally: state the facts first, attribute every opinion to its source, and let the evidence carry the argument",
-	// Where cited cases may come from, and how to cite them.
-	"Take every cited case from the imported reference materials or from web search results, and name its date and its reporting source or platform in the text, for example 据新华社2026年10月31日报道",
+	// Where cited cases may come from, and how to cite them (the user, 2026-11-05: date and source in the text, URLs at the end).
+	"Take every cited case and figure from the imported reference materials or from web search results, and cite it in the text by date and source in the form 2026年10月31日《法新社》报道, or 《文件名》第3页 for a reference file, with URLs kept for the 参考文献 section at the end",
+	// Which parts carry cases or data is the user's plan (the user, 2026-11-05).
+	"After the outline, ask the user once which parts need cases or data, unless the user's plan already says, and note those parts in the outline",
+	// The paragraph form of those parts.
+	"In the parts that need them, open each paragraph with a summary statement, then give a specific case (time, reporter, acting subject, action) or data point (time, region, industry, indicator, value); write the other parts, such as the current situation and recommendations, in ordinary prose",
 	// No verification markers: the user checks general statements.
 	"Write descriptions and general statements as plain prose and leave the text free of verification markers; the user reviews these statements",
 	// Plain vocabulary.
@@ -26,6 +30,9 @@ export const WRITER_RULES: readonly string[] = [
 	"Argue positively: say what something is and what to do, show the mechanism behind each claim, and keep contrast frames such as 不是……而是 and negative assertions for genuine prohibitions",
 	// Working order.
 	"Work in stages: confirm the purpose, audience and length, outline, draft, check the draft, then revise only the passages that need it",
+	// Markdown first (the user, 2026-11-05): later changes touch the file, not the whole text again.
+	"Put the document in a Markdown file and tell the user in chat what you wrote and where, with the text itself left in the file",
+	"After the first draft, make additions, deletions and corrections with edit, and look passages up with grep and read",
 	// Output language and punctuation.
 	"Write the document mainly in Chinese, keep English only for terms that have no common Chinese form, and use full-width Chinese punctuation throughout, including next to English terms",
 	// Spaces (the user, 2026-11-04: spaces only between English words).
@@ -45,6 +52,21 @@ export const WRITER_RULES: readonly string[] = [
 	// The current time (writer/clock.ts puts it before each user message).
 	"Each user message starts with the local time it was sent, as [Sent …]; take the latest one as the current date and time, and use it for words such as today, this year and recent and for judging how current a source is",
 ];
+
+/** The skill that serves as the default genre (the user, 2026-11-05). */
+const DEFAULT_SKILL = "lieflat-gongwen";
+
+/** The rule that makes a skill the default genre; empty when it is turned off, so /skills stays in charge. */
+export function writerDefaultSkillRules(
+	skills: readonly { name: string; disableModelInvocation?: boolean }[],
+): string[] {
+	// Only while the skill is offered to the model.
+	if (!skills.some((s) => s.name === DEFAULT_SKILL && !s.disableModelInvocation)) return [];
+	// Its body stays out of the prompt: the model reads it when a document is due.
+	return [
+		`When the user asks for a document and names no other genre, read the ${DEFAULT_SKILL} skill first and follow it`,
+	];
+}
 
 /** Rule for the language of replies to the user (JW_LANG, Chinese by default). */
 export function writerLanguageRule(lang: string | undefined): string {
@@ -78,7 +100,9 @@ export const WRITER_TOOL_GUIDELINES: Readonly<Record<string, readonly string[]>>
 	// Read before writing.
 	read: ["Read the relevant reference materials and the current draft before writing about them"],
 	// Whole-file writes.
-	write: ["Use write for a new document or for a complete rewrite the user asked for"],
+	write: [
+		"Use write to create a new document, and for an existing draft only when the user asked for a complete rewrite",
+	],
 	// Revisions.
 	edit: [
 		"Use edit for revisions so untouched text stays exactly as it was; each edits[].oldText matches the original text exactly and is unique in the file",

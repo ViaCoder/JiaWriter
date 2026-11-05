@@ -359,9 +359,10 @@ describe("JW_* end to end", () => {
 		);
 		// The built-in Chinese writing skills are offered (JW_LANG unset: zh).
 		expect(JSON.stringify(realRequest()?.body.system)).toContain("<name>report-analysis</name>");
-		expect(JSON.stringify(realRequest()?.body.system)).toContain("写调研报告、情况分析、对策建议和工作总结");
+		expect(JSON.stringify(realRequest()?.body.system)).toContain("用于写企业和研究类的报告、分析和总结");
 		// The default writing tools, the four checks, web search, import and export are offered, bash is not.
 		expect(((realRequest()?.body.tools as { name: string }[]) ?? []).map((t) => t.name).sort()).toEqual([
+			"draft_restore",
 			"edit",
 			"export_document",
 			"find",
@@ -369,9 +370,11 @@ describe("JW_* end to end", () => {
 			"grep",
 			"import_document",
 			"ls",
+			"material_add",
 			"read",
 			"readability_check",
 			"style_check",
+			"topic_open",
 			"web_fetch",
 			"web_search",
 			"word_count",
@@ -427,12 +430,12 @@ describe("JW_* end to end", () => {
 		expect([second.code, seen.filter((s) => s.probe).length, seen.length]).toEqual([0, 0, 1]);
 	}, 120_000);
 
-	it("uses the nearest supported reasoning level when JW_REASONING is unavailable", async () => {
+	it("uses the nearest supported reasoning level when JW_EFFORT is unavailable", async () => {
 		// Responses that accepts low, medium and high only.
 		supported = ["openai-responses"];
 		acceptedLevels = ["low", "medium", "high"];
 		// Ask for max.
-		const r = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_REASONING: "max" }, newAgentDir());
+		const r = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_EFFORT: "max" }, newAgentDir());
 		// Success, and the request uses high, the nearest supported level.
 		expect([
 			r.code,
@@ -449,13 +452,13 @@ describe("JW_* end to end", () => {
 		// Shared agent directory.
 		const dir = newAgentDir();
 		// First run at max fails at the real request.
-		const first = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_REASONING: "max" }, dir);
+		const first = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_EFFORT: "max" }, dir);
 		// The real request carried max.
 		expect((realRequest()?.body.reasoning as { effort?: string })?.effort).toBe("max");
 		// Forget the first run.
 		seen = [];
 		// Second run in the same directory.
-		const second = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_REASONING: "max" }, dir);
+		const second = await runCli({ JW_URL: baseUrl, JW_KEY: SECRET, JW_MODEL: "m1", JW_EFFORT: "max" }, dir);
 		// The cache dropped max, so the nearest level xhigh is used and the reply arrives.
 		expect([
 			first.code !== 0 || !first.stdout.includes(REPLY),

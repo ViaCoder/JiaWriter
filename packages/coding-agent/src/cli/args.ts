@@ -165,7 +165,7 @@ export function parseArgs(args: string[]): Args {
 				.split(",")
 				.map((s) => s.trim())
 				.filter((name) => name.length > 0);
-		} else if (arg === "--thinking" && i + 1 < args.length) {
+		} else if ((arg === "--thinking" || arg === "--effort") && i + 1 < args.length) {
 			const level = args[++i];
 			if (isValidThinkingLevel(level)) {
 				result.thinking = level;
@@ -325,7 +325,7 @@ ${chalk.bold("Options:")}
                                  Only +name/-name entries add to or remove from the defaults
   --exclude-tools, -xt <tools>   Comma-separated denylist of tool names or patterns (*) to disable
                                  Applies to all tools, MCP tools included
-  --thinking <level>             Set thinking level: off, minimal, low, medium, high, xhigh, max
+  --thinking, --effort <level>   Set thinking level: off, minimal, low, medium, high, xhigh, max
   --extension, -e <path>         Load an extension file or builtin:<name> (can be used multiple times)
   --no-extensions, -ne           Disable extension discovery and built-in extensions (explicit -e paths still work)
   --no-mcp                       Disable built-in MCP support: no servers connect and no MCP tools

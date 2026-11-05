@@ -27,7 +27,7 @@ The model is configured with environment variables. OpenAI Responses, OpenAI Cha
 | `JW_API` | API type: `anthropic-messages`, `openai-responses`, `openai-completions` | detected |
 | `JW_CTX` | Context window (tokens) | 128000 |
 | `JW_OUT` | Maximum output (tokens) | 128000 |
-| `JW_REASONING` | Reasoning level: `off`, `low`, `medium`, `high`, `xhigh`, `max` | `medium` |
+| `JW_EFFORT` | Thinking intensity: `off`, `low`, `medium`, `high`, `xhigh`, `max`; the nearest level is used when the model lacks one | `medium` |
 | `JW_LANG` | Interface and tool-output language: `zh`, `en` | `zh` |
 | `JW_SEARCH` | Default search method when the model names none: `auto`, `browser`, `anysearch`; `sf` makes sf the default for reading pages | `auto` |
 | `JW_ENGINES` | Engines the browser method uses, in order, when the model names none: `bing`, `google`, `baidu`, `sogou` | `bing,google` |
@@ -36,6 +36,7 @@ The model is configured with environment variables. OpenAI Responses, OpenAI Cha
 | `JW_AUTO_EXPORT` | `off` stops the automatic docx export at the end of each run | on |
 | `JW_SEARCH_KEY` | AnySearch key | anonymous when unset |
 | `JW_SF` | Path of the search_fetch program | standard places |
+| `PROMPT_ADD` | Text file added to the persona, for example `PROMPT_ADD='~/Downloads/glm.txt'`; its text follows the persona inside the same `<system_prompt>` tag | none |
 
 Setting them (replace the example values):
 
@@ -61,12 +62,16 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `web_search`, `web_fetch` | Web search and page text |
 | `import_document` | Import reference files: PDF, Word (.docx), HTML, txt, md |
 | `export_document` | Export a Markdown draft to docx or md |
+| `topic_open`, `material_add` | Open a topic folder; record cases and data with their sources |
+| `draft_restore` | List a draft's saved versions and bring one back |
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
 | `/jw` | Read-only configuration page |
+| `/effort [level]` | Change the thinking intensity; without a level, pick from a list (`/thinking` and Shift+Tab also work) |
+| `/rewind` | Go back to before a message: conversation and files, conversation only, or files only |
 | `/lang zh`, `/lang en` | Interface language (`JW_LANG`, when set, takes precedence) |
 | `/skills` | Manage writing skills: turn on or off, edit, update from this session, delete (after a backup) |
 | `/skill-new` | New skill: from this session, from a blank template, or written by the model with skill-creator |
@@ -74,6 +79,17 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `/import-doc [file]` | Import reference files |
 | `/export-doc <draft.md> [md\|docx] [--profile=name] [--out=path]` | Export a draft |
 | `/sf status`, `/sf install` | The same as `/browser` |
+
+## How writing works
+
+Just talk to it; the model does the following by itself.
+
+- **Topic folders**: when you start a writing topic, the model creates a folder of that name in the writing folder and reuses it later. It holds `稿件/` (Markdown and docx), `参考资料/`, `检索/` (each search), `网页/` (fetched pages in full, with URL, title and date) and `素材.md` (cases and data). Searches and pages are archived automatically; if no folder was opened they go to `未命名主题-<date>/`.
+- **Research before drafting**: outline, ask which parts need cases or data, search and fetch for those parts one at a time, record materials, check for gaps, then write. The source of a material must be a page that was opened or a page of a reference file.
+- **Paragraphs and sources**: in the parts that need them, a paragraph opens with a summary, then a case (time, reporter, subject, action) or data point (time, region, industry, indicator, value); other parts, such as the current situation and recommendations, are ordinary prose. The text cites 2026年10月31日《法新社》报道 without URLs, and 参考文献 at the end lists every source with title and URL.
+- **Markdown first**: the draft lives in a Markdown file and later changes happen in place. A whole replacement of an existing draft is refused unless you asked for a rewrite.
+- **Going back**: every change saves the file first. Use `/rewind`, or just say "go back to the previous version". The state before going back is saved too.
+- **Long conversations**: the context is compacted automatically when it fills up. Chinese is measured at its real size; oversized tool results are clipped in the request while the full text stays in the session and the topic folder; if the model summary fails, a local summary keeps the conversation going, at the cost of older details, which `/tree` still shows.
 
 ## Reference material
 
@@ -110,6 +126,8 @@ Latin text and digits use Times New Roman, line spacing is exactly 32 pt, the pa
 After writing the docx, the export checks its XML: every run with Chinese text carries `w:hint="eastAsia"` and a Chinese font; it counts ASCII punctuation next to Chinese characters and unpaired quotes, lists the sizes and line spacing in use, and reports any 待核实 mark left in the draft.
 
 ## Writing skills
+
+A skill's text is read only when needed; the system prompt holds a one-line index. A document with no named genre uses the 公文 skill (lieflat-gongwen) by default; turning that skill off in `/skills` drops the default too.
 
 Nine built-in skills ship in Chinese and English and follow the interface language: general article, report and analysis, news and features, academic writing, business email and memos, marketing copy, narrative fiction, skill-creator, and the Chinese official-document skill [lieflat-gongwen](https://github.com/larashero3-dotcom/lieflat-gongwen). lieflat-gongwen covers 调研报告, 领导讲话, 工作意见, 经验材料, 工作方案, 经验总结 and short 党建 pieces with parameters from a corpus of official documents, and checks drafts with the `gongwen_check` tool; its material is Chinese only, so the English entry reads the Chinese folder. Your own skills go in `~/.jiawriter/agent/skills/<name>/SKILL.md` and take the place of a built-in skill with the same name.
 

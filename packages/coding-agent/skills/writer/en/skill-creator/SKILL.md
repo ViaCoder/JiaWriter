@@ -1,6 +1,7 @@
 ---
 name: skill-creator
-description: Create or change a writing skill. Use when the user asks to create, change or tidy up a skill, or to turn the style of sample texts or the requests of a session into a skill.
+description: For creating or changing a writing skill, also from sample texts or the requests of a session.
+disable-model-invocation: true
 metadata:
   title: Writing skill creator
   style_packs: core-en

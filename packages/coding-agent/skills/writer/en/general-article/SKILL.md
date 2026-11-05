@@ -1,6 +1,6 @@
 ---
 name: general-article
-description: Write explanatory articles, opinion pieces, columns and speeches. Use when the user asks for an article, commentary or speech and names no more specific genre.
+description: For explanatory articles, opinion pieces, columns and speeches.
 metadata:
   title: General article
   style_packs: core-en
@@ -25,7 +25,7 @@ metadata:
 - Use common words and complete, short sentences, one idea per sentence.
 - State the facts first, then the judgement, and give the basis for each judgement.
 - Say directly what something is and how it works; cut preambles and stock phrases.
-- Take cited cases only from the reference files or search results, and name the date and outlet in the text, for example "Reuters reported on 31 October 2026".
+- Take cited cases only from the reference files or search results, and name the date and outlet in the text, for example "Reuters reported on 31 October 2026". List every source with its title and URL in the References section at the end.
 
 ## Final checks
 

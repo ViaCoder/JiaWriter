@@ -44,7 +44,7 @@ const ENV = {
 	JW_KEY: "sk-secret-value",
 	JW_MODEL: "m1",
 	JW_CTX: "64000",
-	JW_REASONING: "max",
+	JW_EFFORT: "max",
 };
 
 describe("modelRows", () => {
@@ -58,7 +58,7 @@ describe("modelRows", () => {
 			{ name: "JW_API", value: "openai-responses", source: "自动检测" },
 			{ name: "JW_CTX", value: "64000", source: "环境变量" },
 			{ name: "JW_OUT", value: "128000", source: "默认值" },
-			{ name: "JW_REASONING", value: "max（可用：low/medium/high）", source: "环境变量" },
+			{ name: "JW_EFFORT", value: "max（可用：low/medium/high）", source: "环境变量" },
 		]);
 		expect(JSON.stringify(rows)).not.toContain("sk-secret");
 		// Cache and JW_API sources; nothing configured.
@@ -87,6 +87,7 @@ describe("otherRows / setupCommands", () => {
 			{ name: "JW_SEARCH_URL", value: "https://api.anysearch.com", source: "默认值" },
 			{ name: "JW_SEARCH_KEY", value: "未设置（匿名调用）", source: "默认值" },
 			{ name: "JW_SF", value: "未设置（在约定位置查找）", source: "默认值" },
+			{ name: "PROMPT_ADD", value: "未设置", source: "默认值" },
 		]);
 		setUiLang("en");
 		expect(otherRows({}, "zh")[0]).toEqual({ name: "JW_LANG", value: "en", source: "/lang 设置" });

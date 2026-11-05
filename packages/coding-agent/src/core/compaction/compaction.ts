@@ -24,6 +24,9 @@ import type {
 	Usage,
 } from "@earendil-works/pi-ai/compat";
 import { completeSimple } from "@earendil-works/pi-ai/compat";
+// JiaWriter: the provider name and token estimates for Chinese text.
+import { JW_PROVIDER } from "../../writer/env-config.ts";
+import { estimateTextTokens, weightedChars } from "../../writer/token-estimate.ts";
 import { convertToLlm } from "../messages.ts";
 import {
 	buildSessionProjection,
@@ -277,13 +280,14 @@ const ESTIMATED_IMAGE_CHARS = 4800;
 
 function estimateTextAndImageContentChars(content: string | Array<{ type: string; text?: string }>): number {
 	if (typeof content === "string") {
-		return content.length;
+		// JiaWriter: a Chinese character is about one token, not a quarter of one.
+		return weightedChars(content);
 	}
 
 	let chars = 0;
 	for (const block of content) {
 		if (block.type === "text" && block.text) {
-			chars += block.text.length;
+			chars += weightedChars(block.text);
 		} else if (block.type === "image") {
 			chars += ESTIMATED_IMAGE_CHARS;
 		}
@@ -319,12 +323,13 @@ export function estimateTokens(message: AgentMessage): number {
 		case "assistant": {
 			const assistant = message as AssistantMessage;
 			for (const block of assistant.content) {
+				// JiaWriter: Chinese text weighs its real size here too.
 				if (block.type === "text") {
-					chars += block.text.length;
+					chars += weightedChars(block.text);
 				} else if (block.type === "thinking") {
-					chars += block.thinking.length;
+					chars += weightedChars(block.thinking);
 				} else if (block.type === "toolCall") {
-					chars += block.name.length + JSON.stringify(block.arguments).length;
+					chars += block.name.length + weightedChars(JSON.stringify(block.arguments));
 				}
 			}
 			return Math.ceil(chars / 4);
@@ -335,12 +340,12 @@ export function estimateTokens(message: AgentMessage): number {
 			return Math.ceil(chars / 4);
 		}
 		case "bashExecution": {
-			chars = message.command.length + message.output.length;
+			chars = message.command.length + weightedChars(message.output);
 			return Math.ceil(chars / 4);
 		}
 		case "branchSummary":
 		case "compactionSummary": {
-			chars = message.summary.length;
+			chars = weightedChars(message.summary);
 			return Math.ceil(chars / 4);
 		}
 	}
@@ -602,7 +607,8 @@ function createSummarizationOptions(
 	sessionId: string | undefined,
 ): SimpleStreamOptions {
 	const options: SimpleStreamOptions = { signal, apiKey, headers, env, sessionId };
-	if (model.reasoning && thinkingLevel && thinkingLevel !== "off") {
+	// JiaWriter: a summary needs no reasoning, which would only use up its output budget.
+	if (model.reasoning && thinkingLevel && thinkingLevel !== "off" && model.provider !== JW_PROVIDER) {
 		options.reasoning = thinkingLevel;
 	}
 	return options;
@@ -941,6 +947,31 @@ Create a concise checkpoint of the user's request and the progress shown above. 
 
 Only summarize information explicitly present above. Do not infer or recreate later messages.`;
 
+/** Share of the context window one summary request may use for the conversation (JiaWriter). */
+const SUMMARY_INPUT_SHARE = 0.7;
+/** Most summary requests for one compaction (JiaWriter); older parts beyond this are dropped. */
+const MAX_SUMMARY_PARTS = 8;
+
+/** JiaWriter: messages in order, grouped so each group's serialized text fits one summary request. */
+export function splitForSummary(messages: AgentMessage[], model: Model<any>): AgentMessage[][] {
+	const limit = Math.floor(model.contextWindow * SUMMARY_INPUT_SHARE);
+	// Only the JW_* model, and only with a window to size by; other models keep one request.
+	if (model.provider !== JW_PROVIDER || limit <= 0) return [messages];
+	const parts: AgentMessage[][] = [[]];
+	let size = 0;
+	for (const message of messages) {
+		// The size the summary request will see: long tool output is already cut by serialization.
+		const tokens = estimateTextTokens(serializeConversation(convertToLlm([message])));
+		if (size + tokens > limit && (parts.at(-1)?.length ?? 0) > 0) {
+			parts.push([]);
+			size = 0;
+		}
+		parts.at(-1)?.push(message);
+		size += tokens;
+	}
+	return parts.slice(-MAX_SUMMARY_PARTS);
+}
+
 /**
  * Generate summaries for compaction using prepared data.
  * Returns CompactionResult - SessionManager adds uuid/parentUuid when saving.
@@ -973,6 +1004,31 @@ export async function compact(
 		fileOps,
 	} = preparation;
 
+	// JiaWriter: history larger than one request is summarized in parts, each updating the summary before it.
+	const summarizeHistory = async (): Promise<{ text: string; usage: Usage }> => {
+		let result: { text: string; usage: Usage } | undefined;
+		for (const part of splitForSummary(messagesToSummarize, model)) {
+			const next = await generateSummaryWithUsage(
+				part,
+				model,
+				undefined,
+				apiKey,
+				headers,
+				signal,
+				customInstructions,
+				result?.text ?? previousSummary,
+				thinkingLevel,
+				streamFn,
+				env,
+				retry,
+				callbacks,
+				sessionId,
+			);
+			result = result ? { text: next.text, usage: combineUsage(result.usage, next.usage) } : next;
+		}
+		return result as { text: string; usage: Usage };
+	};
+
 	// Generate summaries and merge into one
 	let summary: string;
 	let summaryUsage: Usage;
@@ -981,22 +1037,7 @@ export async function compact(
 		let historyText = previousSummary ?? "No prior history.";
 		let historyUsage: Usage | undefined;
 		if (messagesToSummarize.length > 0) {
-			const historyResult = await generateSummaryWithUsage(
-				messagesToSummarize,
-				model,
-				undefined,
-				apiKey,
-				headers,
-				signal,
-				customInstructions,
-				previousSummary,
-				thinkingLevel,
-				streamFn,
-				env,
-				retry,
-				callbacks,
-				sessionId,
-			);
+			const historyResult = await summarizeHistory();
 			historyText = historyResult.text;
 			historyUsage = historyResult.usage;
 		}
@@ -1019,22 +1060,7 @@ export async function compact(
 		summaryUsage = historyUsage ? combineUsage(historyUsage, turnPrefixResult.usage) : turnPrefixResult.usage;
 	} else {
 		// Just generate history summary
-		const result = await generateSummaryWithUsage(
-			messagesToSummarize,
-			model,
-			undefined,
-			apiKey,
-			headers,
-			signal,
-			customInstructions,
-			previousSummary,
-			thinkingLevel,
-			streamFn,
-			env,
-			retry,
-			callbacks,
-			sessionId,
-		);
+		const result = await summarizeHistory();
 		summary = result.text;
 		summaryUsage = result.usage;
 	}

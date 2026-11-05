@@ -4,6 +4,11 @@
  * clamping the output budget and writing the Chinese setup hint.
  */
 
+// The check of PROMPT_ADD.
+import { promptAddProblem } from "./prompt-add.ts";
+// Token estimate shared with compaction.
+import { estimateTextTokens } from "./token-estimate.ts";
+
 /** Provider name under which the JW_* model is registered. */
 export const JW_PROVIDER = "jw";
 /** Context window used when JW_CTX is not set. */
@@ -15,11 +20,11 @@ export const OUTPUT_SAFETY_MARGIN = 1_024;
 /** Smallest output budget ever requested, even when the input is very large. */
 export const MIN_OUTPUT_TOKENS = 256;
 
-/** Reasoning levels a user can choose with JW_REASONING; "off" turns reasoning off. */
+/** Reasoning levels a user can choose with JW_EFFORT; "off" turns reasoning off. */
 export const WRITER_REASONING_CHOICES = ["off", "low", "medium", "high", "xhigh", "max"] as const;
-/** One JW_REASONING value. */
+/** One JW_EFFORT value. */
 export type WriterReasoning = (typeof WRITER_REASONING_CHOICES)[number];
-/** Level used when JW_REASONING is not set (the same default pi uses). */
+/** Level used when JW_EFFORT is not set (the same default pi uses). */
 export const DEFAULT_REASONING: WriterReasoning = "medium";
 
 /** The three APIs JiaWriter can talk to. */
@@ -151,8 +156,10 @@ export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 	const lang = readVar(env, "JW_LANG");
 	// Report other values.
 	if (lang !== undefined && lang !== "zh" && lang !== "en") errors.push(`JW_LANG 只能是 zh 或 en，当前值：${lang}`);
+	// The old name stopped working on 2026-11-05: silently ignoring it would change the user's level.
+	if (readVar(env, "JW_REASONING") !== undefined) errors.push("JW_REASONING 已改名为 JW_EFFORT，请改用新名字。");
 	// Reasoning level, when set, must be one of the choices.
-	const reasoningRaw = readVar(env, "JW_REASONING");
+	const reasoningRaw = readVar(env, "JW_EFFORT");
 	// Default, a known level, or undefined for an unknown value.
 	const reasoning =
 		reasoningRaw === undefined
@@ -162,7 +169,10 @@ export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 				: undefined;
 	// Report an unknown level.
 	if (reasoning === undefined)
-		errors.push(`JW_REASONING 只能是 ${WRITER_REASONING_CHOICES.join(" / ")}，当前值：${reasoningRaw}`);
+		errors.push(`JW_EFFORT 只能是 ${WRITER_REASONING_CHOICES.join(" / ")}，当前值：${reasoningRaw}`);
+	// The persona addition must be readable: a silent start without it would look like a model change.
+	const promptAdd = promptAddProblem(env);
+	if (promptAdd) errors.push(promptAdd);
 	// Any problem: no configuration.
 	if (missing.length > 0 || errors.length > 0) return { present, missing, errors };
 	// Everything checked: build the configuration (url and model are set here).
@@ -185,13 +195,7 @@ export function readWriterEnv(env: NodeJS.ProcessEnv): WriterEnvReadResult {
 /** Rough token count of a request payload: CJK characters 1 each, other characters 4 per token. */
 export function estimatePayloadTokens(payload: unknown): number {
 	// Serialize once; undefined becomes an empty string.
-	const text = JSON.stringify(payload) ?? "";
-	// CJK ideographs, kana, hangul and full-width forms are about one token each.
-	const cjk = text.match(/[　-鿿가-힯＀-￯]/g)?.length ?? 0;
-	// The remaining characters average about four per token.
-	const other = text.length - cjk;
-	// Round up so the estimate errs on the large side.
-	return cjk + Math.ceil(other / 4);
+	return estimateTextTokens(JSON.stringify(payload) ?? "");
 }
 
 /** Output budget that fits next to the input: min(maxTokens, context - input - margin), at least MIN_OUTPUT_TOKENS. */
@@ -208,6 +212,9 @@ export function clampMaxTokens(
 	// Keep a small floor; the provider reports a clear error if even that does not fit.
 	return Math.max(MIN_OUTPUT_TOKENS, Math.floor(budget));
 }
+
+/** Smallest thinking budget Anthropic accepts. */
+const MIN_THINKING_BUDGET = 1024;
 
 /** Payload field that carries the output limit for each API. */
 const OUTPUT_FIELDS: Record<WriterApi, string[]> = {
@@ -240,6 +247,20 @@ export function applyOutputClamp(payload: unknown, api: WriterApi, contextWindow
 			// Lower it to the budget.
 			next[field] = budget;
 			// Remember the change.
+			changed = true;
+		}
+	}
+	// Anthropic refuses a thinking budget that does not leave room for the answer, and the upstream budget
+	// was sized from the model's limit, before this clamp.
+	const thinking = next.thinking as { type?: string; budget_tokens?: unknown } | undefined;
+	if (api === "anthropic-messages" && thinking?.type === "enabled" && typeof thinking.budget_tokens === "number") {
+		// The output limit this request ends up with.
+		const output = typeof next.max_tokens === "number" ? next.max_tokens : budget;
+		if (thinking.budget_tokens >= output) {
+			// Half for thinking, half for the answer; too little to think with means no thinking.
+			const half = Math.floor(output / 2);
+			if (half >= MIN_THINKING_BUDGET) next.thinking = { ...thinking, budget_tokens: half };
+			else delete next.thinking;
 			changed = true;
 		}
 	}
@@ -291,7 +312,7 @@ export function formatSetupHint(missing: string[], errors: string[], platform: N
 	}
 	// Optional variables.
 	lines.push(
-		"可选：JW_API（不设置则自动检测）、JW_CTX、JW_OUT（默认都是 128000）、JW_REASONING（off / low / medium / high / xhigh / max，默认 medium，不支持时自动改用最接近的档位）、JW_LANG（zh / en）。",
+		"可选：JW_API（不设置则自动检测）、JW_CTX、JW_OUT（默认都是 128000）、JW_EFFORT（off / low / medium / high / xhigh / max，默认 medium，不支持时自动改用最接近的档位）、JW_LANG（zh / en）。",
 	);
 	// Join into one message.
 	return lines.join("\n");

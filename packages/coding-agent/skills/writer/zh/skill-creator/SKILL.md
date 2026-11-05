@@ -1,6 +1,7 @@
 ---
 name: skill-creator
-description: 新建或修改写作 skill。用户要求创建、修改或整理一个 skill，或要把范文的风格、会话中的要求沉淀成 skill 时使用。
+description: 用于新建或修改写作 skill，也能把范文风格或会话要求整理成 skill。
+disable-model-invocation: true
 metadata:
   title: 编写写作 skill
   style_packs: core-zh

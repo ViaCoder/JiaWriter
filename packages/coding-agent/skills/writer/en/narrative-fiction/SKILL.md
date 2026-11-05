@@ -1,6 +1,6 @@
 ---
 name: narrative-fiction
-description: Write short stories, tales and narrative essays. Use when the user asks for fiction, a story, a plot or a character sketch.
+description: For short stories, tales and narrative essays.
 metadata:
   title: Narrative fiction
   style_packs: core-en

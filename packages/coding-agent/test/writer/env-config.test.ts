@@ -61,16 +61,16 @@ describe("readWriterEnv", () => {
 		expect([DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_OUTPUT]).toEqual([128_000, 128_000]);
 	});
 
-	it("accepts every JW_REASONING choice and rejects others", () => {
+	it("accepts every JW_EFFORT choice and rejects others", () => {
 		// Each documented level.
 		for (const level of ["off", "low", "medium", "high", "xhigh", "max"]) {
 			// Carried into the configuration.
-			expect(readWriterEnv({ ...FULL, JW_REASONING: level }).config?.reasoning).toBe(level);
+			expect(readWriterEnv({ ...FULL, JW_EFFORT: level }).config?.reasoning).toBe(level);
 		}
 		// An unknown level is a format error.
-		const bad = readWriterEnv({ ...FULL, JW_REASONING: "minimal" });
+		const bad = readWriterEnv({ ...FULL, JW_EFFORT: "minimal" });
 		// Reported with the variable name, no configuration.
-		expect([bad.errors.join("").includes("JW_REASONING"), bad.config]).toEqual([true, undefined]);
+		expect([bad.errors.join("").includes("JW_EFFORT"), bad.config]).toEqual([true, undefined]);
 	});
 
 	it("accepts JW_API, JW_CTX and JW_OUT", () => {
@@ -149,7 +149,42 @@ describe("estimatePayloadTokens and clampMaxTokens", () => {
 	});
 });
 
+describe("JW_EFFORT", () => {
+	it("reports the old name instead of ignoring it", () => {
+		const base = { JW_URL: "https://a.example", JW_KEY: "k", JW_MODEL: "m" };
+		const old = readWriterEnv({ ...base, JW_REASONING: "high" });
+		expect(old.config).toBeUndefined();
+		expect(old.errors.join("\n")).toContain("JW_EFFORT");
+		expect(readWriterEnv({ ...base, JW_EFFORT: "high" }).config?.reasoning).toBe("high");
+	});
+});
+
 describe("applyOutputClamp", () => {
+	it("keeps Anthropic's thinking budget below the clamped output limit", () => {
+		// 100000 input tokens leave about 26000 of 128000; a budget of 32000 would be refused.
+		const big = {
+			messages: [{ content: "字".repeat(100_000) }],
+			thinking: { type: "enabled", budget_tokens: 32_000 },
+		};
+		const out = applyOutputClamp({ ...big, max_tokens: 128_000 }, "anthropic-messages", 128_000, 128_000) as {
+			max_tokens: number;
+			thinking: { budget_tokens: number };
+		};
+		expect(out.thinking.budget_tokens).toBeLessThan(out.max_tokens);
+		// With almost no room left, thinking goes.
+		const tight = {
+			messages: [{ content: "字".repeat(126_000) }],
+			thinking: { type: "enabled", budget_tokens: 2048 },
+		};
+		const none = applyOutputClamp({ ...tight, max_tokens: 128_000 }, "anthropic-messages", 128_000, 128_000) as {
+			thinking?: unknown;
+		};
+		expect(none.thinking).toBeUndefined();
+		// A budget that fits stays, and other APIs have no such field.
+		const fits = { messages: [], thinking: { type: "enabled", budget_tokens: 2048 }, max_tokens: 8000 };
+		expect(applyOutputClamp(fits, "anthropic-messages", 128_000, 128_000)).toBeUndefined();
+	});
+
 	it("lowers max_tokens for Anthropic", () => {
 		// Small window, large requested output.
 		const out = applyOutputClamp(

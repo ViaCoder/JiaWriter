@@ -1,6 +1,6 @@
 ---
 name: news-feature
-description: Write news stories, features and news round-ups. Use when the user asks for news, a report on recent events or a round-up.
+description: For news stories, features and news round-ups.
 metadata:
   title: News and features
   style_packs: core-en
@@ -26,7 +26,7 @@ metadata:
 
 - Report objectively; attribute every opinion to a named source.
 - Keep figures, dates, places, names and titles as the sources give them.
-- Give cases and quotes with date and outlet, for example "Reuters reported on 31 October 2026".
+- Give cases and quotes with date and outlet, for example "Reuters reported on 31 October 2026". List every source with its title and URL in the References section at the end.
 
 ## Final checks
 

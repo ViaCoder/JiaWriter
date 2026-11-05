@@ -1,6 +1,6 @@
 ---
 name: academic-writing
-description: 写论文、综述、开题报告和研究摘要。用户要求写学术论文、文献综述或研究性文章时使用。
+description: 用于写论文、文献综述、开题报告和研究摘要。
 metadata:
   title: 学术写作
   style_packs: core-zh

@@ -1,6 +1,6 @@
 ---
 name: marketing-copy
-description: Write product descriptions, campaign copy, promotional articles and social media posts. Use when the user asks for advertising, promotion or publicity material.
+description: For product descriptions, campaign copy, promotional articles and social media posts.
 metadata:
   title: Marketing copy
   style_packs: core-en

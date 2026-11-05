@@ -91,11 +91,14 @@ describe("system prompt updates", () => {
 		});
 	});
 
-	test("keeps the preamble untagged and replaces it like any section", () => {
+	// JiaWriter: the persona stands in <system_prompt> (the user, 2026-11-05).
+	test("keeps the preamble in its tag and replaces it like any section", () => {
 		const previous = buildSystemPromptSections({ customPrompt: "You are A.", cwd: "/tmp" });
 		const current = buildSystemPromptSections({ customPrompt: "You are B.", cwd: "/tmp" });
-		expect(previous.preamble).toBe("You are A.");
-		expect(diffSystemPromptSections(previous, current)).toEqual({ preamble: "You are B." });
+		expect(previous.preamble).toBe("<system_prompt>\nYou are A.\n</system_prompt>");
+		expect(diffSystemPromptSections(previous, current)).toEqual({
+			preamble: "<system_prompt>\nYou are B.\n</system_prompt>",
+		});
 
 		expect(buildSystemPromptState({ forceSystemPrompt: "Exact prompt.", cwd: "/tmp" })).toEqual({
 			content: "Exact prompt.",

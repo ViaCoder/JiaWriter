@@ -272,7 +272,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		}
 	}
 	if (thinkingLevel === undefined) {
-		// JiaWriter: for the JW_* model, JW_REASONING sets the level; clampThinkingLevel below picks the nearest supported one.
+		// JiaWriter: for the JW_* model, JW_EFFORT sets the level; clampThinkingLevel below picks the nearest supported one.
 		const writerLevel = model?.provider === JW_PROVIDER ? getWriterDefaultModel()?.thinkingLevel : undefined;
 		thinkingLevel = writerLevel ?? settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL;
 	}

@@ -4,12 +4,14 @@
 
 import { getSystemMessageText } from "@earendil-works/pi-ai";
 import { getDocsPath, getReadmePath } from "../config.ts";
+import { personaBlock, promptAddText } from "../writer/prompt-add.ts";
 import {
 	WRITER_CHAT_RULE,
 	WRITER_PREAMBLE,
 	WRITER_RULES,
 	WRITER_TOOL_GUIDELINES,
 	WRITER_TOOL_SNIPPETS,
+	writerDefaultSkillRules,
 	writerDocsSection,
 	writerLanguageRule,
 } from "../writer/prompt-text.ts";
@@ -178,7 +180,11 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 		const tools =
 			visibleTools.length > 0 ? visibleTools.map((name) => `- ${name}: ${snippetOf(name)}`).join("\n") : "(none)";
 		promptSections.tools = `${tools}\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.`;
-		promptSections.rules = buildRules(declaredTools, toolGuidelines, promptGuidelines);
+		// JiaWriter: the default genre's rule follows the skill's on/off state.
+		promptSections.rules = buildRules(declaredTools, toolGuidelines, [
+			...promptGuidelines,
+			...writerDefaultSkillRules(skills),
+		]);
 		// JiaWriter: documentation pointers for JiaWriter itself.
 		promptSections.docs = writerDocsSection(getReadmePath(), getDocsPath());
 	}
@@ -199,7 +205,8 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 		if (content) promptSections[name] = content;
 	}
 
-	const sections: SystemPromptSections = { preamble: promptSections.preamble };
+	// JiaWriter: the persona in one tag, with PROMPT_ADD's text inside it.
+	const sections: SystemPromptSections = { preamble: personaBlock(promptSections.preamble, promptAddText()) };
 	for (const [name, content] of Object.entries(promptSections)) {
 		if (name !== "preamble") sections[name] = `<${name}>\n${content}\n</${name}>`;
 	}

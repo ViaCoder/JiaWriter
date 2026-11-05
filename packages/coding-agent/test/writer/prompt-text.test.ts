@@ -52,6 +52,12 @@ describe("rule texts", () => {
 		const text = WRITER_RULES.join("\n");
 		// Cases come from materials or search with date and source.
 		expect(text).toContain("reference materials or from web search results");
+		// In the text: date and 《source》; URLs only at the end.
+		expect(text).toContain("2026年10月31日《法新社》报道");
+		expect(text).toContain("URLs kept for the 参考文献 section");
+		// Cases or data only where the plan asks for them; the model asks once.
+		expect(text).toContain("ask the user once which parts need cases or data");
+		expect(text).toContain("current situation and recommendations, in ordinary prose");
 		// No verification markers.
 		expect(text).toContain("free of verification markers");
 		// Chinese full-width punctuation.
@@ -84,7 +90,7 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 		// Build the prompt.
 		const prompt = defaultPrompt();
 		// Preamble first.
-		expect(prompt.startsWith(WRITER_PREAMBLE)).toBe(true);
+		expect(prompt.startsWith(`<system_prompt>\n${WRITER_PREAMBLE}\n</system_prompt>\n\n<tools>`)).toBe(true);
 		// The first rule line is the first writing rule.
 		expect(prompt).toContain(`<rules>\n- ${WRITER_RULES[0]}`);
 	});
@@ -111,14 +117,16 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 		]).toEqual([true, true, false]);
 	});
 
-	it("adds no new section tags and no coding wording", () => {
+	it("adds no section tags beyond the persona tag, and no coding wording", () => {
 		// Build the prompt.
 		const prompt = defaultPrompt();
 		// Every opening tag in the prompt.
 		const tags = [...prompt.matchAll(/^<([a-z_]+)>$/gm)].map((m) => m[1]);
-		// Only upstream section names.
+		// Upstream section names and the persona tag the user asked for (2026-11-05).
 		for (const tag of tags)
-			expect(["tools", "rules", "docs", "addendum", "project_context", "skills", "cwd"]).toContain(tag);
+			expect(["system_prompt", "tools", "rules", "docs", "addendum", "project_context", "skills", "cwd"]).toContain(
+				tag,
+			);
 		// The upstream coding phrases are gone (file paths such as packages/coding-agent/README.md may remain).
 		expect(prompt).not.toMatch(/coding assistant|coding agent|editing code|executing commands/i);
 	});

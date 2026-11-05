@@ -136,6 +136,10 @@ describe("parseArgs", () => {
 			expect(result.export).toBe("session.jsonl");
 		});
 
+		test("--effort is another name for --thinking", () => {
+			expect(parseArgs(["--effort", "high"]).thinking).toBe("high");
+		});
+
 		test("parses --thinking", () => {
 			const result = parseArgs(["--thinking", "high"]);
 			expect(result.thinking).toBe("high");

@@ -2,7 +2,7 @@
 """Hands-on check of JiaWriter's interactive interface in a pseudo-terminal (no tmux needed).
 
 Starts the source build (pi-test.sh --no-env) with a throwaway HOME and agent folder, types
-/jw, /skills, /lang en, /skills and /jw, and looks for the expected Chinese and English text in
+/jw, /skills, /rewind, /effort, /lang en, /skills and /jw, and looks for the expected Chinese and English text in
 the screen output (ANSI codes removed). Nothing outside the temp folder is read or written, no
 key is set, and no model is called. Prints one line per check and exits 1 when any check fails.
 Usage: python3 -I scripts/writer-tui-check.py [--debug] [program]
@@ -123,6 +123,9 @@ def main():
             ("/jw", 3, ["JiaWriter 配置（只读", "JW_KEY", "未设置", "按任意键关闭"]),
             ("q", 2, []),
             ("/skills", 3, ["写作 skill（9 个）", "报告分析", "内置"]),
+            ("\x1b", 2, []),
+            ("/rewind", 3, ["还没有可以回退的消息"]),
+            ("/effort", 3, ["思考强度（当前", "xhigh"]),
             ("\x1b", 2, []),
             ("/lang en", 3, ["Interface language set to English"]),
             ("/skills", 3, ["Writing skills (9)", "Report and analysis", "built-in"]),
