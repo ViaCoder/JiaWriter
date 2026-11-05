@@ -104,8 +104,23 @@ def docx_text(path):
     # document.xml without its tags.
     if not os.path.exists(path):
         return ""
-    with zipfile.ZipFile(path) as z:
-        return re.sub(r"<[^>]+>", "", z.read("word/document.xml").decode("utf-8"))
+    # A file being written is not a zip yet: no text so far.
+    try:
+        with zipfile.ZipFile(path) as z:
+            return re.sub(r"<[^>]+>", "", z.read("word/document.xml").decode("utf-8"))
+    except (zipfile.BadZipFile, KeyError):
+        return ""
+
+
+def wait_for(ready, seconds):
+    """True once ready() is true, False when the time is up: export ends after the reply, later on a slow machine."""
+    # Look again until the end.
+    end = time.monotonic() + seconds
+    while time.monotonic() < end:
+        if ready():
+            return True
+        time.sleep(0.3)
+    return ready()
 
 
 def main():
@@ -152,7 +167,7 @@ def main():
         read_until(fd, "第二版", 20)
         time.sleep(3)
         check("第二轮改了稿件", "第二版" in read())
-        check("改后的 docx 是第二版", "第二版" in docx_text(os.path.join(work, "稿.docx")))
+        check("改后的 docx 是第二版", wait_for(lambda: "第二版" in docx_text(os.path.join(work, "稿.docx")), 20))
         # Effort on a model without reasoning: the nearest level, in words.
         send(fd, "/effort high")
         os.write(fd, b"\r")
@@ -175,7 +190,7 @@ def main():
         check("/rewind 报告已回退", "已回退" in screen)
         time.sleep(1)
         check("稿件回到第一版", "第一版" in read() and "第二版" not in read())
-        check("docx 也回到第一版", "第一版" in docx_text(os.path.join(work, "稿.docx")))
+        check("docx 也回到第一版", wait_for(lambda: "第一版" in docx_text(os.path.join(work, "稿.docx")), 20))
         check("原消息回到输入框", "改稿" in screen)
     finally:
         # Stop the interface and clean up.
