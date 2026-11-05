@@ -160,7 +160,8 @@ def main():
         check("/effort 说明实际生效的档位", "最接近" in screen)
         # Go back to before the second message, with the files.
         send(fd, "/rewind")
-        screen = read_until(fd, "回退到哪条消息之前", 6)
+        # The last line of the list: a packaged binary draws the title first, the list after it.
+        screen = read_until(fd, "1. 写稿", 6)
         check("/rewind 列出消息", "2. 改稿" in screen and "1. 写稿" in screen)
         if debug:
             print(screen[-500:])
