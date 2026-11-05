@@ -112,15 +112,22 @@ def docx_text(path):
         return ""
 
 
-def wait_for(ready, seconds):
-    """True once ready() is true, False when the time is up: export ends after the reply, later on a slow machine."""
+def wait_for(fd, ready, seconds):
+    """True once ready() is true, False when the time is up. Reads the terminal meanwhile: see settle()."""
     # Look again until the end.
-    end = time.monotonic() + seconds
-    while time.monotonic() < end:
+    start = time.monotonic()
+    while time.monotonic() - start < seconds:
         if ready():
+            print(f"      ready after {time.monotonic() - start:.1f} s")
             return True
-        time.sleep(0.3)
+        read_until(fd, "", 0.3)
     return ready()
+
+
+def settle(fd, seconds):
+    """Let time pass while reading: a terminal nobody reads fills up and stops the program in its next write."""
+    # macOS has a small terminal buffer, so there the export after a reply waited for the next read.
+    read_until(fd, "", seconds)
 
 
 def main():
@@ -161,13 +168,13 @@ def main():
         # The draft, then the edit.
         send(fd, "写稿")
         read_until(fd, "完成了", 20)
-        time.sleep(2)
+        settle(fd, 2)
         check("第一轮写出稿件", "第一版" in read())
         send(fd, "改稿")
         read_until(fd, "第二版", 20)
-        time.sleep(3)
+        settle(fd, 3)
         check("第二轮改了稿件", "第二版" in read())
-        check("改后的 docx 是第二版", wait_for(lambda: "第二版" in docx_text(os.path.join(work, "稿.docx")), 20))
+        check("改后的 docx 是第二版", wait_for(fd, lambda: "第二版" in docx_text(os.path.join(work, "稿.docx")), 20))
         # Effort on a model without reasoning: the nearest level, in words.
         send(fd, "/effort high")
         os.write(fd, b"\r")
@@ -188,9 +195,9 @@ def main():
         if debug:
             print(screen[-700:])
         check("/rewind 报告已回退", "已回退" in screen)
-        time.sleep(1)
+        settle(fd, 1)
         check("稿件回到第一版", "第一版" in read() and "第二版" not in read())
-        check("docx 也回到第一版", wait_for(lambda: "第一版" in docx_text(os.path.join(work, "稿.docx")), 20))
+        check("docx 也回到第一版", wait_for(fd, lambda: "第一版" in docx_text(os.path.join(work, "稿.docx")), 20))
         check("原消息回到输入框", "改稿" in screen)
     finally:
         # Stop the interface and clean up.
