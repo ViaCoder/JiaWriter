@@ -85,7 +85,6 @@ export function otherRows(env: NodeJS.ProcessEnv, lang?: WriterLang): ConfigRow[
 	const src = (name: string) => t(readEnv(env, name) ? "jw.src.env" : "jw.src.default", {}, lang);
 	return [
 		{ name: "JW_LANG", value: currentLang(), source: t(langSource, {}, lang) },
-		{ name: "JW_SEARCH", value: readEnv(env, "JW_SEARCH") ?? "auto", source: src("JW_SEARCH") },
 		{ name: "JW_ENGINES", value: readEnv(env, "JW_ENGINES") ?? "bing,google", source: src("JW_ENGINES") },
 		{ name: "JW_SEARCH_PAGES", value: readEnv(env, "JW_SEARCH_PAGES") ?? "3", source: src("JW_SEARCH_PAGES") },
 		{
@@ -94,9 +93,9 @@ export function otherRows(env: NodeJS.ProcessEnv, lang?: WriterLang): ConfigRow[
 			source: src("JW_SEARCH_URL"),
 		},
 		{
-			name: "JW_SEARCH_KEY",
-			value: t(readEnv(env, "JW_SEARCH_KEY") ? "jw.set" : "jw.anonymous", {}, lang),
-			source: src("JW_SEARCH_KEY"),
+			name: "ANYSEARCH_KEY",
+			value: t(readEnv(env, "ANYSEARCH_KEY") ? "jw.set" : "jw.anonymous", {}, lang),
+			source: src("ANYSEARCH_KEY"),
 		},
 		{ name: "JW_SF", value: readEnv(env, "JW_SF") ?? t("jw.sfAuto", {}, lang), source: src("JW_SF") },
 		{

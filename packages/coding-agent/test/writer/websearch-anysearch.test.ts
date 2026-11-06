@@ -43,8 +43,8 @@ function fakeFetch(...replies: (Response | Error)[]) {
 // No real waiting.
 const noSleep = async () => {};
 // Config with a key and one without.
-const withKey = readSearchEnv({ JW_SEARCH_KEY: "sk-test-4711", JW_SEARCH_URL: "https://any.example" }).config;
-const anon = readSearchEnv({ JW_SEARCH_URL: "https://any.example" }).config;
+const withKey = readSearchEnv({ ANYSEARCH_KEY: "sk-test-4711", JW_SEARCH_URL: "https://any.example" });
+const anon = readSearchEnv({ JW_SEARCH_URL: "https://any.example" });
 
 describe("retryAfterMs and statusError", () => {
 	it("bounds the back-off and maps statuses to messages", () => {

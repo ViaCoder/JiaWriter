@@ -60,21 +60,21 @@ describe("sfPlatform / sfCandidates / locateSf", () => {
 		expect(sfPlatform("win32", "arm64")).toEqual({ os: "windows", arch: "arm64" });
 		expect([sfPlatform("freebsd", "x64"), sfPlatform("linux", "ia32")]).toEqual([null, null]);
 		// JW_SF first, then the release layout, then the agent dir.
-		const cfg = readSearchEnv({ JW_SF: "/opt/sf" }).config;
+		const cfg = readSearchEnv({ JW_SF: "/opt/sf" });
 		expect(sfCandidates(cfg, "linux", "arm64", "/app", "/home/u/.jiawriter/agent")).toEqual([
 			"/opt/sf",
 			join("/app", "search_fetch", "linux", "arm64", "sf"),
 			join("/home/u/.jiawriter/agent", "sf", "linux", "arm64", "sf"),
 		]);
 		// Windows: sf.exe in the windows folders.
-		expect(sfCandidates(readSearchEnv({}).config, "win32", "x64", "/app", "/ag")).toEqual([
+		expect(sfCandidates(readSearchEnv({}), "win32", "x64", "/app", "/ag")).toEqual([
 			join("/app", "search_fetch", "windows", "amd64", "sf.exe"),
 			join("/ag", "sf", "windows", "amd64", "sf.exe"),
 		]);
 	});
 	it("returns the first existing candidate on every system and explains a miss", () => {
 		// Configuration without JW_SF.
-		const cfg = readSearchEnv({}).config;
+		const cfg = readSearchEnv({});
 		// Second candidate exists.
 		const want = join("/a", "sf", "macos", "amd64", "sf");
 		expect(locateSf(cfg, "darwin", "x64", "/x", "/a", (p) => p === want)).toBe(want);

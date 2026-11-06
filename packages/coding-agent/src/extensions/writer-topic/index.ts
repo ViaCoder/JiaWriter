@@ -70,7 +70,7 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		promptSnippet: "Record a case or data point with its source in the topic's materials",
 		// Rules added while the tool is active.
 		promptGuidelines: [
-			"Record each case and figure you may use with material_add right after reading its source, and fetch a page with web_fetch before recording it, because a source is a page you have read",
+			"Record each case and figure you may use with material_add right after reading its source. A source is a page you have read or an address in the results of a search you ran, and fetching the page first gives the fuller, safer record",
 		],
 		// Argument schema.
 		parameters: Type.Object({

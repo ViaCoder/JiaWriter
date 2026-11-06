@@ -81,17 +81,16 @@ describe("otherRows / setupCommands", () => {
 		// Defaults, then the /lang choice, then JW_LANG.
 		expect(otherRows({}, "zh")).toEqual([
 			{ name: "JW_LANG", value: "zh", source: "默认值" },
-			{ name: "JW_SEARCH", value: "auto", source: "默认值" },
 			{ name: "JW_ENGINES", value: "bing,google", source: "默认值" },
 			{ name: "JW_SEARCH_PAGES", value: "3", source: "默认值" },
 			{ name: "JW_SEARCH_URL", value: "https://api.anysearch.com", source: "默认值" },
-			{ name: "JW_SEARCH_KEY", value: "未设置（匿名调用）", source: "默认值" },
+			{ name: "ANYSEARCH_KEY", value: "未设置（匿名调用）", source: "默认值" },
 			{ name: "JW_SF", value: "未设置（在约定位置查找）", source: "默认值" },
 			{ name: "PROMPT_ADD", value: "未设置", source: "默认值" },
 		]);
 		setUiLang("en");
 		expect(otherRows({}, "zh")[0]).toEqual({ name: "JW_LANG", value: "en", source: "/lang 设置" });
-		expect(otherRows({ JW_LANG: "zh", JW_SEARCH_KEY: "k" }, "zh").map((r) => r.source)[0]).toBe("环境变量");
+		expect(otherRows({ JW_LANG: "zh", ANYSEARCH_KEY: "k" }, "zh").map((r) => r.source)[0]).toBe("环境变量");
 		// Commands: current values, the key as a placeholder.
 		expect(setupCommands(ENV, "linux", "zh")).toEqual([
 			'export JW_URL="https://llm.example.com/v1?token=%3Credacted%3E"',

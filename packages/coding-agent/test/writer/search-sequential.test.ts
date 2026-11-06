@@ -29,7 +29,6 @@ describe("web_search and web_fetch one at a time", () => {
 
 	it("never has two AnySearch requests open, with a gap between them", async () => {
 		dir = mkdtempSync(join(tmpdir(), "jw-seq-"));
-		vi.stubEnv("JW_SEARCH", "anysearch");
 		vi.stubEnv("JW_DIR", join(dir, "agent"));
 		// Fake AnySearch: counts open requests and their start times.
 		let open = 0;
@@ -51,7 +50,7 @@ describe("web_search and web_fetch one at a time", () => {
 		});
 		harness.setResponses([
 			fauxAssistantMessage(
-				["甲", "乙", "丙"].map((query) => fauxToolCall("web_search", { query })),
+				["甲", "乙", "丙"].map((query) => fauxToolCall("web_search", { query, method: "anysearch" })),
 				{ stopReason: "toolUse" },
 			),
 			fauxAssistantMessage("好了"),

@@ -93,7 +93,7 @@ function getCacheControl(
 }
 
 // Stealth mode: Mimic Claude Code's tool naming exactly
-const claudeCodeVersion = "2.1.280";
+export const claudeCodeVersion = "2.1.280";
 
 // Claude Code 2.x tool names (canonical casing)
 // Source: https://cchistory.mariozechner.at/data/prompts-2.1.11.md
@@ -332,7 +332,7 @@ function assertRequestAuth(provider: string, apiKey: string | undefined, headers
  * client built with `apiKey: null, authToken: null` for header-owned auth would
  * also resolve and exchange SDK credentials behind pi's auth resolver.
  */
-class PiAnthropic extends Anthropic {
+export class PiAnthropic extends Anthropic {
 	protected override _shouldResolveDefaultCredentials(): boolean {
 		return false;
 	}
@@ -938,7 +938,7 @@ export const stream: StreamFunction<"anthropic-messages", AnthropicOptions> = (
  * Note: effort "max" is available on all adaptive-thinking Claude models, while native
  * "xhigh" is only available on Opus 4.7/4.8, Sonnet 5, and Fable 5.
  */
-function mapThinkingLevelToEffort(
+export function mapThinkingLevelToEffort(
 	model: Model<"anthropic-messages">,
 	level: SimpleStreamOptions["reasoning"],
 ): AnthropicEffort {

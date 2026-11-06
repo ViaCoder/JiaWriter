@@ -40,6 +40,8 @@ export interface IndexEntry {
 	// Page address (pages only), and the address asked for when it redirected.
 	url?: string;
 	requested?: string;
+	// Addresses in a search's results (searches only).
+	urls?: string[];
 }
 
 /** A case or a data point for the draft. */
@@ -123,6 +125,7 @@ function archive(
 	text: string,
 	url?: string,
 	requested?: string,
+	urls?: readonly string[],
 ): string {
 	// Running number over both kinds, then a readable name.
 	const n = readIndex(dir).reduce((most, e) => Math.max(most, e.n), 0) + 1;
@@ -131,15 +134,22 @@ function archive(
 	writeFileSync(join(dir, file), text);
 	appendFileSync(
 		join(dir, INDEX_FILE),
-		`${JSON.stringify({ n, kind, file, title, url, requested } satisfies IndexEntry)}\n`,
+		`${JSON.stringify({ n, kind, file, title, url, requested, urls: urls && [...urls] } satisfies IndexEntry)}\n`,
 	);
 	return file;
 }
 
-/** Keep one search's report. */
-export function archiveSearch(dir: string, query: string, report: string, at: string): string {
+/** Keep one search's report, and the addresses it listed as sources for material_add. */
+export function archiveSearch(
+	dir: string,
+	query: string,
+	report: string,
+	at: string,
+	urls: readonly string[] = [],
+): string {
 	// The report as the model read it, with the time.
-	return archive(dir, "search", TOPIC_DIRS.search, query, `# ${query}\n\n检索时间：${at}\n\n${report}\n`);
+	const text = `# ${query}\n\n检索时间：${at}\n\n${report}\n`;
+	return archive(dir, "search", TOPIC_DIRS.search, query, text, undefined, undefined, urls);
 }
 
 /** Keep one fetched page in full, under the address it was asked for and the one it ended at. */
@@ -189,6 +199,17 @@ export function archivedUrls(dir: string): string[] {
 	);
 }
 
+/** An address as compared for materials: normalized when it is a web address, else as it stands. */
+function materialKey(url: string): string {
+	return normalizeUrl(url) || url.trim();
+}
+
+/** Addresses a material may cite: pages kept in the topic and every search result. */
+export function materialUrls(dir: string): string[] {
+	// Search results count here, and only here: the export check asks what was really opened.
+	return [...archivedUrls(dir), ...readIndex(dir).flatMap((e) => (e.urls ?? []).map(materialKey))];
+}
+
 /** Fields a material must have, by kind. */
 const REQUIRED: Readonly<Record<Material["kind"], readonly (keyof Material)[]>> = {
 	// Time, reporter, the acting subject and the action.
@@ -204,9 +225,9 @@ export function materialProblem(item: Material, archived: readonly string[]): st
 	if (missing.length > 0) return t("topic.missingFields", { fields: missing.join("、") });
 	// A reference file needs its page.
 	if (item.file?.trim()) return item.page?.trim() ? "" : t("topic.missingPage", { file: item.file });
-	// A web source must have been opened and archived.
+	// A web source must be a page or a search result of this topic.
 	if (!item.url?.trim()) return t("topic.missingSource");
-	return archived.includes(normalizeUrl(item.url)) ? "" : t("topic.notArchived", { url: item.url });
+	return archived.includes(materialKey(item.url)) ? "" : t("topic.notArchived", { url: item.url });
 }
 
 /** One material as a Markdown list item. */
@@ -223,7 +244,7 @@ export function renderMaterial(item: Material): string {
 /** Add materials to 素材.md, all or none; returns how many it holds now. */
 export function addMaterials(dir: string, items: readonly Material[]): number {
 	// Every item is checked before anything is written.
-	const archived = archivedUrls(dir);
+	const archived = materialUrls(dir);
 	const problems = items.flatMap((item, i) => {
 		const problem = materialProblem(item, archived);
 		return problem ? [t("topic.itemProblem", { n: i + 1, problem })] : [];

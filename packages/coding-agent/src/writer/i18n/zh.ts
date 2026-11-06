@@ -92,12 +92,10 @@ export const zh = {
 	"search.noQuery": "请提供检索词 query。",
 	// URL not allowed.
 	"fetch.badUrl": "只能抓取 http(s) 网址：{url}",
-	// Unknown backend.
-	"search.badBackend": "JW_SEARCH 只能是 auto、browser、anysearch 或 sf，当前为「{value}」。",
 	// AnySearch quota exhausted (402 body discarded).
-	"anysearch.quota": "AnySearch 匿名额度已用完，可设置 JW_SEARCH_KEY 后重试。",
+	"anysearch.quota": "AnySearch 匿名额度已用完，可设置 ANYSEARCH_KEY 后重试。",
 	// AnySearch key rejected.
-	"anysearch.auth": "AnySearch 拒绝了 key（HTTP {status}），请检查 JW_SEARCH_KEY。",
+	"anysearch.auth": "AnySearch 拒绝了 key（HTTP {status}），请检查 ANYSEARCH_KEY。",
 	// AnySearch rate limit after the single retry.
 	"anysearch.rate": "AnySearch 请求过于频繁（HTTP 429），请稍后再试。",
 	// AnySearch could not extract the page.
@@ -184,7 +182,7 @@ export const zh = {
 	"topic.missingFields": "缺少 {fields}",
 	"topic.missingPage": "《{file}》缺少页码",
 	"topic.missingSource": "缺少来源：要有 url，或 file 加 page",
-	"topic.notArchived": "网址 {url} 还没有在本主题里打开过，请先用 web_fetch 读取",
+	"topic.notArchived": "网址 {url} 不在本主题的检索结果或已读页面里，请先检索或用 web_fetch 读取",
 	"topic.itemProblem": "第{n}条：{problem}",
 	"topic.materialAdded": "已记录 {count} 条，{file} 共 {total} 条。",
 	"rewind.pick": "回退到哪条消息之前？",
@@ -304,8 +302,6 @@ export const zh = {
 	"browser.label": "浏览器（{detail}）",
 	"browser.engineLine": "{engine} {pages} 页",
 	"browser.stopped": "{engine} 读到第 {pages} 页后停止：{reason}",
-	"browser.fallback": "Chrome 里的 JiaWriter 扩展没有连接，本次改用 AnySearch。安装扩展的步骤见 /browser。",
-	"browser.notConnected": "Chrome 里的 JiaWriter 扩展没有连接。请打开 Chrome，并按 /browser 的说明加载扩展。",
 	"browser.verify":
 		"{engine} 需要你处理：请切到 Chrome（窗口已在前台，或在任务栏闪烁），完成验证或登录。最多等 {seconds} 秒，你在窗口里操作时会自动延长；按 Esc 取消。",
 	"browser.verifyLeft": "{engine} 的人机验证还剩 {seconds} 秒。",
@@ -316,8 +312,15 @@ export const zh = {
 	"clock.skew": "本机时钟和模型服务器相差约 {minutes} 分钟，已按服务器时间告诉模型当前时间。请检查系统的时间设置。",
 	"search.time": "检索时间：{time}",
 	"search.methodUnavailable":
-		"browser 方式现在不可用：Chrome 里的 JiaWriter 扩展没有连接。可以改用 method=anysearch，或按 /browser 的说明连接扩展。",
-	"search.sfSearchGone": "sf 不再用于检索，只用于 web_fetch；本次检索按 auto 处理。",
+		"browser 方式现在不可用：Chrome 里的 JiaWriter 扩展没有连接。可以换一种方式，或按 /browser 的说明连接扩展。",
+	"search.noMethod": "这次调用要指定 method，没有默认方式。",
+	"server.noModel": "没有设置模型，无法请求上游。",
+	"server.noSearch": "上游没有执行搜索，这种方式在这里可能用不了。请换一种方式，或者告诉用户。",
+	"server.noOpen": "上游没有打开这个页面。请换一种方式。",
+	"server.toolError": "上游的工具出错：{detail}。请换一种方式。",
+	"server.pdf": "上游返回的是 PDF，这种方式读不了。请用 method=sf。",
+	"server.upstream": "上游请求失败：{detail}",
+	"server.text": "上游的回答：\n{text}\n",
 	"browser.connected": "Chrome 扩展已连接（扩展版本 {version}）。",
 	"browser.disconnected": "Chrome 扩展未连接。",
 	"browser.steps":

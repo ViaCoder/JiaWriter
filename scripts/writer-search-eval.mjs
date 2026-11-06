@@ -1,7 +1,7 @@
 // JiaWriter search backend evaluation (P4): one round of fixed queries and page extractions
 // per configured backend, a comparison table on stdout and the raw results on disk. It helps
 // the user judge the backends; it decides nothing. One request per item, no retries.
-// The only key is JW_SEARCH_KEY (optional), read from the environment and never printed; sf runs without a model.
+// The only key is ANYSEARCH_KEY (optional), read from the environment and never printed; sf runs without a model.
 // Usage: node scripts/writer-search-eval.mjs <output dir> [anysearch] [sf]   (default: anysearch)
 
 // Output files.
@@ -71,7 +71,7 @@ export async function evalBackend(ops, items, pages, blocklist, clock = Date.now
 		const t0 = clock();
 		try {
 			// Cleaned results, as the tool would show them.
-			const results = normalizeResults(await ops.search(q), blocklist, 10);
+			const results = normalizeResults(await ops.search(q), blocklist).slice(0, 10);
 			searches.push({ id: q.id, ms: clock() - t0, count: results.length, dated: results.filter((r) => r.date).length, results, error: "" });
 		} catch (e) {
 			searches.push({ id: q.id, ms: clock() - t0, count: 0, dated: 0, results: [], error: e instanceof Error ? e.message : String(e) });
@@ -144,8 +144,7 @@ export async function runSearchEval(outDir, backends, env = process.env, makeOps
 	// Output directory.
 	mkdirSync(outDir, { recursive: true });
 	// Shared configuration (timeout, blocklist, AnySearch key, JW_SF).
-	const { config, errors } = readSearchEnv(env);
-	if (errors.length) throw new Error(errors.join("\n"));
+	const config = readSearchEnv(env);
 	// Fixed items for today.
 	const items = queries(todayTaipei());
 	// Raw rounds and summaries per backend.

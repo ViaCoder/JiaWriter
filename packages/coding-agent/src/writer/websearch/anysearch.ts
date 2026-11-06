@@ -1,6 +1,6 @@
 /**
  * AnySearch backend (https://www.anysearch.com/docs): POST /v1/search and /v1/extract.
- * Anonymous use works (rate-limited per IP); JW_SEARCH_KEY adds `Authorization: Bearer`.
+ * Anonymous use works (rate-limited per IP); ANYSEARCH_KEY adds `Authorization: Bearer`.
  * The key never appears in errors or logs. A 402 body is never read: for anonymous callers
  * it may carry generated credentials.
  */
@@ -113,7 +113,7 @@ export async function anysearchSearch(
 	const results = Array.isArray(data.results) ? (data.results as Record<string, unknown>[]) : [];
 	// Common shape; the date comes from the content when the snippet has none.
 	return results.map((r) => {
-		const snippet = String(r.snippet ?? "") || String(r.content ?? "").slice(0, 300);
+		const snippet = String(r.snippet ?? "") || String(r.content ?? "");
 		return {
 			title: String(r.title ?? ""),
 			url: String(r.url ?? ""),

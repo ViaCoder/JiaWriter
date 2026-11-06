@@ -18,6 +18,7 @@ import {
 	archiveSearch,
 	type Material,
 	materialProblem,
+	materialUrls,
 	openTopic,
 	readIndex,
 	renderMaterial,
@@ -150,6 +151,17 @@ describe("materials", () => {
 		expect(materialProblem({ ...CASE, url: "" }, opened)).not.toBe("");
 		// A page never opened in the topic is refused.
 		expect(materialProblem(CASE, [])).toContain("https://a.example/x");
+	});
+
+	it("takes any address from search results as a source, and keeps it apart from opened pages", () => {
+		const { dir } = openTopic(cwd, "t");
+		archiveSearch(dir, "甲", "结果", "时间", ["https://www.a.example/x/", "ftp://b.example/file", "不是网址"]);
+		expect(materialUrls(dir)).toEqual(["a.example/x", "ftp://b.example/file", "不是网址"]);
+		expect(archivedUrls(dir)).toEqual([]);
+		// Compared in normalized form, and the same way for what is not a web address.
+		expect(materialProblem({ ...CASE, url: "https://a.example/x" }, materialUrls(dir))).toBe("");
+		expect(materialProblem({ ...CASE, url: "不是网址" }, materialUrls(dir))).toBe("");
+		expect(materialProblem({ ...CASE, url: "ftp://other.example/" }, materialUrls(dir))).not.toBe("");
 	});
 
 	it("renders one line with every field and the source", () => {

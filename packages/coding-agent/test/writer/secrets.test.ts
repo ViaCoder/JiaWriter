@@ -14,19 +14,19 @@ import {
 afterEach(() => clearSecrets());
 
 describe("takeSecrets", () => {
-	test("moves JW_KEY and JW_SEARCH_KEY out of the environment and leaves the rest", () => {
+	test("moves JW_KEY and ANYSEARCH_KEY out of the environment and leaves the rest", () => {
 		// A test environment, not process.env.
 		const env: NodeJS.ProcessEnv = {
 			JW_KEY: "sk-test-1",
-			JW_SEARCH_KEY: "as-test-2",
+			ANYSEARCH_KEY: "as-test-2",
 			JW_URL: "https://api.example.com",
 		};
-		expect(takeSecrets(env)).toEqual(["JW_KEY", "JW_SEARCH_KEY"]);
+		expect(takeSecrets(env)).toEqual(["JW_KEY", "ANYSEARCH_KEY"]);
 		// Gone from the environment a child process would inherit.
 		expect(env).toEqual({ JW_URL: "https://api.example.com" });
 		// Kept in memory.
 		expect(secret("JW_KEY")).toBe("sk-test-1");
-		expect(secret("JW_SEARCH_KEY")).toBe("as-test-2");
+		expect(secret("ANYSEARCH_KEY")).toBe("as-test-2");
 	});
 
 	test("takes nothing when no key is set", () => {
@@ -37,7 +37,7 @@ describe("takeSecrets", () => {
 
 	test("covers exactly the two key variables", () => {
 		// The list the module guards.
-		expect([...SECRET_VARS]).toEqual(["JW_KEY", "JW_SEARCH_KEY"]);
+		expect([...SECRET_VARS]).toEqual(["JW_KEY", "ANYSEARCH_KEY"]);
 	});
 });
 

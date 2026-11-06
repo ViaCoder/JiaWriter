@@ -1,9 +1,9 @@
 /**
- * Built-in JiaWriter extension: web_search and web_fetch. The model picks the method of each call:
- * web_search browser (the user's Chrome through the JiaWriter extension; engines Bing, Google, Baidu,
- * Sogou, 3–5 pages each, ranked locally) or anysearch; web_fetch browser, anysearch or sf (search_fetch).
- * Without a method, JW_SEARCH decides (auto: the browser when the extension is connected, else
- * AnySearch).
+ * Built-in JiaWriter extension: web_search and web_fetch. The model picks the method of every call,
+ * there is no default: web_search browser (the user's Chrome through the JiaWriter extension; engines
+ * Bing, Google, Baidu, Sogou, 3–5 pages each, ranked locally), anysearch, claude or codex; web_fetch
+ * browser, anysearch, sf (search_fetch), claude or codex. claude and codex let the upstream model
+ * do the work in a request of its own, with the conversation's model and thinking level.
  */
 
 // The marker that the extension was seen once.
@@ -12,6 +12,14 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 // Folder of the running binary (release layout of sf), and paths.
 import { dirname, join } from "node:path";
+// Search and page reads by the upstream.
+import {
+	type ServerCall,
+	type ServerStyle,
+	type ServerWay,
+	serverFetch,
+	serverSearch,
+} from "@earendil-works/pi-ai/api/server-search.lazy";
 // Parameter schemas.
 import { Type } from "typebox";
 // Agent directory, binary detection, the extension folder.
@@ -41,13 +49,15 @@ import {
 import { nowText } from "../../writer/clock.ts";
 // Output messages.
 import { currentLang, t } from "../../writer/i18n/index.ts";
+// Secrets are taken out of upstream errors.
+import { redactSecrets } from "../../writer/redact.ts";
 // The AnySearch key held in memory.
 import { withSecrets } from "../../writer/secrets.ts";
 // The research archive.
 import { ensureTopic } from "../../writer/topic/current.ts";
 import { archiveFiltered, archivePage, archiveSearch } from "../../writer/topic/topic.ts";
 // AnySearch backend.
-import { ANYSEARCH_MAX, anysearchExtract, anysearchSearch } from "../../writer/websearch/anysearch.ts";
+import { anysearchExtract, anysearchSearch } from "../../writer/websearch/anysearch.ts";
 // Configuration, normalization and reports.
 import {
 	cleanWebText,
@@ -61,11 +71,9 @@ import {
 } from "../../writer/websearch/core.ts";
 // sf backend.
 import { locateSf, parseSfFetch, runSf, sfChildEnv, sfError } from "../../writer/websearch/sf.ts";
+// The configured model's name.
+import { getWriterModel } from "../../writer/writer-model.ts";
 
-/** Default number of results. */
-const DEFAULT_RESULTS = 10;
-/** Most results one search returns. */
-const MAX_RESULTS = 20;
 /** How long to wait for Chrome to connect after starting it (ms). */
 const CHROME_START_WAIT_MS = 20_000;
 /** Shortest gap between two AnySearch requests (ms); several at once make it fail (the user, 2026-11-05). */
@@ -85,7 +93,32 @@ function engineName(engine: string): string {
 }
 
 /** A method the model may name. */
-type Method = "browser" | "anysearch" | "sf";
+type Method = "browser" | "anysearch" | "sf" | ServerWay;
+
+/** Upstream failures by kind; the two that carry a detail name it. */
+const SERVER_ERRORS = {
+	no_search: "server.noSearch",
+	no_open: "server.noOpen",
+	tool_error: "server.toolError",
+	pdf: "server.pdf",
+	upstream: "server.upstream",
+} as const;
+
+/** True for the methods the upstream serves. */
+function isServerWay(method: Method | undefined): method is ServerWay {
+	return method === "claude" || method === "codex";
+}
+
+/** An upstream failure as the model reads it, without secrets; a cancelled call stays as it is. */
+function serverFailure(error: unknown): unknown {
+	// Its kind, when it has one.
+	const code = (error as { code?: string }).code ?? "";
+	// Not one of ours.
+	if (!(code in SERVER_ERRORS)) return error;
+	// Named, with the detail cleaned.
+	const key = SERVER_ERRORS[code as keyof typeof SERVER_ERRORS];
+	return new Error(t(key, { detail: redactSecrets((error as Error).message) }));
+}
 
 /** Hints shared by both tools: they reach the open web and change nothing locally. */
 const WEB = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true };
@@ -115,7 +148,7 @@ export function abortable<T>(work: Promise<T>, signal?: AbortSignal): Promise<T>
 /** Extension factory. */
 export default function writerSearchExtension(pi: ExtensionAPI): void {
 	// Configuration once per session.
-	const { config, errors } = readSearchEnv(withSecrets(process.env));
+	const config = readSearchEnv(withSecrets(process.env));
 	// Where the browser host listens, and its private folder.
 	const address = bridgeAddress(getAgentDir(), process.platform);
 	const browserDir = join(getAgentDir(), "browser");
@@ -131,6 +164,18 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	const held = new Set<string>();
 	// Browser timing with the configured verification wait.
 	const timing = { ...DEFAULT_TIMING, humanWaitMs: config.verifyWaitMs };
+	// The model the upstream methods are chosen for.
+	const state = getWriterModel();
+	const configured = state.kind === "ready" ? ` The configured model is ${state.model}.` : "";
+	/** The upstream methods in a tool description. */
+	const UPSTREAM_METHODS =
+		"claude and codex = the upstream model does the work itself in a request of its own, with this conversation's model and effort: " +
+		`claude is the way of Claude models, codex the way of Codex and GPT models, whatever the real upstream is.${configured} `;
+	/** When the upstream methods apply. */
+	const UPSTREAM_RULE =
+		"Use claude or codex only when the user's prompt says the upstream supports it, and take the one of the configured model: claude for Claude models, codex for Codex and GPT models";
+	// Which request style each upstream took in this session.
+	const styles = new Map<string, ServerStyle>();
 
 	/** sf binary and child environment (no driver model, see sfModelOff) for one call. */
 	function sfContext(interactive: boolean) {
@@ -235,31 +280,37 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		return pace(join(browserDir, "pacing.json"), "anysearch", ANYSEARCH_GAP_MS, sleep);
 	}
 
-	/** The method of one call: the model's choice, else JW_SEARCH (auto: browser when connected, else anysearch). */
-	async function pick(
-		requested: Method | undefined,
-		tool: "search" | "fetch",
-	): Promise<{ backend: Method; note: string }> {
-		// The model asked for the browser: only when it can be used now.
-		if (requested === "browser") {
-			if (await browserReady()) return { backend: "browser", note: "" };
-			throw new Error(t("search.methodUnavailable"));
-		}
-		// AnySearch, or sf for a fetch.
-		if (requested === "anysearch" || (requested === "sf" && tool === "fetch"))
-			return { backend: requested, note: "" };
-		// The configured default.
-		const notes: string[] = [];
-		if (config.backend === "anysearch") return { backend: "anysearch", note: "" };
-		if (config.backend === "sf" && tool === "fetch") return { backend: "sf", note: "" };
-		if (config.backend === "sf" || requested === "sf") notes.push(t("search.sfSearchGone"));
-		// Browser when it is connected.
-		if (await browserReady()) return { backend: "browser", note: notes.join("\n") };
-		// browser only: an error with the setup hint.
-		if (config.backend === "browser") throw new Error(t("browser.notConnected"));
-		// auto: AnySearch this time.
-		notes.push(t("browser.fallback"));
-		return { backend: "anysearch", note: notes.join("\n") };
+	/** The method of one call, always the model's choice; the browser only when it can be used now. */
+	async function pick(requested: Method | undefined): Promise<Method> {
+		// There is no default.
+		if (!requested) throw new Error(t("search.noMethod"));
+		// Chrome may be away.
+		if (requested === "browser" && !(await browserReady())) throw new Error(t("search.methodUnavailable"));
+		// The model's choice.
+		return requested;
+	}
+
+	/** An upstream request of this conversation: its model, its thinking level, its address and key. */
+	async function serverCall(ctx: ExtensionContext, way: ServerWay, signal?: AbortSignal): Promise<ServerCall> {
+		// The conversation's model.
+		const model = ctx.model;
+		if (!model) throw new Error(t("server.noModel"));
+		// Its key and headers, held in memory.
+		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
+		if (!auth.ok) throw new Error(auth.error);
+		// The address without /v1: each way adds its own path.
+		const baseUrl = (auth.baseUrl ?? model.baseUrl).replace(/\/+$/, "").replace(/\/v1$/, "");
+		// Level as the conversation has it now, so /effort takes effect at once.
+		return {
+			way,
+			baseUrl,
+			model,
+			apiKey: auth.apiKey,
+			headers: auth.headers,
+			thinking: pi.getThinkingLevel(),
+			styles,
+			signal,
+		};
 	}
 
 	/** Register the host with Chrome (release binaries only; source checkouts use /browser). */
@@ -275,7 +326,6 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	// At startup, a release binary keeps Chrome's host registration current (no network, small files).
 	pi.on("session_start", (event) => {
 		if (event.reason !== "startup" || !isBunBinary) return;
-		if (config.backend !== "auto" && config.backend !== "browser") return;
 		try {
 			registerHost();
 		} catch {
@@ -306,7 +356,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			"Search the web. method picks how: " +
 			"browser = the user's Chrome through the JiaWriter extension, typing the query on each engine's home page as a person does and reading 3–5 results pages per engine, ranked locally; engines picks any of bing, google, baidu, sogou (default bing, google); about 1–2 minutes per engine, and an engine may ask for a human check. " +
 			"anysearch = the AnySearch API: fast, needs no Chrome, results carry no dates. " +
-			`Without method: ${config.backend === "anysearch" ? "anysearch" : "browser when the extension is connected, else anysearch"}. ` +
+			`${UPSTREAM_METHODS}` +
 			"Returns titles, URLs, short snippets, dates when known and the search time. Keep the URL of every fact taken from them.",
 		// One line in the tools section.
 		promptSnippet: "Search the web for sources, recent news and facts; returns titles, URLs, snippets and dates",
@@ -315,6 +365,9 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			// Whether to search at all is the user's call (the user, 2026-11-05).
 			"Search only when the user's request calls for it: the user asks for research or recent facts, or for cases and data the reference materials do not hold. When the user asks to write, revise or polish from what is already there, work from that without searching, and never search when the user says not to",
 			"Plan the searches for each question: pick the method and engines that fit it, and search again with a different query, engine or method when one result is not enough",
+			"Name the method of every call yourself: none is the default. When a method is unavailable or fails, use another one or tell the user",
+			UPSTREAM_RULE,
+			"With claude and codex, only addresses in the results list go into the 参考文献 section, never one that appears only in the upstream's text",
 			"Run searches and fetches one at a time: send a single web_search or web_fetch call in a message, read its result, then decide the next call",
 			"When choosing what to fetch and cite, prefer reports from internationally renowned news organizations such as Reuters, AP, AFP, Bloomberg, BBC, The New York Times, The Wall Street Journal and the Financial Times",
 			"Use baidu and sogou for mainland Chinese sources (sogou also finds WeChat public-account articles), bing and google for international and English sources, and anysearch for a quick first overview",
@@ -332,20 +385,17 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		// Argument schema.
 		parameters: Type.Object({
 			query: Type.String({ description: "Search query: 2–6 key terms" }),
-			method: Type.Optional(
-				Type.Union([Type.Literal("browser"), Type.Literal("anysearch")], {
-					description: "browser (Chrome, the engines below) or anysearch (API)",
-				}),
+			method: Type.Union(
+				[Type.Literal("browser"), Type.Literal("anysearch"), Type.Literal("claude"), Type.Literal("codex")],
+				{
+					description:
+						"browser (Chrome, the engines below), anysearch (API), or claude or codex (the upstream model)",
+				},
 			),
 			engines: Type.Optional(
 				Type.Array(Type.Union(ALL_ENGINES.map((e) => Type.Literal(e))), {
 					description:
 						"browser method: engines in the order to use (bing, google, baidu, sogou; default bing, google)",
-				}),
-			),
-			max_results: Type.Optional(
-				Type.Number({
-					description: `Browser method: number of results, 1–${MAX_RESULTS} (default ${DEFAULT_RESULTS}). AnySearch always gives all it has, up to ${ANYSEARCH_MAX}`,
 				}),
 			),
 			pages: Type.Optional(
@@ -367,18 +417,15 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		executionMode: "sequential",
 		// Run the search.
 		async execute(_id, params, signal, _onUpdate, ctx) {
-			// Invalid configuration stops here.
-			if (errors.length > 0) throw new Error(errors.join("\n"));
 			// A query is required.
 			if (!params.query?.trim()) throw new Error(t("search.noQuery"));
-			// Result count.
-			const max = Math.max(1, Math.min(MAX_RESULTS, Math.round(params.max_results ?? DEFAULT_RESULTS)));
 			// The backend for this call.
-			const { backend, note } = await pick(params.method, "search");
-			// Raw results, backend label and notes.
+			const backend = await pick(params.method);
+			// Raw results, backend label, notes and the upstream's own answer.
 			let raw: SearchResult[];
 			let label: string = backend;
-			const notes: string[] = note ? [note] : [];
+			const notes: string[] = [];
+			let answer = "";
 			if (backend === "browser") {
 				usedBrowser = true;
 				// The previous results pages are closed first.
@@ -422,18 +469,27 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 											: o.stopped,
 							}),
 						);
+			} else if (isServerWay(backend)) {
+				// The upstream searches.
+				const out = await serverSearch(await serverCall(ctx, backend, signal), params.query).catch((e: unknown) => {
+					throw serverFailure(e);
+				});
+				raw = out.sources;
+				answer = out.text;
 			} else {
 				// AnySearch.
 				await anysearchTurn();
 				raw = await anysearchSearch(config, params.query, { zone: params.zone, language: params.language }, signal);
 			}
-			// Cleaned results.
-			// AnySearch gives all it found: the model chooses among them.
-			const results = normalizeResults(raw, config.blocklist, backend === "anysearch" ? raw.length : max);
-			// Report with the notes first.
-			const report = formatSearch(params.query, label, results);
+			// Every result goes in: the model chooses among them.
+			const results = normalizeResults(raw, config.blocklist);
+			// Report: the upstream's answer, when there is one, then the list.
+			const report = [answer && t("server.text", { text: answer }), formatSearch(params.query, label, results)]
+				.filter(Boolean)
+				.join("\n");
 			// The search is kept in the topic folder; a full disk must not cost the result.
-			const kept = keep(ctx, (dir) => archiveSearch(dir, params.query, report, nowText()));
+			const urls = results.map((r) => r.url);
+			const kept = keep(ctx, (dir) => archiveSearch(dir, params.query, report, nowText(), urls));
 			const text = [t("search.time", { time: nowText() }), ...notes, report, kept.note].filter(Boolean).join("\n");
 			// Text and structured results.
 			return { content: [{ type: "text", text }], details: { backend, results, topicDir: kept.dir } };
@@ -452,21 +508,32 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			"browser = open it in the user's Chrome (clicked on the last results page when it is there), for news sites and pages that need a real browser; " +
 			"anysearch = the AnySearch extract API, fast; " +
 			"sf = search_fetch, for documents (PDF, Word, Excel links, parsed to text) and video pages (metadata). " +
-			`Without method: ${config.backend === "anysearch" ? "anysearch" : config.backend === "sf" ? "sf" : "browser when the extension is connected, else anysearch"}.`,
+			UPSTREAM_METHODS.trim(),
 		// One line in the tools section.
 		promptSnippet: "Fetch a web page and read its main text, title, source and date",
 		// Rules added while the tool is active.
 		promptGuidelines: [
 			"Use method sf for links to PDF, Word or Excel documents and for video pages, and browser for news and official pages",
 			"When a fetch fails or returns little text, fetch the page again with another method",
+			"Name the method of every call yourself: none is the default",
+			UPSTREAM_RULE,
+			"Method claude reads the page as served: pages built by JavaScript, addresses over 250 characters and sites closed to crawlers need browser",
 		],
 		// Argument schema.
 		parameters: Type.Object({
 			url: Type.String({ description: "http(s) URL of the page" }),
-			method: Type.Optional(
-				Type.Union([Type.Literal("browser"), Type.Literal("anysearch"), Type.Literal("sf")], {
-					description: "browser (Chrome), anysearch (API) or sf (documents and video pages)",
-				}),
+			method: Type.Union(
+				[
+					Type.Literal("browser"),
+					Type.Literal("anysearch"),
+					Type.Literal("sf"),
+					Type.Literal("claude"),
+					Type.Literal("codex"),
+				],
+				{
+					description:
+						"browser (Chrome), anysearch (API), sf (documents and video pages), or claude or codex (the upstream model)",
+				},
 			),
 		}),
 		// Read-only, open world.
@@ -475,12 +542,11 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		executionMode: "sequential",
 		// Fetch the page.
 		async execute(_id, params, signal, _onUpdate, ctx) {
-			// Invalid configuration stops here.
-			if (errors.length > 0) throw new Error(errors.join("\n"));
-			// Web addresses only.
-			if (!isHttpUrl(params.url)) throw new Error(t("fetch.badUrl", { url: params.url }));
+			// The upstream takes any address as it is; the local methods need a web address.
+			if (!isServerWay(params.method) && !isHttpUrl(params.url))
+				throw new Error(t("fetch.badUrl", { url: params.url }));
 			// The backend for this call.
-			const { backend, note } = await pick(params.method, "fetch");
+			const backend = await pick(params.method);
 			// The page from the backend.
 			let page: FetchResult;
 			if (backend === "browser") {
@@ -497,6 +563,12 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				});
 				if (runOut.code !== 0) throw sfError(runOut, config.timeoutMs);
 				page = parseSfFetch(runOut.stdout, params.url);
+			} else if (isServerWay(backend)) {
+				// The upstream reads it.
+				const out = await serverFetch(await serverCall(ctx, backend, signal), params.url).catch((e: unknown) => {
+					throw serverFailure(e);
+				});
+				page = { url: out.url || params.url, title: out.title, content: out.content, date: "" };
 			} else {
 				// AnySearch extract.
 				await anysearchTurn();
@@ -522,7 +594,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				: "";
 			// Report (with the notes) and structured page (without the long text).
 			const unsure = page.unsure ? t("browser.unsure", { url: params.url }) : "";
-			const text = [note, formatFetch(page, backend), unsure, kept.note, left].filter(Boolean).join("\n");
+			const text = [formatFetch(page, backend), unsure, kept.note, left].filter(Boolean).join("\n");
 			return {
 				content: [{ type: "text", text }],
 				details: {

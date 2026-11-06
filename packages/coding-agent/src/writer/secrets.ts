@@ -1,5 +1,5 @@
 /**
- * Keys live only in this process's memory. The user exports JW_KEY (model API) and JW_SEARCH_KEY
+ * Keys live only in this process's memory. The user exports JW_KEY (model API) and ANYSEARCH_KEY
  * (AnySearch) before starting JiaWriter; at startup takeSecrets() moves both values here and deletes
  * them from process.env, so no child process (bash, sf, fd, rg, MCP servers) inherits them, and nothing
  * writes them to a file. Readers ask secret() or build an environment view with withSecrets().
@@ -9,7 +9,7 @@
 import type { AuthContext } from "@earendil-works/pi-ai";
 
 /** The variables that hold keys. */
-export const SECRET_VARS = ["JW_KEY", "JW_SEARCH_KEY"] as const;
+export const SECRET_VARS = ["JW_KEY", "ANYSEARCH_KEY"] as const;
 
 /** Where the values live: one map per process on globalThis, so every copy of this module (the extension
  * loader evaluates some modules a second time) reads the same values. A Symbol.for key is not enumerable

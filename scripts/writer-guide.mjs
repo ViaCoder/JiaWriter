@@ -90,7 +90,7 @@ export function guideHtml(platform) {
 		],
 		[
 			"安装 Chrome 扩展（只需一次）",
-			`<p>JiaWriter 通过这个扩展用你自己的 Chrome 上网检索：先查 Bing，再查 Google，每个引擎看 3 到 5 页结果。没有安装扩展时，它会改用 AnySearch 检索。</p>
+			`<p>JiaWriter 通过这个扩展用你自己的 Chrome 上网检索：先查 Bing，再查 Google，每个引擎看 3 到 5 页结果。没有安装扩展时，模型会用别的方式检索。</p>
 <p>① 打开 Chrome，在地址栏输入 <code>chrome://extensions</code> 并回车。打开右上角的“开发者模式”开关：</p>${img("1-devmode.png", "打开开发者模式")}
 <p>② 点左上角的“加载未打包的扩展程序”，在弹出的窗口里选中解压文件夹里的 <b>chrome-extension</b> 文件夹，点“${p.pick}”：</p>${img("2-load.png", "加载未打包的扩展程序")}
 <p>③ 列表里出现 JiaWriter 就装好了：</p>${img("3-loaded.png", "JiaWriter 扩展已加载")}

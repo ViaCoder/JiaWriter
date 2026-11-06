@@ -104,12 +104,10 @@ export const en: Record<MessageKey, string> = {
 	"search.noQuery": "Provide a search query.",
 	// URL not allowed.
 	"fetch.badUrl": "Only http(s) URLs can be fetched: {url}",
-	// Unknown backend.
-	"search.badBackend": 'JW_SEARCH must be auto, browser, anysearch or sf, not "{value}".',
 	// AnySearch quota exhausted (402 body discarded).
-	"anysearch.quota": "The anonymous AnySearch quota is used up; set JW_SEARCH_KEY and retry.",
+	"anysearch.quota": "The anonymous AnySearch quota is used up; set ANYSEARCH_KEY and retry.",
 	// AnySearch key rejected.
-	"anysearch.auth": "AnySearch rejected the key (HTTP {status}); check JW_SEARCH_KEY.",
+	"anysearch.auth": "AnySearch rejected the key (HTTP {status}); check ANYSEARCH_KEY.",
 	// AnySearch rate limit after the single retry.
 	"anysearch.rate": "AnySearch rate limit reached (HTTP 429); try again later.",
 	// AnySearch could not extract the page.
@@ -204,7 +202,8 @@ export const en: Record<MessageKey, string> = {
 	"topic.missingFields": "missing {fields}",
 	"topic.missingPage": "no page for {file}",
 	"topic.missingSource": "no source: give url, or file and page",
-	"topic.notArchived": "{url} was not opened in this topic yet: read it with web_fetch first",
+	"topic.notArchived":
+		"{url} is not among this topic's search results or pages: search for it or read it with web_fetch first",
 	"topic.itemProblem": "Item {n}: {problem}",
 	"topic.materialAdded": "Recorded {count}; {file} now holds {total}.",
 	"rewind.pick": "Go back to before which message?",
@@ -326,10 +325,6 @@ export const en: Record<MessageKey, string> = {
 	"browser.label": "browser ({detail})",
 	"browser.engineLine": "{engine} {pages} pages",
 	"browser.stopped": "{engine} stopped after page {pages}: {reason}",
-	"browser.fallback":
-		"The JiaWriter extension in Chrome is not connected, so AnySearch was used this time. See /browser to install the extension.",
-	"browser.notConnected":
-		"The JiaWriter extension in Chrome is not connected. Open Chrome and load the extension as /browser shows.",
 	"browser.verify":
 		"{engine} needs you: go to Chrome (the window is in front or flashing in the task bar) and clear the check or sign in. Waiting up to {seconds} s, longer while you work in the window; Esc cancels.",
 	"browser.verifyLeft": "{seconds} s left for the {engine} verification.",
@@ -342,8 +337,16 @@ export const en: Record<MessageKey, string> = {
 		"This machine's clock differs from the model server by about {minutes} min; the model is given the server's time. Check the system time settings.",
 	"search.time": "Searched at: {time}",
 	"search.methodUnavailable":
-		"The browser method is not available now: the JiaWriter extension in Chrome is not connected. Use method=anysearch, or connect the extension as /browser explains.",
-	"search.sfSearchGone": "sf no longer searches (it serves web_fetch only); this search runs as auto.",
+		"The browser method is not available now: the JiaWriter extension in Chrome is not connected. Use another method, or connect the extension as /browser explains.",
+	"search.noMethod": "Name a method for this call: there is no default.",
+	"server.noModel": "No model is set, so the upstream cannot be asked.",
+	"server.noSearch":
+		"The upstream did not run a search, so this method may not work here. Use another method, or tell the user.",
+	"server.noOpen": "The upstream did not open the page. Use another method.",
+	"server.toolError": "The upstream's tool failed: {detail}. Use another method.",
+	"server.pdf": "The upstream returned a PDF, which this method cannot read. Use method=sf.",
+	"server.upstream": "The upstream request failed: {detail}",
+	"server.text": "The upstream's answer:\n{text}\n",
 	"browser.connected": "Chrome extension connected (extension version {version}).",
 	"browser.disconnected": "Chrome extension not connected.",
 	"browser.steps":

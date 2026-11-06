@@ -10,12 +10,6 @@ import { verifyWaitMs } from "../browser/search.ts";
 // Output messages.
 import { t, type WriterLang } from "../i18n/index.ts";
 
-/** Search backends: auto (the browser when its extension is connected, else AnySearch), browser, anysearch, sf. */
-export type SearchBackendName = "auto" | "browser" | "anysearch" | "sf";
-
-/** Every backend name. */
-const BACKENDS: readonly SearchBackendName[] = ["auto", "browser", "anysearch", "sf"];
-
 /** One search result. */
 export interface SearchResult {
 	// Title ("" when the source gives none).
@@ -46,10 +40,8 @@ export interface FetchResult {
 	unsure?: boolean;
 }
 
-/** Plugin configuration from JW_SEARCH* and JW_SF. */
+/** Plugin configuration from JW_SEARCH_* and JW_SF. */
 export interface SearchConfig {
-	// Which backend serves web_search and web_fetch.
-	backend: SearchBackendName;
 	// AnySearch API root.
 	anysearchUrl: string;
 	// AnySearch key ("" = anonymous).
@@ -74,27 +66,17 @@ export const DEFAULT_ANYSEARCH_URL = "https://api.anysearch.com";
 export const DEFAULT_TIMEOUT_S = 300;
 /** Longest page text handed to the model (characters). */
 export const MAX_FETCH_CHARS = 24_000;
-/** Longest snippet shown per result (characters). */
-const MAX_SNIPPET_CHARS = 300;
 
-/** Read the plugin configuration; errors lists invalid values. */
-export function readSearchEnv(env: NodeJS.ProcessEnv): { config: SearchConfig; errors: string[] } {
-	// Collected problems.
-	const errors: string[] = [];
-	// Backend name, auto by default.
-	const raw = (env.JW_SEARCH ?? "").trim().toLowerCase() || "auto";
-	// Only the known backends.
-	const known = BACKENDS.includes(raw as SearchBackendName);
-	if (!known) errors.push(t("search.badBackend", { value: raw }));
+/** Read the plugin configuration. */
+export function readSearchEnv(env: NodeJS.ProcessEnv): SearchConfig {
 	// Pages per engine: 3–5, default 3.
 	const pages = Math.round(Number(env.JW_SEARCH_PAGES ?? ""));
 	// Timeout in seconds (positive number), else the default.
 	const seconds = Number(env.JW_SEARCH_TIMEOUT ?? "");
 	// The configuration.
-	const config: SearchConfig = {
-		backend: known ? (raw as SearchBackendName) : "auto",
+	return {
 		anysearchUrl: (env.JW_SEARCH_URL ?? "").trim().replace(/\/+$/, "") || DEFAULT_ANYSEARCH_URL,
-		anysearchKey: (env.JW_SEARCH_KEY ?? "").trim(),
+		anysearchKey: (env.ANYSEARCH_KEY ?? "").trim(),
 		sfPath: (env.JW_SF ?? "").trim(),
 		timeoutMs: (Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_TIMEOUT_S) * 1000,
 		blocklist: (env.JW_SEARCH_BLOCK ?? "")
@@ -105,8 +87,6 @@ export function readSearchEnv(env: NodeJS.ProcessEnv): { config: SearchConfig; e
 		pages: Number.isFinite(pages) && pages > 0 ? Math.max(3, Math.min(5, pages)) : 3,
 		verifyWaitMs: verifyWaitMs(env.JW_VERIFY_WAIT),
 	};
-	// Both.
-	return { config, errors };
 }
 
 /** True for an absolute http(s) URL. */
@@ -186,27 +166,21 @@ export function cleanWebText(text: string): string {
 	return text.replace(/<!--[\s\S]*?-->/g, "").replace(INVISIBLE, "");
 }
 
-/** Clean a backend's raw results: http(s) only, blocked hosts dropped, duplicates removed, dates filled in, snippets bounded. */
-export function normalizeResults(
-	raw: readonly SearchResult[],
-	blocklist: readonly string[],
-	max: number,
-): SearchResult[] {
+/** Clean a backend's raw results: everything stays except hosts the user blocked and repeats; dates are filled in. */
+export function normalizeResults(raw: readonly SearchResult[], blocklist: readonly string[]): SearchResult[] {
 	// Kept results.
 	const out: SearchResult[] = [];
 	// URLs already kept (without the fragment).
 	const seen = new Set<string>();
 	// Each raw result.
 	for (const r of raw) {
-		// Only web addresses.
-		if (!isHttpUrl(r.url)) continue;
 		// Dedupe key.
 		const key = r.url.replace(/#.*$/, "");
 		// Duplicates and blocked hosts are dropped.
 		if (seen.has(key) || isBlocked(hostOf(r.url), blocklist)) continue;
 		seen.add(key);
-		// Snippet in one line, bounded.
-		const snippet = cleanWebText(r.snippet).replace(/\s+/g, " ").trim().slice(0, MAX_SNIPPET_CHARS);
+		// Snippet in one line, in full.
+		const snippet = cleanWebText(r.snippet).replace(/\s+/g, " ").trim();
 		// Date from the backend, else from the title/snippet, else from the URL path.
 		out.push({
 			title: cleanWebText(r.title).trim() || r.url,
@@ -214,8 +188,6 @@ export function normalizeResults(
 			snippet,
 			date: r.date || findDate(`${r.title} ${snippet}`) || urlDate(r.url),
 		});
-		// Enough.
-		if (out.length >= max) break;
 	}
 	// The results.
 	return out;

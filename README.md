@@ -29,12 +29,11 @@ The model is configured with environment variables. OpenAI Responses, OpenAI Cha
 | `JW_OUT` | Maximum output (tokens) | 128000 |
 | `JW_EFFORT` | Thinking intensity: `off`, `low`, `medium`, `high`, `xhigh`, `max`; the nearest level is used when the model lacks one | `medium` |
 | `JW_LANG` | Interface and tool-output language: `zh`, `en` | `zh` |
-| `JW_SEARCH` | Default search method when the model names none: `auto`, `browser`, `anysearch`; `sf` makes sf the default for reading pages | `auto` |
 | `JW_ENGINES` | Engines the browser method uses, in order, when the model names none: `bing`, `google`, `baidu`, `sogou` | `bing,google` |
 | `JW_VERIFY_WAIT` | Longest wait for you to clear a human check (seconds, 0–300; 0: no wait) | `180` |
 | `JW_SEARCH_PAGES` | Results pages per engine for the browser backend (3–5) | `3` |
 | `JW_AUTO_EXPORT` | `off` stops the automatic docx export at the end of each run | on |
-| `JW_SEARCH_KEY` | AnySearch key | anonymous when unset |
+| `ANYSEARCH_KEY` | AnySearch key | anonymous when unset |
 | `JW_SF` | Path of the search_fetch program | standard places |
 | `PROMPT_ADD` | Text file added to the persona, for example `PROMPT_ADD='~/Downloads/glm.txt'`; its text follows the persona inside the same `<system_prompt>` tag | none |
 
@@ -47,7 +46,7 @@ Setting them (replace the example values):
 
 To detect the API type, JiaWriter sends one invalid request to each of three endpoints (an output limit of 0); servers reject it during validation, so nothing is generated and no tokens are used. The result is cached in `~/.jiawriter/agent/api-detect.json` without the key. 
 
-At startup JiaWriter reads `JW_KEY` and `JW_SEARCH_KEY` into memory and removes them from its own environment, so the shell, sf, fd, rg, MCP servers and other child processes it starts never see a key; no key is written to a file, and `/jw` shows only whether each one is set.
+At startup JiaWriter reads `JW_KEY` and `ANYSEARCH_KEY` into memory and removes them from its own environment, so the shell, sf, fd, rg, MCP servers and other child processes it starts never see a key; no key is written to a file, and `/jw` shows only whether each one is set.
 
 Run `/jw` inside JiaWriter to see each variable's value in effect, where it comes from, and the setup commands for your platform.
 
@@ -139,7 +138,7 @@ A skill made from a session collects only what you wrote in the current session 
 
 The model plans how to search and read for each question: it can rephrase the query, switch engines or switch methods and search several times. The tool descriptions give each method's strengths and costs and the rules for writing queries: 2–6 key terms, Chinese for Chinese sources and English for international ones, the year and month or the date plus a time filter for recent events, and `site:` for official sites.
 
-- `web_search` has two methods:
+- `web_search` has four methods, and the model names one on every call; none is the default:
   - `browser`: your own Chrome, with any of Bing, Google, Baidu and Sogou (several per search; Bing and Google when none is named). It needs the Chrome extension connected and works on all six platforms. The jiawriter program itself is the extension's native messaging host; a release build registers it with Chrome at startup (Chrome's NativeMessagingHosts folder on Linux and macOS, the current user's registry on Windows), with no Python or other dependency.
     - Searching works as a person does: open the engine's home page, move the mouse to the search box and click, type the query one character at a time, press Enter, scroll through the results and click "Next", 3–5 pages per engine. Characters are 0.14–0.32 s apart with an occasional pause of 0.5–1 s. The mouse moves on a curved path that speeds up and slows down, with a slight tremor, now and then overshooting a distant target and coming back; while reading, the hand drifts a little. A cookie consent dialog is accepted by clicking. Clicks, typing and scrolling go through the Input domain of `chrome.debugger`, so the page receives trusted events (isTrusted) like a real mouse and keyboard. Only the time filter (`fresh`) is added as the engine's parameter to the results address, because its menu is several clicks deep.
     - The search box, the search button, a cookie dialog's accept button and "Next" are found through what Chrome tells screen readers (the accessibility tree): each element's role (text field, button, link), its shown name and its place on screen; a "Next" without a name (Baidu draws only an arrow) is the link that leads to the next page of the same query. One set of rules serves all four engines, no CSS class names are read, and a site redesign does not break it; the results list is read from the accessibility tree as well (a heading with a link is one result, the other text in its block the snippet, blocks labelled as ads are skipped). Page code is read only where it is needed: when the accessibility tree has no matching control or no result, and to replace Baidu's and Sogou's redirect links with the real addresses. Sogou has no "Next": scrolling to the bottom loads more results. Baidu results carry their real addresses; Sogou's links are encrypted redirects, and reading one records the address it leads to.
@@ -148,11 +147,13 @@ The model plans how to search and read for each question: it can rephrase the qu
     - Human checks: the program judges a page by its make-up (status 401/403/429/503, or sent to a verification or login address, and a very small page), not by wording, so ordinary pages never wait. On a wall the Chrome window comes to the front or flashes in the task bar, the terminal rings and a status line counts down, for up to `JW_VERIFY_WAIT` seconds (180 by default), longer while you work in the window, at most 5 minutes. Each site waits once a run. If it is not cleared, or a page merely looks wrong, work goes on and the page stays open in Chrome; say when it is done and it is read again, and an engine set aside returns at your next message. Esc or Ctrl+C cancels at any time.
     - Before the first use, load the extension: open `chrome://extensions`, turn on Developer mode, click "Load unpacked" and choose the package's `chrome-extension` folder. Check with `/browser`.
   - `anysearch`: the AnySearch API; fast, needs no Chrome, results carry no dates; anonymous when no key is set.
-  - When the model names no method, `JW_SEARCH` decides: `auto` by default, the browser when the extension is connected, else AnySearch with a note at the top of the results.
-- `web_fetch` has three methods:
+  - `claude` and `codex`: the upstream model searches by itself, in a request of its own with the conversation's model and effort. Tell the model in your prompt (or `PROMPT_ADD`) that the upstream supports it; `claude` is for Claude models and `codex` for Codex and GPT models, whatever the real upstream is. API keys and OAuth-style upstreams both work: a plain request goes first, and one OAuth-style request follows on 401, 403 or 404.
+- `web_fetch` has five methods, again with no default:
   - `browser`: open the page in Chrome. A result still shown on an open results page is clicked there and the tab goes back afterwards; other addresses open in a new tab. The page is scrolled a few times, then Readability (Firefox's reader-mode algorithm) extracts the text; PDF and Word documents are downloaded through Chrome and parsed on this computer.
   - `anysearch`: AnySearch's text extraction API.
   - `sf`: search_fetch, whose pages go through the same extension. It downloads and parses PDF, Word and Excel documents and reads the metadata and subtitles of videos; it does no OCR and no speech recognition. All six packages carry sf (`sf.exe` on Windows, which reaches the native host over a loopback port with a token). sf is a single self-contained file: Python and the packages it uses are inside. Its first run only unpacks that copy once into `~/.jiawriter/agent/sf/`; it downloads and installs nothing.
+  - `claude`: the upstream's fetch tool returns the page text as served; pages built by JavaScript need `browser`, and PDFs need `sf`.
+  - `codex`: OpenAI has no fetch tool, so the upstream opens the page through its search tool and writes the text out; it can be shortened.
   - When a page fails or yields little text, the model can read it again with another method.
 - Time: each user message reaches the model with the local time it was sent at its start, for example `[Sent 2026-11-03 18:42 Tuesday, Asia/Taipei, UTC+08:00]`; the latest one is "now". The text comes from the message's own timestamp and stays the same on every call, so the provider's prompt cache keeps working. Search results start with the search time. When the time in the model server's response headers differs from this computer's by two minutes or more, the model gets the server's time and you are asked to check the system clock.
 

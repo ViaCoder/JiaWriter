@@ -44,7 +44,6 @@ describe("a writing topic", () => {
 	beforeEach(() => {
 		agentDir = mkdtempSync(join(tmpdir(), "jw-flow-"));
 		setCurrentTopic(undefined);
-		vi.stubEnv("JW_SEARCH", "anysearch");
 		vi.stubEnv("JW_DIR", agentDir);
 		vi.stubEnv("JW_LANG", "zh");
 		// Fake AnySearch.
@@ -91,11 +90,12 @@ describe("a writing topic", () => {
 		};
 		harness.setResponses([
 			call("topic_open", { name: "巴黎绿化" }),
-			call("web_search", { query: "巴黎 绿地" }),
-			// A page not opened yet is refused.
+			call("web_search", { query: "巴黎 绿地", method: "anysearch" }),
+			// An address the topic has never seen is refused.
+			call("material_add", { items: [{ ...material, url: "https://elsewhere.example/x" }] }),
+			// A search result is enough.
 			call("material_add", { items: [material] }),
-			call("web_fetch", { url: URL_A }),
-			call("material_add", { items: [material] }),
+			call("web_fetch", { url: URL_A, method: "anysearch" }),
 			call("write", {
 				path: draft,
 				content: "# 巴黎绿化\n\n正文。\n\n## 参考文献\n\n1．[巴黎新增绿地，法新社](https://a.example/news)\n",
@@ -117,7 +117,7 @@ describe("a writing topic", () => {
 		const said = JSON.stringify(harness.session.messages.filter((m) => m.role === "toolResult"));
 		expect(said).not.toMatch(/不可信|untrusted/);
 		expect(page).not.toMatch(/不可信|untrusted/);
-		// The refused call came first: only the second record is there.
+		// The unknown address was refused; the search result went in.
 		const results = harness.session.messages.filter((m) => m.role === "toolResult" && m.toolName === "material_add");
 		expect(results.map((r) => (r as { isError?: boolean }).isError)).toEqual([true, false]);
 		// The draft was edited and exported beside itself; research stayed out of the export.
@@ -157,7 +157,7 @@ describe("a writing topic", () => {
 
 	it("archives into a dated folder when the model never opened a topic", async () => {
 		harness = await setup();
-		harness.setResponses([call("web_search", { query: "绿地" }), fauxAssistantMessage("好")]);
+		harness.setResponses([call("web_search", { query: "绿地", method: "anysearch" }), fauxAssistantMessage("好")]);
 		await harness.session.prompt("查一下");
 		const folder = readdirSync(harness.tempDir).find((f) => f.startsWith("未命名主题-"));
 		expect(folder).toBeDefined();

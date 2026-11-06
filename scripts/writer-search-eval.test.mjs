@@ -97,8 +97,6 @@ test("runSearchEval writes raw.json and table.md and survives a backend that can
 		const raw = JSON.parse(readFileSync(join(dir, "raw.json"), "utf-8"));
 		assert.equal(raw.raw.sf.searches[0].error, "sf missing");
 		assert.equal(readFileSync(join(dir, "table.md"), "utf-8").trim(), table);
-		// A bad JW_SEARCH stops before any request.
-		await assert.rejects(runSearchEval(dir, ["anysearch"], { JW_SEARCH: "exa" }, makeOps), /JW_SEARCH/);
 	} finally {
 		rmSync(dir, { recursive: true, force: true });
 	}

@@ -36,12 +36,11 @@ beforeEach(() => {
 	cwd = realpathSync(mkdtempSync(join(tmpdir(), "wa-search-")));
 	vi.stubEnv("JW_LANG", "zh");
 	vi.stubEnv("JW_KEY", "sk-main-test-1");
-	// Own agent folder: the browser bridge looked up by auto is the test's, not this machine's.
+	// Own agent folder: the browser bridge looked up here is the test's, not this machine's.
 	vi.stubEnv("JW_DIR", join(cwd, "agent"));
 	for (const k of [
-		"JW_SEARCH",
 		"JW_SF",
-		"JW_SEARCH_KEY",
+		"ANYSEARCH_KEY",
 		"JW_SEARCH_BLOCK",
 		"JW_ENGINES",
 		"JW_SEARCH_PAGES",
@@ -141,30 +140,12 @@ function sfLog(): Record<string, unknown>[] {
 }
 
 describe.skipIf(UNIX_ONLY)("writer-search over sf", () => {
-	it("fetches through sf without a driver model, even with a ready main model, and no longer searches with it", async () => {
-		// sf as the default with the fake binary.
-		vi.stubEnv("JW_SEARCH", "sf");
+	it("fetches through sf without a driver model, even with a ready main model", async () => {
+		// The fake binary.
 		vi.stubEnv("JW_SF", fakeSf());
-		vi.stubGlobal(
-			"fetch",
-			async () =>
-				new Response(
-					JSON.stringify({
-						code: 0,
-						data: { results: [{ title: "T", url: "https://a.example/x", snippet: "" }] },
-					}),
-					{
-						status: 200,
-					},
-				),
-		);
 		const map = tools();
-		// A search says that sf no longer searches and runs as auto (AnySearch here).
-		const s = await run(map, "web_search", { query: "-温州" });
-		expect(s.text).toContain("sf 不再用于检索，只用于 web_fetch；本次检索按 auto 处理。");
-		expect(s.details.backend).toBe("anysearch");
-		// Fetch in print mode (the default method is sf), then interactively with method sf.
-		const p = await run(map, "web_fetch", { url: "https://news.example.com/a" });
+		// Fetch in print mode, then interactively.
+		const p = await run(map, "web_fetch", { url: "https://news.example.com/a", method: "sf" });
 		expect(p.text.split("\n")[0]).toBe("网页正文（sf）：https://news.example.com/a");
 		const f = await run(map, "web_fetch", { url: "https://news.example.com/a", method: "sf" }, true);
 		expect(f.text).toContain("正文内容");
@@ -325,8 +306,8 @@ describe("writer-search over the browser", () => {
 		const host = await fakeBrowser();
 		try {
 			const map = tools();
-			// auto finds the connected extension.
-			const s = await run(map, "web_search", { query: "温州", max_results: 20 });
+			// The connected extension does the work.
+			const s = await run(map, "web_search", { query: "温州", method: "browser" });
 			// The search time first, then the report.
 			expect(s.text.split("\n")[0]).toMatch(/^检索时间：\d{4}-\d{2}-\d{2} \d{2}:\d{2} \w+, /);
 			expect(s.text.split("\n")[1]).toBe("检索结果（浏览器（Bing 3 页、Google 3 页），6 条）：温州");
@@ -334,7 +315,7 @@ describe("writer-search over the browser", () => {
 			// The marker that the extension was seen.
 			expect(existsSync(join(cwd, "agent", "browser", "seen"))).toBe(true);
 			// A result on Google's last page is clicked on that page, then the tab goes back.
-			const f = await run(map, "web_fetch", { url: "https://news.example.com/google-3" });
+			const f = await run(map, "web_fetch", { url: "https://news.example.com/google-3", method: "browser" });
 			expect(f.text.split("\n")[0]).toBe("网页正文（browser）：温州新闻");
 			expect(f.details).toMatchObject({ backend: "browser", date: "2026-11-01" });
 			expect(host.ops.slice(-10)).toEqual([
@@ -354,38 +335,32 @@ describe("writer-search over the browser", () => {
 		}
 	}, 60_000);
 
-	it("falls back to AnySearch with a note when the extension is not connected, and fails when browser is required", async () => {
-		vi.stubGlobal(
-			"fetch",
-			async () =>
-				new Response(
-					JSON.stringify({
-						code: 0,
-						data: { results: [{ title: "T", url: "https://a.example/x", snippet: "" }] },
-					}),
-					{ status: 200 },
-				),
-		);
-		const s = await run(tools(), "web_search", { query: "q" });
-		expect(s.text.split("\n")[1]).toBe(
-			"Chrome 里的 JiaWriter 扩展没有连接，本次改用 AnySearch。安装扩展的步骤见 /browser。",
-		);
-		expect(s.details.backend).toBe("anysearch");
+	it("reports an unconnected extension and never moves to AnySearch by itself", async () => {
+		const requests: string[] = [];
+		vi.stubGlobal("fetch", async (url: string) => {
+			requests.push(url);
+			return new Response(
+				JSON.stringify({
+					code: 0,
+					data: { results: [{ title: "T", url: "https://a.example/x", snippet: "" }] },
+				}),
+				{ status: 200 },
+			);
+		});
 		// The model asked for the browser: it learns that it cannot be used now.
 		await expect(run(tools(), "web_search", { query: "q", method: "browser" })).rejects.toThrow(
 			"browser 方式现在不可用",
 		);
+		expect(requests).toEqual([]);
 		// The model asked for AnySearch: no note.
 		const a = await run(tools(), "web_search", { query: "q", method: "anysearch" });
 		expect(a.text.split("\n")[1]).toContain("检索结果（anysearch");
-		vi.stubEnv("JW_SEARCH", "browser");
-		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("Chrome 里的 JiaWriter 扩展没有连接");
 	});
 });
 
 describe("writer-search over AnySearch", () => {
 	it("reports results with dates, applies the blocklist and hides a 402 body", async () => {
-		// Default backend; one blocked host.
+		// One blocked host.
 		vi.stubEnv("JW_SEARCH_BLOCK", "spam.example");
 		const calls: string[] = [];
 		const replies = [
@@ -409,13 +384,15 @@ describe("writer-search over AnySearch", () => {
 		});
 		const map = tools();
 		// Search.
-		const s = await run(map, "web_search", { query: "温州", zone: "cn" });
+		const s = await run(map, "web_search", { query: "温州", zone: "cn", method: "anysearch" });
 		expect(s.text).toContain("检索结果（anysearch，1 条）：温州");
 		expect(s.text).not.toContain("spam.example");
 		expect(calls[0]).toBe("https://api.anysearch.com/v1/search");
 		// Quota exhausted: the body never surfaces.
-		const err = await run(map, "web_fetch", { url: "https://a.example/x" }).catch((e: Error) => e);
-		expect((err as Error).message).toBe("AnySearch 匿名额度已用完，可设置 JW_SEARCH_KEY 后重试。");
+		const err = await run(map, "web_fetch", { url: "https://a.example/x", method: "anysearch" }).catch(
+			(e: Error) => e,
+		);
+		expect((err as Error).message).toBe("AnySearch 匿名额度已用完，可设置 ANYSEARCH_KEY 后重试。");
 	});
 	it("asks AnySearch for all it has and hands every result to the model, which does the choosing", async () => {
 		const results = Array.from({ length: 10 }, (_, i) => ({
@@ -428,21 +405,36 @@ describe("writer-search over AnySearch", () => {
 			body = JSON.parse(String(init.body));
 			return new Response(JSON.stringify({ code: 0, data: { results } }), { status: 200 });
 		});
-		const s = await run(tools(), "web_search", { query: "温州", max_results: 3 });
+		const s = await run(tools(), "web_search", { query: "温州", method: "anysearch" });
 		expect(body.max_results).toBe(10);
 		expect(s.text).toContain("检索结果（anysearch，10 条）：温州");
 		// In their order: nothing is ranked, dropped or marked for the model.
 		expect(s.text.indexOf("bbs.example.com/1")).toBeLessThan(s.text.indexOf("reuters.com/2"));
 		expect(s.text).toContain("bbs.example.com/9");
 	});
-	it("rejects a bad backend, an empty query and a non-http URL", async () => {
-		// Unknown backend.
-		vi.stubEnv("JW_SEARCH", "exa");
-		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("JW_SEARCH 只能是");
+	it("rejects a call without a method, an empty query and a non-http URL for the local methods", async () => {
+		// Nothing may go out.
+		const requests: string[] = [];
+		vi.stubGlobal("fetch", async (url: string) => {
+			requests.push(url);
+			return new Response("{}");
+		});
+		// No method.
+		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("要指定 method");
+		await expect(run(tools(), "web_fetch", { url: "https://a.example/x" })).rejects.toThrow("要指定 method");
 		// Empty query and file URL.
-		vi.stubEnv("JW_SEARCH", "");
-		await expect(run(tools(), "web_search", { query: "  " })).rejects.toThrow("请提供检索词");
-		await expect(run(tools(), "web_fetch", { url: "file:///etc/passwd" })).rejects.toThrow("只能抓取 http(s) 网址");
+		await expect(run(tools(), "web_search", { query: "  ", method: "anysearch" })).rejects.toThrow("请提供检索词");
+		await expect(run(tools(), "web_fetch", { url: "file:///etc/passwd", method: "anysearch" })).rejects.toThrow(
+			"只能抓取 http(s) 网址",
+		);
+		expect(requests).toEqual([]);
+	});
+	it("needs a method in both schemas", () => {
+		// The model sees it as required.
+		for (const name of ["web_search", "web_fetch"]) {
+			const required = (tools().get(name)?.parameters as { required?: string[] }).required;
+			expect(required).toContain("method");
+		}
 	});
 });
 

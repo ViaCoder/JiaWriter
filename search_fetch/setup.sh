@@ -3,7 +3,7 @@
 # tool imports cleanly by running the entry point JiaWriter spawns (sf.py, through home/sf).
 # A broken install therefore fails HERE, loudly, instead of inside a later web_search call.
 #
-# search_fetch is JiaWriter's JW_SEARCH=sf backend (a subprocess, JW_SF=<this dir>/home/sf);
+# search_fetch is JiaWriter's method=sf backend (a subprocess, JW_SF=<this dir>/home/sf);
 # it uses no driver model (LLM) and needs no key.
 #
 # ALL runtime state lives INSIDE the package tree, under $SEARCH_FETCH_HOME (default
@@ -144,7 +144,6 @@ cat <<EOF
 
 ==> Setup complete in ${SECONDS}s.
     JiaWriter wiring:
-      JW_SEARCH=sf
       JW_SF=$SEARCH_FETCH_HOME/sf
 
     Direct self-test (no key needed):

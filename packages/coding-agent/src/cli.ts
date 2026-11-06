@@ -7,7 +7,7 @@ import { hostMain, isHostArgv } from "./writer/browser/bridge.ts";
 // JiaWriter: keys move from the environment into memory before anything else runs.
 import { takeSecrets } from "./writer/secrets.ts";
 
-// JiaWriter: JW_KEY and JW_SEARCH_KEY leave process.env here, so no child process inherits them.
+// JiaWriter: JW_KEY and ANYSEARCH_KEY leave process.env here, so no child process inherits them.
 takeSecrets();
 const args = process.argv.slice(2);
 if (isHostArgv(args)) {

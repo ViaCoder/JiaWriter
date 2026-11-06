@@ -19,13 +19,11 @@ import {
 } from "../../src/writer/websearch/core.ts";
 
 describe("readSearchEnv", () => {
-	it("defaults to auto (browser, else anonymous AnySearch) with a 300 s timeout, Bing then Google, 3 pages", () => {
+	it("defaults to anonymous AnySearch settings, a 300 s timeout, Bing then Google, 3 pages", () => {
 		// Empty environment.
-		const { config, errors } = readSearchEnv({});
+		const config = readSearchEnv({});
 		// Defaults.
-		expect(errors).toEqual([]);
 		expect(config).toEqual({
-			backend: "auto",
 			anysearchUrl: DEFAULT_ANYSEARCH_URL,
 			anysearchKey: "",
 			sfPath: "",
@@ -36,12 +34,12 @@ describe("readSearchEnv", () => {
 			verifyWaitMs: 180_000,
 		});
 	});
-	it("reads every variable and reports an unknown backend", () => {
+	it("reads every variable and ignores JW_SEARCH, which is gone", () => {
 		// All set.
-		const { config } = readSearchEnv({
-			JW_SEARCH: " SF ",
+		const config = readSearchEnv({
+			JW_SEARCH: "exa",
 			JW_SEARCH_URL: "http://h/",
-			JW_SEARCH_KEY: "k",
+			ANYSEARCH_KEY: "k",
 			JW_SF: "/x/sf",
 			JW_SEARCH_TIMEOUT: "60",
 			JW_SEARCH_BLOCK: "Spam.example, .junk.example",
@@ -51,7 +49,6 @@ describe("readSearchEnv", () => {
 		});
 		// Parsed.
 		expect(config).toEqual({
-			backend: "sf",
 			anysearchUrl: "http://h",
 			anysearchKey: "k",
 			sfPath: "/x/sf",
@@ -61,13 +58,8 @@ describe("readSearchEnv", () => {
 			pages: 5,
 			verifyWaitMs: 45_000,
 		});
-		// The browser backends are known; pages below 3 become 3.
-		expect(readSearchEnv({ JW_SEARCH: "browser", JW_SEARCH_PAGES: "1" }).config).toMatchObject({
-			backend: "browser",
-			pages: 3,
-		});
-		// Unknown backend.
-		expect(readSearchEnv({ JW_SEARCH: "exa", JW_LANG: "zh" }).errors[0]).toContain("「exa」");
+		// Pages below 3 become 3.
+		expect(readSearchEnv({ JW_SEARCH_PAGES: "1" }).pages).toBe(3);
 	});
 });
 
@@ -116,7 +108,7 @@ describe("urlDate", () => {
 });
 
 describe("normalizeResults", () => {
-	it("keeps http(s), drops duplicates and blocked hosts, fills dates, bounds the count", () => {
+	it("keeps every result but repeats and blocked hosts, and fills dates", () => {
 		// Raw results.
 		const raw = [
 			{ title: "A", url: "https://a.example/x", snippet: "  2026-10-30\n  report ", date: "" },
@@ -127,17 +119,29 @@ describe("normalizeResults", () => {
 			{ title: "C", url: "https://c.example/", snippet: "", date: "" },
 		];
 		// Cleaned.
-		const out = normalizeResults(raw, ["spam.example"], 2);
+		const out = normalizeResults(raw, ["spam.example"]);
 		// A date only in the URL path is used last.
 		expect(
-			normalizeResults([{ title: "T", url: "https://r.example/x-2026-11-01/", snippet: "", date: "" }], [], 5)[0]
-				.date,
+			normalizeResults([{ title: "T", url: "https://r.example/x-2026-11-01/", snippet: "", date: "" }], [])[0].date,
 		).toBe("2026-11-01");
-		// Two kept, date filled, title defaulted.
+		// All kept, any kind of address, date filled, title defaulted.
 		expect(out).toEqual([
 			{ title: "A", url: "https://a.example/x", snippet: "2026-10-30 report", date: "2026-10-30" },
+			{ title: "Local", url: "file:///x", snippet: "", date: "" },
 			{ title: "https://b.example/", url: "https://b.example/", snippet: "", date: "1 day ago" },
+			{ title: "C", url: "https://c.example/", snippet: "", date: "" },
 		]);
+		// A long snippet stays whole.
+		const long = "长".repeat(5000);
+		expect(normalizeResults([{ title: "T", url: "u", snippet: long, date: "" }], [])[0].snippet).toBe(long);
+		// Many results all stay.
+		const many = Array.from({ length: 100 }, (_, i) => ({
+			title: "T",
+			url: `https://a.example/${i}`,
+			snippet: "",
+			date: "",
+		}));
+		expect(normalizeResults(many, [])).toHaveLength(100);
 	});
 });
 
@@ -154,7 +158,6 @@ describe("cleanWebText", () => {
 		const [r] = normalizeResults(
 			[{ title: "标\u200B题", url: "https://a.example/", snippet: "摘<!-- x -->要", date: "" }],
 			[],
-			5,
 		);
 		expect([r.title, r.snippet]).toEqual(["标题", "摘要"]);
 	});

@@ -1,6 +1,6 @@
-# search_fetch — JiaWriter 的检索后端（`JW_SEARCH=sf`）
+# search_fetch — JiaWriter 的读取后端（`method=sf`）
 
-JiaWriter 的 `web_search` / `web_fetch` 工具在 `JW_SEARCH=sf` 时以子进程调用本程序
+JiaWriter 的 `web_fetch` 工具在模型选择 `method=sf` 时以子进程调用本程序
 （`sf search --json …`、`sf fetch --json …`，参数不经 shell，查询词和 URL 放在 `--` 之后）。
 它通过 **search_fetch 扩展在你自己的 Chrome 专用窗口里**打开网页，再用 crawl4ai 转成 markdown：
 真实浏览器、真实的 Cookie 与登录状态，产物全部落盘，可以复查。
@@ -69,7 +69,7 @@ home/venv/bin/python3 sf.py bridge install     # 一次：复制扩展、写 nat
 home/venv/bin/python3 sf.py bridge status      # connected=true 即可（保持 Chrome 开着）
 ```
 
-在 JiaWriter 里使用：`JW_SEARCH=sf`，`JW_SF` 指向 sf 程序（源码开发时可指向一个调用
+在 JiaWriter 里使用：`JW_SF` 指向 sf 程序（源码开发时可指向一个调用
 `home/venv/bin/python3 sf.py "$@"` 的脚本）。直接自测：
 
 ```bash
