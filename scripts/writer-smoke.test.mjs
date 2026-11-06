@@ -61,7 +61,7 @@ else if (a[1] === "导入并导出") {
   await fetch(process.env.JW_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.JW_KEY }, body: JSON.stringify({ max_tokens: 100, messages: [{ role: "tool", content: "✗ 领导讲话不用三级标题" }] }) });
   console.log(${JSON.stringify(REPLY)});
 } else {
-  const body = { max_tokens: 100, messages: [{ role: "system", content: "You are an expert writing assistant. <name>report-analysis</name> <name>lieflat-gongwen</name>" }],
+  const body = { max_tokens: 100, messages: [{ role: "system", content: "You are JiaWriter, a general-purpose assistant. <name>report-analysis</name> <name>lieflat-gongwen</name>" }],
     tools: ${JSON.stringify(TOOLS)}.map((name) => ({ type: "function", function: { name } })) };
   const res = await fetch(process.env.JW_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.JW_KEY }, body: JSON.stringify(body) });
   const text = await res.text();

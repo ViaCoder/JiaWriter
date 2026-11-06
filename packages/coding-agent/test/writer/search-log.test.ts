@@ -23,8 +23,11 @@ describe("appendSearchLog", () => {
 		appendSearchLog("one", file);
 		appendSearchLog("two", file);
 		expect(readFileSync(file, "utf8")).toBe("one\ntwo\n");
-		expect(statSync(file).mode & 0o777).toBe(0o600);
-		expect(statSync(join(dir, "logs")).mode & 0o777).toBe(0o700);
+		// Windows has no such permission bits.
+		if (process.platform !== "win32") {
+			expect(statSync(file).mode & 0o777).toBe(0o600);
+			expect(statSync(join(dir, "logs")).mode & 0o777).toBe(0o700);
+		}
 	});
 
 	it("moves a full log aside once, so the disk never fills", () => {
