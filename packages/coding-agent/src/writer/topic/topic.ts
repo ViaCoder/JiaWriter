@@ -10,7 +10,7 @@
  */
 
 // Files.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 // Paths.
 import { basename, join } from "node:path";
 // URL comparison shared with the reference check.
@@ -70,10 +70,8 @@ export function safeName(text: string): string {
 	return text
 		.replace(/[\\/:*?"<>|\u0000-\u001f]/g, " ")
 		.replace(/\s+/g, " ")
-		.trim()
-		.replace(/^\.+|\.+$/g, "")
 		.slice(0, MAX_NAME)
-		.trim();
+		.replace(/^[\s.]+|[\s.]+$/g, "");
 }
 
 /** Folder of a topic: the working folder itself when it already carries the topic's name. */
@@ -98,6 +96,21 @@ export function unnamedTopic(now: Date): string {
 	// The day in local time, YYYYMMDD.
 	const p = (n: number) => String(n).padStart(2, "0");
 	return `未命名主题-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}`;
+}
+
+/** True for the folder made when work started before a topic was named. */
+export function isUnnamedTopic(dir: string): boolean {
+	return /^未命名主题-\d{8}$/.test(basename(dir));
+}
+
+/** Give an unnamed folder its topic's name, so research done first stays with the draft; false when that name is taken. */
+export function adoptUnnamedTopic(unnamed: string, cwd: string, name: string): boolean {
+	const clean = safeName(name);
+	if (!clean || !isUnnamedTopic(unnamed) || !existsSync(unnamed)) return false;
+	const target = topicPath(cwd, clean);
+	if (existsSync(target)) return false;
+	renameSync(unnamed, target);
+	return true;
 }
 
 /** The archive index of a topic (lines that cannot be read are skipped). */
@@ -176,6 +189,9 @@ export function archivePage(
 	].join("\n");
 	if (known) {
 		writeFileSync(join(dir, known.file), `${head}${page.content}\n`);
+		// A new way to the same page counts as archived too.
+		if (requested !== page.url && requested !== known.requested)
+			appendFileSync(join(dir, INDEX_FILE), `${JSON.stringify({ ...known, requested })}\n`);
 		return known.file;
 	}
 	const asked = requested !== page.url ? requested : undefined;

@@ -489,10 +489,7 @@ describe("AgentSession compaction characterization", () => {
 			const order: string[] = [];
 			const observedSettings: unknown[] = [];
 			const harness = await createHarness({
-				// JiaWriter: 3600 instead of 2600. The writing system prompt is longer, which left the request
-				// after compaction within a few characters of the window, so the random length of faux
-				// tool-call ids decided whether a second (overflow) compaction followed.
-				models: [{ id: "faux-1", contextWindow: 3600, maxTokens: 100 }],
+				models: [{ id: "faux-1", contextWindow: 2600, maxTokens: 100 }],
 				settings: {
 					compaction: modelOverride
 						? {

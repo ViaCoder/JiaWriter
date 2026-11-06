@@ -9,10 +9,11 @@ import writerDocsExtension from "./writer-docs/index.ts";
 import writerEnvExtension from "./writer-env/index.ts";
 // JiaWriter: gongwen_check for the lieflat-gongwen skill (PolyForm Noncommercial, see its LICENSE).
 import writerGongwenExtension from "./writer-gongwen/index.ts";
+// JiaWriter: web_search and web_fetch (AnySearch or search_fetch in the user's Chrome).
+import writerPromptsExtension from "./writer-prompts/index.ts";
 // JiaWriter: read-only writing checks (style_check, word_count, readability_check).
 // JiaWriter: going back in the conversation and the files.
 import writerRewindExtension from "./writer-rewind/index.ts";
-// JiaWriter: web_search and web_fetch (AnySearch or search_fetch in the user's Chrome).
 import writerSearchExtension from "./writer-search/index.ts";
 // JiaWriter: built-in writing skills, /skills and /skill-new.
 import writerSkillsExtension from "./writer-skills/index.ts";
@@ -30,6 +31,7 @@ export const builtInExtensions: InlineExtension[] = [
 	// JiaWriter: the 公文 self-check.
 	{ name: "writer-gongwen", factory: writerGongwenExtension, builtin: true },
 	// JiaWriter: web search.
+	{ name: "writer-prompts", factory: writerPromptsExtension, builtin: true },
 	{ name: "writer-search", factory: writerSearchExtension, builtin: true },
 	// JiaWriter: reference import and draft export.
 	{ name: "writer-topic", factory: writerTopicExtension, builtin: true },

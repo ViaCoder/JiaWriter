@@ -18,14 +18,12 @@ metadata:
 
 - The title names the subject and the topic.
 - A common structure: background, main findings, causes, recommendations. Each finding has a matching recommendation.
-- After the outline, ask the user which parts need cases or data, unless the plan already says. In those parts open each paragraph with a summary statement, then give a case (time, reporter, acting subject, action) or data point (time, region, industry, indicator, value); write the other parts, such as the current situation and recommendations, in ordinary prose.
 
 ## Content
 
 - Give every figure with its definition, period and source, for example "according to the city statistics bureau, September 2026".
 - Describe each problem by its concrete effects and scope; trace causes to a level where action is possible.
 - Each recommendation states what, who and by when, with target values where they can be measured.
-- Take cases only from the reference files or search results, with date and source. List every source with its title and URL in the References section at the end.
 
 ## Style
 

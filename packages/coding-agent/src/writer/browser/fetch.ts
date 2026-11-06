@@ -176,13 +176,22 @@ export async function documentText(kind: "pdf" | "docx", bytes: Uint8Array): Pro
 	return pages.length > 1 ? pages.map((p, i) => `<!-- page ${i + 1} -->\n${p}`).join("\n\n") : (pages[0] ?? "");
 }
 
+/** A file name from an address: decoded, or as it stands when it is not valid percent-encoding (100%.pdf). */
+export function decodedName(name: string): string {
+	try {
+		return decodeURIComponent(name);
+	} catch {
+		return name;
+	}
+}
+
 /** Download a document through Chrome and parse it. */
 async function fetchDocument(deps: BrowserDeps, url: string, kind: "pdf" | "docx"): Promise<FetchResult> {
 	// Chrome makes the request with the user's cookies.
 	const got = (await deps.call("download", { url }, 120_000)) as { base64: string; url: string };
 	const text = await documentText(kind, new Uint8Array(Buffer.from(got.base64, "base64")));
 	// Title from the file name.
-	const name = decodeURIComponent(new URL(got.url || url).pathname.split("/").pop() || url);
+	const name = decodedName(new URL(got.url || url).pathname.split("/").pop() || url);
 	return { url: got.url || url, title: name, content: text, date: "" };
 }
 

@@ -102,6 +102,8 @@ export class ServerSearchError extends Error {
 
 /** Most searches in one request, the number Claude Code uses. */
 const MAX_SEARCHES = 8;
+/** Output limit of an inner request: the page or the results come from the tools, not the reply. */
+const REPLY_TOKENS = 16_000;
 /** Most resumes of a paused turn: a guard against a reply that never ends. */
 const MAX_ROUNDS = 5;
 /** Statuses that may mean the other request style is wanted. */
@@ -117,11 +119,13 @@ const CLAUDE_FETCH: BetaToolUnion = { type: "web_fetch_20250910", name: "web_fet
 /** Sources are only listed when asked for. */
 const CODEX_INCLUDE = "web_search_call.action.sources";
 /** Instructions of a search. */
-const SEARCH_RULES = "Search the web for the query and report what you find, naming each source.";
+const SEARCH_RULES =
+	"Search the web for the query, always, and never answer from memory. Report only what the results say, with the date and the source of each fact.";
 /** Instructions of a page read on the "claude" way: the text comes from the tool, not the reply. */
-const FETCH_RULES = "Fetch the page the user names, then reply with one short sentence.";
+const FETCH_RULES = "Fetch the exact page the user names with the fetch tool, then reply with one short sentence.";
 /** Instructions of a page read on the "codex" way: the reply is all there is. */
-const OPEN_RULES = "Open the page the user names and write out its full text, word for word, with no comments.";
+const OPEN_RULES =
+	"Open the exact page the user names with the web search tool, and never answer from memory. Write out the page's full text, word for word, in its own language, with no summary and no comments.";
 
 /** Status of a failed request, or undefined when it never got one. */
 function statusOf(error: unknown): number | undefined {
@@ -247,7 +251,7 @@ async function claudeBlocks(
 			.stream(
 				{
 					model: call.model.id,
-					max_tokens: call.model.maxTokens,
+					max_tokens: Math.min(call.model.maxTokens, REPLY_TOKENS),
 					system,
 					messages,
 					tools: [tool],

@@ -8,12 +8,17 @@
 // Unzip.
 import { strFromU8, unzipSync } from "fflate";
 
+/** A numeric entity's character; one outside Unicode stays as written instead of failing the whole file. */
+function codePoint(entity: string, code: number): string {
+	return code <= 0x10ffff ? String.fromCodePoint(code) : entity;
+}
+
 /** XML text → plain text (the five predefined entities and numeric references). */
 export function decodeXml(s: string): string {
 	// Numeric references first, then the named ones (&amp; last).
 	return s
-		.replace(/&#x([0-9a-f]+);/gi, (_m, h: string) => String.fromCodePoint(Number.parseInt(h, 16)))
-		.replace(/&#(\d+);/g, (_m, d: string) => String.fromCodePoint(Number(d)))
+		.replace(/&#x([0-9a-f]+);/gi, (m, h: string) => codePoint(m, Number.parseInt(h, 16)))
+		.replace(/&#(\d+);/g, (m, d: string) => codePoint(m, Number(d)))
 		.replace(/&lt;/g, "<")
 		.replace(/&gt;/g, ">")
 		.replace(/&quot;/g, '"')

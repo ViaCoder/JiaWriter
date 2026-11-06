@@ -12,10 +12,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { currentTopic, ensureTopic, setCurrentTopic, topicFromEntries } from "../../src/writer/topic/current.ts";
 import {
 	addMaterials,
+	adoptUnnamedTopic,
 	archivedUrls,
 	archiveFiltered,
 	archivePage,
 	archiveSearch,
+	isUnnamedTopic,
 	type Material,
 	materialProblem,
 	materialUrls,
@@ -81,6 +83,32 @@ describe("names and folders", () => {
 
 	it("names a topic by the local day when work starts without one", () => {
 		expect(unnamedTopic(new Date(2026, 10, 5))).toBe("未命名主题-20261105");
+	});
+});
+
+describe("adoptUnnamedTopic", () => {
+	it("recognises only the folder made for unnamed work", () => {
+		expect(isUnnamedTopic(join(cwd, unnamedTopic(new Date(2026, 10, 6))))).toBe(true);
+		expect(isUnnamedTopic(join(cwd, "未命名主题"))).toBe(false);
+		expect(isUnnamedTopic(join(cwd, "绿化"))).toBe(false);
+	});
+
+	it("gives research done first the topic's name, with its archive", () => {
+		const { dir } = openTopic(cwd, unnamedTopic(new Date(2026, 10, 6)));
+		archiveSearch(dir, "甲", "结果", "时间", ["https://a.example/x"]);
+		expect(adoptUnnamedTopic(dir, cwd, "城市绿化")).toBe(true);
+		const named = join(cwd, "城市绿化");
+		expect(existsSync(dir)).toBe(false);
+		expect(materialUrls(named)).toEqual(["a.example/x"]);
+	});
+
+	it("leaves everything alone when the name is taken, the folder is named, or the name is empty", () => {
+		const unnamed = openTopic(cwd, unnamedTopic(new Date(2026, 10, 6))).dir;
+		openTopic(cwd, "已有");
+		expect(adoptUnnamedTopic(unnamed, cwd, "已有")).toBe(false);
+		expect(adoptUnnamedTopic(unnamed, cwd, "///")).toBe(false);
+		expect(existsSync(unnamed)).toBe(true);
+		expect(adoptUnnamedTopic(openTopic(cwd, "别的").dir, cwd, "新名")).toBe(false);
 	});
 });
 

@@ -207,7 +207,7 @@ describe("writer-env time notes", () => {
 			{ role: "assistant", content: [{ type: "text", text: "好" }], timestamp: Date.UTC(2026, 10, 3, 10, 43) },
 		];
 		const out = handlers.context({ type: "context", messages }, {}) as { messages: { content: unknown }[] };
-		expect(String(out.messages[0].content)).toMatch(/^\[Sent 2026-11-03 \d{2}:\d{2} Tuesday, [^\]]+\]\n写一篇综述$/);
+		expect(String(out.messages[0].content)).toMatch(/^\[Date: 2026-11-03 Tuesday, [^\]]+\]\n写一篇综述$/);
 		expect(out.messages[1]).toBe(messages[1]);
 	});
 

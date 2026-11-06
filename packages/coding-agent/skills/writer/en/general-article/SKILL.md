@@ -30,5 +30,4 @@ metadata:
 ## Final checks
 
 - Run style_check on the finished draft, rewrite only the flagged sentences, and run it again until it passes.
-- Check the length with word_count and long sentences with readability_check.
 - Export a .docx with export_document when the user needs a file.

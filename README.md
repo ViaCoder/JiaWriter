@@ -25,8 +25,8 @@ The model is configured with environment variables. OpenAI Responses, OpenAI Cha
 | `JW_KEY` | API key | required |
 | `JW_MODEL` | Model name | required |
 | `JW_API` | API type: `anthropic-messages`, `openai-responses`, `openai-completions` | detected |
-| `JW_CTX` | Context window (tokens) | 128000 |
-| `JW_OUT` | Maximum output (tokens) | 128000 |
+| `JW_CTX` | Context window (tokens; 128k and 1m also work) | 128000 |
+| `JW_OUT` | Maximum output (tokens; 128k and 1m also work) | 128000 |
 | `JW_EFFORT` | Thinking intensity: `off`, `low`, `medium`, `high`, `xhigh`, `max`; the nearest level is used when the model lacks one | `medium` |
 | `JW_LANG` | Interface and tool-output language: `zh`, `en` | `zh` |
 | `JW_ENGINES` | Engines the browser method uses, in order, when the model names none: `bing`, `google`, `baidu`, `sogou` | `bing,google` |

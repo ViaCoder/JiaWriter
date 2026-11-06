@@ -341,32 +341,19 @@ describe("web_fetch with the upstream methods", () => {
 	});
 });
 
-describe("the prompt", () => {
-	/** The text a model reads for one tool. */
-	function words(name: string): string {
-		const tool = tools().get(name);
-		return [tool?.description, ...(tool?.promptGuidelines ?? [])].join("\n");
-	}
-
-	it("leaves the choice to the model, with no default", () => {
+describe("the tool descriptions", () => {
+	it("name no default and no removed setting", () => {
 		for (const name of ["web_search", "web_fetch"]) {
-			expect(words(name)).toContain("none is the default");
-			expect(words(name)).not.toContain("Without method");
-			expect(words(name)).not.toContain("JW_SEARCH");
+			const text = tools().get(name)?.description ?? "";
+			expect(text).not.toContain("Without method");
+			expect(text).not.toContain("JW_SEARCH");
 		}
 	});
 
-	it("uses the upstream methods only when the user's prompt says the upstream supports them", () => {
-		for (const name of ["web_search", "web_fetch"]) {
-			expect(words(name)).toContain("only when the user's prompt says the upstream supports it");
-			expect(words(name)).toContain("claude for Claude models, codex for Codex and GPT models");
-		}
-	});
-
-	it("names the configured model when there is one", () => {
-		expect(words("web_search")).not.toContain("The configured model is");
+	it("name the configured model when there is one", () => {
+		expect(tools().get("web_search")?.description).not.toContain("The configured model is");
 		setWriterModel({ kind: "ready", model: "claude-test" } as unknown as WriterModelState);
-		expect(words("web_search")).toContain("The configured model is claude-test.");
+		expect(tools().get("web_search")?.description).toContain("The configured model is claude-test.");
 	});
 });
 

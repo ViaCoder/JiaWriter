@@ -5,17 +5,12 @@
 import { getSystemMessageText } from "@earendil-works/pi-ai";
 import { getDocsPath, getReadmePath } from "../config.ts";
 import { personaBlock, promptAddText } from "../writer/prompt-add.ts";
-import {
-	WRITER_CHAT_RULE,
-	WRITER_PREAMBLE,
-	WRITER_RULES,
-	WRITER_TOOL_GUIDELINES,
-	WRITER_TOOL_SNIPPETS,
-	writerDefaultSkillRules,
-	writerDocsSection,
-	writerLanguageRule,
-} from "../writer/prompt-text.ts";
+import { WRITER_CHAT_RULE, WRITER_PREAMBLE, writerDocsSection, writerLanguageRule } from "../writer/prompt-text.ts";
+import { CORE_RULES, defaultSkillRule } from "../writer/prompts/core.ts";
 import { formatSkillsForPrompt, type Skill } from "./skills.ts";
+
+/** JiaWriter: built-in tools whose upstream guidelines are replaced by their descriptions and the stages. */
+const WRITER_REPLACED_TOOLS = new Set(["read", "write", "edit", "ls", "find", "grep"]);
 
 export interface BuildSystemPromptOptions {
 	/** Custom system prompt (replaces the default prefix). */
@@ -111,8 +106,10 @@ function buildRules(
 		rules.push(normalized);
 	};
 
-	// JiaWriter: the writing rules come first.
-	for (const rule of WRITER_RULES) addRule(rule);
+	// JiaWriter: the language first, then the rules of every request (writer/prompts/core.ts).
+	addRule(writerLanguageRule(process.env.JW_LANG));
+	addRule(WRITER_CHAT_RULE);
+	for (const rule of CORE_RULES) addRule(rule);
 
 	const hasBash = selectedTools.includes("bash");
 	const hasPowerShell = selectedTools.includes("powershell");
@@ -131,15 +128,10 @@ function buildRules(
 	}
 
 	for (const name of selectedTools) {
-		// JiaWriter: writing-oriented guidelines replace the upstream ones for built-in tools.
-		for (const rule of WRITER_TOOL_GUIDELINES[name] ?? toolGuidelines[name] ?? []) addRule(rule);
+		if (WRITER_REPLACED_TOOLS.has(name)) continue;
+		for (const rule of toolGuidelines[name] ?? []) addRule(rule);
 	}
 	for (const rule of promptGuidelines) addRule(rule);
-	// JiaWriter: reply language from JW_LANG (Chinese by default).
-	addRule(writerLanguageRule(process.env.JW_LANG));
-	// JiaWriter: concise chat, full-length documents (replaces "Be concise in your responses").
-	addRule(WRITER_CHAT_RULE);
-	addRule("Show file paths clearly when working with files");
 	return rules.map((rule) => `- ${rule}`).join("\n");
 }
 
@@ -173,17 +165,14 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 	} else {
 		// JiaWriter: writing assistant instead of coding assistant.
 		promptSections.preamble = WRITER_PREAMBLE;
-		// JiaWriter: writing-oriented summaries replace the upstream ones for built-in tools.
-		const snippetOf = (name: string): string | undefined =>
-			toolSnippets[name] ? (WRITER_TOOL_SNIPPETS[name] ?? toolSnippets[name]) : undefined;
-		const visibleTools = declaredTools.filter((name) => !!snippetOf(name));
-		const tools =
-			visibleTools.length > 0 ? visibleTools.map((name) => `- ${name}: ${snippetOf(name)}`).join("\n") : "(none)";
-		promptSections.tools = `${tools}\n\nIn addition to the tools above, you may have access to other custom tools depending on the project.`;
+		// JiaWriter: JiaWriter's own tools carry their use in their descriptions; other tools stay listed.
+		const listed = declaredTools.filter((name) => toolSnippets[name] && !WRITER_REPLACED_TOOLS.has(name));
+		if (listed.length > 0) promptSections.tools = listed.map((name) => `- ${name}: ${toolSnippets[name]}`).join("\n");
+		else if (declaredTools.length === 0) promptSections.tools = "(none)";
 		// JiaWriter: the default genre's rule follows the skill's on/off state.
 		promptSections.rules = buildRules(declaredTools, toolGuidelines, [
 			...promptGuidelines,
-			...writerDefaultSkillRules(skills),
+			...defaultSkillRule(skills),
 		]);
 		// JiaWriter: documentation pointers for JiaWriter itself.
 		promptSections.docs = writerDocsSection(getReadmePath(), getDocsPath());

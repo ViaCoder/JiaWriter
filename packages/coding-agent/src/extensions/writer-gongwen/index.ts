@@ -28,23 +28,13 @@ export default function writerGongwenExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "公文参数自检",
 		// Full description sent to the model.
-		description: `Self-check of the lieflat-gongwen skill for Chinese official documents (公文). Measures length, sentence length, heading levels (一、/（一）/1.), 一是二是, 顿号 density, mandatory/requirement/suggestion words, percentages, quotes, dashes and loose colons, and compares them with the corpus ranges of the genre: ${GENRES.join("、")}. Only ✗ hard conflicts (a wrong genre) are errors; ⚠ lines are hints. Without genre it ranks the genres by distance. The text stays as it is.`,
-		// One line in the tools section of the system prompt.
-		promptSnippet: "Check a 公文 draft against the corpus parameters of its genre (lieflat-gongwen self-check)",
-		// Rules added to the rules section while the tool is active.
-		promptGuidelines: [
-			"Run gongwen_check with the genre on every 公文 draft written with the lieflat-gongwen skill, fix every ✗ hard conflict, and explain each deliberate ⚠ deviation",
-		],
+		description: "Check a 公文 draft against the corpus figures of its genre",
 		// Argument schema.
 		parameters: Type.Object({
 			// File input.
-			path: Type.Optional(
-				Type.String({ description: "Draft to check (.md, .txt), relative to the working directory" }),
-			),
+			path: Type.Optional(Type.String({ description: "Text file" })),
 			// Inline input.
-			text: Type.Optional(
-				Type.String({ description: "Text to check when there is no file; ignored when path is given" }),
-			),
+			text: Type.Optional(Type.String({ description: "Text, when there is no file" })),
 			// Genre.
 			genre: Type.Optional(Type.String({ description: `One of ${GENRES.join(", ")}; omit to rank the genres` })),
 		}),

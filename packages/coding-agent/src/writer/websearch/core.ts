@@ -166,6 +166,9 @@ export function cleanWebText(text: string): string {
 	return text.replace(/<!--[\s\S]*?-->/g, "").replace(INVISIBLE, "");
 }
 
+/** How much of a snippet is searched for its date. */
+const DATE_CHARS = 300;
+
 /** Clean a backend's raw results: everything stays except hosts the user blocked and repeats; dates are filled in. */
 export function normalizeResults(raw: readonly SearchResult[], blocklist: readonly string[]): SearchResult[] {
 	// Kept results.
@@ -177,7 +180,7 @@ export function normalizeResults(raw: readonly SearchResult[], blocklist: readon
 		// Dedupe key.
 		const key = r.url.replace(/#.*$/, "");
 		// Duplicates and blocked hosts are dropped.
-		if (seen.has(key) || isBlocked(hostOf(r.url), blocklist)) continue;
+		if ((key && seen.has(key)) || isBlocked(hostOf(r.url), blocklist)) continue;
 		seen.add(key);
 		// Snippet in one line, in full.
 		const snippet = cleanWebText(r.snippet).replace(/\s+/g, " ").trim();
@@ -186,7 +189,8 @@ export function normalizeResults(raw: readonly SearchResult[], blocklist: readon
 			title: cleanWebText(r.title).trim() || r.url,
 			url: r.url,
 			snippet,
-			date: r.date || findDate(`${r.title} ${snippet}`) || urlDate(r.url),
+			// The head of the text only: further in, a date is about something else.
+			date: r.date || findDate(`${r.title} ${snippet.slice(0, DATE_CHARS)}`) || urlDate(r.url),
 		});
 	}
 	// The results.

@@ -21,6 +21,7 @@ import {
 	serverSearch,
 } from "@earendil-works/pi-ai/api/server-search.lazy";
 // Parameter schemas.
+import { StringEnum } from "@earendil-works/pi-ai/utils/typebox-helpers";
 import { Type } from "typebox";
 // Agent directory, binary detection, the extension folder.
 import { getAgentDir, getWriterExtensionDir, isBunBinary } from "../../config.ts";
@@ -58,6 +59,8 @@ import { ensureTopic } from "../../writer/topic/current.ts";
 import { archiveFiltered, archivePage, archiveSearch } from "../../writer/topic/topic.ts";
 // AnySearch backend.
 import { anysearchExtract, anysearchSearch } from "../../writer/websearch/anysearch.ts";
+// Arguments as models send them.
+import { cleanFetchArgs, cleanSearchArgs } from "../../writer/websearch/args.ts";
 // Configuration, normalization and reports.
 import {
 	cleanWebText,
@@ -168,12 +171,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	const state = getWriterModel();
 	const configured = state.kind === "ready" ? ` The configured model is ${state.model}.` : "";
 	/** The upstream methods in a tool description. */
-	const UPSTREAM_METHODS =
-		"claude and codex = the upstream model does the work itself in a request of its own, with this conversation's model and effort: " +
-		`claude is the way of Claude models, codex the way of Codex and GPT models, whatever the real upstream is.${configured} `;
-	/** When the upstream methods apply. */
-	const UPSTREAM_RULE =
-		"Use claude or codex only when the user's prompt says the upstream supports it, and take the one of the configured model: claude for Claude models, codex for Codex and GPT models";
+	const UPSTREAM_METHODS = `claude, codex = the upstream model does it itself.${configured} `;
 	// Which request style each upstream took in this session.
 	const styles = new Map<string, ServerStyle>();
 
@@ -353,64 +351,23 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		label: "Web search",
 		// Full description sent to the model.
 		description:
-			"Search the web. method picks how: " +
-			"browser = the user's Chrome through the JiaWriter extension, typing the query on each engine's home page as a person does and reading 3–5 results pages per engine, ranked locally; engines picks any of bing, google, baidu, sogou (default bing, google); about 1–2 minutes per engine, and an engine may ask for a human check. " +
-			"anysearch = the AnySearch API: fast, needs no Chrome, results carry no dates. " +
+			"Search the web. browser = the user's Chrome; takes engines, pages, fresh. anysearch = API; takes zone, language. " +
 			`${UPSTREAM_METHODS}` +
-			"Returns titles, URLs, short snippets, dates when known and the search time. Keep the URL of every fact taken from them.",
-		// One line in the tools section.
-		promptSnippet: "Search the web for sources, recent news and facts; returns titles, URLs, snippets and dates",
-		// Rules added while the tool is active.
-		promptGuidelines: [
-			// Whether to search at all is the user's call (the user, 2026-11-05).
-			"Search only when the user's request calls for it: the user asks for research or recent facts, or for cases and data the reference materials do not hold. When the user asks to write, revise or polish from what is already there, work from that without searching, and never search when the user says not to",
-			"Plan the searches for each question: pick the method and engines that fit it, and search again with a different query, engine or method when one result is not enough",
-			"Name the method of every call yourself: none is the default. When a method is unavailable or fails, use another one or tell the user",
-			UPSTREAM_RULE,
-			"With claude and codex, only addresses in the results list go into the 参考文献 section, never one that appears only in the upstream's text",
-			"Run searches and fetches one at a time: send a single web_search or web_fetch call in a message, read its result, then decide the next call",
-			"When choosing what to fetch and cite, prefer reports from internationally renowned news organizations such as Reuters, AP, AFP, Bloomberg, BBC, The New York Times, The Wall Street Journal and the Financial Times",
-			"Use baidu and sogou for mainland Chinese sources (sogou also finds WeChat public-account articles), bing and google for international and English sources, and anysearch for a quick first overview",
-			"Write each query as 2–6 key terms: names of people, places, organisations, documents and specific terms, in place of a whole sentence or question",
-			"Write Chinese queries for Chinese sources and English queries for international sources",
-			"For recent events, take today's date from the latest [Sent …] time, put the year and month or the exact date into the query, set fresh to day, week or month, then use web_fetch on the authoritative outlet's page to read the full report",
-			"Add site:domain to reach an official or authoritative site (site:gov.cn, site:xinhuanet.com, site:reuters.com), and put an exact name or title in quotation marks",
-			"When results are few or off topic, rewrite the query with the official name, a synonym or a narrower term, or switch engine or method",
-			"When a page still waits for a human check after the wait, tell the user which site it is and that the page stays open in Chrome, and fetch or search it again when the user says it is done",
-			"Keep the source URL with every fact taken from search results for the 参考文献 section, and cite each case in the draft in the form 2026年10月31日《路透社》报道: work out from the address which outlet published the page and write its usual Chinese name, as 路透社 for reuters.com, never the address",
-			"Treat a fact as current only when its page shows the date",
-			"Read the whole result list before fetching and choose the pages yourself, judging each by its address and title: open reports from major international or national outlets and official sources that name a specific company, organisation or person or give authoritative data, and pass over forums, blogs, Q&A sites and reposts",
-			"When the list has nothing of that kind, search again: in English with zone intl for international cases, with an outlet added to the query (路透社 or Reuters, site:reuters.com on the browser method), or with the official name of the company or body",
-		],
+			"Each method uses only its own parameters.",
 		// Argument schema.
 		parameters: Type.Object({
-			query: Type.String({ description: "Search query: 2–6 key terms" }),
-			method: Type.Union(
-				[Type.Literal("browser"), Type.Literal("anysearch"), Type.Literal("claude"), Type.Literal("codex")],
-				{
-					description:
-						"browser (Chrome, the engines below), anysearch (API), or claude or codex (the upstream model)",
-				},
-			),
+			query: Type.String(),
+			method: StringEnum(["browser", "anysearch", "claude", "codex"] as const),
 			engines: Type.Optional(
-				Type.Array(Type.Union(ALL_ENGINES.map((e) => Type.Literal(e))), {
-					description:
-						"browser method: engines in the order to use (bing, google, baidu, sogou; default bing, google)",
-				}),
+				Type.Array(StringEnum(ALL_ENGINES), { description: "browser only, in order; default bing, google" }),
 			),
-			pages: Type.Optional(
-				Type.Number({ description: "Results pages per engine, 3–5 (browser backend, default 3)" }),
-			),
-			fresh: Type.Optional(
-				Type.Union([Type.Literal("day"), Type.Literal("week"), Type.Literal("month"), Type.Literal("year")], {
-					description: "Time window (browser method)",
-				}),
-			),
-			zone: Type.Optional(
-				Type.Union([Type.Literal("cn"), Type.Literal("intl")], { description: "Region (anysearch method)" }),
-			),
-			language: Type.Optional(Type.String({ description: "Preferred language, e.g. zh-CN or en" })),
+			pages: Type.Optional(Type.Number({ description: "browser only: results pages per engine, 3–5" })),
+			fresh: Type.Optional(StringEnum(["day", "week", "month", "year"] as const, { description: "browser only" })),
+			zone: Type.Optional(StringEnum(["cn", "intl"] as const, { description: "anysearch only" })),
+			language: Type.Optional(Type.String({ description: "anysearch only, such as zh-CN" })),
 		}),
+		// Models fill in fields of other methods: each call keeps only what its method uses.
+		prepareArguments: (args) => cleanSearchArgs(args) as never,
 		// Read-only, open world.
 		annotations: WEB,
 		// One at a time: AnySearch fails on parallel requests, and the browser shares one results tab.
@@ -490,7 +447,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			// The search is kept in the topic folder; a full disk must not cost the result.
 			const urls = results.map((r) => r.url);
 			const kept = keep(ctx, (dir) => archiveSearch(dir, params.query, report, nowText(), urls));
-			const text = [t("search.time", { time: nowText() }), ...notes, report, kept.note].filter(Boolean).join("\n");
+			const text = [...notes, report, kept.note].filter(Boolean).join("\n");
 			// Text and structured results.
 			return { content: [{ type: "text", text }], details: { backend, results, topicDir: kept.dir } };
 		},
@@ -504,40 +461,18 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		label: "Web fetch",
 		// Full description sent to the model.
 		description:
-			"Fetch one web page and return its main text. method picks how: " +
-			"browser = open it in the user's Chrome (clicked on the last results page when it is there), for news sites and pages that need a real browser; " +
-			"anysearch = the AnySearch extract API, fast; " +
-			"sf = search_fetch, for documents (PDF, Word, Excel links, parsed to text) and video pages (metadata). " +
+			"Fetch a page's main text. browser = the user's Chrome, for news and JavaScript pages. anysearch = API. " +
+			"sf = PDF, Word and Excel links, video pages. " +
 			UPSTREAM_METHODS.trim(),
-		// One line in the tools section.
-		promptSnippet: "Fetch a web page and read its main text, title, source and date",
-		// Rules added while the tool is active.
-		promptGuidelines: [
-			"Use method sf for links to PDF, Word or Excel documents and for video pages, and browser for news and official pages",
-			"When a fetch fails or returns little text, fetch the page again with another method",
-			"Name the method of every call yourself: none is the default",
-			UPSTREAM_RULE,
-			"Method claude reads the page as served: pages built by JavaScript, addresses over 250 characters and sites closed to crawlers need browser",
-		],
 		// Argument schema.
 		parameters: Type.Object({
-			url: Type.String({ description: "http(s) URL of the page" }),
-			method: Type.Union(
-				[
-					Type.Literal("browser"),
-					Type.Literal("anysearch"),
-					Type.Literal("sf"),
-					Type.Literal("claude"),
-					Type.Literal("codex"),
-				],
-				{
-					description:
-						"browser (Chrome), anysearch (API), sf (documents and video pages), or claude or codex (the upstream model)",
-				},
-			),
+			url: Type.String(),
+			method: StringEnum(["browser", "anysearch", "sf", "claude", "codex"] as const),
 		}),
 		// Read-only, open world.
 		annotations: WEB,
+		// The method in the form the schema uses.
+		prepareArguments: (args) => cleanFetchArgs(args) as never,
 		// One at a time, like web_search.
 		executionMode: "sequential",
 		// Fetch the page.

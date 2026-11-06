@@ -9,12 +9,13 @@
 import { truncateToWidth } from "@earendil-works/pi-tui";
 // Extension API types.
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
-// The configuration page.
 import { formatWaConfig } from "../../writer/config-view.ts";
 // The levels /effort offers.
 import { WRITER_REASONING_CHOICES, type WriterReasoning } from "../../writer/env-config.ts";
 // Messages and the language setting.
 import { setUiLang, t, type WriterLang } from "../../writer/i18n/index.ts";
+// The configuration page.
+import { stageLines } from "../../writer/prompts/stages.ts";
 // The keys held in memory (shown only as set or unset).
 import { withSecrets } from "../../writer/secrets.ts";
 // Main-model state after startup.
@@ -113,10 +114,15 @@ export default function writerUiExtension(pi: ExtensionAPI): void {
 
 	// /jw.
 	pi.registerCommand("jw", {
-		description: "Show the JiaWriter model and search configuration (read-only)",
-		handler: async (_args, ctx) => {
-			// The page from the environment and the startup state.
-			const lines = formatWaConfig(withSecrets(process.env), getWriterModel(), process.platform);
+		description: "Show the JiaWriter configuration; /jw prompts shows which rules reach the model and when",
+		getArgumentCompletions: (prefix) =>
+			"prompts".startsWith(prefix) ? [{ value: "prompts", label: "prompts" }] : null,
+		handler: async (args, ctx) => {
+			// The stage table, or the page from the environment and the startup state.
+			const lines =
+				args.trim() === "prompts"
+					? stageLines()
+					: formatWaConfig(withSecrets(process.env), getWriterModel(), process.platform);
 			// Full screen in the terminal; a note elsewhere.
 			if (ctx.mode === "tui")
 				await ctx.ui.custom<void>((_tui, _theme, _kb, done) => new ReadOnlyPage(lines, () => done(undefined)));

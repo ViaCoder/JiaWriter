@@ -139,6 +139,20 @@ describe("anysearchSearch and anysearchExtract", () => {
 			{ title: "", url: "https://b.example/", snippet: "3 hours ago long text", date: "3 hours ago" },
 		]);
 	});
+	it("takes the fuller of snippet and content", async () => {
+		const f = fakeFetch(
+			new Response(
+				JSON.stringify({
+					code: 0,
+					data: {
+						results: [{ title: "T", url: "https://a.example/", snippet: "短", content: "清洗后的完整正文" }],
+					},
+				}),
+			),
+		);
+		const out = await anysearchSearch(anon, "q", {}, undefined, f.fn, noSleep);
+		expect(out[0].snippet).toBe("清洗后的完整正文");
+	});
 	it("sends the strict extract body and maps the page", async () => {
 		// One page.
 		const f = fakeFetch(

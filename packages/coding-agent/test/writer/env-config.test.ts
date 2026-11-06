@@ -73,6 +73,24 @@ describe("readWriterEnv", () => {
 		expect([bad.errors.join("").includes("JW_EFFORT"), bad.config]).toEqual([true, undefined]);
 	});
 
+	it.each([
+		["128000", 128_000],
+		["128k", 128_000],
+		["128K", 128_000],
+		["1m", 1_000_000],
+		["1M", 1_000_000],
+		["1.5m", 1_500_000],
+		["0.5k", 500],
+	])("reads the size %s", (raw, wanted) => {
+		const r = readWriterEnv({ ...FULL, JW_CTX: raw, JW_OUT: raw });
+		expect(r).toMatchObject({ config: { contextWindow: wanted, maxTokens: wanted } });
+	});
+
+	it.each(["128kb", "k", "-1k", "1.5", "1 m", "0k", "0.0m"])("refuses the size %s", (raw) => {
+		const r = readWriterEnv({ ...FULL, JW_CTX: raw });
+		expect(JSON.stringify(r)).toContain("JW_CTX");
+	});
+
 	it("accepts JW_API, JW_CTX and JW_OUT", () => {
 		// All optional values set.
 		const r = readWriterEnv({ ...FULL, JW_API: "openai-responses", JW_CTX: "200000", JW_OUT: "32000" });
@@ -86,7 +104,7 @@ describe("readWriterEnv", () => {
 			...FULL,
 			JW_URL: "api.example.com",
 			JW_API: "gemini",
-			JW_CTX: "128k",
+			JW_CTX: "lots",
 			JW_OUT: "0",
 			JW_LANG: "fr",
 		});

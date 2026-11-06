@@ -158,7 +158,6 @@ describe("AgentSession codemode tool", () => {
 		harness.setResponses([record]);
 		await harness.session.prompt("on");
 		expect(requestTools[0]).toEqual(expect.arrayContaining(["read", "echo", "codemode"]));
-		expect(requestPrompts[0]).toContain("\n- read: ");
 
 		// only: codemode lists echo, which stays active but is left out of requests.
 		harness.settingsManager.applyOverrides({ codemode: { mode: "only" } });

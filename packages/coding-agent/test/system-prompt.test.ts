@@ -33,7 +33,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			expect(prompt).toContain("Show file paths clearly");
+			expect(prompt).toContain("<tools>\n(none)");
 		});
 	});
 
@@ -96,9 +96,8 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			// JiaWriter: every default tool is listed and bash is not.
-			for (const name of ["read", "write", "edit", "ls", "find", "grep"]) expect(prompt).toContain(`- ${name}:`);
-			expect(prompt).not.toContain("- bash:");
+			// JiaWriter: the default tools are in their descriptions, so no list repeats them.
+			expect(prompt).not.toContain("<tools>");
 		});
 
 		test.each([
@@ -123,8 +122,9 @@ describe("buildSystemPrompt", () => {
 			});
 
 			// JiaWriter: documentation pointers for JiaWriter, still resolved under absolute base paths.
-			expect(prompt).toContain("- Resolve docs/... under Additional docs, not under the current working directory");
-			expect(prompt).toContain("environment variables (docs/environment-variables.md)");
+			expect(prompt).toMatch(
+				/<docs>\nWhen the user asks about JiaWriter itself, read \S+ and the files in \S+\n<\/docs>/,
+			);
 		});
 	});
 

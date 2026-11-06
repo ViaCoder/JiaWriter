@@ -1,9 +1,9 @@
 /**
- * The current time for the model. Each user message reaches the model with the local time it was
- * sent ("[Sent 2026-11-03 18:42 Tuesday, Asia/Taipei, UTC+08:00]"), taken from the message's own
- * timestamp, so the text of an earlier message never changes and the provider's prompt cache keeps
- * working. The latest message's time is "now". When the machine clock is off, the Date header of the
- * model API's responses gives the offset, and the times are corrected by it.
+ * The date for the model. The first user message and the first of each later day start with a note such as
+ * "[Date: 2026-11-03 Tuesday, Asia/Taipei]", and no other time reaches the model, so there is only one date to
+ * read. Which messages carry it follows from their own timestamps, so old text never changes and the provider's
+ * prompt cache keeps working. When the machine clock is off, the Date header of the model API's responses gives
+ * the offset, and the date is corrected by it.
  */
 
 // Message types of the conversation.
@@ -13,7 +13,7 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 export const SKEW_LIMIT_MS = 120_000;
 
 /** Prefix of the time note at the start of a user message. */
-const NOTE_PREFIX = "[Sent ";
+const NOTE_PREFIX = "[Date: ";
 
 /** "UTC+08:00" for an offset in minutes east of UTC. */
 function utcOffset(minutes: number): string {
@@ -71,18 +71,24 @@ export function correction(skewMs: number | undefined): number {
 	return skewMs !== undefined && Math.abs(skewMs) >= SKEW_LIMIT_MS ? skewMs : 0;
 }
 
-/** The note for a message sent at ms (corrected by offsetMs). */
-export function timeNote(ms: number, offsetMs = 0, timeZone?: string): string {
-	// One bracketed line.
-	return `${NOTE_PREFIX}${formatLocalTime(ms + offsetMs, timeZone)}]`;
+/** The date note: the day alone, so the model has one date and never several times to choose from. */
+export function dateNote(ms: number, offsetMs = 0, timeZone?: string): string {
+	// "2026-11-03 18:42 Tuesday, Asia/Taipei, UTC+08:00" without the minutes and the offset.
+	const [, date, weekday, zone] = /^(\S+) \S+ (\S+), ([^,]+)/.exec(formatLocalTime(ms + offsetMs, timeZone)) ?? [];
+	return `${NOTE_PREFIX}${date} ${weekday}, ${zone}]`;
 }
 
-/** Messages with each user message starting with its time note (copies; the session is not changed). */
-export function withTimeNotes(messages: AgentMessage[], offsetMs = 0, timeZone?: string): AgentMessage[] {
-	// Only user messages with a timestamp get a note.
+/** Add the date to the first user message and to the first of each later day; all others stay untouched. */
+export function withDateNotes(messages: AgentMessage[], offsetMs = 0, timeZone?: string): AgentMessage[] {
+	// The day of the last note.
+	let day = "";
 	return messages.map((m) => {
+		// Only user messages with a timestamp count.
 		if (m.role !== "user" || typeof m.timestamp !== "number") return m;
-		const note = timeNote(m.timestamp, offsetMs, timeZone);
+		const note = dateNote(m.timestamp, offsetMs, timeZone);
+		// Same day: nothing to say. This depends only on the messages' own times, so old text never changes.
+		if (note === day) return m;
+		day = note;
 		// Text content: the note on its own line first.
 		if (typeof m.content === "string")
 			return m.content.startsWith(NOTE_PREFIX) ? m : { ...m, content: `${note}\n${m.content}` };

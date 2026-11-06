@@ -177,6 +177,7 @@ export const zh = {
 	"topic.badName": "主题名“{name}”无法作为文件夹名。",
 	"topic.opened": "已建立主题文件夹：{dir}。稿件放在 {drafts}/ 下。",
 	"topic.continued": "继续使用已有的主题文件夹：{dir}。稿件放在 {drafts}/ 下。",
+	"topic.earlier": "之前的检索结果留在 {dir}，需要时用 read 读取。",
 	"topic.archived": "已归档：{path}",
 	"topic.archiveFailed": "归档失败（{reason}），本次结果没有保存到主题文件夹。",
 	"topic.missingFields": "缺少 {fields}",
@@ -310,7 +311,6 @@ export const zh = {
 	"browser.reason.verification": "需要人工处理，未在时限内完成；页面留在 Chrome 里，你下次发消息时会再试这个引擎",
 	"browser.reason.resting": "上一次人工处理没有完成，这一轮暂不使用",
 	"clock.skew": "本机时钟和模型服务器相差约 {minutes} 分钟，已按服务器时间告诉模型当前时间。请检查系统的时间设置。",
-	"search.time": "检索时间：{time}",
 	"search.methodUnavailable":
 		"browser 方式现在不可用：Chrome 里的 JiaWriter 扩展没有连接。可以换一种方式，或按 /browser 的说明连接扩展。",
 	"search.noMethod": "这次调用要指定 method，没有默认方式。",

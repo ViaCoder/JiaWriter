@@ -60,9 +60,16 @@ import { stripFrontmatter } from "../utils/frontmatter.ts";
 import { processImage } from "../utils/image-process.ts";
 import { sleep } from "../utils/sleep.ts";
 import { normalizeToolResultImages } from "../utils/tool-result-images.ts";
+import {
+	prepareForSummary,
+	withWritingState,
+	writerCompactionSettings,
+	writingState,
+} from "../writer/compact/state.ts";
 // JiaWriter: compaction fallback, overflow errors and the provider name.
 import { isAuthFailure, isWriterOverflow, localCompaction } from "../writer/compact-fallback.ts";
 import { JW_PROVIDER } from "../writer/env-config.ts";
+import { currentTopic } from "../writer/topic/current.ts";
 import { formatNoApiKeyFoundMessage, formatNoModelSelectedMessage } from "./auth-guidance.ts";
 import { type BashResult, executeBashWithOperations } from "./bash-executor.ts";
 import { generateBugReportSummary } from "./bug-report.ts";
@@ -772,7 +779,7 @@ export class AgentSession {
 		return shouldCompact(
 			estimateProjectedContextTokens(projection, this.sessionManager.getBranch()).tokens,
 			model.contextWindow,
-			this.settingsManager.getCompactionSettings(this.model),
+			this._compactionSettings(this.model),
 		);
 	}
 
@@ -2794,8 +2801,11 @@ export class AgentSession {
 		const request = await this._getSummarizationRequestAuth(model, signal);
 		// JiaWriter: when the model cannot summarize, a local summary keeps the conversation going;
 		// without it the next request would go out as oversized as this one.
+		// JiaWriter: archived results reach the summary as one line, and the writing state comes from the disk.
+		const finish = (result: CompactionResult) =>
+			withWritingState(result, writingState(this.sessionManager.getBranch(), currentTopic()));
 		return compact(
-			preparation,
+			prepareForSummary(preparation),
 			request.model,
 			request.apiKey,
 			request.headers,
@@ -2807,11 +2817,18 @@ export class AgentSession {
 			this.settingsManager.getRetrySettings(),
 			this._summarizationRetryCallbacks({ source: "compaction", reason }),
 			undefined, // sessionId
-		).catch((error: unknown) => {
-			const message = error instanceof Error ? error.message : String(error);
-			if (model.provider !== JW_PROVIDER || signal.aborted || isAuthFailure(message)) throw error;
-			return localCompaction(preparation, message);
-		});
+		)
+			.then(finish)
+			.catch((error: unknown) => {
+				const message = error instanceof Error ? error.message : String(error);
+				if (model.provider !== JW_PROVIDER || signal.aborted || isAuthFailure(message)) throw error;
+				return finish(localCompaction(preparation, message));
+			});
+	}
+
+	/** JiaWriter: the configured compaction settings, scaled to the model's context window. */
+	private _compactionSettings(model: Model<any> | undefined) {
+		return writerCompactionSettings(this.settingsManager.getCompactionSettings(model), model?.contextWindow ?? 0);
 	}
 
 	private _clearManualCompactionState(): void {
@@ -3018,7 +3035,7 @@ export class AgentSession {
 	 * @returns Whether the post-run loop should call `agent.continue()` for overflow recovery or queued messages
 	 */
 	private async _checkCompaction(assistantMessage: AssistantMessage, skipAbortedCheck = true): Promise<boolean> {
-		const settings = this.settingsManager.getCompactionSettings(this.model);
+		const settings = this._compactionSettings(this.model);
 		if (!settings.enabled) return false;
 
 		// Skip if message was aborted (user cancelled) - unless skipAbortedCheck is false
@@ -3168,7 +3185,7 @@ export class AgentSession {
 	 */
 	private async _runAutoCompaction(reason: "overflow" | "threshold", willRetry: boolean): Promise<boolean> {
 		const model = this.model;
-		const settings = this.settingsManager.getCompactionSettings(model);
+		const settings = this._compactionSettings(model);
 		let abortController: AbortController | undefined;
 		let started = false;
 		let fromExtension = false;
@@ -3180,7 +3197,11 @@ export class AgentSession {
 			}
 
 			const pathEntries = this.sessionManager.getBranch();
-			const preparation = prepareCompaction(pathEntries, settings);
+			// JiaWriter: when the scaled share keeps everything, as with image-heavy history, the configured
+			// amount still finds something to compact.
+			const preparation =
+				prepareCompaction(pathEntries, settings) ??
+				prepareCompaction(pathEntries, this.settingsManager.getCompactionSettings(model));
 			if (!preparation) {
 				return false;
 			}

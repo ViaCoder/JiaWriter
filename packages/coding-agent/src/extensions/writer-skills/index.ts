@@ -72,9 +72,11 @@ async function confirmAndWrite(
 	agentDir: string,
 	title: string,
 	body: string,
+	prepare?: () => void,
 ): Promise<void> {
 	// Ask first.
 	if (!(await ctx.ui.confirm(title, body))) return;
+	prepare?.();
 	const { path, backup } = writeUserSkill(name, content, agentDir);
 	ctx.ui.notify(t("skills.saved", { path, backup: backup ? t("skills.backupNote", { backup }) : "" }), "info");
 }
@@ -114,14 +116,15 @@ async function skillActions(s: SkillEntry, ctx: ExtensionCommandContext, agentDi
 		);
 	} else if (choice === t("skills.edit")) {
 		// Built-ins are edited as the user's copy.
-		const dir = s.origin === "builtin" ? copyBuiltinForEdit(s, agentDir) : s.dir;
-		const current = readFileSync(join(dir, "SKILL.md"), "utf-8");
+		const current = readFileSync(join(s.dir, "SKILL.md"), "utf-8");
 		const edited = await ctx.ui.editor(t("skills.editTitle", { name: s.name }), current);
 		if (edited === undefined) return;
 		if (edited === current) {
 			ctx.ui.notify(t("skills.unchanged"), "info");
 			return;
 		}
+		// A built-in skill is copied only now: a cancelled edit leaves nothing behind.
+		if (s.origin === "builtin") copyBuiltinForEdit(s, agentDir);
 		const { path, backup } = writeUserSkill(s.name, edited, agentDir);
 		ctx.ui.notify(t("skills.saved", { path, backup: backup ? t("skills.backupNote", { backup }) : "" }), "info");
 	} else if (choice === t("skills.updateFromSession")) {
@@ -139,7 +142,10 @@ async function skillActions(s: SkillEntry, ctx: ExtensionCommandContext, agentDi
 			ctx.ui.notify(t("skills.unchanged"), "info");
 			return;
 		}
-		await confirmAndWrite(ctx, s.name, draft, agentDir, t("skills.diffTitle", { name: s.name }), diff);
+		// A built-in skill's other files have to come along, or the user's copy would replace it without them.
+		await confirmAndWrite(ctx, s.name, draft, agentDir, t("skills.diffTitle", { name: s.name }), diff, () => {
+			if (s.origin === "builtin") copyBuiltinForEdit(s, agentDir);
+		});
 	} else if (choice === t("skills.delete")) {
 		// Built-ins are turned off; user skills are backed up and removed.
 		if (s.origin === "builtin") {

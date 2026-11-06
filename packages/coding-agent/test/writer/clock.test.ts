@@ -1,13 +1,13 @@
-// Tests for src/writer/clock.ts: the time each user message carries for the model.
+// Tests for src/writer/clock.ts: the date the model reads.
 import type { AgentMessage } from "@earendil-works/pi-agent-core";
 import { describe, expect, test } from "vitest";
 import {
 	correction,
+	dateNote,
 	formatLocalTime,
 	SKEW_LIMIT_MS,
 	skewFromDate,
-	timeNote,
-	withTimeNotes,
+	withDateNotes,
 } from "../../src/writer/clock.ts";
 
 // 2026-11-03T10:42:30Z.
@@ -45,37 +45,55 @@ describe("correction", () => {
 	});
 });
 
-describe("timeNote", () => {
-	test("is one bracketed line, corrected by the offset", () => {
-		expect(timeNote(T, 0, "Asia/Taipei")).toBe("[Sent 2026-11-03 18:42 Tuesday, Asia/Taipei, UTC+08:00]");
-		expect(timeNote(T, 3_600_000, "Asia/Taipei")).toBe("[Sent 2026-11-03 19:42 Tuesday, Asia/Taipei, UTC+08:00]");
+describe("dateNote", () => {
+	test("is the day alone, corrected by the offset", () => {
+		expect(dateNote(T, 0, "Asia/Taipei")).toBe("[Date: 2026-11-03 Tuesday, Asia/Taipei]");
+		expect(dateNote(T, 86_400_000, "Asia/Taipei")).toBe("[Date: 2026-11-04 Wednesday, Asia/Taipei]");
 	});
 });
 
-describe("withTimeNotes", () => {
-	test("puts the note first in every user message and leaves other messages and the input alone", () => {
-		// A text message, a message with parts, and an assistant reply.
+describe("withDateNotes", () => {
+	const user = (content: unknown, timestamp: number) => ({ role: "user", content, timestamp });
+	const DAY = 86_400_000;
+
+	test("dates the first user message only, in text or in parts, and leaves the input alone", () => {
 		const input = [
-			{ role: "user", content: "写一篇综述", timestamp: T },
+			user("写一篇综述", T),
 			{ role: "assistant", content: [{ type: "text", text: "好的" }], timestamp: T + 1000 },
-			{ role: "user", content: [{ type: "text", text: "继续" }], timestamp: T + 60_000 },
+			user([{ type: "text", text: "继续" }], T + 60_000),
 		] as unknown as AgentMessage[];
-		const out = withTimeNotes(input, 0, "Asia/Taipei") as unknown as Array<{ content: unknown }>;
-		expect(out[0].content).toBe("[Sent 2026-11-03 18:42 Tuesday, Asia/Taipei, UTC+08:00]\n写一篇综述");
+		const out = withDateNotes(input, 0, "Asia/Taipei") as unknown as Array<{ content: unknown }>;
+		expect(out[0].content).toBe("[Date: 2026-11-03 Tuesday, Asia/Taipei]\n写一篇综述");
 		expect(out[1]).toBe(input[1]);
-		expect(out[2].content).toEqual([
-			{ type: "text", text: "[Sent 2026-11-03 18:43 Tuesday, Asia/Taipei, UTC+08:00]" },
-			{ type: "text", text: "继续" },
-		]);
-		// The session's messages are not changed.
+		expect(out[2]).toBe(input[2]);
 		expect((input[0] as unknown as { content: string }).content).toBe("写一篇综述");
+		const parts = withDateNotes(
+			[user([{ type: "text", text: "甲" }], T)] as unknown as AgentMessage[],
+			0,
+			"Asia/Taipei",
+		);
+		expect((parts[0] as unknown as { content: unknown }).content).toEqual([
+			{ type: "text", text: "[Date: 2026-11-03 Tuesday, Asia/Taipei]" },
+			{ type: "text", text: "甲" },
+		]);
 	});
 
-	test("gives the same text on every call, so earlier messages stay byte-identical", () => {
-		// Two calls, and a call on already noted messages.
-		const input = [{ role: "user", content: "a", timestamp: T }] as unknown as AgentMessage[];
-		const once = withTimeNotes(input, 0, "Asia/Taipei");
-		expect(withTimeNotes(input, 0, "Asia/Taipei")).toEqual(once);
-		expect(withTimeNotes(once, 0, "Asia/Taipei")).toEqual(once);
+	test("adds one note when the day changes", () => {
+		const input = [user("甲", T), user("乙", T + 1000), user("丙", T + DAY), user("丁", T + DAY + 1000)];
+		const out = withDateNotes(input as unknown as AgentMessage[], 0, "Asia/Taipei") as unknown as {
+			content: unknown;
+		}[];
+		expect(JSON.stringify(out).match(/\[Date: /g)).toHaveLength(2);
+		expect(String(out[2].content)).toContain("2026-11-04");
+		expect(out[3]).toBe(input[3]);
+	});
+
+	test("never changes an earlier message when a later one arrives", () => {
+		const before = [user("甲", T), user("乙", T + 1000)];
+		const first = withDateNotes(before as unknown as AgentMessage[], 0, "Asia/Taipei");
+		const second = withDateNotes([...before, user("丙", T + 2000)] as unknown as AgentMessage[], 0, "Asia/Taipei");
+		expect(JSON.stringify(second.slice(0, 2))).toBe(JSON.stringify(first));
+		// Notes already there are not doubled.
+		expect(withDateNotes(first, 0, "Asia/Taipei")[0]).toEqual(first[0]);
 	});
 });

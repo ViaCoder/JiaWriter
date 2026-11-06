@@ -87,7 +87,8 @@ export async function anysearchPost(
 			throw statusError(res.status, typeof body.url === "string" ? body.url : "");
 		}
 		// Success envelope {code: 0, data}.
-		const json = (await res.json()) as { code?: number; data?: Record<string, unknown> };
+		// A body that is not JSON counts as a failed answer, and its text stays out of the message.
+		const json = (await res.json().catch(() => ({}))) as { code?: number; data?: Record<string, unknown> };
 		if (json.code !== 0 || !json.data) throw new Error(t("anysearch.http", { status: res.status }));
 		// The payload.
 		return json.data;
@@ -113,12 +114,16 @@ export async function anysearchSearch(
 	const results = Array.isArray(data.results) ? (data.results as Record<string, unknown>[]) : [];
 	// Common shape; the date comes from the content when the snippet has none.
 	return results.map((r) => {
-		const snippet = String(r.snippet ?? "") || String(r.content ?? "");
+		// The cleaned content is the fuller text when there is one: everything found goes in.
+		const short = String(r.snippet ?? "");
+		const content = String(r.content ?? "");
+		const snippet = content.length > short.length ? content : short;
 		return {
 			title: String(r.title ?? ""),
 			url: String(r.url ?? ""),
 			snippet,
-			date: findDate(`${snippet} ${String(r.content ?? "").slice(0, 2000)}`),
+			// The head of the text only: further in, a date is about something else.
+			date: findDate(`${short} ${content.slice(0, 2000)}`),
 		};
 	});
 }

@@ -254,7 +254,7 @@ describe("writer-gongwen extension", () => {
 		// Name and rule.
 		const t = tool();
 		expect(t.name).toBe("gongwen_check");
-		expect(t.promptGuidelines?.[0]).toContain("gongwen_check");
+		expect(t.description).toContain("公文");
 	});
 
 	it("checks a draft file for a genre and ranks the genres without one", async () => {

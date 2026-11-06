@@ -75,10 +75,8 @@ describe("regression #2835: tool allowlists filter extension tools", () => {
 				.sort(),
 		).toEqual(["dynamic_tool", "read"]);
 		expect(session.getActiveToolNames().sort()).toEqual(["dynamic_tool", "read"]);
-		// JiaWriter: writing-oriented summary for the read tool.
-		expect(session.systemPrompt).toContain(
-			"- read: Read reference materials, drafts and other files (text and images)",
-		);
+		// JiaWriter: built-in tools are in their descriptions; other tools stay listed.
+		expect(session.systemPrompt).not.toContain("- read:");
 		expect(session.systemPrompt).toContain("- dynamic_tool: Run dynamic test behavior");
 		expect(session.systemPrompt).not.toContain("- bash:");
 		expect(session.systemPrompt).not.toContain("- edit:");

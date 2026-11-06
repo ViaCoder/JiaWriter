@@ -352,7 +352,7 @@ describe("JW_* end to end", () => {
 		// Output limit lowered from 128000 to fit the 20000 window.
 		expect(realRequest()?.body.max_tokens).toBeLessThan(CTX);
 		// The user message reaches the model with the time it was sent.
-		expect(JSON.stringify(realRequest()?.body.messages)).toMatch(/\[Sent \d{4}-\d{2}-\d{2} \d{2}:\d{2} \w+, /);
+		expect(JSON.stringify(realRequest()?.body.messages)).toMatch(/\[Date: \d{4}-\d{2}-\d{2} \w+, /);
 		// The request carries the writing system prompt.
 		expect(JSON.stringify(realRequest()?.body.system)).toContain(
 			"expert writing assistant operating inside JiaWriter",

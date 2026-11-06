@@ -21,17 +21,16 @@ import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 const replaceEditSchema = Type.Object(
 	{
 		oldText: Type.String({
-			description:
-				"Exact text for one targeted replacement. It must be unique in the original file and must not overlap with any other edits[].oldText in the same call.",
+			description: "Exact text, unique in the file, as short as it can be",
 		}),
-		newText: Type.String({ description: "Replacement text for this targeted edit." }),
+		newText: Type.String({ description: "Replacement text" }),
 	},
 	{},
 );
 
 const editSchema = Type.Object(
 	{
-		path: Type.String({ description: "Path to the file to edit (relative or absolute)" }),
+		path: Type.String({ description: "File path" }),
 		edits: Type.Array(replaceEditSchema, {
 			description:
 				"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.",
@@ -149,7 +148,7 @@ export function createEditToolDefinition(
 		name: "edit",
 		label: "edit",
 		description:
-			"Change an existing file using exact text replacement, however large the change: to add a section, replace a short passage with itself plus the new text. Every edits[].oldText must match a unique, non-overlapping region of the original file. If two changes affect the same block or nearby lines, merge them into one edit instead of emitting overlapping edits. Do not include large unchanged regions just to connect distant changes.",
+			"Change a file by exact text replacement, however large the change: to add a section, replace a short passage with itself plus the new text. One call per file, one edits[] entry per change, matched against the original file",
 		promptSnippet: editToolSystemPromptContribution.snippet,
 		promptGuidelines: [...editToolSystemPromptContribution.guidelines],
 		parameters: editSchema,

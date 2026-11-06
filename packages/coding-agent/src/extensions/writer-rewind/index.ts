@@ -104,14 +104,7 @@ export default function writerRewindExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "Restore draft",
 		// Full description sent to the model.
-		description:
-			"List the saved versions of a file, or bring it back to one. Every write and edit saves the file's earlier state, one version per user message. Without version the versions are listed; with version the file returns to it, and the state before the restore is saved as a new version.",
-		// One line in the tools section.
-		promptSnippet: "List a draft's saved versions or bring one back",
-		// Rules added while the tool is active.
-		promptGuidelines: [
-			"When the user asks to go back to an earlier version of a draft, list its versions with draft_restore, restore the matching one, and tell the user what changed",
-		],
+		description: "List a file's saved versions, or restore one; each user message keeps one",
 		// Argument schema.
 		parameters: Type.Object({
 			path: Type.String({ description: "The file" }),
@@ -169,18 +162,18 @@ export default function writerRewindExtension(pi: ExtensionAPI): void {
 			const mode = targets.length > 0 ? await ctx.ui.select(t("rewind.mode"), [both, talk, files]) : talk;
 			if (mode === undefined) return;
 			// Files first: a failure leaves the conversation where it was.
+			// The conversation first: when that is cancelled, the files stay as they are.
+			if (mode !== files) {
+				const result = await ctx.navigateTree(target.id, { summarize: false });
+				if (result.cancelled) return;
+				ctx.ui.setEditorText(target.text);
+			}
 			if (mode !== talk) {
 				for (const snapshot of targets) restoreSnapshot(store(ctx), snapshot);
 				await exportAgain(
 					targets.map((s) => s.file),
 					ctx,
 				);
-			}
-			// The conversation; the message goes back into the input box.
-			if (mode !== files) {
-				const result = await ctx.navigateTree(target.id, { summarize: false });
-				if (result.cancelled) return;
-				ctx.ui.setEditorText(target.text);
 			}
 			ctx.ui.notify(t("rewind.done", { count: mode === talk ? 0 : targets.length }), "info");
 		},

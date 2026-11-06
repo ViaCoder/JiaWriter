@@ -128,7 +128,7 @@ class Upstream(http.server.BaseHTTPRequestHandler):
     def on_codex(self, body):
         """The codex way: plain requests."""
         seen.append(("/v1/responses", "plain", body.get("model")))
-        if "search" in body["instructions"].lower():
+        if "Search the web" in body["instructions"]:
             action = {"type": "search", "query": "乙", "sources": [{"type": "url", "url": URL + "?b=1"}]}
             answer = "科德克斯的回答"
         else:

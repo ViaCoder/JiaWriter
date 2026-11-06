@@ -75,21 +75,26 @@ function readVar(env: NodeJS.ProcessEnv, name: string): string | undefined {
 	return value ? value : undefined;
 }
 
-/** Parse a positive integer variable; push a Chinese error when it is not one. */
+/** Multipliers of a size written with a unit. */
+const SIZE_UNITS: Readonly<Record<string, number>> = { "": 1, k: 1_000, m: 1_000_000 };
+
+/** Parse a size in tokens, as digits or with k or m (128000, 128k, 1m, 1.5M); push a Chinese error when it is not one. */
 function readPositiveInt(env: NodeJS.ProcessEnv, name: string, fallback: number, errors: string[]): number {
 	// Unset means "use the default".
 	const raw = readVar(env, name);
 	// Nothing set: default value.
 	if (raw === undefined) return fallback;
-	// Accept plain digits only (no units, no signs, no decimals).
-	if (!/^\d+$/.test(raw)) {
+	// Digits, a decimal part only with a unit, then k or m in either case; no signs.
+	const match = /^(\d+(?:\.\d+)?)([kKmM]?)$/.exec(raw);
+	const unit = match?.[2].toLowerCase() ?? "";
+	const value = match ? Math.round(Number(match[1]) * SIZE_UNITS[unit]) : Number.NaN;
+	// Not a size, or a fraction of a token.
+	if (!match || (unit === "" && match[1].includes("."))) {
 		// Explain what is expected.
-		errors.push(`${name} 必须是正整数（单位 token），当前值：${raw}`);
+		errors.push(`${name} 必须是正整数，可以带单位 k 或 m（单位 token），例如 128000、128k、1m，当前值：${raw}`);
 		// Keep going with the default so all problems are reported at once.
 		return fallback;
 	}
-	// Convert the digits to a number.
-	const value = Number.parseInt(raw, 10);
 	// Zero is not a usable size.
 	if (value <= 0) {
 		// Explain the rule.
@@ -312,7 +317,7 @@ export function formatSetupHint(missing: string[], errors: string[], platform: N
 	}
 	// Optional variables.
 	lines.push(
-		"可选：JW_API（不设置则自动检测）、JW_CTX、JW_OUT（默认都是 128000）、JW_EFFORT（off / low / medium / high / xhigh / max，默认 medium，不支持时自动改用最接近的档位）、JW_LANG（zh / en）。",
+		"可选：JW_API（不设置则自动检测）、JW_CTX、JW_OUT（默认都是 128k，可以写 128k、1m）、JW_EFFORT（off / low / medium / high / xhigh / max，默认 medium，不支持时自动改用最接近的档位）、JW_LANG（zh / en）。",
 	);
 	// Join into one message.
 	return lines.join("\n");

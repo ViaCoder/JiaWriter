@@ -25,8 +25,8 @@ JiaWriter 是一个通用写作 agent，在终端里运行。它读取参考资�
 | `JW_KEY` | API key | 必填 |
 | `JW_MODEL` | 模型名 | 必填 |
 | `JW_API` | 接口类型：`anthropic-messages`、`openai-responses`、`openai-completions` | 自动检测 |
-| `JW_CTX` | 上下文窗口（token） | 128000 |
-| `JW_OUT` | 最大输出（token） | 128000 |
+| `JW_CTX` | 上下文窗口（token，也可以写 128k、1m） | 128000 |
+| `JW_OUT` | 最大输出（token，也可以写 128k、1m） | 128000 |
 | `JW_EFFORT` | 思考强度：`off`、`low`、`medium`、`high`、`xhigh`、`max`，模型不支持时自动用最接近的档位 | `medium` |
 | `JW_LANG` | 界面和工具输出的语言：`zh`、`en` | `zh` |
 | `JW_ENGINES` | 模型没有指定引擎时，浏览器检索依次使用的引擎，可选 `bing`、`google`、`baidu`、`sogou` | `bing,google` |

@@ -69,14 +69,12 @@ describe("writer-tools registration", () => {
 		// Each tool.
 		for (const tool of tools.values()) {
 			// Shown in the tools section.
-			expect(tool.promptSnippet).toBeTruthy();
 			// Positive guidelines only.
-			for (const g of tool.promptGuidelines ?? []) expect(g).not.toMatch(/^(do not|don't|never|avoid|no )/i);
 			// Read-only hint.
 			expect(tool.annotations?.readOnlyHint).toBe(true);
 		}
 	});
-	it("puts the snippets and guidelines into the default system prompt", () => {
+	it("adds no list or rules of these tools to the system prompt", () => {
 		// The tools.
 		const tools = [...registeredTools().values()];
 		// Prompt with the three tools selected.
@@ -86,10 +84,8 @@ describe("writer-tools registration", () => {
 			toolSnippets: Object.fromEntries(tools.map((t) => [t.name, t.promptSnippet ?? ""])),
 			promptGuidelines: tools.flatMap((t) => t.promptGuidelines ?? []),
 		});
-		// Snippet line and a guideline.
-		expect(prompt).toContain("- style_check: Check a draft for AI-style writing");
-		// Guideline.
-		expect(prompt).toContain("Run style_check on every finished draft");
+		// Their use is in the tool descriptions, not repeated in the prompt.
+		expect(prompt).not.toContain("- style_check:");
 	});
 });
 

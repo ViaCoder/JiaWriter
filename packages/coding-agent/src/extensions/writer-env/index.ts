@@ -11,7 +11,7 @@ import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Rejected reasoning levels are remembered in the detection cache.
 import { markReasoningUnsupported } from "../../writer/api-detect.ts";
 // The time each user message carries, and the clock check.
-import { clockOffset, correction, setClockOffset, skewFromDate, withTimeNotes } from "../../writer/clock.ts";
+import { clockOffset, correction, setClockOffset, skewFromDate, withDateNotes } from "../../writer/clock.ts";
 // Request size guard.
 import { CONTEXT_SHARE, fitToolResults } from "../../writer/context-fit.ts";
 // Output clamp and the provider name.
@@ -23,12 +23,14 @@ import { buildProviderConfig, dropReasoningLevel, getWriterModel, setWriterModel
 
 /** Error text that points at a reasoning parameter. */
 export const REASONING_ERROR = /reasoning|effort|thinking|budget/i;
+/** An exhausted budget is a billing error, whatever words it shares with the above. */
+const BILLING_ERROR = /quota|billing|insufficient|credit|balance|exceeded your|余额|额度/i;
 
 /** Extension factory. */
 export default function writerEnvExtension(pi: ExtensionAPI): void {
-	// Every model call: each user message carries the local time it was sent (the latest one is "now").
+	// Every model call: the date goes on the first user message and on the first of each later day.
 	pi.on("context", (event, ctx) => {
-		const messages = withTimeNotes(event.messages, clockOffset());
+		const messages = withDateNotes(event.messages, clockOffset());
 		// Tool results too large to compact away are clipped in the request (the session keeps them).
 		const window = ctx.model?.contextWindow ?? 0;
 		return { messages: window > 0 ? fitToolResults(messages, Math.floor(window * CONTEXT_SHARE)) : messages };
@@ -76,7 +78,8 @@ export default function writerEnvExtension(pi: ExtensionAPI): void {
 		if (
 			message.role !== "assistant" ||
 			message.stopReason !== "error" ||
-			!REASONING_ERROR.test(message.errorMessage ?? "")
+			!REASONING_ERROR.test(message.errorMessage ?? "") ||
+			BILLING_ERROR.test(message.errorMessage ?? "")
 		)
 			return;
 		// Level that was rejected.

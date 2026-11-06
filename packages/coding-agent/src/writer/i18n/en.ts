@@ -197,6 +197,7 @@ export const en: Record<MessageKey, string> = {
 	"topic.badName": 'The topic name "{name}" cannot be a folder name.',
 	"topic.opened": "Topic folder created: {dir}. Drafts go in {drafts}/.",
 	"topic.continued": "Continuing the topic folder: {dir}. Drafts go in {drafts}/.",
+	"topic.earlier": "Earlier research stays in {dir}: read it there when needed.",
 	"topic.archived": "Archived: {path}",
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
 	"topic.missingFields": "missing {fields}",
@@ -335,7 +336,6 @@ export const en: Record<MessageKey, string> = {
 	"browser.reason.resting": "the last check was not cleared; skipped for the rest of this run",
 	"clock.skew":
 		"This machine's clock differs from the model server by about {minutes} min; the model is given the server's time. Check the system time settings.",
-	"search.time": "Searched at: {time}",
 	"search.methodUnavailable":
 		"The browser method is not available now: the JiaWriter extension in Chrome is not connected. Use another method, or connect the extension as /browser explains.",
 	"search.noMethod": "Name a method for this call: there is no default.",

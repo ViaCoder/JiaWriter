@@ -15,7 +15,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Extension API types.
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../src/core/extensions/types.ts";
 // The prompt builder that shows snippets and guidelines.
-import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 // Extension under test.
 import writerSearchExtension, { abortable } from "../../src/extensions/writer-search/index.ts";
 // Browser host and frames.
@@ -308,9 +307,9 @@ describe("writer-search over the browser", () => {
 			const map = tools();
 			// The connected extension does the work.
 			const s = await run(map, "web_search", { query: "温州", method: "browser" });
-			// The search time first, then the report.
-			expect(s.text.split("\n")[0]).toMatch(/^检索时间：\d{4}-\d{2}-\d{2} \d{2}:\d{2} \w+, /);
-			expect(s.text.split("\n")[1]).toBe("检索结果（浏览器（Bing 3 页、Google 3 页），6 条）：温州");
+			// The report, with no time in it.
+			expect(s.text).not.toContain("检索时间");
+			expect(s.text.split("\n")[0]).toBe("检索结果（浏览器（Bing 3 页、Google 3 页），6 条）：温州");
 			expect(s.details.backend).toBe("browser");
 			// The marker that the extension was seen.
 			expect(existsSync(join(cwd, "agent", "browser", "seen"))).toBe(true);
@@ -354,7 +353,7 @@ describe("writer-search over the browser", () => {
 		expect(requests).toEqual([]);
 		// The model asked for AnySearch: no note.
 		const a = await run(tools(), "web_search", { query: "q", method: "anysearch" });
-		expect(a.text.split("\n")[1]).toContain("检索结果（anysearch");
+		expect(a.text.split("\n")[0]).toContain("检索结果（anysearch");
 	});
 });
 
@@ -435,41 +434,6 @@ describe("writer-search over AnySearch", () => {
 			const required = (tools().get(name)?.parameters as { required?: string[] }).required;
 			expect(required).toContain("method");
 		}
-	});
-});
-
-describe("writer-search prompt text", () => {
-	it("adds both snippets and the citation guideline", () => {
-		// Prompt with both tools.
-		const list = [...tools().values()];
-		const prompt = buildSystemPrompt({
-			cwd,
-			selectedTools: list.map((t) => t.name),
-			toolSnippets: Object.fromEntries(list.map((t) => [t.name, t.promptSnippet ?? ""])),
-			promptGuidelines: list.flatMap((t) => t.promptGuidelines ?? []),
-		});
-		// Snippet lines and a guideline.
-		expect(prompt).toContain("- web_search: Search the web for sources");
-		expect(prompt).toContain("- web_fetch: Fetch a web page");
-		expect(prompt).toContain("cite");
-	});
-});
-
-describe("writer-search prompt rules", () => {
-	it("prefers renowned international press, and carries no remark on the reliability of web text", () => {
-		const { map } = (() => {
-			const map = new Map<string, ToolDefinition>();
-			writerSearchExtension({
-				on: () => undefined,
-				registerCommand: () => undefined,
-				registerTool: (t: ToolDefinition) => map.set(t.name, t),
-			} as unknown as ExtensionAPI);
-			return { map };
-		})();
-		const text = [...map.values()].map((t) => [t.description, ...(t.promptGuidelines ?? [])].join("\n")).join("\n");
-		expect(text).toContain("internationally renowned news organizations");
-		expect(text).toContain("Reuters, AP, AFP");
-		expect(text).not.toMatch(/untrusted|as material|follow only/i);
 	});
 });
 

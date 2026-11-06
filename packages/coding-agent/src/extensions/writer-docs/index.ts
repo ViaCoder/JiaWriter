@@ -13,10 +13,12 @@
 
 // Whether a draft exists.
 // Copying a file into the topic.
+import { existsSync, readFileSync } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 // Paths.
 import { basename, join, resolve } from "node:path";
 // Parameter schemas.
+import { StringEnum } from "@earendil-works/pi-ai/utils/typebox-helpers";
 import { Type } from "typebox";
 // Agent directory (~/.jiawriter/agent).
 import { getAgentDir } from "../../config.ts";
@@ -48,6 +50,19 @@ function sessionOpened(ctx: ExtensionContext, extra: readonly unknown[] = []): s
 	// Pages archived in the topic were opened too, also in an earlier session.
 	const topic = currentTopic();
 	return [...openedUrls([...branch, ...extra]), ...(topic ? archivedUrls(topic) : [])];
+}
+
+/** Where a file is copied in a folder: its own name, or a numbered one when another file holds that name. */
+export function freeName(folder: string, file: string): string {
+	// The same content under the same name is the same file.
+	const name = basename(file);
+	const same = (path: string) => !existsSync(path) || readFileSync(path).equals(readFileSync(file));
+	// Name and extension apart, for 报告-2.pdf.
+	const dot = name.lastIndexOf(".");
+	const [stem, ext] = dot > 0 ? [name.slice(0, dot), name.slice(dot)] : [name, ""];
+	let path = join(folder, name);
+	for (let n = 2; !same(path); n++) path = join(folder, `${stem}-${n}${ext}`);
+	return path;
 }
 
 /** Arguments of /export-doc: [path] [md|docx] [--profile=name] [--out=path]. */
@@ -85,8 +100,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 			const file = await resolveReadPathAsync(path, cwd);
 			if (!topic) return [await importFile(file, cwd)];
 			const refs = join(topic, TOPIC_DIRS.refs);
-			const copy = join(refs, basename(file));
 			await mkdir(refs, { recursive: true });
+			const copy = freeName(refs, file);
 			if (resolve(file) !== resolve(copy)) await copyFile(file, copy);
 			return [await importFile(copy, topic)];
 		}
@@ -102,17 +117,10 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		label: "Import document",
 		// Full description sent to the model.
 		description:
-			"Import reference material (pdf, docx, txt, md, html) into Markdown with page markers under 参考资料/.parsed/, where read and grep can search it. Without path, every new or changed file in 参考资料/ (or sources/) is imported. A scanned PDF without a text layer is reported, because there is no OCR.",
-		// One line in the tools section.
-		promptSnippet: "Import reference files (PDF, Word, HTML, text) as searchable Markdown with page markers",
-		// Rules added while the tool is active.
-		promptGuidelines: [
-			"Files in 参考资料/ are imported automatically before each run: read and grep their parsed copies in 参考资料/.parsed, and use import_document for a file elsewhere",
-			"Cite a case taken from a reference file with the file name and page, and keep each quotation as written in the source",
-		],
+			"Import a reference file (pdf, docx, txt, md, html) to Markdown with page markers under 参考资料/.parsed/; without path, every new file in 参考资料/",
 		// Argument schema.
 		parameters: Type.Object({
-			path: Type.Optional(Type.String({ description: "File to import; omit to import the reference folder" })),
+			path: Type.Optional(Type.String({ description: "File" })),
 		}),
 		// Writes only the parsed copies; no network.
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -131,29 +139,13 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "Export document",
 		// Full description sent to the model.
-		description:
-			"Export a finished Markdown draft to .docx (default) or Markdown. # is the title, ## / ### / #### are heading levels 1–3. The export converts punctuation to Chinese full-width marks (numbers, URLs, code and terms such as Wi-Fi keep theirs), applies the export profile's fonts, sizes and line spacing (default default-zh), and reports a check of the written file.",
-		// One line in the tools section.
-		promptSnippet:
-			"Export a finished Markdown draft to .docx or Markdown with Chinese punctuation and the export profile's layout",
-		// Rules added while the tool is active.
-		promptGuidelines: [
-			"Write drafts in Markdown with # for the title and ## / ### / #### for heading levels 1–3; a draft written or edited in a run is exported to .docx automatically at its end, so run style_check before finishing, and use export_document for another format or profile",
-			"Fix every unpaired quote the export reports in the draft with edit, then export again",
-			"End a draft that uses sources with a 参考文献 section listing every source used in the text: one numbered entry per source, written as [descriptive title](full URL), where the title names the page's own title, the publisher and the date, and the URL is a page you opened with web_fetch and that loaded",
-			"Open every reference URL the export reports as not opened in this session with web_fetch; keep the entry when the page loads and matches its title, replace it with a source you opened or remove it otherwise, then export again",
-			"Write symbols as Unicode characters such as ×, ≤ and x² in the draft, write formulas in plain text with these characters and without LaTeX, and join two steps or items with — instead of an arrow",
-		],
+		description: "Export a Markdown draft to .docx (default) or Markdown, with Chinese punctuation",
 		// Argument schema.
 		parameters: Type.Object({
-			path: Type.String({ description: "Markdown draft to export" }),
-			format: Type.Optional(
-				Type.Union([Type.Literal("docx"), Type.Literal("md")], { description: "Output format (default docx)" }),
-			),
-			profile: Type.Optional(Type.String({ description: "Export profile name or .json path (default default-zh)" })),
-			output: Type.Optional(
-				Type.String({ description: "Output path (default: the draft's name with .docx or .export.md)" }),
-			),
+			path: Type.String({ description: "Draft" }),
+			format: Type.Optional(StringEnum(["docx", "md"] as const)),
+			profile: Type.Optional(Type.String({ description: "Profile name or .json path" })),
+			output: Type.Optional(Type.String({ description: "Output path" })),
 		}),
 		// Writes one new file.
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -202,11 +194,17 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 
 	// Scans of the reference folder run one after another (startup and each run may overlap).
 	let scans: Promise<void> = Promise.resolve();
+	// Files already reported as giving nothing.
+	const reported = new Set<string>();
 	/** Queue a scan; new imports and scans without a text layer are announced. */
 	function scan(ctx: ExtensionContext): Promise<void> {
 		scans = scans.then(async () => {
 			try {
-				const news = (await runImport(undefined, ctx.cwd)).filter((r) => r.status !== "unchanged");
+				// A file that yields nothing (a scan) comes up in every scan: it is reported once.
+				const news = (await runImport(undefined, ctx.cwd)).filter(
+					(r) => r.status !== "unchanged" && (r.status === "ok" || !reported.has(`${r.source}\n${r.status}`)),
+				);
+				for (const r of news) reported.add(`${r.source}\n${r.status}`);
 				if (news.length > 0 && ctx.hasUI) ctx.ui.notify(formatImport(news), "info");
 			} catch {
 				// A folder that cannot be read is skipped; import_document reports the reason.

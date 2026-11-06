@@ -74,18 +74,16 @@ describe("documentation variant", () => {
 			cwd: "/workspace",
 			selectedTools: [...DOCUMENTATION_EVAL_TOOLS],
 		});
-		// JiaWriter: the docs section now points at JiaWriter documentation.
-		expect(prompt).toContain("\n<docs>\nJiaWriter documentation");
+		// JiaWriter: the docs section points at JiaWriter's documentation.
+		expect(prompt).toContain("\n<docs>\nWhen the user asks about JiaWriter");
 		expect(prompt).toContain("\n<rules>\n");
 		expect(prompt).toContain("\n<cwd>\n/workspace\n</cwd>");
-		expect(prompt).toContain("docs/skills.md");
 
 		const stripped = excludePiDocumentation(prompt);
 		expect(stripped).toContain("\n<rules>\n");
 		expect(stripped).toContain("\n<cwd>\n/workspace\n</cwd>");
 		expect(stripped).not.toContain("<docs>");
-		expect(stripped).not.toContain("JiaWriter documentation");
-		expect(stripped).not.toContain("docs/skills.md");
+		expect(stripped).not.toContain("When the user asks about JiaWriter");
 		expect(stripped).not.toContain(getReadmePath());
 		expect(stripped).not.toContain(getDocsPath());
 		expect(stripped).not.toContain(getExamplesPath());

@@ -16,7 +16,6 @@ import { createEditToolDefinition } from "../../src/core/tools/edit.ts";
 import { createWriteToolDefinition } from "../../src/core/tools/write.ts";
 // Extension under test.
 import writerDocsExtension from "../../src/extensions/writer-docs/index.ts";
-import { WRITER_TOOL_GUIDELINES, WRITER_TOOL_SNIPPETS } from "../../src/writer/prompt-text.ts";
 // Harness with the faux provider.
 import { createHarness, type Harness } from "../suite/harness.ts";
 
@@ -29,11 +28,6 @@ describe("guidance before writing", () => {
 		expect(createWriteToolDefinition("/tmp").description).toMatch(/already exists is changed with edit/);
 		expect(createWriteToolDefinition("/tmp").description).not.toMatch(/overwrites/);
 		expect(createEditToolDefinition("/tmp").description).toMatch(/however large the change/);
-	});
-
-	it("says the same in the writing rules", () => {
-		expect(WRITER_TOOL_SNIPPETS.write).toBe("Create a new document");
-		expect(WRITER_TOOL_GUIDELINES.write?.join(" ")).toMatch(/Every later change goes through edit/);
 	});
 });
 

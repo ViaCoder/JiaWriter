@@ -26,10 +26,10 @@ export function relativizeFindResultPath(
 const findSchema = Type.Object({
 	pattern: Type.String({
 		// JiaWriter: examples from writing projects.
-		description: "Glob pattern to match files, e.g. '*.md', '**/*.docx', or '参考资料/**/*.pdf'",
+		description: "Glob pattern",
 	}),
-	path: Type.Optional(Type.String({ description: "Directory to search in (default: current directory)" })),
-	limit: Type.Optional(Type.Number({ description: "Maximum number of results (default: 1000)" })),
+	path: Type.Optional(Type.String({ description: "Folder, default the current one" })),
+	limit: Type.Optional(Type.Number({ description: "Most results, default 1000" })),
 });
 
 export const findToolSystemPromptContribution = {
@@ -76,7 +76,7 @@ export function createFindToolDefinition(
 	return {
 		name: "find",
 		label: "find",
-		description: `Search for files by glob pattern. Returns matching file paths relative to the search directory. Respects .gitignore. Output is truncated to ${DEFAULT_LIMIT} results or ${DEFAULT_MAX_BYTES / 1024}KB (whichever is hit first).`,
+		description: "Find files by glob pattern, such as 参考资料/**/*.pdf",
 		promptSnippet: findToolSystemPromptContribution.snippet,
 		parameters: findSchema,
 		async execute(

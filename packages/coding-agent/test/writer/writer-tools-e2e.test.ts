@@ -193,7 +193,7 @@ describe("writing checks end to end", () => {
 		// The three checks next to the default tools.
 		expect(names).toEqual(expect.arrayContaining(["style_check", "word_count", "readability_check", "read", "edit"]));
 		// The system prompt lists them.
-		expect(JSON.stringify(bodies[0].messages)).toContain("- readability_check: Find rare Chinese characters");
+		expect(JSON.stringify(bodies[0].tools)).toContain("readability_check");
 		// Second request carries the report.
 		const history = JSON.stringify(bodies[1].messages);
 		// Contrast frame with its position.

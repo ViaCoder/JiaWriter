@@ -8,19 +8,16 @@ import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 import {
 	WRITER_CHAT_RULE,
 	WRITER_PREAMBLE,
-	WRITER_RULES,
-	WRITER_TOOL_GUIDELINES,
-	WRITER_TOOL_SNIPPETS,
 	writerDocsSection,
 	writerLanguageRule,
 } from "../../src/writer/prompt-text.ts";
+// The rules of every request.
+import { CORE_RULES } from "../../src/writer/prompts/core.ts";
 
 // The six default writing tools.
 const DEFAULT_TOOLS = ["read", "write", "edit", "ls", "find", "grep"];
 // Snippets as the real tool definitions provide them (any non-empty text works).
 const SNIPPETS = Object.fromEntries([...DEFAULT_TOOLS, "bash"].map((name) => [name, `upstream ${name}`]));
-// Openings that would make a rule a prohibition instead of a positive instruction.
-const NEGATIVE_START = /^(do not|don't|never|avoid|no )/i;
 
 // Undo JW_LANG changes.
 afterEach(() => vi.unstubAllEnvs());
@@ -38,42 +35,6 @@ describe("writerLanguageRule", () => {
 });
 
 describe("rule texts", () => {
-	it("are all positive instructions", () => {
-		// Every general rule and every tool guideline.
-		const all = [...WRITER_RULES, ...Object.values(WRITER_TOOL_GUIDELINES).flat(), WRITER_CHAT_RULE];
-		// None starts with a prohibition.
-		for (const rule of all) expect(rule).not.toMatch(NEGATIVE_START);
-		// None is empty.
-		for (const rule of all) expect(rule.trim().length).toBeGreaterThan(10);
-	});
-
-	it("cover the citation, verification-marker, punctuation and positive-argument requirements", () => {
-		// All rules as one text.
-		const text = WRITER_RULES.join("\n");
-		// Cases come from materials or search with date and source.
-		expect(text).toContain("reference materials or from web search results");
-		// In the text: date and 《source》; URLs only at the end.
-		expect(text).toContain("2026年10月31日《路透社》报道");
-		expect(text).toContain("never its web address such as reuters.com");
-		expect(text).toContain("URLs kept for the 参考文献 section");
-		// Cases or data only where the plan asks for them; the model asks once.
-		expect(text).toContain("ask the user once which parts need cases or data");
-		expect(text).toContain("current situation and recommendations, in ordinary prose");
-		// Search results are stated without remarks on their reliability.
-		expect(text).toContain("leave out remarks on how reliable web results are");
-		// No verification markers.
-		expect(text).toContain("free of verification markers");
-		// Chinese full-width punctuation.
-		expect(text).toContain("full-width Chinese punctuation");
-		// Contrast frames kept for genuine prohibitions.
-		expect(text).toContain("不是……而是");
-	});
-
-	it("give a writing-oriented summary for each default tool", () => {
-		// Every default tool has a summary.
-		for (const name of DEFAULT_TOOLS) expect(WRITER_TOOL_SNIPPETS[name]?.length ?? 0).toBeGreaterThan(5);
-	});
-
 	it("point the docs section at the given paths", () => {
 		// Paths appear in the section.
 		const docs = writerDocsSection("/opt/wa/README.md", "/opt/wa/docs");
@@ -93,18 +54,14 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 		// Build the prompt.
 		const prompt = defaultPrompt();
 		// Preamble first.
-		expect(prompt.startsWith(`<system_prompt>\n${WRITER_PREAMBLE}\n</system_prompt>\n\n<tools>`)).toBe(true);
-		// The first rule line is the first writing rule.
-		expect(prompt).toContain(`<rules>\n- ${WRITER_RULES[0]}`);
+		expect(prompt.startsWith(`<system_prompt>\n${WRITER_PREAMBLE}\n</system_prompt>\n\n<rules>`)).toBe(true);
+		// The language comes first, and the rules of every request follow.
+		expect(prompt).toContain("<rules>\n- Reply to the user in Simplified Chinese");
+		for (const rule of CORE_RULES) expect(prompt).toContain(`- ${rule}`);
 	});
 
-	it("uses writing summaries for the default tools and leaves bash out", () => {
-		// Build the prompt.
-		const prompt = defaultPrompt();
-		// Each default tool shows the JiaWriter summary.
-		for (const name of DEFAULT_TOOLS) expect(prompt).toContain(`- ${name}: ${WRITER_TOOL_SNIPPETS[name]}`);
-		// bash is not a default tool.
-		expect(prompt).not.toContain("- bash:");
+	it("leaves the tool list to the tool descriptions", () => {
+		expect(defaultPrompt()).not.toContain("<tools>");
 	});
 
 	it("follows JW_LANG and replaces the upstream concise rule", () => {
