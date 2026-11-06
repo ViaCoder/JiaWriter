@@ -96,7 +96,7 @@ jobs:
         run: |
           set -euo pipefail
           cd packages/coding-agent/binaries
-          sha256sum jiawriter-*.tar.gz jiawriter-*.zip > SHA256SUMS
+          sha256sum jiawriter-*.tar.xz jiawriter-*.zip > SHA256SUMS
           cat SHA256SUMS
 
       - name: Upload packages
@@ -104,7 +104,7 @@ jobs:
         with:
           name: jiawriter-packages
           path: |
-            packages/coding-agent/binaries/jiawriter-*.tar.gz
+            packages/coding-agent/binaries/jiawriter-*.tar.xz
             packages/coding-agent/binaries/jiawriter-*.zip
             packages/coding-agent/binaries/SHA256SUMS
           if-no-files-found: error
@@ -154,7 +154,7 @@ jobs:
             powershell.exe -NoProfile -NonInteractive -Command 'Expand-Archive -LiteralPath $env:ARCHIVE_PATH -DestinationPath $env:DESTINATION_PATH -Force'
             echo "binary=extracted/jiawriter.exe" >> "${GITHUB_OUTPUT}"
           else
-            tar -xzf "jiawriter-${{ matrix.platform }}.tar.gz" -C ../extracted
+            tar -xJf "jiawriter-${{ matrix.platform }}.tar.xz" -C ../extracted
             echo "binary=extracted/jiawriter/jiawriter" >> "${GITHUB_OUTPUT}"
           fi
 

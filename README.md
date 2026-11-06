@@ -10,7 +10,7 @@ JiaWriter is a general-purpose writing agent for the terminal. It reads referenc
 
 ## Install
 
-1. Download the package for your platform: `jiawriter-<platform>.tar.gz` (Linux, macOS) or `jiawriter-<platform>.zip` (Windows), where the platform is `linux-x64`, `linux-arm64`, `darwin-arm64`, `darwin-x64`, `windows-x64` or `windows-arm64`. The packages and `SHA256SUMS` are attached to the runs of the "JiaWriter packages" GitHub Actions workflow.
+1. Download the package for your platform: `jiawriter-<platform>.tar.xz` (Linux, macOS) or `jiawriter-<platform>.zip` (Windows), where the platform is `linux-x64`, `linux-arm64`, `darwin-arm64`, `darwin-x64`, `windows-x64` or `windows-arm64`. The packages and `SHA256SUMS` are attached to the runs of the "JiaWriter packages" GitHub Actions workflow.
 2. Check the digests: `sha256sum -c SHA256SUMS` (on macOS `shasum -a 256 -c SHA256SUMS`).
 3. Extract the package and run `jiawriter` (`jiawriter.exe` on Windows). Each package carries pinned fd and ripgrep, so nothing is downloaded at run time.
 4. Load the package's `chrome-extension` folder in Chrome (once). Every package carries a Chinese `使用说明.html` that shows each step, from the model settings to the extension, with screenshots.

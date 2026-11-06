@@ -9,7 +9,7 @@
 #
 # Usage: bash search_fetch/build_binary.sh [--out <dir>]
 #   Output: <out>/<os>/<arch>/sf, or sf.exe on Windows   (default <out>: <repo>/.tmp/sf/dist)
-# Needs: cargo, curl, perl, tar, and a Python with pip (PYTHON, default python3) to build the wheel.
+# Needs: cargo, curl, perl, tar, zstd, and a Python with pip (PYTHON, default python3) to build the wheel.
 set -euo pipefail
 
 # This folder and the repository root.
@@ -96,7 +96,7 @@ tar -xzf "$PBS_TAR" -C "$DIST"
 # anything removed by mistake.
 STD="$(dirname "$SITE_REL")"
 rm -rf "$DIST"/python/{include,share,libs,tcl} "$DIST"/python/lib/{tcl,tk,itcl,thread}[0-9]* "$DIST"/python/lib/lib{tcl,tk}* \
-  "$DIST/$STD"/{tkinter,idlelib,turtledemo,ensurepip} "$DIST/$STD"/lib-dynload/_tkinter* \
+  "$DIST/$STD"/{tkinter,idlelib,turtledemo,ensurepip,pydoc_data,lib2to3} "$DIST/$STD"/lib-dynload/_tkinter* \
   "$DIST"/python/DLLs/{_tkinter.pyd,tcl86t.dll,tk86t.dll} "$DIST"/python/DLLs/_test*.pyd
 if [ "$os" = linux ]; then rm -f "$DIST"/python/lib/libpython3*.so*; fi
 # License texts (Python's, the dependencies' dist-info ones, the vendored crawl4ai and Readability ones) stay
@@ -110,8 +110,11 @@ fi
 # Every module the CLI uses must import from the bundle (a scratch home keeps the check out of $HOME).
 SEARCH_FETCH_HOME="$(native_path "$WORK/check-home")" "$DIST/$PY_REL" -I -c "import search_fetch.cli, search_fetch.fetch, search_fetch.search, search_fetch.ingest, search_fetch.docparse, search_fetch.media, search_fetch.bridge, search_fetch.vendor.crawl4ai.markdown_generator, search_fetch.vendor.crawl4ai.content_filter, pypdf, openpyxl, yt_dlp, idna; from search_fetch.markdown import _html_to_markdown; assert _html_to_markdown('<h1>t</h1><p>body text here</p>', 'https://example.com/')['raw']; print('==> imports ok')"
 rm -rf "$WORK/check-home"
-# Repacked with the top-level python/ folder, as PyApp's own distributions are.
-( cd "$DIST" && tar -czf "$WORK/dist.tar.gz" python )
+# Bytecode is rebuilt by Python on the first run, in a fraction of a second, and it is a quarter of the bundle.
+find "$DIST/python" -type d -name __pycache__ -prune -exec rm -rf {} +
+# Repacked with the top-level python/ folder, as PyApp's own distributions are. zstd is the smallest format
+# PyApp reads: half the size of gzip here. --long=27 stays inside the window its decoder accepts.
+( cd "$DIST" && tar -cf - python | zstd -19 --long=27 -T0 -q -f -o "$WORK/dist.tar.zst" )
 
 # 4. PyApp source, checked against the pinned digest.
 TARBALL="$WORK/pyapp-v$PYAPP_VERSION.tar.gz"
@@ -146,7 +149,7 @@ PYAPP_PROJECT_VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' "$DIR/pyproject.tom
 export PYAPP_PROJECT_VERSION
 export PYAPP_EXEC_MODULE="search_fetch"
 export PYAPP_PYTHON_VERSION="3.12"
-PYAPP_DISTRIBUTION_PATH="$(native_path "$WORK/dist.tar.gz")"
+PYAPP_DISTRIBUTION_PATH="$(native_path "$WORK/dist.tar.zst")"
 export PYAPP_DISTRIBUTION_PATH
 export PYAPP_DISTRIBUTION_PYTHON_PATH="$PY_REL"
 export PYAPP_DISTRIBUTION_SITE_PACKAGES_PATH="$SITE_REL"

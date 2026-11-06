@@ -17,10 +17,10 @@
 #
 # Output:
 #   packages/coding-agent/binaries/
-#     jiawriter-darwin-arm64.tar.gz
-#     jiawriter-darwin-x64.tar.gz
-#     jiawriter-linux-x64.tar.gz
-#     jiawriter-linux-arm64.tar.gz
+#     jiawriter-darwin-arm64.tar.xz
+#     jiawriter-darwin-x64.tar.xz
+#     jiawriter-linux-x64.tar.xz
+#     jiawriter-linux-arm64.tar.xz
 #     jiawriter-windows-x64.zip
 #     jiawriter-windows-arm64.zip
 #   Each package also carries pinned fd and rg (bin/) and the built-in writing skills (writer-skills/).
@@ -138,13 +138,15 @@ for platform in "${PLATFORMS[@]}"; do
     # common directory of all entrypoints, so the main entry must stay in dist/
     # for the worker specifiers in the runtime to resolve.
     #
+    # JiaWriter: whitespace and syntax minified, identifiers kept: the search log records error class names.
+    #
     # Disable cwd bunfig.toml autoload so project preload scripts cannot crash the
     # standalone binary before pi starts (see #7684). Disable cwd .env autoload so
     # project env files do not leak into pi's environment (see #10473).
     if [[ "$platform" == windows-* ]]; then
-        bun build --compile --no-compile-autoload-bunfig --no-compile-autoload-dotenv --target="$bun_target" ./dist/bun/cli.js ./src/utils/image-resize-worker.ts ./src/extensions/codemode/worker.ts --outfile "$OUTPUT_DIR/$platform/$NAME.exe"
+        bun build --compile --no-compile-autoload-bunfig --no-compile-autoload-dotenv --minify-whitespace --minify-syntax --target="$bun_target" ./dist/bun/cli.js ./src/utils/image-resize-worker.ts ./src/extensions/codemode/worker.ts --outfile "$OUTPUT_DIR/$platform/$NAME.exe"
     else
-        bun build --compile --no-compile-autoload-bunfig --no-compile-autoload-dotenv --target="$bun_target" ./dist/bun/cli.js ./src/utils/image-resize-worker.ts ./src/extensions/codemode/worker.ts --outfile "$OUTPUT_DIR/$platform/$NAME"
+        bun build --compile --no-compile-autoload-bunfig --no-compile-autoload-dotenv --minify-whitespace --minify-syntax --target="$bun_target" ./dist/bun/cli.js ./src/utils/image-resize-worker.ts ./src/extensions/codemode/worker.ts --outfile "$OUTPUT_DIR/$platform/$NAME"
     fi
 done
 
@@ -165,6 +167,8 @@ for platform in "${PLATFORMS[@]}"; do
     # JiaWriter: the upstream docs (read by the model when asked about the program) with the JiaWriter
     # name; pi's changelog and extension examples stay in the repository.
     cp -r docs "$OUTPUT_DIR/$platform/"
+    # JiaWriter: upstream screenshots, which nothing reads at run time.
+    rm -rf "$OUTPUT_DIR/$platform/docs/images"
     node ../../scripts/writer-docs-brand.mjs "$OUTPUT_DIR/$platform/docs" >/dev/null
 
     # Copy the selected architecture's native platform helpers next to the executable.
@@ -211,8 +215,9 @@ for platform in "${PLATFORMS[@]}"; do
         (cd "$platform" && zip -r ../$NAME-$platform.zip .)
     else
         # Unix platforms (tar.gz) - use wrapper directory for mise compatibility
-        echo "Creating $NAME-$platform.tar.gz..."
-        mv "$platform" $NAME && tar -czf $NAME-$platform.tar.gz $NAME && mv $NAME "$platform"
+        # JiaWriter: xz, about a fifth smaller than gzip; tar on Linux and macOS reads it.
+        echo "Creating $NAME-$platform.tar.xz..."
+        mv "$platform" $NAME && tar -cf - $NAME | xz -9e -T0 > $NAME-$platform.tar.xz && mv $NAME "$platform"
     fi
 done
 
@@ -223,14 +228,14 @@ for platform in "${PLATFORMS[@]}"; do
     if [[ "$platform" == windows-* ]]; then
         mkdir -p "$platform" && (cd "$platform" && unzip -q ../$NAME-$platform.zip)
     else
-        tar -xzf $NAME-$platform.tar.gz && mv $NAME "$platform"
+        tar -xJf $NAME-$platform.tar.xz && mv $NAME "$platform"
     fi
 done
 
 echo ""
 echo "==> Build complete!"
 echo "Archives available in $OUTPUT_DIR/"
-ls -lh *.tar.gz *.zip 2>/dev/null || true
+ls -lh *.tar.xz *.zip 2>/dev/null || true
 echo ""
 echo "Extracted directories for testing:"
 for platform in "${PLATFORMS[@]}"; do

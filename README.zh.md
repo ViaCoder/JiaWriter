@@ -10,7 +10,7 @@ JiaWriter 是一个通用写作 agent，在终端里运行。它读取参考资�
 
 ## 安装
 
-1. 下载对应平台的包：`jiawriter-<平台>.tar.gz`（Linux、macOS）或 `jiawriter-<平台>.zip`（Windows），平台为 `linux-x64`、`linux-arm64`、`darwin-arm64`、`darwin-x64`、`windows-x64`、`windows-arm64`。包和 `SHA256SUMS` 在 GitHub Actions「JiaWriter packages」工作流的运行结果里。
+1. 下载对应平台的包：`jiawriter-<平台>.tar.xz`（Linux、macOS）或 `jiawriter-<平台>.zip`（Windows），平台为 `linux-x64`、`linux-arm64`、`darwin-arm64`、`darwin-x64`、`windows-x64`、`windows-arm64`。包和 `SHA256SUMS` 在 GitHub Actions「JiaWriter packages」工作流的运行结果里。
 2. 核对校验值：`sha256sum -c SHA256SUMS`（macOS 用 `shasum -a 256 -c SHA256SUMS`）。
 3. 解压后运行 `jiawriter`（Windows 为 `jiawriter.exe`）。包里自带固定版本的 fd 和 ripgrep，运行时不下载任何工具。
 4. 在 Chrome 里加载包里的 `chrome-extension` 文件夹（只需一次）。每个包都带一份中文的 `使用说明.html`，用截图写明了从设置模型到安装扩展的每一步。
