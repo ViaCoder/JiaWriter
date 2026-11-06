@@ -13,7 +13,7 @@ const VERSION = chrome.runtime.getManifest().version;
 // Page scripts that may be run (file names in ops/ without .js).
 const SCRIPTS = new Set(["features", "html", "meta", "probe", "observe", "results", "extent", "url", "scroll_bottom",
   "click_target", "type_target", "next_link", "more_button", "activity_install", "activity_last",
-  "locate", "serp", "article"]);
+  "locate", "serp", "article", "compat", "compat_box", "compat_in"]);
 // Scripts that need a vendored library injected first.
 const PRELOAD = { article: ["vendor/Readability.js"] };
 // Longest wait for a page load (ms) when the caller gives none.
@@ -613,13 +613,14 @@ async function typeText(send, text) {
   }
 }
 
-// Press one named key (Enter, Escape, Tab).
+// Press one named key (Enter, Escape, Tab, Space).
 async function pressKey(send, name) {
   // Fields per key.
   const keys = {
     Enter: { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, text: "\r" },
     Escape: { key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 },
     Tab: { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9 },
+    Space: { key: " ", code: "Space", windowsVirtualKeyCode: 32 },
   };
   const f = keys[name];
   if (!f) throw new Error(`unknown key ${name}`);
@@ -647,6 +648,214 @@ function toBase64(bytes) {
   for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
   // Encoded.
   return btoa(s);
+}
+
+// --- Interactive verification on a page ----------------------------------------------
+
+// Some sites gate a page behind a small control a person clicks or checks; until it is answered the
+// content is not served. It is handled with the same input engine as the ops below: the pointer
+// moves onto the control and — window in front — a click, or — window behind — keyboard focus and a
+// key, so the user's window keeps focus (a mouse press raises the window on some desktops; moves,
+// keys and wheel do not). Page code is only read, through the fixed scripts in ops/.
+
+// Tabs whose verification is being handled, so a second trigger does not double-attach the debugger.
+const solving = new Set();
+
+// Page-side detection (MAIN world, ops/compat.js): {challengeIframe, cfChallenge, cfCleared}, or null.
+async function detectPage(tabId) {
+  try {
+    // The script reports through a JSON string, so page globals never cross the bridge.
+    const r = await runScript(tabId, "compat", null, "MAIN");
+    return r ? JSON.parse(r) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// The verification <iframe>'s rect in the main frame (viewport px), or null (ops/compat_box.js).
+async function controlFrameRect(tabId) {
+  try {
+    return await runScript(tabId, "compat_box", null);
+  } catch (_) {
+    return null;
+  }
+}
+
+// Run one fixed page script in every frame of the tab and return its first non-null answer. A
+// cross-origin control frame lives in its own process, beyond the page's frame tree; an
+// all-frames injection still reaches it.
+async function runScriptAllFrames(tabId, script, args) {
+  // Only known scripts.
+  if (!SCRIPTS.has(script)) throw new Error(`unknown script ${script}`);
+  const target = { tabId, allFrames: true };
+  // Hand the arguments over first.
+  await chrome.scripting.executeScript({ target, world: "ISOLATED", func: (a) => { window.__sfArgs = a; }, args: [args || {}] });
+  // The script; its last expression is the result.
+  const res = await chrome.scripting.executeScript({ target, world: "ISOLATED", files: [`ops/${script}.js`] });
+  for (const r of res || []) if (r && r.result) return r.result;
+  return null;
+}
+
+// The host the control's frame comes from.
+const CONTROL_FRAME_RE = /challenges\.cloudflare\.com/;
+
+// The control's <iframe> node in the page's own DOM, or null. It lives in a closed shadow root
+// that page scripts cannot read, but the DOM agent walks those trees when asked to pierce.
+function findControlFrameNode(n) {
+  if (!n) return null;
+  const src = (n.attributes || []).find((a) => a.name === "src");
+  if (n.nodeName === "IFRAME"
+    && (CONTROL_FRAME_RE.test((n.contentDocument && n.contentDocument.baseURL) || "")
+      || CONTROL_FRAME_RE.test((src && src.value) || "")))
+    return n;
+  for (const list of [n.children || [], n.shadowRoots || []])
+    for (const c of list) { const f = findControlFrameNode(c); if (f) return f; }
+  return null;
+}
+
+// Focus the control's <iframe> (no mouse press), so a key goes inside its frame.
+async function focusControlFrame(send) {
+  const { root } = await send("DOM.getDocument", { depth: -1, pierce: true });
+  const iframe = findControlFrameNode(root);
+  if (!iframe || iframe.backendDOMNodeId === undefined) return false;
+  await send("DOM.focus", { backendNodeId: iframe.backendDOMNodeId });
+  return true;
+}
+
+// The control's own box, read from inside its frame (ops/compat_in.js), or null.
+async function readControlBox(tabId) {
+  try {
+    const r = await runScriptAllFrames(tabId, "compat_in");
+    return r ? JSON.parse(r) : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Locate the control and work out the point to press, in CDP (main-frame viewport) coordinates.
+async function locateControl(send, tabId) {
+  // Where the control sits in the main frame: its own <iframe>'s box first — the DOM agent walks
+  // the closed shadow root it lives in, where page queries cannot — then the page-side wrappers
+  // (ops/compat_box.js).
+  let off = null;
+  try {
+    const { root } = await send("DOM.getDocument", { depth: -1, pierce: true });
+    const iframe = findControlFrameNode(root);
+    if (iframe && iframe.backendDOMNodeId !== undefined) {
+      const box = await axBox(send, { backendDOMNodeId: iframe.backendDOMNodeId });
+      if (box && box.w >= 1 && box.h >= 1) off = { left: box.x, top: box.y, width: box.w, height: box.h };
+    }
+  } catch (_) {
+    // Fall through to the page-side box.
+  }
+  if (!off) off = await controlFrameRect(tabId);
+  if (!off) return { found: false, reason: "no-iframe-rect" };
+  // The control's box in its own frame's viewport.
+  const v = await readControlBox(tabId);
+  let clickX, clickY, which;
+  if (v) {
+    // A real control: its centre. A wide area: the left mark, mid-height.
+    if (v.which === "checkbox") { clickX = off.left + v.x + v.w / 2; clickY = off.top + v.y + v.h / 2; which = "checkbox"; }
+    else { clickX = off.left + v.x + Math.min(26, v.w * 0.18); clickY = off.top + v.y + v.h / 2; which = "stage"; }
+  } else {
+    // No readable element. The standard control keeps its mark near the left; inside a wide
+    // container the control can sit centred, so aim into the middle, not into empty margin.
+    const inset = off.width > 340 ? (off.width - 300) / 2 : 0;
+    clickX = off.left + inset + 25; clickY = off.top + off.height / 2; which = "fallback";
+  }
+  return { found: true, which, clickX, clickY };
+}
+
+// Poll until the page reports the verification completed (the hidden input it fills in then).
+async function waitCleared(tabId, ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const d = await detectPage(tabId);
+    if (d && d.cfCleared) return true;
+    await sleep(rand(400, 900));
+  }
+  return false;
+}
+
+// A real press settles what a key or a grazing point did not. It may raise this window for a
+// moment, so the user's focus is handed straight back afterwards.
+async function pressControl(tabId) {
+  const t = await chrome.tabs.get(tabId).catch(() => null);
+  const prev = t ? await chrome.windows.getLastFocused().catch(() => null) : null;
+  if (t) await chrome.windows.update(t.windowId, { focused: true }).catch(() => {});
+  await sleep(rand(400, 800));
+  let done = false;
+  await withInput(tabId, async (send) => {
+    const loc = await locateControl(send, tabId);
+    if (!loc.found) return;
+    await moveMouse(send, tabId, loc.clickX + rand(-2, 2), loc.clickY + rand(-2, 2));
+    await sleep(rand(150, 400));
+    await clickHere(send, tabId);
+    done = true;
+  }).catch(() => {});
+  const cleared = done ? await waitCleared(tabId, 9000) : false;
+  if (prev && prev.focused && prev.id !== undefined && t && prev.id !== t.windowId)
+    await chrome.windows.update(prev.id, { focused: true }).catch(() => {});
+  return { done, cleared };
+}
+
+// Handle one verification on a tab. {ok, how, cleared, ms}.
+async function solveChallenge(tabId) {
+  // Only one at a time per tab.
+  if (solving.has(tabId)) return { ok: false, how: "busy" };
+  solving.add(tabId);
+  const started = Date.now();
+  try {
+    const pre = await detectPage(tabId);
+    // Already clear.
+    if (pre && pre.cfCleared) return { ok: true, how: "already", cleared: true, ms: Date.now() - started };
+    // Nothing to handle.
+    if (pre && !pre.cfChallenge && !pre.challengeIframe) return { ok: false, how: "no-challenge", cleared: false, ms: Date.now() - started };
+
+    // Up to three passes. The control can move or resize as the page settles, so every pass
+    // locates it afresh, and a pass that only grazed it costs nothing to retry.
+    let how = null, cleared = false;
+    for (let round = 0; round < 3 && !cleared; round++) {
+      await sleep(round === 0 ? rand(500, 1000) : rand(700, 1400));
+      if (round === 0) {
+        let acted = false;
+        await withInput(tabId, async (send) => {
+          const loc = await locateControl(send, tabId);
+          if (!loc.found) return;
+          // A human point near the control, with a little jitter.
+          const x = loc.clickX + rand(-2, 2), y = loc.clickY + rand(-2, 2);
+          await moveMouse(send, tabId, x, y);
+          await sleep(rand(150, 400));
+          if (await inFront(tabId)) {
+            await clickHere(send, tabId);
+            how = "click";
+          } else {
+            // Behind another window: no mouse press that could raise this one. Focus straight
+            // into the control's frame — through the page's own frames when they are reachable,
+            // and on the control's <iframe> itself, which sits in a closed shadow root beyond
+            // page scripts but not beyond the DOM agent; a Space key then toggles such a control.
+            await runScriptAllFrames(tabId, "compat_in", { focus: true }).catch(() => null);
+            await focusControlFrame(send).catch(() => false);
+            await sleep(rand(80, 220));
+            await pressKey(send, "Space");
+            how = "keyboard";
+          }
+          acted = true;
+        }).catch(() => {});
+        cleared = acted ? await waitCleared(tabId, how === "keyboard" ? 4500 : 10000) : false;
+      }
+      if (!cleared) {
+        const r = await pressControl(tabId);
+        if (r.done) how = "press";
+        cleared = r.cleared;
+      }
+    }
+    return { ok: cleared, how: how || (cleared ? "cleared" : "no-checkbox"), cleared, ms: Date.now() - started };
+  } catch (e) {
+    return { ok: false, how: "error", error: String((e && e.message) || e), cleared: false, ms: Date.now() - started };
+  } finally {
+    solving.delete(tabId);
+  }
 }
 
 // Operations by name.
@@ -778,6 +987,10 @@ const OPS = {
       }
     });
     return true;
+  },
+  // Handle the interactive verification on a tab, if any. {tab} → {ok, how, cleared, ms}.
+  async solve(msg) {
+    return solveChallenge(msg.tab);
   },
   // Download a document through this Chrome (its cookies and network). {url, max} → {base64, type, url}.
   async download(msg) {

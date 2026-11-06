@@ -269,6 +269,12 @@ async def _await_content(page, url: str = ""):
                 challenge_since = now
                 chal_deadline = now + config.FETCH_CHALLENGE_WAIT
                 seen_activity = 0.0
+                # The extension can answer some of these itself, with the same trusted input a
+                # person's hands produce; let it try once before anyone waits. Best effort.
+                try:
+                    await page.input("solve")
+                except Exception:
+                    pass
             if not announced:
                 announced = True
                 hint = ", or solve it in the Chrome window" if config.ALLOW_HUMAN_WAIT else ""
@@ -410,6 +416,15 @@ async def _human_wait(page, ctx: dict, budget: float = 0.0) -> bool:
     deterministic signal (no LLM spam); never the old 600s. `budget` overrides the window
     (0 = the full config.HUMAN_WAIT)."""
     budget = budget or config.HUMAN_WAIT
+    # The extension can answer some of these itself, with the same trusted input a person's
+    # hands produce; let it try once before asking a person. Best effort.
+    try:
+        await page.input("solve")
+        if not _looks_challenged(await _observe(page)):
+            _log("✓ challenge cleared")
+            return True
+    except Exception:
+        pass
     # Bring the challenge tab to the front of the user's Chrome.
     try:
         await page.activate()
