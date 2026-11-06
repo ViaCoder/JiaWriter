@@ -6,6 +6,8 @@ import type { Api, Model } from "../src/types.ts";
 
 /** A key that would be obvious if it leaked. */
 const KEY = "dummy-key-value-for-tests";
+/** A page long enough to count as one. */
+const PAGE = "页面正文。".repeat(120);
 
 /** One request the fake upstream saw. */
 interface Seen {
@@ -197,7 +199,7 @@ describe("serverSearch, claude", () => {
 		expect(seen[0].path).toBe("/v1/messages");
 		expect(seen[0].headers["x-api-key"]).toBe(KEY);
 		expect(seen[0].body.tools).toEqual([{ type: "web_search_20250305", name: "web_search", max_uses: 8 }]);
-		expect(JSON.stringify(seen[0].body.messages)).toContain("Perform a web search for the query: some query");
+		expect(JSON.stringify(seen[0].body.messages)).toContain("Research this: some query");
 	});
 
 	it("merges citations into the sources, each address once", async () => {
@@ -419,6 +421,51 @@ describe("serverSearch, codex streams", () => {
 	});
 });
 
+describe("codex research", () => {
+	const searched = (query: string) => ({
+		type: "web_search_call",
+		id: query,
+		status: "completed",
+		action: { type: "search", query, sources: [{ type: "url", url: `https://example.com/${query}` }] },
+	});
+	const opened = {
+		type: "web_search_call",
+		id: "o",
+		status: "completed",
+		action: { type: "open_page", url: "https://example.com/read" },
+	};
+
+	it("asks for several rounds, and keeps the sources of each round and the pages opened", async () => {
+		answers = [() => codexEvents([searched("a"), searched("b"), opened, codexMessage("报告")])];
+		const out = await serverSearch(call("codex"), "q");
+		expect(out.sources.map((s) => s.url)).toEqual([
+			"https://example.com/a",
+			"https://example.com/b",
+			"https://example.com/read",
+		]);
+		expect(seen[0].body.instructions).toContain("in several rounds");
+		expect(seen[0].body.instructions).toContain("never answer from memory");
+	});
+
+	it("turns a reply that gave no page into a failure that says why, as in the log of 2026-11-06", async () => {
+		const opened2 = { ...opened, action: { type: "open_page", url: "https://example.com/a" } };
+		const refused = "I can't reproduce the entire page verbatim.";
+		answers = [() => codexEvents([opened2, codexMessage(refused)])];
+		await expect(serverFetch(call("codex"), "https://example.com/a")).rejects.toMatchObject({
+			code: "no_open",
+			message: refused,
+		});
+	});
+
+	it("asks for the page's content in full detail, and no word-for-word copy", async () => {
+		const opened2 = { ...opened, action: { type: "open_page", url: "https://example.com/a" } };
+		answers = [() => codexEvents([opened2, codexMessage(PAGE)])];
+		await serverFetch(call("codex"), "https://example.com/a");
+		expect(seen[0].body.instructions).toContain("in full detail");
+		expect(seen[0].body.instructions).not.toContain("word for word");
+	});
+});
+
 describe("the record of a call", () => {
 	const used = { type: "web_search_call", id: "w", status: "completed", action: { type: "search", query: "q" } };
 
@@ -446,6 +493,25 @@ describe("the record of a call", () => {
 		expect(lines.join("\n")).toContain('"kind":"done"');
 	});
 
+	it("keeps no address in the log, whatever the search and the fetch went through", async () => {
+		const lines: string[] = [];
+		const log = (line: string) => lines.push(line);
+		const opened = {
+			type: "web_search_call",
+			id: "w",
+			status: "completed",
+			action: { type: "open_page", url: "https://example.com/a" },
+		};
+		answers = [() => codexEvents([used]), () => codexEvents([opened, codexMessage(`${PAGE} https://example.com/b`)])];
+		await serverSearch(call("codex", { log }), "site:example.com 查询");
+		await serverFetch(call("codex", { log }), "https://example.com/a?token=x");
+		await vi.waitFor(() => expect(lines.join("\n").match(/"kind":"stream"/g)).toHaveLength(2));
+		const text = lines.join("\n");
+		expect(text).toContain("/v1/responses");
+		expect(text).toContain('"what":"fetch"');
+		expect(text).not.toMatch(/127\.0\.0\.1|example\.com|"upstream"|firstSources/);
+	});
+
 	it("records the plain and the OAuth try of a call that needed both, for claude", async () => {
 		const lines: string[] = [];
 		answers = [
@@ -464,6 +530,140 @@ describe("the record of a call", () => {
 	it("works the same with no log", async () => {
 		answers = [() => codexEvents([used])];
 		await expect(serverSearch(call("codex"), "q")).resolves.toBeDefined();
+	});
+});
+
+describe("codex's own search endpoint", () => {
+	/** A call allowed to use it. */
+	const direct = (extra: Partial<ServerCall> = {}) =>
+		call("codex", { direct: { id: "session-1", refused: new Set() }, ...extra });
+	/** A reply of the endpoint. */
+	const found =
+		(output: string, results: Record<string, unknown>[] = []) =>
+		() => ({
+			status: 200,
+			json: { encrypted_output: "x", output, results },
+		});
+	/** A hosted search, for when the endpoint is not there. */
+	const hostedSearch = () =>
+		codexEvents([
+			{ type: "web_search_call", id: "w", status: "completed", action: { type: "search", query: "q" } },
+			codexMessage("the hosted answer"),
+		]);
+	/** A hosted page read. */
+	const hostedPage = () =>
+		codexEvents([
+			{
+				type: "web_search_call",
+				id: "w",
+				status: "completed",
+				action: { type: "open_page", url: "https://e.example/a" },
+			},
+			codexMessage(PAGE),
+		]);
+
+	it("sends a search as Codex does, and reads the tool's text and results", async () => {
+		answers = [
+			found("the results", [
+				{ type: "text_result", ref_id: "turn0search0", url: "https://e.example/a", title: "A" },
+				{ type: "image" },
+			]),
+		];
+		const report = await serverSearch(direct(), "some query", "week");
+		expect(seen).toHaveLength(1);
+		expect(seen[0].path).toBe("/v1/alpha/search");
+		expect(seen[0].headers.authorization).toBe(`Bearer ${KEY}`);
+		expect(seen[0].body).toEqual({
+			id: "session-1",
+			model: "test-model",
+			input: "some query",
+			commands: { search_query: [{ q: "some query", recency: 7 }], response_length: "long" },
+			settings: { external_web_access: true, allowed_callers: ["direct"], search_context_size: "high" },
+			max_output_tokens: 16000,
+		});
+		expect(report).toEqual({
+			text: "the results",
+			sources: [{ url: "https://e.example/a", title: "A", snippet: "", date: "" }],
+		});
+	});
+
+	it("opens a page and gives its text as it is, with the address behind a reference", async () => {
+		answers = [found(PAGE, [{ url: "https://e.example/a", title: "The page" }])];
+		const page = await serverFetch(direct(), "turn0search3");
+		expect(seen[0].body.commands).toEqual({ open: [{ ref_id: "turn0search3" }], response_length: "long" });
+		expect(page).toEqual({ url: "https://e.example/a", title: "The page", content: PAGE });
+	});
+
+	it("reads on from a line, and finds words, where a short text is a real answer", async () => {
+		answers = [found("the rest"), found("one passage")];
+		const rest = await serverFetch(direct(), "https://e.example/a", { lineno: 120 });
+		expect(seen[0].body.commands).toEqual({
+			open: [{ ref_id: "https://e.example/a", lineno: 120 }],
+			response_length: "long",
+		});
+		expect(rest).toEqual({ url: "https://e.example/a", title: "", content: "the rest" });
+		const hit = await serverFetch(direct(), "https://e.example/a", { find: "绿化" });
+		expect(seen[1].body.commands).toEqual({
+			find: [{ ref_id: "https://e.example/a", pattern: "绿化" }],
+			response_length: "long",
+		});
+		expect(hit.content).toBe("one passage");
+	});
+
+	it("names a page it could not give, and does not count that against the endpoint", async () => {
+		answers = [found("Failed to open the page.")];
+		const state = { id: "session-1", refused: new Set<string>() };
+		await expect(serverFetch(direct({ direct: state }), "https://e.example/a")).rejects.toMatchObject({
+			code: "no_open",
+		});
+		expect(seen).toHaveLength(1);
+		expect(state.refused.size).toBe(0);
+	});
+
+	it.each([
+		["a missing endpoint", () => ({ status: 404, json: {} })],
+		["a server error", () => ({ status: 500, json: {} })],
+		["an answer of another form", () => ({ status: 200, json: { ok: true } })],
+		["an empty output", found("  ")],
+	])("falls back to the hosted tool on %s, once for the session", async (_name, refused) => {
+		answers = [refused, hostedSearch, hostedSearch];
+		const state = { id: "session-1", refused: new Set<string>() };
+		const lines: string[] = [];
+		const log = (line: string) => lines.push(line);
+		const first = await serverSearch(direct({ direct: state, log }), "q");
+		expect(first.text).toBe("the hosted answer");
+		await serverSearch(direct({ direct: state }), "q");
+		expect(seen.map((s) => s.path)).toEqual(["/v1/alpha/search", "/v1/responses", "/v1/responses"]);
+		expect(state.refused.size).toBe(1);
+		expect(lines.join("\n")).toContain('"style":"direct"');
+	});
+
+	it("gives the hosted tool what the endpoint would have taken as fields", async () => {
+		answers = [() => ({ status: 404, json: {} }), hostedSearch, () => ({ status: 404, json: {} }), hostedPage];
+		await serverSearch(direct(), "q", "month");
+		expect(JSON.stringify(seen[1].body.input)).toContain("Only use sources from the last 30 days.");
+		await serverFetch(direct(), "https://e.example/a", { find: "绿化" });
+		expect(JSON.stringify(seen[3].body.input)).toContain("Give every passage about: 绿化");
+	});
+
+	it("is not used without being allowed, nor stopped by a cancelled call", async () => {
+		answers = [hostedSearch];
+		await serverSearch(call("codex"), "q");
+		expect(seen[0].path).toBe("/v1/responses");
+		const stop = new AbortController();
+		stop.abort();
+		seen = [];
+		const state = { id: "s", refused: new Set<string>() };
+		await expect(serverSearch(direct({ direct: state, signal: stop.signal }), "q")).rejects.toBeTruthy();
+		expect(state.refused.size).toBe(0);
+		expect(seen.map((s) => s.path)).not.toContain("/v1/responses");
+	});
+
+	it("takes the style the hosted tool already found", async () => {
+		answers = [found("the results")];
+		const styles = new Map([[`codex\n${baseUrl}`, "oauth" as const]]);
+		await serverSearch(direct({ styles }), "q");
+		expect(seen[0].path).toBe("/codex/alpha/search");
 	});
 });
 
@@ -533,11 +733,11 @@ describe("serverFetch", () => {
 						status: "completed",
 						action: { type: "open_page", url: "https://example.com/moved" },
 					},
-					codexMessage("The page text."),
+					codexMessage(PAGE),
 				]),
 		];
 		const page = await serverFetch(call("codex"), "https://example.com/a");
-		expect(page).toEqual({ url: "https://example.com/a", title: "", content: "The page text." });
+		expect(page).toEqual({ url: "https://example.com/a", title: "", content: PAGE });
 	});
 
 	it("codex: refuses a reply without an opened page", async () => {

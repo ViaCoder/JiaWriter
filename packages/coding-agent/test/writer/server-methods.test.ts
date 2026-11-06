@@ -25,6 +25,10 @@ let server: Server;
 let upstream = "";
 /** Stream events of the next answers; the last one repeats. */
 let answers: Record<string, unknown>[][] = [];
+/** Requests to Codex's own search endpoint. */
+let direct: Seen[] = [];
+/** Its next answers. */
+let endpoint: Record<string, unknown>[] = [];
 
 beforeEach(async () => {
 	cwd = realpathSync(mkdtempSync(join(tmpdir(), "jw-server-")));
@@ -33,16 +37,27 @@ beforeEach(async () => {
 	vi.stubEnv("JW_SEARCH_BLOCK", "");
 	setCurrentTopic(undefined);
 	seen = [];
+	direct = [];
+	endpoint = [];
 	answers = [];
 	server = createServer((req, res) => {
 		const chunks: Buffer[] = [];
 		req.on("data", (c: Buffer) => chunks.push(c));
 		req.on("end", () => {
-			seen.push({
+			const request = {
 				path: (req.url ?? "").split("?")[0],
 				headers: req.headers,
 				body: JSON.parse(Buffer.concat(chunks).toString("utf-8")),
-			});
+			};
+			// Codex's own endpoint is counted apart, and is missing unless a test gives it answers.
+			if (request.path.endsWith("/alpha/search")) {
+				direct.push(request);
+				const reply = endpoint.shift();
+				res.writeHead(reply ? 200 : 404, { "content-type": "application/json" });
+				res.end(JSON.stringify(reply ?? {}));
+				return;
+			}
+			seen.push(request);
 			const events = answers.length > 1 ? answers.shift() : answers[0];
 			res.writeHead(200, { "content-type": "text/event-stream" });
 			for (const e of events ?? []) res.write(`event: ${e.type}\ndata: ${JSON.stringify(e)}\n\n`);
@@ -91,6 +106,7 @@ function context(extra: Record<string, unknown> = {}): ExtensionToolContext {
 			...extra,
 		},
 		modelRegistry: { getApiKeyAndHeaders: async () => ({ ok: true, apiKey: KEY }) },
+		sessionManager: { getSessionId: () => "session-1" },
 	} as unknown as ExtensionToolContext;
 }
 
@@ -178,6 +194,51 @@ function filesIn(topic: string, sub: string): string[] {
 	const dir = join(topic, sub);
 	return existsSync(dir) ? readdirSync(dir) : [];
 }
+
+describe("codex's own search endpoint, through the tools", () => {
+	it("searches with the time window, reads the page's own text and keeps both", async () => {
+		const page = "页面原文。".repeat(200);
+		endpoint = [
+			{
+				output: "检索到的正文",
+				results: [{ type: "text_result", ref_id: "turn0search0", url: URL_A, title: "新闻" }],
+			},
+			{ output: page, results: [{ url: URL_A, title: "新闻" }] },
+			{ output: "含绿化的一段" },
+		];
+		const map = tools();
+		const s = await run(map, "web_search", { query: "温州", method: "codex", fresh: "week" });
+		expect(direct[0].path).toBe("/v1/alpha/search");
+		expect(direct[0].body.id).toBe("session-1");
+		expect(direct[0].body.commands).toMatchObject({ search_query: [{ q: "温州", recency: 7 }] });
+		expect(s.text).toContain("检索到的正文");
+		expect(s.text).toContain(URL_A);
+		const f = await run(map, "web_fetch", { url: "turn0search0", method: "codex" });
+		expect(direct[1].body.commands).toMatchObject({ open: [{ ref_id: "turn0search0" }] });
+		expect(f.text).toContain("页面原文");
+		expect(f.details.url).toBe(URL_A);
+		const topic = f.details.topicDir as string;
+		expect(readFileSync(join(topic, "网页", filesIn(topic, "网页")[0]), "utf-8")).toContain(page);
+		const part = await run(map, "web_fetch", { url: URL_A, method: "codex", find: "绿化" });
+		expect(direct[2].body.commands).toMatchObject({ find: [{ ref_id: URL_A, pattern: "绿化" }] });
+		expect(part.text).toContain("含绿化的一段");
+		// The part has its own file: the whole page is still there.
+		const files = filesIn(topic, "网页");
+		expect(files).toHaveLength(2);
+		expect(files.map((f) => readFileSync(join(topic, "网页", f), "utf-8")).join("")).toContain(page);
+		// Nothing went through the hosted tool.
+		expect(seen).toHaveLength(0);
+	});
+
+	it("uses the hosted tool where the endpoint is missing, and asks once per session", async () => {
+		answers = [codex(CODEX_SEARCHED)];
+		const map = tools();
+		await run(map, "web_search", { query: "甲", method: "codex" });
+		await run(map, "web_search", { query: "乙", method: "codex" });
+		expect(direct).toHaveLength(1);
+		expect(seen.map((s) => s.path)).toEqual(["/v1/responses", "/v1/responses"]);
+	});
+});
 
 describe("web_search with the upstream methods", () => {
 	it("claude: asks the upstream, reports, and archives where every search goes", async () => {
@@ -267,6 +328,14 @@ describe("web_search with the upstream methods", () => {
 		expect(sent).not.toContain("pages");
 	});
 
+	it("tells that once per method", async () => {
+		answers = [claude(SEARCHED)];
+		const list = tools();
+		const args = { query: "q", method: "claude", ignored: ["pages"] };
+		expect((await run(list, "web_search", args)).text).toContain("没有生效");
+		expect((await run(list, "web_search", args)).text).not.toContain("没有生效");
+	});
+
 	it("runs one call at a time", () => {
 		for (const name of ["web_search", "web_fetch"]) expect(tools().get(name)?.executionMode).toBe("sequential");
 	});
@@ -319,7 +388,7 @@ describe("web_fetch with the upstream methods", () => {
 					id: "m",
 					role: "assistant",
 					status: "completed",
-					content: [{ type: "output_text", text: "页面全文", annotations: [] }],
+					content: [{ type: "output_text", text: "页面全文".repeat(200), annotations: [] }],
 				},
 			]),
 		];
@@ -351,7 +420,9 @@ describe("web_fetch with the upstream methods", () => {
 			claude([{ type: "text", text: "打不开" }]),
 		];
 		await expect(run(tools(), "web_fetch", { url: URL_A, method: "claude" })).rejects.toThrow("method=sf");
-		await expect(run(tools(), "web_fetch", { url: URL_A, method: "claude" })).rejects.toThrow("上游没有打开这个页面");
+		await expect(run(tools(), "web_fetch", { url: URL_A, method: "claude" })).rejects.toThrow(
+			"上游没有给出这个页面的内容",
+		);
 	});
 });
 

@@ -6,6 +6,7 @@ Usage: python3 -I scripts/writer-prompt-check.py [program]
 """
 
 # Mock server, process control and files.
+import time
 import http.server
 import json
 import os
@@ -189,7 +190,7 @@ def main():
     check("只有检索时压缩后不发写作手册", "Writing rules:" not in after)
 
     # Compaction with a document under way.
-    draft = Script([("topic_open", {"name": "绿化"}), ("write", {"path": "绿化/稿件/初稿.md", "content": "正文"}), ("web_search", {"query": "甲", "method": "claude"}), ("web_search", {"query": "乙", "method": "claude"})], tokens=110_000)
+    draft = Script([("topic_open", {"name": "绿化"}), ("write", {"path": f"{time.strftime('%Y%m%d')}-绿化/稿件/初稿.md", "content": "正文"}), ("web_search", {"query": "甲", "method": "claude"}), ("web_search", {"query": "乙", "method": "claude"})], tokens=110_000)
     run(draft, ["写报告", "继续写"])
     after = text_of(draft.requests[-1])
     check("写作中压缩后要求先读大纲和稿件", "先读大纲和当前稿件" in after)
@@ -199,7 +200,7 @@ def main():
     late = Script([("web_search", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "time": "2026年", "reporter": "路透社", "subject": "甲", "action": "乙", "url": "https://news.example.com/a"}]})])
     run(late, ["查一下再写"])
     last = text_of(late.requests[-1])
-    check("先搜索后开主题，资料并入主题", "已建立主题文件夹" in last and "未命名主题" in last and "已记录" in last)
+    check("先搜索后开主题，资料并入主题", "已建立主题文件夹" in last and f"{time.strftime('%Y%m%d')}-绿化" in last and "已记录" in last)
 
     # Compaction when the summary fails.
     broken = Script([("topic_open", {"name": "绿化"}), ("web_search", {"query": "甲", "method": "claude"}), ("web_search", {"query": "乙", "method": "claude"})], tokens=110_000, summary_fails=True)

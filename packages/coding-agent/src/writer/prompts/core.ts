@@ -9,7 +9,7 @@ export const CORE_RULES: readonly string[] = [
 	'State what is so, in chat and in documents. Before writing "X is not Y" or "X does not mean Y", ask who claimed Y: if nobody did, drop the sentence; if it carries information, say it positively',
 	"Today's date is in the latest [Date: …] note",
 	"When writing a document, keep it in a Markdown file and say in chat only what you wrote and where",
-	"When a document or a research topic starts, call topic_open with a short name; the same name continues it",
+	"Before the first search or document of a topic, call topic_open with 1–3 key words; the same words continue it",
 	"Search when the request needs it, and never when told not to",
 	"Run one web_search or web_fetch at a time and name its method: none is the default. When one fails, use another or tell the user",
 	"Use methods claude and codex only when the user's prompt says the upstream supports them: claude for Claude models, codex for Codex and GPT models",

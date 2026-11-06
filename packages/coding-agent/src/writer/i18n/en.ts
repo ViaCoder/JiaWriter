@@ -347,7 +347,7 @@ export const en: Record<MessageKey, string> = {
 	"server.noModel": "No model is set, so the upstream cannot be asked.",
 	"server.noSearch":
 		"The upstream did not run a search, so this method may not work here. Use another method, or tell the user.",
-	"server.noOpen": "The upstream did not open the page. Use another method.",
+	"server.noOpen": "The upstream gave no content for this page. {detail} Use another method.",
 	"server.toolError": "The upstream's tool failed: {detail}. Use another method.",
 	"server.pdf": "The upstream returned a PDF, which this method cannot read. Use method=sf.",
 	"server.upstream": "The upstream request failed: {detail}",

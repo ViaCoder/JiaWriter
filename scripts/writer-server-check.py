@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Hands-on check of the claude and codex methods of web_search and web_fetch in the real program: a local mock
 plays the model and the upstream (nothing leaves 127.0.0.1, the key is a dummy). The main conversation runs on Chat
-Completions, the claude way answers only in the OAuth style, the codex way answers plain requests.
+Completions, the claude way answers only in the OAuth style, the codex way answers plain requests: first on Codex's
+own search endpoint, then, when that endpoint stops answering, through the hosted tool.
 Prints one line per check and exits 1 when any fails.
 Usage: python3 -I scripts/writer-server-check.py [program]
 """
@@ -26,12 +27,16 @@ URL = "https://news.example.com/a"
 CALLS = [
     ("web_search", {"query": "甲", "method": "claude"}),
     ("web_fetch", {"url": URL, "method": "claude"}),
+    ("web_search", {"query": "丁", "method": "codex", "fresh": "week"}),
+    ("web_fetch", {"url": URL + "?c=1", "method": "codex", "find": "绿化"}),
     ("web_search", {"query": "乙", "method": "codex"}),
     ("web_fetch", {"url": URL + "?b=1", "method": "codex"}),
     ("web_search", {"query": "丙"}),
 ]
 # What the upstream saw: (path, style or "", model).
 seen = []
+# What Codex's own search endpoint saw.
+direct = []
 # Tool results the conversation carried at the end.
 results = []
 
@@ -87,6 +92,8 @@ class Upstream(http.server.BaseHTTPRequestHandler):
             self.on_claude(body)
         elif path == "/v1/responses":
             self.on_codex(body)
+        elif path == "/v1/alpha/search":
+            self.on_direct(body)
         else:
             self.reject(404)
 
@@ -131,13 +138,25 @@ class Upstream(http.server.BaseHTTPRequestHandler):
     def on_codex(self, body):
         """The codex way: plain requests."""
         seen.append(("/v1/responses", "plain", body.get("model")))
-        if "Search the web" in body["instructions"]:
+        if body["instructions"].startswith("Research"):
             action = {"type": "search", "query": "乙", "sources": [{"type": "url", "url": URL + "?b=1"}]}
             answer = "科德克斯的回答"
         else:
             action = {"type": "open_page", "url": URL}
-            answer = "科德克斯写出的全文"
+            answer = "科德克斯写出的全文。" * 60
         sse(self, codex_reply([{"type": "web_search_call", "id": "w", "status": "completed", "action": action}, text_item(answer)]))
+
+    def on_direct(self, body):
+        """Codex's own search endpoint: it answers twice, then stops, as an upstream without it would."""
+        direct.append(body)
+        if len(direct) > 2:
+            return self.reject(404)
+        output = "端点检索结果" if "search_query" in body["commands"] else "端点找到的段落"
+        data = json.dumps({"output": output, "results": [{"type": "text_result", "ref_id": "turn0search0", "url": URL, "title": "新闻"}]}).encode("utf-8")
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(data)
 
     def log_message(self, *_args):
         """Silence."""
@@ -185,14 +204,19 @@ def main():
         ("内部请求的模型就是对话模型", {s[2] for s in seen} == {"mock-model"}),
         ("搜索结果和上游回答都进工具结果", "克劳德的回答" in all_results and "科德克斯的回答" in all_results and URL in all_results),
         ("抓取结果进工具结果", "克劳德抓到的原文" in all_results and "科德克斯写出的全文" in all_results),
-        ("搜索都归档到 检索/", counts["检索"] == 2 and "克劳德的回答" in found["检索"] and "科德克斯的回答" in found["检索"]),
-        ("抓取都归档到 网页/", counts["网页"] == 2 and "克劳德抓到的原文" in found["网页"] and "科德克斯写出的全文" in found["网页"]),
-        ("不填 method 时报错，也没有发请求", len(results) == 5 and "method" in results[4] and len(seen) == 5),
+        ("搜索都归档到 检索/", counts["检索"] == 3 and "克劳德的回答" in found["检索"] and "科德克斯的回答" in found["检索"] and "端点检索结果" in found["检索"]),
+        ("抓取都归档到 网页/", counts["网页"] == 3 and "克劳德抓到的原文" in found["网页"] and "科德克斯写出的全文" in found["网页"] and "端点找到的段落" in found["网页"]),
+        ("codex：搜索走自己的端点，时间范围生效", direct[0]["commands"]["search_query"] == [{"q": "丁", "recency": 7}]),
+        ("codex：抓取走自己的端点，find 生效", direct[1]["commands"]["find"] == [{"ref_id": URL + "?c=1", "pattern": "绿化"}]),
+        ("codex：端点不答后回到托管工具，本会话只多试一次", len(direct) == 3),
+        ("不填 method 时报错，也没有发请求", len(results) == 7 and "method" in results[6] and len(seen) == 5),
         ("输出里没有 key", KEY not in out.stdout + out.stderr + all_results),
         ("日志记下了搜索工具的调用", "web_search_call" in log_text and "server_tool_use" in log_text),
         ("日志记下了 SDK 不认识的事件", "response.something_new" in log_text),
         ("日志记下了模型每轮调用的工具和方式", '"kind":"turn"' in log_text and '"kind":"tool"' in log_text and '"kind":"session"' in log_text),
         ("日志里没有 key", log_text != "" and KEY not in log_text),
+        ("日志里有请求路径", "/alpha/search" in log_text and "/v1/responses" in log_text),
+        ("日志里没有网址和上游地址", log_text != "" and not any(x in log_text for x in ("news.example.com", "127.0.0.1", "http://", "https://"))),
     ]
     server.shutdown()
     shutil.rmtree(tmp, ignore_errors=True)

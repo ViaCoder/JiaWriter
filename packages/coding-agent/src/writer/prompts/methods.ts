@@ -21,15 +21,15 @@ export const SEARCH_METHODS: Readonly<Record<string, readonly string[]>> = {
 		"At most 10 results, with no paging, time filter, site: or dates: search other words for more, and fetch a page for its date",
 	],
 	claude: [
-		"query is the only parameter, so ask one thing per call and put any time range in it; the upstream runs up to 8 searches",
+		"query is the only parameter: ask one full question and put any time range in it. The upstream researches it in up to 8 searches and reports",
 		"Results give titles, page ages and cited passages; treat the upstream's answer as a guide",
 		UPSTREAM_SOURCES,
 	],
 	codex: [
-		"query is the only parameter, so ask one thing per call and put any time range in it",
-		"Results often give bare addresses: fetch a page before relying on it",
+		"fresh: day, week, month or year. Search again with what you found",
+		"Fetch a page before relying on it; ids like turn0search3 work as its url",
 		UPSTREAM_SOURCES,
-		"An effort error means this search needs a higher level: tell the user or use another method",
+		"An effort error needs a higher level: tell the user or use another method",
 	],
 };
 
@@ -52,7 +52,9 @@ export const FETCH_METHODS: Readonly<Record<string, readonly string[]>> = {
 		"JavaScript pages, sites closed to crawlers and addresses over 250 characters need browser; PDFs need sf",
 	],
 	codex: [
-		"The upstream writes the page out, so it can be shortened: check exact wording and figures with another method",
+		"lineno reads on in a long page, find gives the passages with some words",
+		"The text may be the upstream's own report: check exact wording and figures",
+		"When it cannot give a page you get an error: use browser or sf",
 		"An address outside search results may not open: search for it first",
 	],
 };

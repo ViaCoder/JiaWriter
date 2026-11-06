@@ -21,14 +21,18 @@ import {
 	serverSearch,
 } from "@earendil-works/pi-ai/api/server-search.lazy";
 // The record of a search.
-import { secretsOf, serverLog } from "@earendil-works/pi-ai/api/server-trace";
+import { hostsOf, secretsOf, serverLog } from "@earendil-works/pi-ai/api/server-trace";
 // Parameter schemas.
 import { StringEnum } from "@earendil-works/pi-ai/utils/typebox-helpers";
+// Plain text in the interface.
+import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 // Agent directory, binary detection, the extension folder.
 import { getAgentDir, getWriterExtensionDir, isBunBinary, VERSION } from "../../config.ts";
 // Extension API types.
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
+// How a tool call is shown.
+import { formatToolCallWithArgs } from "../../core/tools/render-utils.ts";
 // The bridge to Chrome.
 import { bridgeAddress, bridgeCall } from "../../writer/browser/bridge.ts";
 // Host registration and starting Chrome.
@@ -62,7 +66,7 @@ import { archiveFiltered, archivePage, archiveSearch } from "../../writer/topic/
 // AnySearch backend.
 import { anysearchExtract, anysearchSearch } from "../../writer/websearch/anysearch.ts";
 // Arguments as models send them.
-import { cleanFetchArgs, cleanSearchArgs } from "../../writer/websearch/args.ts";
+import { cleanFetchArgs, cleanSearchArgs, shownSearchArgs } from "../../writer/websearch/args.ts";
 // Configuration, normalization and reports.
 import {
 	cleanWebText,
@@ -156,6 +160,8 @@ export function abortable<T>(work: Promise<T>, signal?: AbortSignal): Promise<T>
 export default function writerSearchExtension(pi: ExtensionAPI): void {
 	// Configuration once per session.
 	const config = readSearchEnv(withSecrets(process.env));
+	// Methods the model has been told about their unused parameters.
+	const toldIgnored = new Set<string>();
 	// Where the browser host listens, and its private folder.
 	const address = bridgeAddress(getAgentDir(), process.platform);
 	const browserDir = join(getAgentDir(), "browser");
@@ -178,6 +184,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	const UPSTREAM_METHODS = `claude, codex = the upstream model does it itself.${configured} `;
 	// Which request style each upstream took in this session.
 	const styles = new Map<string, ServerStyle>();
+	// Addresses without Codex's own search endpoint, found in this session.
+	const refused = new Set<string>();
 
 	/** sf binary and child environment (no driver model, see sfModelOff) for one call. */
 	function sfContext(interactive: boolean) {
@@ -268,9 +276,9 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	}
 
 	/** Run an archive step in the topic folder: its path as a note, or a note that it failed. */
-	function keep(ctx: ExtensionContext, write: (dir: string) => string): { dir?: string; note: string } {
+	function keep(ctx: ExtensionContext, hint: string, write: (dir: string) => string): { dir?: string; note: string } {
 		try {
-			const dir = ensureTopic(ctx.cwd);
+			const dir = ensureTopic(ctx.cwd, hint);
 			return { dir, note: t("topic.archived", { path: join(dir, write(dir)) }) };
 		} catch (e) {
 			return { note: t("topic.archiveFailed", { reason: e instanceof Error ? e.message : String(e) }) };
@@ -313,6 +321,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			styles,
 			signal,
 			log: appendSearchLog,
+			direct: { id: ctx.sessionManager.getSessionId(), refused },
 		};
 	}
 
@@ -321,8 +330,12 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		// The conversation's key and headers, when it has a model.
 		const auth = ctx.model ? await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model) : undefined;
 		// Everything that must stay out of the file.
-		const secrets = auth?.ok ? secretsOf(auth.apiKey, auth.headers) : [];
-		return serverLog(appendSearchLog, [...secrets, ...secretsOf(config.anysearchKey)]);
+		const secrets = auth?.ok ? [...secretsOf(auth.apiKey, auth.headers), ...hostsOf(auth.baseUrl)] : [];
+		return serverLog(appendSearchLog, [
+			...secrets,
+			...hostsOf(ctx.model?.baseUrl),
+			...secretsOf(config.anysearchKey),
+		]);
 	}
 
 	/** Register the host with Chrome (release binaries only; source checkouts use /browser). */
@@ -344,7 +357,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		(await searchLog(ctx))({
 			kind: "tool",
 			tool: event.toolName,
-			input: event.input,
+			// Without the page's address, which may have no form the log can recognize.
+			input: { ...event.input, url: undefined },
 			error: event.isError,
 			text: text.slice(0, 2000),
 		});
@@ -363,8 +377,13 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		});
 	});
 
+	// A shorter or another history may have lost the note about unused parameters.
+	pi.on("session_compact", () => toldIgnored.clear());
+	pi.on("session_tree", () => toldIgnored.clear());
+
 	// Which program and setup the lines below come from.
 	pi.on("session_start", async (_event, ctx) => {
+		toldIgnored.clear();
 		(await searchLog(ctx))({
 			kind: "session",
 			version: VERSION,
@@ -416,12 +435,17 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				Type.Array(StringEnum(ALL_ENGINES), { description: "browser only, in order; default bing, google" }),
 			),
 			pages: Type.Optional(Type.Number({ description: "browser only: results pages per engine, 3–5" })),
-			fresh: Type.Optional(StringEnum(["day", "week", "month", "year"] as const, { description: "browser only" })),
+			fresh: Type.Optional(
+				StringEnum(["day", "week", "month", "year"] as const, { description: "browser and codex only" }),
+			),
 			zone: Type.Optional(StringEnum(["cn", "intl"] as const, { description: "anysearch only" })),
 			language: Type.Optional(Type.String({ description: "anysearch only, such as zh-CN" })),
 		}),
 		// Models fill in fields of other methods: each call keeps only what its method uses.
 		prepareArguments: (args) => cleanSearchArgs(args) as never,
+		// The call as it took effect; a model's unused fields would read as if they had been sent.
+		renderCall: (args, theme, context) =>
+			new Text(formatToolCallWithArgs("web_search", shownSearchArgs(args), theme, context.expanded), 0, 0),
 		// Read-only, open world.
 		annotations: WEB,
 		// One at a time: AnySearch fails on parallel requests, and the browser shares one results tab.
@@ -439,7 +463,11 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			let answer = "";
 			// Parameters this method does not use: the model is told, so it does not count on them.
 			const ignored = (params as { ignored?: string[] }).ignored ?? [];
-			if (ignored.length > 0) notes.push(t("search.ignored", { method: backend, names: ignored.join(", ") }));
+			// Once per method: strict models fill every field on every call, and the line would repeat for nothing.
+			if (ignored.length > 0 && !toldIgnored.has(backend)) {
+				toldIgnored.add(backend);
+				notes.push(t("search.ignored", { method: backend, names: ignored.join(", ") }));
+			}
 			if (backend === "browser") {
 				usedBrowser = true;
 				// The previous results pages are closed first.
@@ -488,7 +516,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 						);
 			} else if (isServerWay(backend)) {
 				// The upstream searches.
-				const out = await serverSearch(await serverCall(ctx, backend, signal), params.query).catch((e: unknown) => {
+				const call = await serverCall(ctx, backend, signal);
+				const out = await serverSearch(call, params.query, params.fresh).catch((e: unknown) => {
 					throw serverFailure(e);
 				});
 				raw = out.sources;
@@ -506,7 +535,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				.join("\n");
 			// The search is kept in the topic folder; a full disk must not cost the result.
 			const urls = results.map((r) => r.url);
-			const kept = keep(ctx, (dir) => archiveSearch(dir, params.query, report, nowText(), urls));
+			const kept = keep(ctx, params.query, (dir) => archiveSearch(dir, params.query, report, nowText(), urls));
 			const text = [...notes, report, kept.note].filter(Boolean).join("\n");
 			// Text and structured results.
 			return { content: [{ type: "text", text }], details: { backend, results, topicDir: kept.dir } };
@@ -528,6 +557,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		parameters: Type.Object({
 			url: Type.String(),
 			method: StringEnum(["browser", "anysearch", "sf", "claude", "codex"] as const),
+			lineno: Type.Optional(Type.Number({ description: "codex only: the line to read from" })),
+			find: Type.Optional(Type.String({ description: "codex only: words to find in the page" })),
 		}),
 		// Read-only, open world.
 		annotations: WEB,
@@ -560,7 +591,9 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				page = parseSfFetch(runOut.stdout, params.url);
 			} else if (isServerWay(backend)) {
 				// The upstream reads it.
-				const out = await serverFetch(await serverCall(ctx, backend, signal), params.url).catch((e: unknown) => {
+				const call = await serverCall(ctx, backend, signal);
+				const part = { lineno: params.lineno, find: params.find };
+				const out = await serverFetch(call, params.url, part).catch((e: unknown) => {
 					throw serverFailure(e);
 				});
 				page = { url: out.url || params.url, title: out.title, content: out.content, date: "" };
@@ -574,8 +607,10 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			// The whole page is kept in the topic folder, also what the report below leaves out.
 			const filtered = page.filtered ?? [];
 			let filteredFile = "";
-			const kept = keep(ctx, (dir) => {
-				const file = archivePage(dir, page, params.url, backend, nowText());
+			// A part of a page has its own entry, because a second read of an address replaces the file.
+			const section = params.find ? `#find=${params.find}` : params.lineno ? `#line=${params.lineno}` : "";
+			const kept = keep(ctx, page.title, (dir) => {
+				const file = archivePage(dir, { ...page, url: `${page.url}${section}` }, params.url, backend, nowText());
 				if (filtered.length > 0) filteredFile = join(dir, archiveFiltered(dir, file, filtered));
 				return file;
 			});

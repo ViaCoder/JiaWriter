@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExtensionAPI, ToolDefinition } from "../../src/core/extensions/types.ts";
 import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
-import { cleanFetchArgs, cleanSearchArgs } from "../../src/writer/websearch/args.ts";
+import { cleanFetchArgs, cleanSearchArgs, shownSearchArgs } from "../../src/writer/websearch/args.ts";
 
 describe("cleanSearchArgs", () => {
 	it("drops what a method does not use", () => {
@@ -17,7 +17,12 @@ describe("cleanSearchArgs", () => {
 			other: 1,
 		};
 		const all = ["engines", "pages", "fresh", "zone", "language"];
-		expect(cleanSearchArgs({ ...full, method: "codex" })).toEqual({ query: "q", method: "codex", ignored: all });
+		expect(cleanSearchArgs({ ...full, method: "codex" })).toEqual({
+			query: "q",
+			method: "codex",
+			fresh: "week",
+			ignored: all.filter((name) => name !== "fresh"),
+		});
 		expect(cleanSearchArgs({ ...full, method: "claude" })).toEqual({ query: "q", method: "claude", ignored: all });
 		expect(cleanSearchArgs({ ...full, method: "anysearch" })).toEqual({
 			query: "q",
@@ -36,9 +41,19 @@ describe("cleanSearchArgs", () => {
 		});
 	});
 
+	it("shows a call as it took effect", () => {
+		const call = { query: "q", method: "codex", engines: [], fresh: "year", language: "", pages: 3, zone: "intl" };
+		expect(shownSearchArgs(call)).toEqual({ query: "q", method: "codex", fresh: "year" });
+		expect(shownSearchArgs({ query: "q", method: "browser", pages: 4 })).toEqual({
+			query: "q",
+			method: "browser",
+			pages: 4,
+		});
+	});
+
 	it("counts only real values as ignored, as in the reported call", () => {
 		const call = { query: "q", method: "codex", engines: [], fresh: "year", language: "en", pages: 3, zone: "intl" };
-		expect(cleanSearchArgs(call).ignored).toEqual(["pages", "fresh", "zone", "language"]);
+		expect(cleanSearchArgs(call).ignored).toEqual(["pages", "zone", "language"]);
 		expect(
 			cleanSearchArgs({ query: "q", method: "codex", engines: [], pages: null, fresh: "" }).ignored,
 		).toBeUndefined();
@@ -106,6 +121,16 @@ describe("cleanFetchArgs", () => {
 		expect(cleanFetchArgs({ url, method: " SF ", engines: ["bing"], pages: 3 })).toEqual({ url, method: "sf" });
 		expect(cleanFetchArgs({ url, method: null })).toEqual({ url });
 		expect(cleanFetchArgs({ url })).toEqual({ url });
+		// Only codex takes these, and only with real values.
+		expect(cleanFetchArgs({ url, method: "codex", lineno: 120, find: " 绿化 " })).toEqual({
+			url,
+			method: "codex",
+			lineno: 120,
+			find: "绿化",
+		});
+		expect(cleanFetchArgs({ url, method: "codex", lineno: 0, find: "" })).toEqual({ url, method: "codex" });
+		expect(cleanFetchArgs({ url, method: "codex", lineno: "x", find: null })).toEqual({ url, method: "codex" });
+		expect(cleanFetchArgs({ url, method: "browser", lineno: 5, find: "绿化" })).toEqual({ url, method: "browser" });
 	});
 });
 

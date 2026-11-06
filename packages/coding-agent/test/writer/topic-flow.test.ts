@@ -6,7 +6,7 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
-import { join } from "node:path";
+import { basename, join } from "node:path";
 // Faux provider helpers.
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 // Test API.
@@ -22,6 +22,7 @@ import writerTopicExtension from "../../src/extensions/writer-topic/index.ts";
 import { readSnapshots, storeDir } from "../../src/writer/rewind/rewind.ts";
 // The current topic.
 import { currentTopic, setCurrentTopic } from "../../src/writer/topic/current.ts";
+import { topicPath } from "../../src/writer/topic/topic.ts";
 // Harness with the faux provider.
 import { createHarness, getToolResult, type Harness } from "../suite/harness.ts";
 
@@ -78,8 +79,10 @@ describe("a writing topic", () => {
 
 	it("keeps the research, materials and drafts in one folder", async () => {
 		harness = await setup();
-		const topic = join(harness.tempDir, "巴黎绿化");
-		const draft = join("巴黎绿化", "稿件", "初稿.md");
+		// The folder takes today's date.
+		const folder = basename(topicPath(harness.tempDir, "巴黎绿化"));
+		const topic = join(harness.tempDir, folder);
+		const draft = join(folder, "稿件", "初稿.md");
 		const material = {
 			kind: "case",
 			time: "2026年10月31日",
@@ -149,17 +152,17 @@ describe("a writing topic", () => {
 		]);
 		await harness.session.prompt("第一轮");
 		await harness.session.prompt("第二轮");
-		const file = join(harness.tempDir, "主题乙", "素材.md");
+		const file = join(topicPath(harness.tempDir, "主题乙"), "素材.md");
 		const snapshots = readSnapshots(storeDir(agentDir, harness.tempDir)).filter((s) => s.file === file);
 		// One per user message: the first records that the file did not exist.
 		expect(snapshots.map((s) => s.blob === null)).toEqual([true, false]);
 	});
 
-	it("archives into a dated folder when the model never opened a topic", async () => {
+	it("archives into a folder named after the search when the model never opened a topic", async () => {
 		harness = await setup();
 		harness.setResponses([call("web_search", { query: "绿地", method: "anysearch" }), fauxAssistantMessage("好")]);
 		await harness.session.prompt("查一下");
-		const folder = readdirSync(harness.tempDir).find((f) => f.startsWith("未命名主题-"));
+		const folder = readdirSync(harness.tempDir).find((f) => /^\d{8}-绿地$/.test(f));
 		expect(folder).toBeDefined();
 		expect(readdirSync(join(harness.tempDir, folder as string, "检索"))).toHaveLength(1);
 	});

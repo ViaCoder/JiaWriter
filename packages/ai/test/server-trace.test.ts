@@ -2,10 +2,11 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	addressEnd,
 	cleanLog,
 	eventName,
 	failureEntry,
-	safeUrl,
+	hostsOf,
 	secretsOf,
 	serverLog,
 	tracedFetch,
@@ -70,14 +71,55 @@ describe("cleanLog", () => {
 	it("leaves ordinary text alone", () => {
 		expect(cleanLog("basic search, no cookies here", [KEY])).toBe("basic search, no cookies here");
 	});
+
+	it.each([
+		["see https://example.com/a?b=1 here", "see <url> here"],
+		["HTTP://EXAMPLE.COM", "<url>"],
+		["wss://example.com/s", "<url>"],
+		['{\\"url\\":\\"https://example.com/a\\"}', '{\\"url\\":\\"<url>\\"}'],
+		["https:\\/\\/example.com\\/a\\/b end", "<url> end"],
+		["www.example.com/a end", "<url> end"],
+		["example.com/a/b end", "<url> end"],
+		['query site:fcc.gov "26-73"', 'query <url> "26-73"'],
+		["connect ECONNREFUSED 203.0.113.7:443", "connect ECONNREFUSED <url>"],
+		["详见 https://example.com/中文路径。 下一句", "详见 <url> 下一句"],
+		["[title](https://example.com/a)", "[title](<url>"],
+	])("removes the address from %s", (text, clean) => {
+		expect(cleanLog(text, [KEY])).toBe(clean);
+	});
+
+	it("removes an address that also holds a secret or a host named as one", () => {
+		expect(cleanLog(`https://relay.example.com/${KEY}/v1?x=1`, ["relay.example.com", KEY])).toBe("<url>");
+		expect(cleanLog("getaddrinfo ENOTFOUND relay.example.com", ["relay.example.com"])).toBe(
+			"getaddrinfo ENOTFOUND <redacted>",
+		);
+	});
+
+	it.each([
+		"response.output_item.added:web_search_call",
+		"web_search_call.action.sources",
+		"text/event-stream",
+		"gpt-5.1",
+		"/home/a/server-search.ts:10:3",
+		"file:///home/a/server-search.ts:10:3",
+	])("keeps %s, which explains a failure and is no address", (text) => {
+		expect(cleanLog(text, [KEY])).toBe(text);
+	});
 });
 
-describe("safeUrl", () => {
-	it("drops the login, the query and the fragment", () => {
-		expect(safeUrl("https://u:p@example.com:8443/v1/responses?key=abc#x")).toBe(
-			"https://example.com:8443/v1/responses",
-		);
-		expect(safeUrl("not a url")).toBe("<bad url>");
+describe("addressEnd", () => {
+	it("keeps the last two parts of the path and nothing else", () => {
+		expect(addressEnd("https://u:p@example.com:8443/private/v1/responses?key=abc#x")).toBe("/v1/responses");
+		expect(addressEnd("https://example.com/")).toBe("/");
+		expect(addressEnd("not a url")).toBe("<bad url>");
+	});
+});
+
+describe("hostsOf", () => {
+	it("gives the host names of real addresses, leaving out what is too short to cut safely", () => {
+		expect(hostsOf("https://relay.example.com:8443/v1", undefined, "not a url", "http://x.io")).toEqual([
+			"relay.example.com",
+		]);
 	});
 });
 
@@ -127,7 +169,8 @@ describe("tracedFetch", () => {
 		const headers = { authorization: `Bearer ${KEY}`, "x-custom": KEY };
 		await traced()(`${base}/v1/responses?key=${KEY}`, { method: "POST", headers, body: '{"model":"m"}' });
 		const sent = entries("request")[0];
-		expect(sent.url).toBe(`${base}/v1/responses`);
+		expect(sent.url).toBe("/v1/responses");
+		expect(lines.join("\n")).not.toContain("127.0.0.1");
 		expect(sent.headers).toEqual(expect.arrayContaining(["authorization", "x-custom"]));
 		expect(sent.body).toBe('{"model":"m"}');
 		const got = entries("response")[0];

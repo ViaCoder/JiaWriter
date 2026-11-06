@@ -1,8 +1,8 @@
 /**
  * A record of what an upstream search request really did, so a failed one can be explained afterwards.
  * It works at the HTTP level: what was sent, what came back, and every kind of stream event, also when
- * an SDK gives up on the stream. Every line passes through cleanLog before it leaves, header values
- * are never recorded, and a failure here never touches the request.
+ * an SDK gives up on the stream. Every line passes through cleanLog before it leaves, so it holds no
+ * address and no secret. Header values are never recorded, and a failure here never touches the request.
  */
 
 // The headers and the fetch type.
@@ -27,9 +27,22 @@ const SHOWN_HEADERS = [
 	"request-id",
 	"cf-ray",
 	"server",
-	"via",
 	"retry-after",
 	"x-should-retry",
+];
+/** What stands in for an address. */
+const NO_ADDRESS = "<url>";
+/** Addresses in every form they take, because the log holds none. */
+const ADDRESS_FORMS = [
+	// With a scheme, also with its slashes escaped inside JSON.
+	/\b(?:https?|wss?|ftps?):(?:\\*\/){2}(?:\\+\/|[^\s"'<>\\])*/gi,
+	// Without one: www, and a host followed by a path.
+	/\bwww\.(?:\\+\/|[^\s"'<>\\])+/gi,
+	/\b(?:[a-z0-9-]+\.)+[a-z]{2,}\\*\/(?:\\+\/|[^\s"'<>\\])*/gi,
+	// A search limited to one site.
+	/\bsite:[^\s"'<>\\]+/gi,
+	// An IP address, as network errors give it.
+	/\b\d{1,3}(?:\.\d{1,3}){3}(?::\d+)?\b/g,
 ];
 /** Secrets by their form, for one an upstream echoes back in another shape. */
 const SECRET_FORMS = [
@@ -52,22 +65,40 @@ export function secretsOf(key: string | undefined, ...headers: (ProviderHeaders 
 	return [key, ...values].filter((v): v is string => typeof v === "string" && v.length >= SHORTEST_SECRET);
 }
 
-/** Text with every secret taken out, by value and by form. */
+/** The host names of addresses: a network error can name one alone, which no form can tell from a word. */
+export function hostsOf(...urls: (string | undefined)[]): string[] {
+	return urls.flatMap((url) => {
+		try {
+			// Parsed, so the name is exact.
+			const host = new URL(url ?? "").hostname;
+			// A shorter one would cut up ordinary words.
+			return host.length >= SHORTEST_SECRET ? [host] : [];
+		} catch {
+			// Not an address.
+			return [];
+		}
+	});
+}
+
+/** Text with every address and secret taken out: addresses first, since a mark inside one would hide it. */
 export function cleanLog(text: string, secrets: readonly string[]): string {
-	// The known values first, in full.
+	// Addresses, whole.
 	let out = text;
+	for (const form of ADDRESS_FORMS) out = out.replace(form, NO_ADDRESS);
+	// The known values, in full.
 	for (const secret of secrets) out = out.split(secret).join("<redacted>");
 	// Then whatever has the form of one.
 	for (const form of SECRET_FORMS) out = out.replace(form, "<redacted>");
 	return out;
 }
 
-/** An address without its login, query or fragment, which can hold tokens. */
-export function safeUrl(url: string): string {
+/** The last two parts of an address's path, such as /v1/responses: the endpoint, and nothing of who serves it. */
+export function addressEnd(url: string): string {
 	try {
-		// Parsed, so the parts are exact.
-		const parsed = new URL(url);
-		return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+		// Parsed, so the host, the login and the query stay out.
+		const parts = new URL(url).pathname.split("/").filter(Boolean);
+		// An earlier part of a path can hold a token.
+		return `/${parts.slice(-2).join("/")}`;
 	} catch {
 		// Not an address: nothing from it is kept.
 		return "<bad url>";
@@ -179,7 +210,7 @@ function requestEntry(input: Parameters<FetchFunction>[0], init: RequestInit | u
 	const headers = [...new Headers(init?.headers).keys()];
 	// The JSON the SDK built, which holds no key.
 	const body = typeof init?.body === "string" ? clip(init.body, BODY_LIMIT) : "";
-	return { kind: "request", method: init?.method ?? "GET", url: safeUrl(url), headers, body };
+	return { kind: "request", method: init?.method ?? "GET", url: addressEnd(url), headers, body };
 }
 
 /** A fetch that records each exchange and hands the reply on untouched. */

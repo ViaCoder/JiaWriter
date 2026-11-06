@@ -12,10 +12,10 @@ const SEARCH_PARAMS: Readonly<Record<string, readonly string[]>> = {
 	browser: ["engines", "pages", "fresh"],
 	anysearch: ["zone", "language"],
 	claude: [],
-	codex: [],
+	codex: ["fresh"],
 };
 
-/** Time windows of the browser method. */
+/** Time windows of the browser and codex methods. */
 const WINDOWS = ["day", "week", "month", "year"];
 /** Regions of the anysearch method. */
 const ZONES = ["cn", "intl"];
@@ -29,6 +29,13 @@ const OPTION_NAMES = ["engines", "pages", "fresh", "zone", "language"];
 function filled(value: unknown): boolean {
 	// null, "" and [] are what strict models send for a field they leave out.
 	return value !== null && value !== undefined && value !== "" && !(Array.isArray(value) && value.length === 0);
+}
+
+/** The arguments as they took effect, for showing a call: what the method does not use stays out. */
+export function shownSearchArgs(args: unknown): Record<string, unknown> {
+	// The record of what was dropped is no argument.
+	const { ignored: _ignored, ...shown } = cleanSearchArgs(args);
+	return shown;
 }
 
 /** A raw call as an object. */
@@ -92,7 +99,7 @@ export function cleanSearchArgs(raw: unknown): Record<string, unknown> {
 	return out;
 }
 
-/** web_fetch arguments: the address as given, the method in the form the schema uses. */
+/** web_fetch arguments: the address as given, the method in the form the schema uses, codex's own options. */
 export function cleanFetchArgs(raw: unknown): Record<string, unknown> {
 	const args = record(raw);
 	// The address is never touched.
@@ -100,5 +107,10 @@ export function cleanFetchArgs(raw: unknown): Record<string, unknown> {
 	const method = word(args.method);
 	if (method) out.method = method;
 	else if (args.method !== undefined && args.method !== null) out.method = args.method;
+	// Only codex can start at a line or look for words; 0 is the page's start and needs no field.
+	if (method !== "codex") return out;
+	const lineno = Number(args.lineno);
+	if (Number.isInteger(lineno) && lineno > 0) out.lineno = lineno;
+	if (typeof args.find === "string" && args.find.trim()) out.find = args.find.trim();
 	return out;
 }

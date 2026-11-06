@@ -45,7 +45,9 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		description: "Open or continue a topic folder: 稿件/, 参考资料/, 检索/, 网页/ and 素材.md",
 		// Argument schema.
 		parameters: Type.Object({
-			name: Type.String({ description: "Short name, such as 城市绿化调研; the same name continues a topic" }),
+			name: Type.String({
+				description: "1–3 key words, such as 城市绿化; the date is added, and the same words continue",
+			}),
 		}),
 		// Creates folders only.
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -97,7 +99,8 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 		// Record them.
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const dir = ensureTopic(ctx.cwd);
+			// The first item says what the material is about, when no topic was opened.
+			const dir = ensureTopic(ctx.cwd, String(params.items[0]?.subject ?? ""));
 			const total = addMaterials(dir, params.items as Material[]);
 			const text = t("topic.materialAdded", { count: params.items.length, total, file: MATERIAL_FILE });
 			return { content: [{ type: "text", text }], details: { topicDir: dir, total } };

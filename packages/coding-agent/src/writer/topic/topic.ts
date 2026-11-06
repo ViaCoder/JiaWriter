@@ -10,7 +10,16 @@
  */
 
 // Files.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+	appendFileSync,
+	existsSync,
+	mkdirSync,
+	readdirSync,
+	readFileSync,
+	renameSync,
+	rmSync,
+	writeFileSync,
+} from "node:fs";
 // Paths.
 import { basename, join } from "node:path";
 // URL comparison shared with the reference check.
@@ -26,6 +35,17 @@ export const MATERIAL_FILE = "素材.md";
 const INDEX_FILE = ".index.jsonl";
 /** Longest topic name and file name part (characters). */
 const MAX_NAME = 40;
+/** Most words of a topic in a folder name (the user, 2026-11-06: "20261106+topic word(1-3 words)"). */
+const MAX_WORDS = 3;
+/** Longest topic part of a folder name. */
+const MAX_TOPIC = 24;
+/** Marks a folder named by the program, until topic_open names it. */
+const AUTO_MARK = ".auto-name";
+/** Name of a topic with no words to take from anywhere. */
+const AUTO_WORD = "资料";
+/** Words that say when or link others, in a query's words. */
+const NOT_TOPIC =
+	/^(?:the|a|an|of|for|to|in|on|at|by|and|or|with|from|about|january|february|march|april|may|june|july|august|september|october|november|december)$/i;
 
 /** One line of the archive index. */
 export interface IndexEntry {
@@ -74,42 +94,89 @@ export function safeName(text: string): string {
 		.replace(/^[\s.]+|[\s.]+$/g, "");
 }
 
-/** Folder of a topic: the working folder itself when it already carries the topic's name. */
-export function topicPath(cwd: string, name: string): string {
+/** text without web addresses: a file name is shown wherever its path is, also in the search log. */
+function withoutAddresses(text: string): string {
+	return text.replace(/\S*:\/\/\S*|\b(?:www\.|site:)\S*/gi, " ");
+}
+
+/** The day in local time, YYYYMMDD: every topic folder starts with it. */
+function dayStamp(now: Date): string {
+	// Two digits for month and day.
+	const p = (n: number) => String(n).padStart(2, "0");
+	return `${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}`;
+}
+
+/** The words of a topic: the first three, within the length of a folder name. */
+function firstWords(name: string): string {
+	return name.split(" ").slice(0, MAX_WORDS).join("-").slice(0, MAX_TOPIC);
+}
+
+/** Up to three words that name a topic, from a query or a title; "" when it has none. */
+export function topicWords(text: string): string {
+	// Words end at spaces and punctuation; a site: filter, an address or a quoted number names nothing.
+	const words = text
+		.split(/[\s,，。、;；:：|()（）"“”'‘’[\]《》]+/)
+		.filter((word) => word && !/^(?:site|https?)$|[/.]/i.test(word))
+		// Dates and numbers say when, and short linking words say nothing.
+		.filter((word) => !/^\d+(?:[年月日号]\d*)*[年月日号]?$/.test(word) && !NOT_TOPIC.test(word));
+	return safeName(words.slice(0, MAX_WORDS).join(" ")).replace(/ /g, "-").slice(0, MAX_TOPIC);
+}
+
+/** Folder of a topic name: a folder already holding it, on any day, else a new one dated today. */
+export function topicPath(cwd: string, name: string, now: Date = new Date()): string {
+	// A name that already carries its date is the folder's own name.
+	if (/^\d{8}-/.test(name)) return basename(cwd) === name ? cwd : join(cwd, name);
+	// The words as the folder would hold them.
+	const words = firstWords(name);
+	/** True for a folder of this topic, dated or from before dates. */
+	const same = (folder: string) => folder === name || folder.replace(/^\d{8}-/, "") === words;
 	// A user who started JiaWriter inside the topic folder gets no folder within a folder.
-	return basename(cwd) === name ? cwd : join(cwd, name);
+	if (same(basename(cwd))) return cwd;
+	// The latest folder of this topic, so the same words continue it on another day.
+	const found = existsSync(cwd) ? readdirSync(cwd).filter(same).sort().at(-1) : undefined;
+	return join(cwd, found ?? `${dayStamp(now)}-${words}`);
 }
 
 /** Create or reuse a topic's folders; returns the folder and whether it was there already. */
-export function openTopic(cwd: string, name: string): { dir: string; existed: boolean } {
+export function openTopic(cwd: string, name: string, now: Date = new Date()): { dir: string; existed: boolean } {
 	// A name left empty by cleaning is refused.
 	const clean = safeName(name);
 	if (!clean) throw new Error(t("topic.badName", { name }));
-	const dir = topicPath(cwd, clean);
+	const dir = topicPath(cwd, clean, now);
 	const existed = existsSync(join(dir, INDEX_FILE)) || existsSync(join(dir, TOPIC_DIRS.drafts));
 	for (const sub of Object.values(TOPIC_DIRS)) mkdirSync(join(dir, sub), { recursive: true });
 	return { dir, existed };
 }
 
-/** Name of the folder used when work starts before a topic is named. */
-export function unnamedTopic(now: Date): string {
-	// The day in local time, YYYYMMDD.
-	const p = (n: number) => String(n).padStart(2, "0");
-	return `未命名主题-${now.getFullYear()}${p(now.getMonth() + 1)}${p(now.getDate())}`;
+/** Open a topic the model did not name, called after what it is doing; topic_open may still rename it. */
+export function openAutoTopic(cwd: string, hint: string, now: Date = new Date()): string {
+	// Words of the search or page, or a plain word when there are none.
+	const { dir, existed } = openTopic(cwd, topicWords(hint) || AUTO_WORD, now);
+	// Only a new folder is marked: one with this name from before keeps it.
+	if (!existed) writeFileSync(join(dir, AUTO_MARK), "");
+	return dir;
 }
 
-/** True for the folder made when work started before a topic was named. */
+/** True for a folder the program named itself. */
 export function isUnnamedTopic(dir: string): boolean {
-	return /^未命名主题-\d{8}$/.test(basename(dir));
+	return existsSync(join(dir, AUTO_MARK));
 }
 
-/** Give an unnamed folder its topic's name, so research done first stays with the draft; false when that name is taken. */
-export function adoptUnnamedTopic(unnamed: string, cwd: string, name: string): boolean {
+/** Give an unnamed folder its topic's name, so research done first stays with the draft; false when that
+ * name is taken, in which case the old folder stays where it is. */
+export function adoptUnnamedTopic(unnamed: string, cwd: string, name: string, now: Date = new Date()): boolean {
 	const clean = safeName(name);
 	if (!clean || !isUnnamedTopic(unnamed) || !existsSync(unnamed)) return false;
-	const target = topicPath(cwd, clean);
+	// The folder this name belongs in.
+	const target = topicPath(cwd, clean, now);
+	// The same folder needs no move, only to stop counting as unnamed.
+	if (target === unnamed) {
+		rmSync(join(unnamed, AUTO_MARK));
+		return true;
+	}
 	if (existsSync(target)) return false;
 	renameSync(unnamed, target);
+	rmSync(join(target, AUTO_MARK));
 	return true;
 }
 
@@ -142,7 +209,7 @@ function archive(
 ): string {
 	// Running number over both kinds, then a readable name.
 	const n = readIndex(dir).reduce((most, e) => Math.max(most, e.n), 0) + 1;
-	const file = join(sub, `${String(n).padStart(3, "0")}-${safeName(title) || kind}.md`);
+	const file = join(sub, `${String(n).padStart(3, "0")}-${safeName(withoutAddresses(title)) || kind}.md`);
 	mkdirSync(join(dir, sub), { recursive: true });
 	writeFileSync(join(dir, file), text);
 	appendFileSync(
@@ -195,7 +262,9 @@ export function archivePage(
 		return known.file;
 	}
 	const asked = requested !== page.url ? requested : undefined;
-	return archive(dir, "page", TOPIC_DIRS.web, page.title || page.url, `${head}${page.content}\n`, page.url, asked);
+	// Without a title, the text's first words name the file.
+	const name = page.title || page.content.slice(0, 200).replace(/^[#>*\s-]+/, "");
+	return archive(dir, "page", TOPIC_DIRS.web, name, `${head}${page.content}\n`, page.url, asked);
 }
 
 /** Keep the text left out of a page beside its archive file, so a misjudged passage is never lost. */

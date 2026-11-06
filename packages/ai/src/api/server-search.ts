@@ -29,9 +29,9 @@ import { extractAccountId, resolveCodexUrl } from "./openai-codex-responses.ts";
 // The record of each request.
 import {
 	failureEntry,
+	hostsOf,
 	type ServerLog,
 	type ServerLogWrite,
-	safeUrl,
 	secretsOf,
 	serverLog,
 	tracedFetch,
@@ -65,6 +65,27 @@ export interface ServerCall {
 	signal?: AbortSignal;
 	// Takes the record of this call, line by line; lines hold no key.
 	log?: ServerLogWrite;
+	// Allows Codex's own search endpoint; without it only the hosted tool is used.
+	direct?: ServerDirect;
+}
+
+/** What the endpoint needs across the calls of a session. */
+export interface ServerDirect {
+	// The session's id: references like turn0search3 live under it.
+	id: string;
+	// Addresses that did not take the endpoint this session.
+	refused: Set<string>;
+}
+
+/** The time window of a search. */
+export type ServerFresh = "day" | "week" | "month" | "year";
+
+/** What a page read can ask for besides the page. */
+export interface ServerPageOptions {
+	// Line to read from, for the rest of a long page.
+	lineno?: number;
+	// Words to find in the page instead of reading all of it.
+	find?: string;
 }
 
 /** One source the upstream used. */
@@ -116,6 +137,12 @@ export class ServerSearchError extends Error {
 const MAX_SEARCHES = 8;
 /** Output limit of an inner request: the page or the results come from the tools, not the reply. */
 const REPLY_TOKENS = 16_000;
+/** Fewest characters of a real page: real replies that gave no page were 137 to 333 (log of 2026-11-06). */
+const MIN_PAGE = 500;
+/** Longest reply of Codex's own search endpoint, in tokens. */
+const MAX_DIRECT_TOKENS = 16000;
+/** Days of each time window. */
+const FRESH_DAYS: Readonly<Record<ServerFresh, number>> = { day: 1, week: 7, month: 30, year: 365 };
 /** Most resumes of a paused turn: a guard against a reply that never ends. */
 const MAX_ROUNDS = 5;
 /** Statuses that may mean the other request style is wanted. */
@@ -132,12 +159,12 @@ const CLAUDE_FETCH: BetaToolUnion = { type: "web_fetch_20250910", name: "web_fet
 const CODEX_INCLUDE = "web_search_call.action.sources";
 /** Instructions of a search. */
 const SEARCH_RULES =
-	"Search the web for the query, always, and never answer from memory. Report only what the results say, with the date and the source of each fact.";
+	"Research the user's question on the web until it is answered, in several rounds, and never answer from memory. Start broad, then search again with what you found: new terms, official names, other languages. Open the primary sources and the strongest reports and read them. Check key facts against a second source. Then write a complete, organized report of what the sources say, giving each fact its date and source link, and name what stayed unknown.";
 /** Instructions of a page read on the "claude" way: the text comes from the tool, not the reply. */
 const FETCH_RULES = "Fetch the exact page the user names with the fetch tool, then reply with one short sentence.";
 /** Instructions of a page read on the "codex" way: the reply is all there is. */
 const OPEN_RULES =
-	"Open the exact page the user names with the web search tool, and never answer from memory. Write out the page's full text, word for word, in its own language, with no summary and no comments.";
+	"Open the exact page the user names with the web search tool, and never answer from memory. Report everything it says in full detail, in its own language: every fact, figure, date, name and section, in the page's order. Add no comments.";
 
 /** Status of a failed request, or undefined when it never got one. */
 function statusOf(error: unknown): number | undefined {
@@ -149,7 +176,13 @@ function statusOf(error: unknown): number | undefined {
 
 /** Text of an error with the key taken out. */
 function callLog(call: ServerCall): ServerLog | undefined {
-	return call.log ? serverLog(call.log, secretsOf(call.apiKey, call.headers, call.model.headers)) : undefined;
+	// Nothing is built when no log is kept.
+	if (!call.log) return undefined;
+	// The key, the headers and the upstream's name stay out of it.
+	return serverLog(call.log, [
+		...secretsOf(call.apiKey, call.headers, call.model.headers),
+		...hostsOf(call.baseUrl, call.model.baseUrl),
+	]);
 }
 
 /** The fetch of a call's client: recorded when the call keeps a log, else the SDK's own. */
@@ -163,7 +196,7 @@ function clientFetch(call: ServerCall): FetchFunction | undefined {
 async function recorded<T>(
 	call: ServerCall,
 	what: "search" | "fetch",
-	target: string,
+	target: string | undefined,
 	run: () => Promise<T>,
 	result: (out: T) => Record<string, unknown>,
 ): Promise<T> {
@@ -180,7 +213,6 @@ async function recorded<T>(
 		model: call.model.id,
 		reasoning: call.model.reasoning,
 		thinking: call.thinking,
-		upstream: safeUrl(call.baseUrl),
 		// A style found earlier in this session is tried first.
 		known: call.styles.get(`${call.way}\n${call.baseUrl}`) ?? "",
 	});
@@ -441,14 +473,13 @@ function codexReasoning(model: Model<Api>, level: ModelThinkingLevel): Record<st
 	return { reasoning: { effort: effort === "minimal" ? "low" : effort } };
 }
 
-/** One Responses request with the hosted search tool, read to the end. */
-async function codexReply(call: ServerCall, style: ServerStyle, rules: string, prompt: string): Promise<CodexReply> {
+/** A client of one request style; retries are the caller's business. */
+function codexClient(call: ServerCall, style: ServerStyle): OpenAI {
 	// The OAuth style talks to the Codex backend.
 	const oauth = style === "oauth";
 	// Its account header, when the key holds one.
 	const account = oauth ? accountOf(call.apiKey) : undefined;
-	// The client; retries are the caller's business.
-	const client = new OpenAI({
+	return new OpenAI({
 		apiKey: call.apiKey ?? "",
 		baseURL: oauth ? resolveCodexUrl(call.baseUrl).replace(/\/responses$/, "") : `${call.baseUrl}/v1`,
 		dangerouslyAllowBrowser: true,
@@ -461,6 +492,12 @@ async function codexReply(call: ServerCall, style: ServerStyle, rules: string, p
 			...call.headers,
 		},
 	});
+}
+
+/** One Responses request with the hosted search tool, read to the end. */
+async function codexReply(call: ServerCall, style: ServerStyle, rules: string, prompt: string): Promise<CodexReply> {
+	// The client of this style.
+	const client = codexClient(call, style);
 	// The question.
 	const input: ResponseInput = [{ role: "user", content: [{ type: "input_text", text: prompt }] }];
 	// Live search, as Codex sends it; instructions and no storage suit both styles. The raw stream, because the
@@ -528,6 +565,9 @@ function codexReport(reply: CodexReply): ServerReport {
 		if (item.action?.type === "search")
 			for (const s of item.action.sources ?? [])
 				addSource(sources, { url: s.url, title: "", snippet: "", date: "" });
+		// A page it opened is the source it read most closely.
+		if (item.action?.type === "open_page" && item.action.url)
+			addSource(sources, { url: item.action.url, title: "", snippet: "", date: "" });
 	}
 	// The text alone proves nothing: the upstream may have ignored the tool.
 	if (!searched) throw new ServerSearchError("no_search", "");
@@ -542,43 +582,152 @@ function codexPage(reply: CodexReply, url: string): ServerPage {
 	if (!opened) throw new ServerSearchError("no_open", "");
 	// What the model wrote.
 	const content = codexText(reply, new Map());
-	// Nothing was written.
-	if (!content) throw new ServerSearchError("no_open", "");
+	// Nothing was written, or a line saying the page could not be given: that is no page, and it is not kept.
+	if (content.length < MIN_PAGE) throw new ServerSearchError("no_open", content);
 	// The page.
 	return { url, title: "", content };
 }
 
+/** What Codex's own search endpoint gives back: the tool's text, and the results it comes from. */
+interface DirectReply {
+	// The text as the tool wrote it, with page text in it.
+	output: string;
+	// The results, each with at least an address; other fields can change.
+	results: { url?: unknown; title?: unknown }[];
+}
+
+/** One request to Codex's own search endpoint, as Codex sends it: no reasoning, and the session's id. */
+async function directReply(
+	call: ServerCall,
+	style: ServerStyle,
+	commands: Record<string, unknown>,
+	input: string,
+): Promise<DirectReply> {
+	// The JSON reply; the client adds the key and fails on a bad status.
+	const reply = await codexClient(call, style).post<unknown>("/alpha/search", {
+		body: {
+			id: call.direct?.id,
+			model: call.model.id,
+			input,
+			commands: { ...commands, response_length: "long" },
+			settings: { external_web_access: true, allowed_callers: ["direct"], search_context_size: "high" },
+			max_output_tokens: MAX_DIRECT_TOKENS,
+		},
+		signal: call.signal,
+	});
+	// An address that answers something else has no such endpoint.
+	const { output, results } = (reply ?? {}) as { output?: unknown; results?: unknown };
+	if (typeof output !== "string") throw new Error("the search endpoint gave no output");
+	return { output, results: Array.isArray(results) ? results : [] };
+}
+
+/** The sources of a reply from the endpoint, each address once. */
+function directSources(reply: DirectReply): ServerSource[] {
+	// Each address once, as everywhere.
+	const sources = new Map<string, ServerSource>();
+	for (const r of reply.results) {
+		// A result of an unknown kind may have no address.
+		if (typeof r?.url !== "string" || !r.url) continue;
+		addSource(sources, { url: r.url, title: typeof r.title === "string" ? r.title : "", snippet: "", date: "" });
+	}
+	return [...sources.values()];
+}
+
+/** The sources and text of a search through the endpoint. */
+function directReport(reply: DirectReply): ServerReport {
+	// The tool's text.
+	const text = reply.output.trim();
+	// Nothing at all: the hosted tool is worth a try.
+	if (!text) throw new Error("the search endpoint gave an empty output");
+	return { text, sources: directSources(reply) };
+}
+
+/** A page read through the endpoint; its first result knows the address behind a reference. */
+function directPage(reply: DirectReply, url: string, options: ServerPageOptions): ServerPage {
+	// The tool's text.
+	const content = reply.output.trim();
+	// Part of a page may be short; the start of one this short is an error text rather than the page.
+	const part = options.find !== undefined || options.lineno !== undefined;
+	if (content.length < (part ? 1 : MIN_PAGE)) throw new ServerSearchError("no_open", content);
+	// The result that names the page.
+	const first = directSources(reply)[0];
+	return { url: first?.url ?? url, title: first?.title ?? "", content };
+}
+
+/** Codex's own endpoint when this address takes it, else the hosted tool, for the rest of the session. */
+async function viaDirect<T>(
+	call: ServerCall,
+	direct: (style: ServerStyle) => Promise<T>,
+	hosted: () => Promise<T>,
+): Promise<T> {
+	// Only for callers that allow it, and only until an address refuses.
+	if (!call.direct || call.direct.refused.has(call.baseUrl)) return hosted();
+	// For the time it took.
+	const started = Date.now();
+	try {
+		// The style the hosted tool found, else plain: one request, because the hosted tool is there to fall back on.
+		return await direct(call.styles.get(`codex\n${call.baseUrl}`) ?? "plain");
+	} catch (error) {
+		// Stopped by the caller, or an answer about this page.
+		if (call.signal?.aborted || error instanceof ServerSearchError) throw error;
+		// The real error stays in the log.
+		callLog(call)?.({ ...failureEntry(error, Date.now() - started), kind: "attempt-failed", style: "direct" });
+		call.direct.refused.add(call.baseUrl);
+		return hosted();
+	}
+}
+
 /** Let the upstream search; the query goes out as given. */
-export function serverSearch(call: ServerCall, query: string): Promise<ServerReport> {
-	// The words Claude Code uses, and the same for Codex.
-	const prompt = `Perform a web search for the query: ${query}`;
+export function serverSearch(call: ServerCall, query: string, fresh?: ServerFresh): Promise<ServerReport> {
+	// The same question for both ways: how far to go is in the rules. The time window, where no field takes it.
+	const prompt = `Research this: ${query}${fresh ? ` Only use sources from the last ${FRESH_DAYS[fresh]} days.` : ""}`;
+	/** The question through the hosted tool. */
+	const hosted = () =>
+		withStyle(call, async (style) => codexReport(await codexReply(call, style, SEARCH_RULES, prompt)));
+	/** The question through Codex's own endpoint, which takes the time window as a field. */
+	const direct = async (style: ServerStyle) => {
+		const search = { q: query, ...(fresh ? { recency: FRESH_DAYS[fresh] } : {}) };
+		return directReport(await directReply(call, style, { search_query: [search] }, query));
+	};
 	// The way asked for.
 	const run = () =>
-		withStyle(call, async (style) =>
-			call.way === "claude"
-				? claudeReport(await claudeBlocks(call, style, CLAUDE_SEARCH, SEARCH_RULES, prompt))
-				: codexReport(await codexReply(call, style, SEARCH_RULES, prompt)),
-		);
+		call.way === "claude"
+			? withStyle(call, async (style) =>
+					claudeReport(await claudeBlocks(call, style, CLAUDE_SEARCH, SEARCH_RULES, prompt)),
+				)
+			: viaDirect(call, direct, hosted);
 	return recorded(call, "search", query, run, (out) => ({
 		textChars: out.text.length,
 		sources: out.sources.length,
-		firstSources: out.sources.slice(0, 5).map((s) => s.url),
 	}));
 }
 
 /** Let the upstream read a page; the address goes out as given, inside this request's user message. */
-export function serverFetch(call: ServerCall, url: string): Promise<ServerPage> {
+export function serverFetch(call: ServerCall, url: string, options: ServerPageOptions = {}): Promise<ServerPage> {
 	// In the user message any address counts as named by the user, wherever it came from.
-	const prompt = `Read this page: ${url}`;
+	const prompt = `Report this page: ${url}`;
+	// The hosted tool can only be told what to look for.
+	const hostedPrompt = options.find ? `${prompt} Give every passage about: ${options.find}` : prompt;
+	/** The page through the hosted tool. */
+	const hosted = () =>
+		withStyle(call, async (style) => codexPage(await codexReply(call, style, OPEN_RULES, hostedPrompt), url));
+	/** The page through Codex's own endpoint, which gives its text as it is. */
+	const direct = async (style: ServerStyle) => {
+		// Find works on the page by itself, and open takes the line to start from.
+		const commands = options.find
+			? { find: [{ ref_id: url, pattern: options.find }] }
+			: { open: [{ ref_id: url, ...(options.lineno === undefined ? {} : { lineno: options.lineno }) }] };
+		return directPage(await directReply(call, style, commands, url), url, options);
+	};
 	// The way asked for.
 	const run = () =>
-		withStyle(call, async (style) =>
-			call.way === "claude"
-				? claudePage(await claudeBlocks(call, style, CLAUDE_FETCH, FETCH_RULES, prompt))
-				: codexPage(await codexReply(call, style, OPEN_RULES, prompt), url),
-		);
-	return recorded(call, "fetch", url, run, (out) => ({
-		url: out.url,
+		call.way === "claude"
+			? withStyle(call, async (style) =>
+					claudePage(await claudeBlocks(call, style, CLAUDE_FETCH, FETCH_RULES, prompt)),
+				)
+			: viaDirect(call, direct, hosted);
+	// The log says that a page was read, not which.
+	return recorded(call, "fetch", undefined, run, (out) => ({
 		title: out.title,
 		contentChars: out.content.length,
 	}));

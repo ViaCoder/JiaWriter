@@ -5,7 +5,7 @@
  */
 
 // Folder creation and the name of an unnamed topic.
-import { openTopic, unnamedTopic } from "./topic.ts";
+import { openAutoTopic } from "./topic.ts";
 
 /** Holder key. */
 const KEY = Symbol.for("jiawriter.topic");
@@ -24,10 +24,10 @@ export function setCurrentTopic(dir: string | undefined): void {
 	holder[KEY] = dir;
 }
 
-/** The current topic, opening a dated one when work started before a topic was named. */
-export function ensureTopic(cwd: string, now = new Date()): string {
+/** The current topic; when work started before one was named, one named after the search or page at hand. */
+export function ensureTopic(cwd: string, hint: string, now = new Date()): string {
 	// Nothing is lost when the model skips topic_open.
-	const dir = currentTopic() ?? openTopic(cwd, unnamedTopic(now)).dir;
+	const dir = currentTopic() ?? openAutoTopic(cwd, hint, now);
 	setCurrentTopic(dir);
 	return dir;
 }

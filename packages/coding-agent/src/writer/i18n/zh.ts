@@ -320,7 +320,7 @@ export const zh = {
 	"search.noYear": "fresh=year 在 {engines} 上没有生效。",
 	"server.noModel": "没有设置模型，无法请求上游。",
 	"server.noSearch": "上游没有执行搜索，这种方式在这里可能用不了。请换一种方式，或者告诉用户。",
-	"server.noOpen": "上游没有打开这个页面。请换一种方式。",
+	"server.noOpen": "上游没有给出这个页面的内容。{detail}请换一种方式。",
 	"server.toolError": "上游的工具出错：{detail}。请换一种方式。",
 	"server.pdf": "上游返回的是 PDF，这种方式读不了。请用 method=sf。",
 	"server.upstream": "上游请求失败：{detail}",

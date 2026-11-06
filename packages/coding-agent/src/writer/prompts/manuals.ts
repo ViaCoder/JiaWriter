@@ -23,7 +23,7 @@ export const WRITING_MANUAL: readonly string[] = [
 
 /** How to research: the first search or fetch. */
 export const RESEARCH_MANUAL: readonly string[] = [
-	"Write queries as 2–6 key terms, in Chinese for Chinese sources and English for international ones",
+	"For browser and anysearch write queries as 2–6 key terms, in Chinese for Chinese sources and English for international ones",
 	"For recent events put the year and month in the query; a fact is current only when its page shows the date",
 	"Read the whole list and choose by address and title: major outlets (Reuters, AP, AFP, Bloomberg, BBC, NYT, WSJ, FT, and national ones) and official sources with named actors or data. Forums, blogs, Q&A sites and reposts are only leads",
 	"When nothing fits, search again in English, with an outlet named, or with the official name",
