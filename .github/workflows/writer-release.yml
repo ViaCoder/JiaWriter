@@ -1,0 +1,48 @@
+# Publish a GitHub Release from the packages of a finished run. Started by hand, never by a push:
+# nothing is rebuilt, so what is published is exactly what the package run tested.
+name: JiaWriter release
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: Run of "JiaWriter packages" that built the files
+        required: true
+      tag:
+        description: New tag, for example v1.4.0
+        required: true
+      commit:
+        description: Full commit the tag points at
+        required: true
+      notes:
+        description: Release notes
+        required: true
+
+# Only this workflow may write to the repository.
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Fetch the packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ inputs.run_id }}
+        run: gh run download "$RUN_ID" --repo "$GITHUB_REPOSITORY" --name jiawriter-packages --dir out
+
+      # The published files must match the checksums the package run wrote.
+      - name: Check the packages
+        working-directory: out
+        run: sha256sum -c SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+          COMMIT: ${{ inputs.commit }}
+          NOTES: ${{ inputs.notes }}
+        run: gh release create "$TAG" out/* --repo "$GITHUB_REPOSITORY" --target "$COMMIT" --title "JiaWriter $TAG" --notes "$NOTES"
