@@ -45,4 +45,11 @@ jobs:
           TAG: ${{ inputs.tag }}
           COMMIT: ${{ inputs.commit }}
           NOTES: ${{ inputs.notes }}
-        run: gh release create "$TAG" out/* --repo "$GITHUB_REPOSITORY" --target "$COMMIT" --title "JiaWriter $TAG" --notes "$NOTES"
+        run: |
+          # A release that exists gets the new files and notes; its tag is moved beforehand.
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$TAG" out/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --notes "$NOTES" --latest
+          else
+            gh release create "$TAG" out/* --repo "$GITHUB_REPOSITORY" --target "$COMMIT" --title "JiaWriter $TAG" --notes "$NOTES"
+          fi
