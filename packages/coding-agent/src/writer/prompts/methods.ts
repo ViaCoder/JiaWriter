@@ -21,12 +21,12 @@ export const SEARCH_METHODS: Readonly<Record<string, readonly string[]>> = {
 		"At most 10 results, with no paging, time filter, site: or dates: search other words for more, and fetch a page for its date",
 	],
 	claude: [
-		"query is the only parameter, so ask one thing per call; the upstream runs up to 8 searches",
+		"query is the only parameter, so ask one thing per call and put any time range in it; the upstream runs up to 8 searches",
 		"Results give titles, page ages and cited passages; treat the upstream's answer as a guide",
 		UPSTREAM_SOURCES,
 	],
 	codex: [
-		"query is the only parameter, so ask one thing per call",
+		"query is the only parameter, so ask one thing per call and put any time range in it",
 		"Results often give bare addresses: fetch a page before relying on it",
 		UPSTREAM_SOURCES,
 		"An effort error means this search needs a higher level: tell the user or use another method",

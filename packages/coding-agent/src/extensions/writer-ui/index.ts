@@ -18,6 +18,8 @@ import { setUiLang, t, type WriterLang } from "../../writer/i18n/index.ts";
 import { stageLines } from "../../writer/prompts/stages.ts";
 // The keys held in memory (shown only as set or unset).
 import { withSecrets } from "../../writer/secrets.ts";
+// Where the search log is.
+import { fileSize, searchLogPath } from "../../writer/websearch/log.ts";
 // Main-model state after startup.
 import { getWriterModel } from "../../writer/writer-model.ts";
 
@@ -57,6 +59,13 @@ export class ReadOnlyPage {
 	}
 	/** Nothing is cached between renders. */
 	invalidate(): void {}
+}
+
+/** The /jw log page: where the file is and what it holds. */
+export function logLines(): string[] {
+	// The file, whether or not it exists yet.
+	const path = searchLogPath();
+	return [t("jw.logPath", { path, bytes: fileSize(path) }), t("jw.logNote")];
 }
 
 /** Extension factory. */
@@ -114,15 +123,22 @@ export default function writerUiExtension(pi: ExtensionAPI): void {
 
 	// /jw.
 	pi.registerCommand("jw", {
-		description: "Show the JiaWriter configuration; /jw prompts shows which rules reach the model and when",
-		getArgumentCompletions: (prefix) =>
-			"prompts".startsWith(prefix) ? [{ value: "prompts", label: "prompts" }] : null,
+		description: "Show the JiaWriter configuration; /jw prompts shows the rules sent, /jw log the search log",
+		getArgumentCompletions: (prefix) => {
+			// The sub-pages that fit.
+			const fit = ["prompts", "log"].filter((name) => name.startsWith(prefix));
+			return fit.length > 0 ? fit.map((name) => ({ value: name, label: name })) : null;
+		},
 		handler: async (args, ctx) => {
-			// The stage table, or the page from the environment and the startup state.
+			// The word after /jw.
+			const page = args.trim();
+			// The stage table, the search log, or the page from the environment and the startup state.
 			const lines =
-				args.trim() === "prompts"
+				page === "prompts"
 					? stageLines()
-					: formatWaConfig(withSecrets(process.env), getWriterModel(), process.platform);
+					: page === "log"
+						? logLines()
+						: formatWaConfig(withSecrets(process.env), getWriterModel(), process.platform);
 			// Full screen in the terminal; a note elsewhere.
 			if (ctx.mode === "tui")
 				await ctx.ui.custom<void>((_tui, _theme, _kb, done) => new ReadOnlyPage(lines, () => done(undefined)));

@@ -62,7 +62,10 @@ def claude_reply(blocks):
 def codex_reply(output):
     """A Responses stream that ends with this output."""
     response = {"id": "r", "object": "response", "created_at": 1, "model": "x", "status": "completed", "output": []}
-    events = [{"type": "response.created", "sequence_number": 0, "response": response}, {"type": "response.completed", "sequence_number": 1, "response": {**response, "output": output}}]
+    # An event no SDK knows, as real upstreams send, and items that arrive one by one before an empty final list.
+    events = [{"type": "response.created", "sequence_number": 0, "response": response}, {"type": "response.something_new", "sequence_number": 1}]
+    events += [{"type": "response.output_item.done", "item": item} for item in output]
+    events += [{"type": "response.completed", "sequence_number": 2, "response": response}]
     return [f"event: {e['type']}\ndata: {json.dumps(e, ensure_ascii=False)}\n\n" for e in events]
 
 
@@ -169,6 +172,9 @@ def main():
                 with open(os.path.join(folder, f), encoding="utf-8") as h:
                     found[name] += h.read()
     all_results = "\n".join(results)
+    # The search log, as a user would send it.
+    log_path = os.path.join(env["JW_DIR"], "logs", "search.log")
+    log_text = open(log_path, encoding="utf-8").read() if os.path.exists(log_path) else ""
     claude_calls = [s for s in seen if s[0] == "/v1/messages"]
     codex_calls = [s for s in seen if s[0] == "/v1/responses"]
     checks = [
@@ -183,6 +189,10 @@ def main():
         ("抓取都归档到 网页/", counts["网页"] == 2 and "克劳德抓到的原文" in found["网页"] and "科德克斯写出的全文" in found["网页"]),
         ("不填 method 时报错，也没有发请求", len(results) == 5 and "method" in results[4] and len(seen) == 5),
         ("输出里没有 key", KEY not in out.stdout + out.stderr + all_results),
+        ("日志记下了搜索工具的调用", "web_search_call" in log_text and "server_tool_use" in log_text),
+        ("日志记下了 SDK 不认识的事件", "response.something_new" in log_text),
+        ("日志记下了模型每轮调用的工具和方式", '"kind":"turn"' in log_text and '"kind":"tool"' in log_text and '"kind":"session"' in log_text),
+        ("日志里没有 key", log_text != "" and KEY not in log_text),
     ]
     server.shutdown()
     shutil.rmtree(tmp, ignore_errors=True)

@@ -21,11 +21,21 @@ import type { Response, ResponseInput } from "openai/resources/responses/respons
 // Levels a model really offers.
 import { clampThinkingLevel } from "../models.ts";
 // Shared types.
-import type { Api, Model, ModelThinkingLevel, ProviderHeaders } from "../types.ts";
+import type { Api, FetchFunction, Model, ModelThinkingLevel, ProviderHeaders } from "../types.ts";
 // The Anthropic client, its OAuth identity and its effort names.
 import { claudeCodeVersion, mapThinkingLevelToEffort, PiAnthropic } from "./anthropic-messages.ts";
 // The address and account of a Codex login.
 import { extractAccountId, resolveCodexUrl } from "./openai-codex-responses.ts";
+// The record of each request.
+import {
+	failureEntry,
+	type ServerLog,
+	type ServerLogWrite,
+	safeUrl,
+	secretsOf,
+	serverLog,
+	tracedFetch,
+} from "./server-trace.ts";
 // Thinking budgets of older models.
 import { adjustMaxTokensForThinking } from "./simple-options.ts";
 
@@ -53,6 +63,8 @@ export interface ServerCall {
 	styles: Map<string, ServerStyle>;
 	// Stops the request.
 	signal?: AbortSignal;
+	// Takes the record of this call, line by line; lines hold no key.
+	log?: ServerLogWrite;
 }
 
 /** One source the upstream used. */
@@ -136,6 +148,53 @@ function statusOf(error: unknown): number | undefined {
 }
 
 /** Text of an error with the key taken out. */
+function callLog(call: ServerCall): ServerLog | undefined {
+	return call.log ? serverLog(call.log, secretsOf(call.apiKey, call.headers, call.model.headers)) : undefined;
+}
+
+/** The fetch of a call's client: recorded when the call keeps a log, else the SDK's own. */
+function clientFetch(call: ServerCall): FetchFunction | undefined {
+	// One logger for the client's requests.
+	const log = callLog(call);
+	return log ? tracedFetch(log) : undefined;
+}
+
+/** Run a call between a start and an end in the log. */
+async function recorded<T>(
+	call: ServerCall,
+	what: "search" | "fetch",
+	target: string,
+	run: () => Promise<T>,
+	result: (out: T) => Record<string, unknown>,
+): Promise<T> {
+	// Nothing is built when no log is kept.
+	const log = callLog(call);
+	// For the time it took.
+	const started = Date.now();
+	log?.({
+		kind: "start",
+		what,
+		target,
+		way: call.way,
+		api: call.model.api,
+		model: call.model.id,
+		reasoning: call.model.reasoning,
+		thinking: call.thinking,
+		upstream: safeUrl(call.baseUrl),
+		// A style found earlier in this session is tried first.
+		known: call.styles.get(`${call.way}\n${call.baseUrl}`) ?? "",
+	});
+	try {
+		const out = await run();
+		log?.({ kind: "done", ms: Date.now() - started, ...result(out) });
+		return out;
+	} catch (error) {
+		log?.(failureEntry(error, Date.now() - started));
+		throw error;
+	}
+}
+
+/** The message of an error, without the key. */
 function cleanMessage(error: unknown, key: string | undefined): string {
 	// The plain message.
 	const message = error instanceof Error ? error.message : String(error);
@@ -147,11 +206,22 @@ function cleanMessage(error: unknown, key: string | undefined): string {
 async function withStyle<T>(call: ServerCall, send: (style: ServerStyle) => Promise<T>): Promise<T> {
 	// Styles are kept per way and address.
 	const slot = `${call.way}\n${call.baseUrl}`;
+	/** One try; the log gets the SDK's own error before it is wrapped below. */
+	const attempt = async (style: ServerStyle): Promise<T> => {
+		// For the time it took.
+		const started = Date.now();
+		try {
+			return await send(style);
+		} catch (error) {
+			callLog(call)?.({ ...failureEntry(error, Date.now() - started), kind: "attempt-failed", style });
+			throw error;
+		}
+	};
 	// Known from an earlier call.
 	const known = call.styles.get(slot);
 	if (known) {
 		try {
-			return await send(known);
+			return await attempt(known);
 		} catch (error) {
 			// The upstream changed: find out again next time.
 			if (STYLE_STATUSES.has(statusOf(error) ?? 0)) call.styles.delete(slot);
@@ -161,7 +231,7 @@ async function withStyle<T>(call: ServerCall, send: (style: ServerStyle) => Prom
 	// The plain request.
 	let first: unknown;
 	try {
-		const out = await send("plain");
+		const out = await attempt("plain");
 		call.styles.set(slot, "plain");
 		return out;
 	} catch (error) {
@@ -171,7 +241,7 @@ async function withStyle<T>(call: ServerCall, send: (style: ServerStyle) => Prom
 	}
 	// The same key, the OAuth form, once.
 	try {
-		const out = await send("oauth");
+		const out = await attempt("oauth");
 		call.styles.set(slot, "oauth");
 		return out;
 	} catch (error) {
@@ -195,17 +265,19 @@ function rethrown(call: ServerCall, error: unknown): unknown {
 
 /** Thinking fields of a Claude request at the conversation's level, and the output limit they need. */
 function claudeThinking(model: Model<Api>, level: ModelThinkingLevel): Record<string, unknown> {
+	// Which form a model takes is known only from its Anthropic settings; no field is always accepted.
+	if (model.api !== "anthropic-messages") return {};
 	// What this model offers at that level.
 	const clamped = clampThinkingLevel(model, level);
 	// No thinking asked for or possible.
 	if (!model.reasoning || clamped === "off") return {};
 	// The same model read as Anthropic's.
-	const claude = model as unknown as Model<"anthropic-messages">;
+	const claude = model as Model<"anthropic-messages">;
 	// Current models take an effort level.
 	if (claude.compat?.forceAdaptiveThinking === true)
 		return { thinking: { type: "adaptive" }, output_config: { effort: mapThinkingLevelToEffort(claude, clamped) } };
-	// Older models take a budget.
-	const fit = adjustMaxTokensForThinking(undefined, model.maxTokens, clamped);
+	// Older models take a budget, which has to fit inside the output limit.
+	const fit = adjustMaxTokensForThinking(REPLY_TOKENS, model.maxTokens, clamped);
 	return { max_tokens: fit.maxTokens, thinking: { type: "enabled", budget_tokens: fit.thinkingBudget } };
 }
 
@@ -226,6 +298,7 @@ async function claudeBlocks(
 		baseURL: call.baseUrl,
 		dangerouslyAllowBrowser: true,
 		maxRetries: 0,
+		fetch: clientFetch(call),
 		defaultHeaders: {
 			accept: "application/json",
 			"anthropic-dangerous-direct-browser-access": "true",
@@ -351,20 +424,25 @@ function accountOf(key: string | undefined): string | undefined {
 	}
 }
 
+/** The part of a Responses reply this file reads. */
+type CodexReply = Pick<Response, "output">;
+
 /** The reasoning field of a Responses request at the conversation's level. */
 function codexReasoning(model: Model<Api>, level: ModelThinkingLevel): Record<string, unknown> {
-	// Models without reasoning take no such field.
-	if (!model.reasoning) return {};
+	// Levels probed on another API say nothing here, and no field is always accepted.
+	if (!model.api.startsWith("openai") || !model.reasoning) return {};
 	// What this model offers at that level.
 	const clamped = clampThinkingLevel(model, level);
-	// Its own name for that level.
-	const effort = model.thinkingLevelMap?.[clamped] ?? (clamped === "off" ? "none" : clamped);
-	// The model takes no value at this level.
-	return effort === null ? {} : { reasoning: { effort } };
+	// Hosted search refuses reasoning that is off, so the model's default stands.
+	if (clamped === "off") return {};
+	// Its own name for that level; it also refuses minimal, whose nearest level is low.
+	const effort = model.thinkingLevelMap?.[clamped] ?? clamped;
+	if (effort === null) return {};
+	return { reasoning: { effort: effort === "minimal" ? "low" : effort } };
 }
 
 /** One Responses request with the hosted search tool, read to the end. */
-async function codexReply(call: ServerCall, style: ServerStyle, rules: string, prompt: string): Promise<Response> {
+async function codexReply(call: ServerCall, style: ServerStyle, rules: string, prompt: string): Promise<CodexReply> {
 	// The OAuth style talks to the Codex backend.
 	const oauth = style === "oauth";
 	// Its account header, when the key holds one.
@@ -375,6 +453,7 @@ async function codexReply(call: ServerCall, style: ServerStyle, rules: string, p
 		baseURL: oauth ? resolveCodexUrl(call.baseUrl).replace(/\/responses$/, "") : `${call.baseUrl}/v1`,
 		dangerouslyAllowBrowser: true,
 		maxRetries: 0,
+		fetch: clientFetch(call),
 		defaultHeaders: {
 			...(oauth ? { originator: "pi", "OpenAI-Beta": "responses=experimental" } : {}),
 			...(account ? { "chatgpt-account-id": account } : {}),
@@ -384,25 +463,40 @@ async function codexReply(call: ServerCall, style: ServerStyle, rules: string, p
 	});
 	// The question.
 	const input: ResponseInput = [{ role: "user", content: [{ type: "input_text", text: prompt }] }];
-	// Live search, as Codex sends it; instructions and no storage suit both styles.
-	return client.responses
-		.stream(
-			{
-				model: call.model.id,
-				instructions: rules,
-				input,
-				tools: [{ type: "web_search", external_web_access: true }],
-				include: [CODEX_INCLUDE],
-				store: false,
-				...codexReasoning(call.model, call.thinking),
-			},
-			{ signal: call.signal },
-		)
-		.finalResponse();
+	// Live search, as Codex sends it; instructions and no storage suit both styles. The raw stream, because the
+	// SDK's stream helper throws on any event outside its own list, and upstreams send others.
+	const stream = await client.responses.create(
+		{
+			model: call.model.id,
+			instructions: rules,
+			input,
+			tools: [{ type: "web_search", external_web_access: true }],
+			include: [CODEX_INCLUDE],
+			store: false,
+			stream: true,
+			...codexReasoning(call.model, call.thinking),
+		},
+		{ signal: call.signal },
+	);
+	// Finished items as they arrive: some upstreams end with an empty output list.
+	const items: Response["output"] = [];
+	// The final response, when one comes.
+	let final: Response | undefined;
+	for await (const event of stream) {
+		// Other events carry nothing the result needs.
+		if (event.type === "response.output_item.done") items.push(event.item);
+		else if (event.type === "response.completed" || event.type === "response.incomplete") final = event.response;
+		else if (event.type === "response.failed")
+			throw new ServerSearchError("upstream", cleanMessage(event.response.error?.message ?? "failed", call.apiKey));
+		else if (event.type === "error")
+			throw new ServerSearchError("upstream", cleanMessage(event.message, call.apiKey));
+	}
+	// The final list when it has anything, else what arrived on the way.
+	return { output: final?.output.length ? final.output : items };
 }
 
 /** The text of a Responses reply, and the sources it cites. */
-function codexText(reply: Response, sources: Map<string, ServerSource>): string {
+function codexText(reply: CodexReply, sources: Map<string, ServerSource>): string {
 	// The upstream's text.
 	const text: string[] = [];
 	// Every output item.
@@ -422,7 +516,7 @@ function codexText(reply: Response, sources: Map<string, ServerSource>): string 
 }
 
 /** The sources and text of a Codex search. */
-function codexReport(reply: Response): ServerReport {
+function codexReport(reply: CodexReply): ServerReport {
 	// Each address once.
 	const sources = new Map<string, ServerSource>();
 	// True once the server really searched.
@@ -442,7 +536,7 @@ function codexReport(reply: Response): ServerReport {
 }
 
 /** The page in a Codex reply: the model's own writing, once a page was really opened. */
-function codexPage(reply: Response, url: string): ServerPage {
+function codexPage(reply: CodexReply, url: string): ServerPage {
 	// A redirect or a changed parameter is no failure, so the address is not compared.
 	const opened = reply.output.some((item) => item.type === "web_search_call" && item.action?.type === "open_page");
 	if (!opened) throw new ServerSearchError("no_open", "");
@@ -459,11 +553,17 @@ export function serverSearch(call: ServerCall, query: string): Promise<ServerRep
 	// The words Claude Code uses, and the same for Codex.
 	const prompt = `Perform a web search for the query: ${query}`;
 	// The way asked for.
-	return withStyle(call, async (style) =>
-		call.way === "claude"
-			? claudeReport(await claudeBlocks(call, style, CLAUDE_SEARCH, SEARCH_RULES, prompt))
-			: codexReport(await codexReply(call, style, SEARCH_RULES, prompt)),
-	);
+	const run = () =>
+		withStyle(call, async (style) =>
+			call.way === "claude"
+				? claudeReport(await claudeBlocks(call, style, CLAUDE_SEARCH, SEARCH_RULES, prompt))
+				: codexReport(await codexReply(call, style, SEARCH_RULES, prompt)),
+		);
+	return recorded(call, "search", query, run, (out) => ({
+		textChars: out.text.length,
+		sources: out.sources.length,
+		firstSources: out.sources.slice(0, 5).map((s) => s.url),
+	}));
 }
 
 /** Let the upstream read a page; the address goes out as given, inside this request's user message. */
@@ -471,9 +571,15 @@ export function serverFetch(call: ServerCall, url: string): Promise<ServerPage> 
 	// In the user message any address counts as named by the user, wherever it came from.
 	const prompt = `Read this page: ${url}`;
 	// The way asked for.
-	return withStyle(call, async (style) =>
-		call.way === "claude"
-			? claudePage(await claudeBlocks(call, style, CLAUDE_FETCH, FETCH_RULES, prompt))
-			: codexPage(await codexReply(call, style, OPEN_RULES, prompt), url),
-	);
+	const run = () =>
+		withStyle(call, async (style) =>
+			call.way === "claude"
+				? claudePage(await claudeBlocks(call, style, CLAUDE_FETCH, FETCH_RULES, prompt))
+				: codexPage(await codexReply(call, style, OPEN_RULES, prompt), url),
+		);
+	return recorded(call, "fetch", url, run, (out) => ({
+		url: out.url,
+		title: out.title,
+		contentChars: out.content.length,
+	}));
 }

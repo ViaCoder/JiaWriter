@@ -22,6 +22,15 @@ const ZONES = ["cn", "intl"];
 /** Other names of the engines. */
 const ENGINE_NAMES: Readonly<Record<string, string>> = { 必应: "bing", 谷歌: "google", 百度: "baidu", 搜狗: "sogou" };
 
+/** Every option of web_search. */
+const OPTION_NAMES = ["engines", "pages", "fresh", "zone", "language"];
+
+/** True when a field really holds a value. */
+function filled(value: unknown): boolean {
+	// null, "" and [] are what strict models send for a field they leave out.
+	return value !== null && value !== undefined && value !== "" && !(Array.isArray(value) && value.length === 0);
+}
+
 /** A raw call as an object. */
 function record(raw: unknown): Record<string, unknown> {
 	// Anything else has nothing to clean.
@@ -77,6 +86,9 @@ export function cleanSearchArgs(raw: unknown): Record<string, unknown> {
 	if (allowed.includes("zone") && ZONES.includes(word(args.zone))) out.zone = word(args.zone);
 	if (allowed.includes("language") && typeof args.language === "string" && args.language.trim())
 		out.language = args.language.trim();
+	// What the model asked for and this method does not use, so the result can say so.
+	const ignored = OPTION_NAMES.filter((name) => filled(args[name]) && !allowed.includes(name));
+	if (SEARCH_PARAMS[method] && ignored.length > 0) out.ignored = ignored;
 	return out;
 }
 

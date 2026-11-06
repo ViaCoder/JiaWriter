@@ -21,7 +21,6 @@ import {
 	MATERIAL_FILE,
 	type Material,
 	openTopic,
-	TOPIC_DIRS,
 } from "../../writer/topic/topic.ts";
 
 /** Follow the session: the topic of the branch now shown. */
@@ -59,7 +58,7 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 			setCurrentTopic(dir);
 			// A folder of that name was there already: the earlier research stays where it is, and the model is told.
 			const left = before && !moved && isUnnamedTopic(before) ? t("topic.earlier", { dir: before }) : "";
-			const opened = t(existed && !moved ? "topic.continued" : "topic.opened", { dir, drafts: TOPIC_DIRS.drafts });
+			const opened = t(existed && !moved ? "topic.continued" : "topic.opened", { dir });
 			const text = [opened, left].filter(Boolean).join("\n");
 			return { content: [{ type: "text", text }], details: { topicDir: dir } };
 		},

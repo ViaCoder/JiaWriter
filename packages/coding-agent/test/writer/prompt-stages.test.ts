@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import writerPromptsExtension from "../../src/extensions/writer-prompts/index.ts";
+import { t } from "../../src/writer/i18n/index.ts";
+import { WRITER_PREAMBLE } from "../../src/writer/prompt-text.ts";
 import { SUMMARY_PROMPT, SUMMARY_TURN_PROMPT, SUMMARY_UPDATE_PROMPT } from "../../src/writer/prompts/compact.ts";
 import { CORE_RULES, DEFAULT_SKILL, defaultSkillRule } from "../../src/writer/prompts/core.ts";
 import {
@@ -22,6 +24,7 @@ import {
 	stageText,
 	WRITING_STAGE,
 } from "../../src/writer/prompts/stages.ts";
+import { styleCheck, styleClean } from "../../src/writer/style/check.ts";
 import { setCurrentTopic } from "../../src/writer/topic/current.ts";
 
 /** Total characters of some rules. */
@@ -113,6 +116,7 @@ describe("the user's requirements", () => {
 		["punctuation", "full-width punctuation"],
 		["spaces", "only between English words"],
 		["no remarks on reliability", "no remarks on reliability"],
+		["the mechanism behind claims", "the mechanism behind each claim"],
 		["attributed opinions", "attribute opinions"],
 		["no verification markers", "no verification markers"],
 		["positive argument", "不是……而是"],
@@ -126,6 +130,7 @@ describe("the user's requirements", () => {
 	it("keeps search on the user's request, one call at a time, with no default", () => {
 		const core = CORE_RULES.join("\n");
 		expect(core).toContain("never when told not to");
+		expect(core).toContain("a draft comes only when the user asks for one");
 		expect(core).toContain("one web_search or web_fetch at a time");
 		expect(core).toContain("none is the default");
 		expect(core).toContain("only when the user's prompt says the upstream supports them");
@@ -144,19 +149,98 @@ describe("the user's requirements", () => {
 	});
 });
 
+describe("denials", () => {
+	const flagged = (text: string) => styleCheck(text).hits.length > 0;
+
+	it.each([
+		"这并不意味着市场已经饱和。",
+		"增长不等于发展。",
+		"效率不是目的。",
+		"这不代表企业没有责任。",
+		"这并非技术问题。",
+		"这不只是成本问题。",
+		"这不仅仅是政策问题。",
+		"问题不在于资金。",
+		"关键不是规模，而是质量。",
+		"This does not mean the market is saturated.",
+		"Growth is not development.",
+		"It is not a technical problem.",
+		"This isn't about cost.",
+		"That doesn't mean we should stop.",
+		"It's not just cost.",
+		"This is not to say that it failed.",
+	])("marks %s", (text) => {
+		expect(flagged(text)).toBe(true);
+		expect(styleClean(styleCheck(text))).toBe(false);
+	});
+
+	it.each(["这是不是真的？", "要不是下雨，活动就办了。", "市场已经饱和。", "Growth needs investment."])(
+		"leaves %s alone",
+		(text) => {
+			expect(flagged(text)).toBe(false);
+		},
+	);
+
+	it("asks the same question in chat and in documents", () => {
+		const core = CORE_RULES.join("\n");
+		expect(core).toContain("in chat and in documents");
+		expect(core).toContain("ask who claimed Y");
+		expect(core).toContain("if nobody did, drop the sentence");
+		const rules = CHECK_MANUALS.style_check.join("\n");
+		expect(rules).toContain("delete it if it denies what nobody claimed");
+		expect(rules).toContain("keep a denial that answers a real claim");
+		expect(rules).not.toContain("until it passes");
+	});
+});
+
+describe("nothing assumes a writing task", () => {
+	it("asks a compaction summary about any session", () => {
+		for (const prompt of [SUMMARY_PROMPT, SUMMARY_TURN_PROMPT, SUMMARY_UPDATE_PROMPT]) {
+			expect(prompt).not.toMatch(/writing session|drafts|cases/);
+		}
+	});
+
+	it("keeps a style report from demanding a clean pass", () => {
+		expect(t("style.advice", {}, "en")).not.toContain("again");
+		expect(t("style.advice", {}, "zh")).not.toContain("再运行");
+	});
+});
+
+describe("a general-purpose assistant", () => {
+	it("says so, and limits the document rules to documents", () => {
+		expect(WRITER_PREAMBLE).toContain("general-purpose assistant");
+		expect(WRITER_PREAMBLE).not.toMatch(/writing|research/i);
+		expect(CORE_RULES.join("\n")).toContain("In a document, take every case");
+		expect(CORE_RULES.join("\n")).toContain("When writing a document, keep it");
+	});
+});
+
 describe("dueStages", () => {
 	it("picks by tool and method, and leaves out what was given", () => {
-		const first = dueStages("web_search", "codex", new Set()).map((s) => s.id);
+		const first = dueStages("web_search", { method: "codex" }, new Set()).map((s) => s.id);
 		expect(first).toEqual(["research", "web_search:codex"]);
-		expect(dueStages("web_search", "browser", new Set(first)).map((s) => s.id)).toEqual(["web_search:browser"]);
-		expect(dueStages("ls", undefined, new Set())).toEqual([]);
+		expect(dueStages("web_search", { method: "browser" }, new Set(first)).map((s) => s.id)).toEqual([
+			"web_search:browser",
+		]);
+		expect(dueStages("ls", {}, new Set())).toEqual([]);
+	});
+
+	it("gives the writing rules when writing starts, and never for research alone", () => {
+		const ids = (tool: string, input: Record<string, unknown>) => dueStages(tool, input, new Set()).map((s) => s.id);
+		expect(ids("topic_open", {})).toEqual([]);
+		expect(ids("web_search", { method: "codex" })).not.toContain(WRITING_STAGE);
+		expect(ids("web_fetch", { method: "sf" })).not.toContain(WRITING_STAGE);
+		expect(ids("read", { path: "notes.md" })).toEqual([]);
+		expect(ids("read", { path: "/skills/report-analysis/SKILL.md" })).toEqual([WRITING_STAGE]);
+		expect(ids("write", { path: "稿.md" })).toEqual([WRITING_STAGE]);
+		expect(ids("edit", { path: "稿.md" })).toEqual([WRITING_STAGE]);
 	});
 
 	it("shows the table with what was given", () => {
 		givenStages().add(WRITING_STAGE);
 		const lines = stageLines();
 		expect(lines).toHaveLength(PROMPT_STAGES.length);
-		expect(lines[0]).toMatch(/^✓ Writing rules: topic_open, write, edit, \d+ chars$/);
+		expect(lines[0]).toMatch(/^✓ Writing rules: write, edit, SKILL\.md, \d+ chars$/);
 		expect(lines[1]).toMatch(/^· Research rules/);
 	});
 });
@@ -164,15 +248,19 @@ describe("dueStages", () => {
 describe("the extension", () => {
 	it("appends a stage to the first success only, after the tool's own text", () => {
 		const on = handlers().get("tool_result");
-		const first = on?.(result("topic_open")) as { content: { text: string }[] };
+		const first = on?.(result("write")) as { content: { text: string }[] };
 		expect(first.content[0].text).toBe("结果");
 		expect(first.content[1].text).toContain("Writing rules:");
-		expect(on?.(result("topic_open"))).toBeUndefined();
+		expect(on?.(result("write"))).toBeUndefined();
+	});
+
+	it("adds nothing to opening a topic", () => {
+		expect(handlers().get("tool_result")?.(result("topic_open"))).toBeUndefined();
 	});
 
 	it("gives nothing for a failed call", () => {
 		const on = handlers().get("tool_result");
-		expect(on?.({ ...result("topic_open"), isError: true })).toBeUndefined();
+		expect(on?.({ ...result("write"), isError: true })).toBeUndefined();
 		expect(givenStages().size).toBe(0);
 	});
 
@@ -194,19 +282,28 @@ describe("the extension", () => {
 
 	it("forgets what was given after compaction", () => {
 		const map = handlers();
-		map.get("tool_result")?.(result("topic_open"));
+		map.get("tool_result")?.(result("write"));
 		map.get("session_compact")?.();
 		expect(givenStages().size).toBe(0);
-		expect(map.get("tool_result")?.(result("topic_open"))).toBeDefined();
+		expect(map.get("tool_result")?.(result("write"))).toBeDefined();
 	});
 
-	it("starts a run inside a topic with the writing rules, once", () => {
-		const start = handlers().get("before_agent_start");
-		expect(start?.()).toBeUndefined();
+	it("adds nothing to a run in a topic where only research happened, also after compaction", () => {
+		const map = handlers();
 		setCurrentTopic("/tmp/主题");
-		const out = start?.() as { message: { content: string; display: boolean } };
+		map.get("tool_result")?.(result("web_search", "codex"));
+		expect(map.get("before_agent_start")?.()).toBeUndefined();
+		map.get("session_compact")?.();
+		expect(map.get("before_agent_start")?.()).toBeUndefined();
+	});
+
+	it("gives the writing rules back after compaction when a document is under way, once", () => {
+		const map = handlers();
+		map.get("tool_result")?.(result("write"));
+		map.get("session_compact")?.();
+		const out = map.get("before_agent_start")?.() as { message: { content: string; display: boolean } };
 		expect(out.message.content).toBe(stageText(PROMPT_STAGES[0]));
 		expect(out.message.display).toBe(false);
-		expect(start?.()).toBeUndefined();
+		expect(map.get("before_agent_start")?.()).toBeUndefined();
 	});
 });

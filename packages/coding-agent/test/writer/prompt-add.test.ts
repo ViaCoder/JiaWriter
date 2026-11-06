@@ -67,7 +67,7 @@ describe("PROMPT_ADD", () => {
 		vi.stubEnv("PROMPT_ADD", added("回答时先想读者是谁。", "prompt.txt").PROMPT_ADD as string);
 		const prompt = buildSystemPrompt({ cwd: "/w", selectedTools: [], skills: [], contextFiles: [] });
 		expect(prompt).toMatch(
-			/^<system_prompt>\nYou are an expert[^\n]*\n回答时先想读者是谁。\n<\/system_prompt>\n\n<tools>/,
+			/^<system_prompt>\nYou are JiaWriter[^\n]*\n回答时先想读者是谁。\n<\/system_prompt>\n\n<tools>/,
 		);
 	});
 

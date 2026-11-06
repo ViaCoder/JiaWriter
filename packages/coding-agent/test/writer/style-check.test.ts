@@ -19,6 +19,8 @@ import { DEFAULT_PACKS, STYLE_PACKS } from "../../src/writer/style/patterns.ts";
 
 /** One hit example per pattern id. */
 const HIT_EXAMPLES: Record<string, string> = {
+	"zh-denial": "这不是目的",
+	"en-denial": "This is not it",
 	// core-zh.
 	"zh-bushi-ershi": "这一举措不是为了短期收益，而是着眼长远布局。",
 	"zh-fou-ershi": "关键并非投入不足，而是机制不顺。",
@@ -265,7 +267,7 @@ describe("formatStyleReport", () => {
 		// Position line.
 		expect(text).toContain("- 第 1 行第 6 列：无法");
 		// Advice.
-		expect(text).toContain("请用 edit 只改写命中的片段");
+		expect(text).toContain("请逐条判断，用 edit 只改需要改的片段");
 	});
 	it("writes an English report and a clean verdict", () => {
 		// Clean English report.

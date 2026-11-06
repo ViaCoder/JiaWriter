@@ -8,16 +8,25 @@
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Stages and their text.
 import { dueStages, givenStages, PROMPT_STAGES, stageText, WRITING_STAGE } from "../../writer/prompts/stages.ts";
-// The open topic.
-import { currentTopic } from "../../writer/topic/current.ts";
 
 /** Extension factory. */
 export default function writerPromptsExtension(pi: ExtensionAPI): void {
-	// A shorter or another history may have lost what was given.
-	const forget = () => givenStages().clear();
-	pi.on("session_start", forget);
+	// A document was under way when compaction cleared the record.
+	let writing = false;
+	/** Forget what was given: a shorter or another history may have lost it. */
+	const forget = () => {
+		const given = givenStages();
+		// Only writing that had started goes on after this.
+		writing = given.has(WRITING_STAGE);
+		given.clear();
+	};
 	pi.on("session_compact", forget);
 	pi.on("session_tree", forget);
+	// A new session has written nothing yet.
+	pi.on("session_start", () => {
+		writing = false;
+		givenStages().clear();
+	});
 
 	// A stage arrives with the first success of its tool.
 	pi.on("tool_result", (event) => {
@@ -25,7 +34,7 @@ export default function writerPromptsExtension(pi: ExtensionAPI): void {
 		if (event.isError) return;
 		const given = givenStages();
 		// What this call brings that was not given.
-		const due = dueStages(event.toolName, event.input.method, given);
+		const due = dueStages(event.toolName, event.input, given);
 		if (due.length === 0) return;
 		// Each stage once.
 		for (const stage of due) given.add(stage.id);
@@ -34,11 +43,10 @@ export default function writerPromptsExtension(pi: ExtensionAPI): void {
 		return { content: [...event.content, { type: "text", text }], details: event.details };
 	});
 
-	// A run inside a topic needs the writing rules even when no tool triggers them first.
+	// After compaction a document under way needs its rules back; a topic alone asks for nothing.
 	pi.on("before_agent_start", () => {
 		const given = givenStages();
-		// Outside a topic, or already given: nothing to add.
-		if (!currentTopic() || given.has(WRITING_STAGE)) return;
+		if (!writing || given.has(WRITING_STAGE)) return;
 		const stage = PROMPT_STAGES.find((s) => s.id === WRITING_STAGE);
 		if (!stage) return;
 		given.add(stage.id);

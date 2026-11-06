@@ -43,7 +43,7 @@ export const en: Record<MessageKey, string> = {
 	"style.clean": "Check passed: no hits.",
 	// What to do with the hits.
 	"style.advice":
-		"Only positions are reported; the text is left as it was. Rewrite just the flagged passages with edit, then run style_check again.",
+		"Only positions are reported; the text is left as it was. Judge each hit, and edit only the passages that need it.",
 	// word_count heading.
 	"count.title": "Word count",
 	// Totals.
@@ -195,8 +195,8 @@ export const en: Record<MessageKey, string> = {
 	"compact.localNotice":
 		"The model summary failed, so a local summary was used and the conversation can continue. Older details may be missing; /tree shows the full record.",
 	"topic.badName": 'The topic name "{name}" cannot be a folder name.',
-	"topic.opened": "Topic folder created: {dir}. Drafts go in {drafts}/.",
-	"topic.continued": "Continuing the topic folder: {dir}. Drafts go in {drafts}/.",
+	"topic.opened": "Topic folder created: {dir}.",
+	"topic.continued": "Continuing the topic folder: {dir}.",
 	"topic.earlier": "Earlier research stays in {dir}: read it there when needed.",
 	"topic.archived": "Archived: {path}",
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
@@ -222,6 +222,9 @@ export const en: Record<MessageKey, string> = {
 	"promptAdd.empty": "The file PROMPT_ADD points to is empty: {path}",
 	"promptAdd.unreadable": "The file PROMPT_ADD points to cannot be read: {path}",
 	"jw.promptAdd": "{path} ({chars} characters)",
+	"jw.logPath": "Search log: {path} ({bytes} bytes)",
+	"jw.logNote":
+		"When a search fails, send this file to the developer. It holds queries and upstream text, and no key.",
 	"effort.choose": "Thinking intensity (now: {level})",
 	"effort.bad": "Thinking intensity must be {levels}.",
 	"effort.set": "Thinking intensity set to {level}.",
@@ -339,6 +342,8 @@ export const en: Record<MessageKey, string> = {
 	"search.methodUnavailable":
 		"The browser method is not available now: the JiaWriter extension in Chrome is not connected. Use another method, or connect the extension as /browser explains.",
 	"search.noMethod": "Name a method for this call: there is no default.",
+	"search.ignored": "Method {method} does not use these, so they had no effect: {names}.",
+	"search.noYear": "fresh=year had no effect on {engines}.",
 	"server.noModel": "No model is set, so the upstream cannot be asked.",
 	"server.noSearch":
 		"The upstream did not run a search, so this method may not work here. Use another method, or tell the user.",

@@ -160,8 +160,8 @@ export function writingState(entries: readonly SessionEntry[], dir: string | und
 	}
 	const skill = genre(entries);
 	if (skill) lines.push(`文体：${skill}`);
-	// The files are the truth, not this summary.
-	if (dir) lines.push("继续之前先读大纲和当前稿件。");
+	// A document under way is read from its files, not from this summary; research alone asks for nothing.
+	if (dir && drafts(dir).length > 0) lines.push("继续写稿之前先读大纲和当前稿件。");
 	// The user's words, as they were written.
 	const said = userWords(entries);
 	if (said.length > 0) lines.push("", "用户说过的话：", ...said.map((text) => `- ${text}`));

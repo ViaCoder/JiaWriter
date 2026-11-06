@@ -1,6 +1,6 @@
 import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type ServerCall, type ServerStyle, serverFetch, serverSearch } from "../src/api/server-search.ts";
 import type { Api, Model } from "../src/types.ts";
 
@@ -262,6 +262,7 @@ describe("serverSearch, claude", () => {
 
 	it("follows the conversation's model and effort", async () => {
 		const adaptive = model({
+			api: "anthropic-messages",
 			reasoning: true,
 			compat: { forceAdaptiveThinking: true },
 		} as Partial<Model<Api>>);
@@ -272,11 +273,31 @@ describe("serverSearch, claude", () => {
 		expect(seen[0].body.output_config).toEqual({ effort: "high" });
 	});
 
+	it("sends no thinking field for a model set up on another API", async () => {
+		answers = [() => claudeEvents([USED, results("https://example.com/a")])];
+		const other = model({ api: "openai-responses", reasoning: true });
+		await serverSearch(call("claude", { model: other, thinking: "high" }), "q");
+		expect(seen[0].body.thinking).toBeUndefined();
+		expect(seen[0].body.output_config).toBeUndefined();
+	});
+
+	it("keeps the output limit of a request inside what the model can take", async () => {
+		answers = [() => claudeEvents([USED, results("https://example.com/a")])];
+		await serverSearch(call("claude", { model: model({ maxTokens: 128_000 }) }), "q");
+		expect(seen[0].body.max_tokens).toBe(16_000);
+		const old = model({ api: "anthropic-messages", reasoning: true, maxTokens: 128_000 });
+		await serverSearch(call("claude", { model: old, thinking: "high" }), "q");
+		const thinking = seen[1].body.thinking as { budget_tokens: number };
+		expect(thinking.budget_tokens).toBeLessThan(seen[1].body.max_tokens as number);
+		expect(seen[1].body.max_tokens).toBeLessThan(128_000);
+	});
+
 	it("uses a thinking budget on older models and none when thinking is off", async () => {
 		answers = [() => claudeEvents([USED, results("https://example.com/a")])];
-		await serverSearch(call("claude", { model: model({ reasoning: true }), thinking: "low" }), "q");
+		const old = model({ api: "anthropic-messages", reasoning: true });
+		await serverSearch(call("claude", { model: old, thinking: "low" }), "q");
 		expect(seen[0].body.thinking).toMatchObject({ type: "enabled" });
-		await serverSearch(call("claude", { model: model({ reasoning: true }), thinking: "off" }), "q");
+		await serverSearch(call("claude", { model: old, thinking: "off" }), "q");
 		expect(seen[1].body.thinking).toBeUndefined();
 		expect(seen[1].body.output_config).toBeUndefined();
 	});
@@ -319,13 +340,130 @@ describe("serverSearch, codex", () => {
 	});
 
 	it("follows the conversation's effort", async () => {
-		const reasoning = model({ reasoning: true });
+		const reasoning = model({ api: "openai-responses", reasoning: true });
 		const used = { type: "web_search_call", id: "w", status: "completed", action: { type: "search", query: "q" } };
 		answers = [() => codexEvents([used])];
 		await serverSearch(call("codex", { model: reasoning, thinking: "medium" }), "q");
 		expect(seen[0].body.reasoning).toEqual({ effort: "medium" });
 		await serverSearch(call("codex", { thinking: "medium" }), "q");
 		expect(seen[1].body.reasoning).toBeUndefined();
+	});
+
+	it("never sends an effort hosted search refuses", async () => {
+		const used = { type: "web_search_call", id: "w", status: "completed", action: { type: "search", query: "q" } };
+		answers = [() => codexEvents([used])];
+		const reasoning = model({ api: "openai-responses", reasoning: true });
+		await serverSearch(call("codex", { model: reasoning, thinking: "off" }), "q");
+		expect(seen[0].body.reasoning).toBeUndefined();
+		await serverSearch(call("codex", { model: reasoning, thinking: "minimal" }), "q");
+		expect(seen[1].body.reasoning).toEqual({ effort: "low" });
+		const claudeModel = model({ api: "anthropic-messages", reasoning: true });
+		await serverSearch(call("codex", { model: claudeModel, thinking: "high" }), "q");
+		expect(seen[2].body.reasoning).toBeUndefined();
+		await serverSearch(call("codex", { model: reasoning, thinking: "max" }), "q");
+		expect(seen[3].body.reasoning).not.toEqual({ effort: "max" });
+	});
+});
+
+describe("serverSearch, codex streams", () => {
+	const used = {
+		type: "web_search_call",
+		id: "w",
+		status: "completed",
+		action: { type: "search", query: "q", sources: [{ type: "url", url: "https://example.com/a" }] },
+	};
+	const created = { type: "response.created", sequence_number: 0, response: { id: "r", output: [] } };
+
+	it("skips events the SDK does not know", async () => {
+		const done = { type: "response.completed", response: { id: "r", output: [used, codexMessage("结果")] } };
+		answers = [
+			() => ({ events: [created, { type: "response.something_new", value: 1 }, { type: "keepalive" }, done] }),
+		];
+		const out = await serverSearch(call("codex"), "q");
+		expect(out.text).toBe("结果");
+		expect(out.sources).toHaveLength(1);
+	});
+
+	it("takes the items as they arrive when the final output is empty", async () => {
+		const item = (i: Record<string, unknown>) => ({ type: "response.output_item.done", output_index: 0, item: i });
+		const done = { type: "response.completed", response: { id: "r", output: [] } };
+		answers = [() => ({ events: [created, item(used), item(codexMessage("逐条到达")), done] })];
+		const out = await serverSearch(call("codex"), "q");
+		expect(out.text).toBe("逐条到达");
+	});
+
+	it("takes the items when no final event comes at all", async () => {
+		answers = [() => ({ events: [{ type: "response.output_item.done", item: used }] })];
+		expect((await serverSearch(call("codex"), "q")).sources).toHaveLength(1);
+	});
+
+	it("reports a failed response and an error event by their message", async () => {
+		const failed = { type: "response.failed", response: { error: { message: "model overloaded" } } };
+		answers = [() => ({ events: [failed] })];
+		await expect(serverSearch(call("codex"), "q")).rejects.toMatchObject({
+			code: "upstream",
+			message: "model overloaded",
+		});
+	});
+
+	it("does not leak the key from a failed response", async () => {
+		const failed = { type: "response.failed", response: { error: { message: `bad ${KEY}` } } };
+		answers = [() => ({ events: [failed] })];
+		const error = await serverSearch(call("codex"), "q").catch((e: Error) => e);
+		expect((error as Error).message).not.toContain(KEY);
+	});
+
+	it("reports an upstream that finished without searching", async () => {
+		answers = [() => ({ events: [{ type: "response.completed", response: { id: "r", output: [] } }] })];
+		await expect(serverSearch(call("codex"), "q")).rejects.toMatchObject({ code: "no_search" });
+	});
+});
+
+describe("the record of a call", () => {
+	const used = { type: "web_search_call", id: "w", status: "completed", action: { type: "search", query: "q" } };
+
+	it("shows the failed SDK error, the unknown event and the tool that ran, without the key", async () => {
+		const lines: string[] = [];
+		const log = (line: string) => lines.push(line);
+		const failed = { type: "response.failed", response: { error: { message: `bad ${KEY}` } } };
+		answers = [() => ({ events: [{ type: "response.something_new" }, failed] })];
+		await expect(serverSearch(call("codex", { log }), "查询")).rejects.toMatchObject({ code: "upstream" });
+		await vi.waitFor(() => expect(lines.join("\n")).toContain('"kind":"stream"'));
+		const text = lines.join("\n");
+		expect(text).toContain('"kind":"start"');
+		expect(text).toContain("查询");
+		expect(text).toContain("response.something_new");
+		expect(text).toContain('"kind":"attempt-failed"');
+		expect(text).toContain('"kind":"failed"');
+		expect(text).not.toContain(KEY);
+	});
+
+	it("shows how many sources a finished search had", async () => {
+		const lines: string[] = [];
+		answers = [() => codexEvents([used])];
+		await serverSearch(call("codex", { log: (line) => lines.push(line) }), "q");
+		await vi.waitFor(() => expect(lines.join("\n")).toContain("response.completed"));
+		expect(lines.join("\n")).toContain('"kind":"done"');
+	});
+
+	it("records the plain and the OAuth try of a call that needed both, for claude", async () => {
+		const lines: string[] = [];
+		answers = [
+			() => ({ status: 401, json: { error: { type: "authentication_error", message: "no" } } }),
+			() => claudeEvents([USED, results("https://example.com/a")]),
+		];
+		await serverSearch(call("claude", { log: (line) => lines.push(line) }), "q");
+		await vi.waitFor(() => expect(lines.join("\n")).toContain("content_block_start:server_tool_use"));
+		const text = lines.join("\n");
+		expect(text).toContain('"style":"plain"');
+		expect(text).toContain("authentication_error");
+		expect(text).toContain('"kind":"done"');
+		expect(text).not.toContain(KEY);
+	});
+
+	it("works the same with no log", async () => {
+		answers = [() => codexEvents([used])];
+		await expect(serverSearch(call("codex"), "q")).resolves.toBeDefined();
 	});
 });
 

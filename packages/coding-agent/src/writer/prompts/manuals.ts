@@ -6,7 +6,7 @@
 // Folder and file names of a topic.
 import { MATERIAL_FILE, TOPIC_DIRS } from "../topic/topic.ts";
 
-/** How a document is written: the moment writing starts. */
+/** How a document is written: only once the user has asked for one and writing starts. */
 export const WRITING_MANUAL: readonly string[] = [
 	`Order: confirm purpose, audience and length; outline in ${TOPIC_DIRS.drafts}/大纲.md; ask once which parts need cases or data, unless the user's plan says; research those parts and record what you will use with material_add; check ${MATERIAL_FILE} against the outline; draft; run style_check, word_count and readability_check, and gongwen_check on 公文; revise only what they flag`,
 	"Parts with cases or data: each paragraph opens with a summary, then a case (time, reporter, subject, action) or data point (time, region, industry, indicator, value). Other parts are plain prose",
@@ -15,7 +15,7 @@ export const WRITING_MANUAL: readonly string[] = [
 	"End with 参考文献: every source used, numbered, as [page title, publisher, date](full URL) of a page opened with web_fetch",
 	"Write mainly in Chinese with full-width punctuation; no spaces around Chinese (使用GPT-5模型), only between English words",
 	"Use common words and explain a needed term once. State facts directly and attribute opinions, with no remarks on reliability and no verification markers",
-	"Say what something is and what to do; keep 不是……而是 and negation for real prohibitions",
+	"Show the mechanism behind each claim, and keep 不是……而是 for real prohibitions",
 	"Open with the substance: no summary or uplifting close",
 	"Use # for the title, ## to #### for levels 1–3, Unicode symbols (×, ≤, x²) without LaTeX, and — instead of arrows",
 	`Read 参考资料/.parsed for parsed files, quote them as written, and check ${TOPIC_DIRS.search}/ and ${TOPIC_DIRS.web}/ before repeating a search`,
@@ -27,20 +27,20 @@ export const RESEARCH_MANUAL: readonly string[] = [
 	"For recent events put the year and month in the query; a fact is current only when its page shows the date",
 	"Read the whole list and choose by address and title: major outlets (Reuters, AP, AFP, Bloomberg, BBC, NYT, WSJ, FT, and national ones) and official sources with named actors or data. Forums, blogs, Q&A sites and reposts are only leads",
 	"When nothing fits, search again in English, with an outlet named, or with the official name",
-	"Keep each fact's URL, and take the outlet's usual Chinese name from the address, as 路透社 for reuters.com",
+	"Keep each fact's URL. In a document, name the outlet as Chinese readers do, as 路透社 for reuters.com",
 ];
 
 /** Recording materials: the first material_add. */
 export const MATERIAL_MANUAL: readonly string[] = [
-	"Record each case and figure right after reading its source; a search result's address counts, a fetched page is fuller",
-	"Before drafting, search again for what the outline still lacks",
+	"A search result's address counts as a source; a fetched page is the fuller record",
 ];
 
 /** Handling check results: the first run of each check. */
 export const CHECK_MANUALS: Readonly<Record<string, readonly string[]>> = {
 	style_check: [
-		"Rewrite only the flagged passages with edit, as plain statements with concrete content, and run it until it passes",
-		'Add packs: ["core-zh", "gongwen-zh"] for 公文 and reports for government readers',
+		"For each flagged denial or contrast, find what it asserts: delete it if it denies what nobody claimed, else say it positively with concrete content",
+		"Edit only flagged passages; keep a denial that answers a real claim, and stop when only those remain",
+		'For 公文 add packs: ["core-zh", "gongwen-zh"]',
 	],
 	word_count: ["Lengthen or shorten the sections it reports, against the target in the brief"],
 	readability_check: ["Replace the rare characters and split the long sentences, keeping names and quotations"],

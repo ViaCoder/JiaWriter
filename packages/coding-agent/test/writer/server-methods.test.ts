@@ -82,7 +82,7 @@ function context(extra: Record<string, unknown> = {}): ExtensionToolContext {
 		hasUI: false,
 		model: {
 			id: "conversation-model",
-			api: "openai-completions",
+			api: "anthropic-messages",
 			provider: "jw",
 			baseUrl: `${upstream}/v1`,
 			reasoning: true,
@@ -199,7 +199,12 @@ describe("web_search with the upstream methods", () => {
 
 	it("codex: goes to the Responses path even when the detected API is Chat Completions", async () => {
 		answers = [codex(CODEX_SEARCHED)];
-		const s = await run(tools(), "web_search", { query: "温州", method: "codex" });
+		const s = await run(
+			tools(),
+			"web_search",
+			{ query: "温州", method: "codex" },
+			context({ api: "openai-completions" }),
+		);
 		expect(seen[0].path).toBe("/v1/responses");
 		expect(s.text).toContain("检索结果（codex，1 条）：温州");
 		expect(filesIn(s.details.topicDir as string, "检索")).toHaveLength(1);
@@ -251,6 +256,15 @@ describe("web_search with the upstream methods", () => {
 		const ctx = { ...context(), model: undefined } as ExtensionToolContext;
 		await expect(run(tools(), "web_search", { query: "q", method: "claude" }, ctx)).rejects.toThrow("没有设置模型");
 		expect(seen).toHaveLength(1);
+	});
+
+	it("tells the model which parameters had no effect, and sends none of them", async () => {
+		answers = [claude(SEARCHED)];
+		const s = await run(tools(), "web_search", { query: "q", method: "claude", ignored: ["pages", "fresh"] });
+		expect(s.text).toContain("claude 方式不使用这些参数，它们没有生效：pages, fresh。");
+		const sent = JSON.stringify(seen[0].body);
+		expect(sent).not.toContain("fresh");
+		expect(sent).not.toContain("pages");
 	});
 
 	it("runs one call at a time", () => {

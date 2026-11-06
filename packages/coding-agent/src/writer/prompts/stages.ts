@@ -4,6 +4,8 @@
  * here: a stage names what triggers it, and extensions/writer-prompts adds its text once, until compaction.
  */
 
+// The name of a file being read.
+import { basename } from "node:path";
 // The text of each stage.
 import {
 	CHECK_MANUALS,
@@ -27,6 +29,8 @@ export interface PromptStage {
 	tools: readonly string[];
 	// Only with this method.
 	method?: string;
+	// Also when a skill file is read: that is the first step of writing a document.
+	onSkill?: boolean;
 }
 
 /** Stage of the writing manual, also sent when a run starts inside a topic. */
@@ -46,7 +50,8 @@ function methodStages(tool: string, methods: Readonly<Record<string, readonly st
 
 /** Every stage, in the order they are added to one result. */
 export const PROMPT_STAGES: readonly PromptStage[] = [
-	{ id: WRITING_STAGE, title: "Writing rules", rules: WRITING_MANUAL, tools: ["topic_open", "write", "edit"] },
+	// Searching is not writing: these rules wait until a document is really started.
+	{ id: WRITING_STAGE, title: "Writing rules", rules: WRITING_MANUAL, tools: ["write", "edit"], onSkill: true },
 	{ id: "research", title: "Research rules", rules: RESEARCH_MANUAL, tools: ["web_search", "web_fetch"] },
 	...methodStages("web_search", SEARCH_METHODS),
 	...methodStages("web_fetch", FETCH_METHODS),
@@ -83,15 +88,20 @@ export function stageLines(): string[] {
 	const given = givenStages();
 	return PROMPT_STAGES.map((s) => {
 		// What sets it off.
-		const trigger = `${s.tools.join(", ")}${s.method ? ` (${s.method})` : ""}`;
+		const trigger = `${[...s.tools, ...(s.onSkill ? ["SKILL.md"] : [])].join(", ")}${s.method ? ` (${s.method})` : ""}`;
 		return `${given.has(s.id) ? "✓" : "·"} ${s.title}: ${trigger}, ${stageText(s).length} chars`;
 	});
 }
 
 /** The stages a successful tool call triggers that were not given yet. */
-export function dueStages(tool: string, method: unknown, given: ReadonlySet<string>): PromptStage[] {
+export function dueStages(tool: string, input: Record<string, unknown>, given: ReadonlySet<string>): PromptStage[] {
+	// A skill being read.
+	const skill = tool === "read" && basename(String(input.path ?? "")) === "SKILL.md";
 	// This tool, this method if the stage names one, and not given yet.
 	return PROMPT_STAGES.filter(
-		(s) => s.tools.includes(tool) && (s.method === undefined || s.method === method) && !given.has(s.id),
+		(s) =>
+			(s.tools.includes(tool) || (skill && s.onSkill === true)) &&
+			(s.method === undefined || s.method === input.method) &&
+			!given.has(s.id),
 	);
 }

@@ -354,9 +354,7 @@ describe("JW_* end to end", () => {
 		// The user message reaches the model with the time it was sent.
 		expect(JSON.stringify(realRequest()?.body.messages)).toMatch(/\[Date: \d{4}-\d{2}-\d{2} \w+, /);
 		// The request carries the writing system prompt.
-		expect(JSON.stringify(realRequest()?.body.system)).toContain(
-			"expert writing assistant operating inside JiaWriter",
-		);
+		expect(JSON.stringify(realRequest()?.body.system)).toContain("general-purpose assistant");
 		// The built-in Chinese writing skills are offered (JW_LANG unset: zh).
 		expect(JSON.stringify(realRequest()?.body.system)).toContain("<name>report-analysis</name>");
 		expect(JSON.stringify(realRequest()?.body.system)).toContain("用于写企业和研究类的报告、分析和总结");

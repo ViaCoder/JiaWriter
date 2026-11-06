@@ -163,16 +163,18 @@ def main():
     ])
     run(topic, ["写一份报告"])
     last = text_of(topic.requests[-1])
-    check("topic_open 后出现写作手册，只有一次", last.count("Writing rules:") == 1)
+    check("只搜索时没有写作手册", "Writing rules:" not in last)
+    check("工具结果不提稿件", "稿件放在" not in last)
     check("第一次搜索出现检索手册和该方式规则，各一次", last.count("Research rules:") == 1 and last.count("Method claude of web_search:") == 1)
     check("错误参数被清理，搜索照常完成", last.count("检索结果（claude") == 2)
+    check("没有生效的参数告诉模型", "它们没有生效：pages" in last)
     check("工具结果不含时间", "检索时间" not in last)
     check("系统提示全程不变", len({system_of(r) for r in topic.requests}) == 1)
 
     # A draft without a topic.
-    bare = Script([("write", {"path": "稿.md", "content": "正文"})])
+    bare = Script([("write", {"path": "稿.md", "content": "正文"}), ("write", {"path": "稿二.md", "content": "正文"})])
     run(bare, ["写一段"])
-    check("没开主题就 write，也收到写作手册", "Writing rules:" in text_of(bare.requests[-1]))
+    check("开始写时收到写作手册，只有一次", text_of(bare.requests[-1]).count("Writing rules:") == 1)
 
     # Compaction with a working summary.
     full = Script([("topic_open", {"name": "绿化"}), ("web_search", {"query": "甲", "method": "claude"}), ("web_search", {"query": "乙", "method": "claude"})], tokens=110_000)
@@ -183,8 +185,15 @@ def main():
     check("摘要请求里没有搜索全文", "页面正文内容" not in summary_in)
     check("压缩后带写作状态和用户原话", "写作状态" in after and "写报告，要三节" in after)
     check("压缩后保留模型写的决定", "定了三节" in after)
-    check("压缩后要求先读大纲和稿件", "先读大纲和当前稿件" in after)
-    check("压缩后重发写作手册", "Writing rules:" in after)
+    check("只有检索时压缩后不要求读稿件", "先读大纲和当前稿件" not in after)
+    check("只有检索时压缩后不发写作手册", "Writing rules:" not in after)
+
+    # Compaction with a document under way.
+    draft = Script([("topic_open", {"name": "绿化"}), ("write", {"path": "绿化/稿件/初稿.md", "content": "正文"}), ("web_search", {"query": "甲", "method": "claude"}), ("web_search", {"query": "乙", "method": "claude"})], tokens=110_000)
+    run(draft, ["写报告", "继续写"])
+    after = text_of(draft.requests[-1])
+    check("写作中压缩后要求先读大纲和稿件", "先读大纲和当前稿件" in after)
+    check("写作中压缩后重发写作手册", "Writing rules:" in after)
 
     # Research before the topic has a name.
     late = Script([("web_search", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "time": "2026年", "reporter": "路透社", "subject": "甲", "action": "乙", "url": "https://news.example.com/a"}]})])

@@ -16,13 +16,15 @@ describe("cleanSearchArgs", () => {
 			max_results: 5,
 			other: 1,
 		};
-		expect(cleanSearchArgs({ ...full, method: "codex" })).toEqual({ query: "q", method: "codex" });
-		expect(cleanSearchArgs({ ...full, method: "claude" })).toEqual({ query: "q", method: "claude" });
+		const all = ["engines", "pages", "fresh", "zone", "language"];
+		expect(cleanSearchArgs({ ...full, method: "codex" })).toEqual({ query: "q", method: "codex", ignored: all });
+		expect(cleanSearchArgs({ ...full, method: "claude" })).toEqual({ query: "q", method: "claude", ignored: all });
 		expect(cleanSearchArgs({ ...full, method: "anysearch" })).toEqual({
 			query: "q",
 			method: "anysearch",
 			zone: "intl",
 			language: "en",
+			ignored: ["engines", "pages", "fresh"],
 		});
 		expect(cleanSearchArgs({ ...full, method: "browser" })).toEqual({
 			query: "q",
@@ -30,7 +32,16 @@ describe("cleanSearchArgs", () => {
 			engines: ["bing"],
 			pages: 3,
 			fresh: "week",
+			ignored: ["zone", "language"],
 		});
+	});
+
+	it("counts only real values as ignored, as in the reported call", () => {
+		const call = { query: "q", method: "codex", engines: [], fresh: "year", language: "en", pages: 3, zone: "intl" };
+		expect(cleanSearchArgs(call).ignored).toEqual(["pages", "fresh", "zone", "language"]);
+		expect(
+			cleanSearchArgs({ query: "q", method: "codex", engines: [], pages: null, fresh: "" }).ignored,
+		).toBeUndefined();
 	});
 
 	it("drops empty values that strict models send for unused fields", () => {
@@ -107,7 +118,7 @@ describe("preparing a call", () => {
 			on: () => undefined,
 		} as unknown as ExtensionAPI);
 		const prepared = map.get("web_search")?.prepareArguments?.({ query: "q", method: "codex", engines: ["bing"] });
-		expect(prepared).toEqual({ query: "q", method: "codex" });
+		expect(prepared).toEqual({ query: "q", method: "codex", ignored: ["engines"] });
 		expect(map.get("web_fetch")?.prepareArguments?.({ url: "u", method: "SF" })).toEqual({ url: "u", method: "sf" });
 	});
 });

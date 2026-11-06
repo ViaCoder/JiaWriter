@@ -36,6 +36,13 @@ function enp(id: string, zh: string, en: string, source: string): StylePattern {
 
 /** General Chinese pack: contrast frames and stock phrases that fit no register. */
 const CORE_ZH: readonly StylePattern[] = [
+	// "X is not Y": each one is looked at, whatever the density. 是不是 and 要不是 ask or suppose, and deny nothing.
+	zhp(
+		"zh-denial",
+		"否定判断 不是/不等于",
+		"denial 不是/不等于",
+		"(?<![是要若还])(?:并不意味着|不意味着|不代表|不等于|并非|不在于|不只是|不仅仅是|不单是|不是)",
+	),
 	// 不是……而是 (bounded to one clause frame).
 	zhp("zh-bushi-ershi", "对比框架 不是……而是", "contrast 不是……而是", `不是[^${ZH_END}]{0,40}?而是`),
 	// The rest of the negation-contrast family; 而在 alone is ordinary prose, only 而是/而在于 frame it.
@@ -89,6 +96,13 @@ const CORE_ZH: readonly StylePattern[] = [
 
 /** General English pack. */
 const CORE_EN: readonly StylePattern[] = [
+	// "X is not Y": each one is looked at, whatever the density.
+	{
+		id: "en-denial",
+		zh: "否定判断 is not",
+		en: "denial: is not, does not mean",
+		re: /\b(?:does not mean|doesn['’]t mean|do not mean|don['’]t mean|(?:is|are|was|were) not|(?:is|are|was|were)n['’]t|['’]s not|not (?:just|only|merely|simply)|not to say)\b/gi,
+	},
 	// not just/only/merely X but Y.
 	enp(
 		"en-not-just-but",

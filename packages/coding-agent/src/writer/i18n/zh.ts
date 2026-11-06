@@ -36,7 +36,7 @@ export const zh = {
 	// Clean result.
 	"style.clean": "检查通过：没有命中。",
 	// What to do with the hits.
-	"style.advice": "以上只标出位置，原文保持原样。请用 edit 只改写命中的片段，改完再运行一次 style_check。",
+	"style.advice": "以上只标出位置，原文保持原样。请逐条判断，用 edit 只改需要改的片段。",
 	// word_count heading.
 	"count.title": "字数统计",
 	// Totals.
@@ -175,8 +175,8 @@ export const zh = {
 	"compact.localReply": "模型最后的回复：",
 	"compact.localNotice": "模型摘要失败，已用本地摘要压缩，对话可以继续。较早的细节可能丢失，可用 /tree 回看完整记录。",
 	"topic.badName": "主题名“{name}”无法作为文件夹名。",
-	"topic.opened": "已建立主题文件夹：{dir}。稿件放在 {drafts}/ 下。",
-	"topic.continued": "继续使用已有的主题文件夹：{dir}。稿件放在 {drafts}/ 下。",
+	"topic.opened": "已建立主题文件夹：{dir}。",
+	"topic.continued": "继续使用已有的主题文件夹：{dir}。",
 	"topic.earlier": "之前的检索结果留在 {dir}，需要时用 read 读取。",
 	"topic.archived": "已归档：{path}",
 	"topic.archiveFailed": "归档失败（{reason}），本次结果没有保存到主题文件夹。",
@@ -201,6 +201,8 @@ export const zh = {
 	"promptAdd.empty": "PROMPT_ADD 指向的文件是空的：{path}",
 	"promptAdd.unreadable": "PROMPT_ADD 指向的文件读不了：{path}",
 	"jw.promptAdd": "{path}（{chars} 字）",
+	"jw.logPath": "搜索日志：{path}（{bytes} 字节）",
+	"jw.logNote": "搜索失败时把这个文件发给开发者。里面有查询词和上游返回的文字，没有 key。",
 	"effort.choose": "思考强度（当前：{level}）",
 	"effort.bad": "思考强度只能是 {levels}。",
 	"effort.set": "思考强度已设为 {level}。",
@@ -314,6 +316,8 @@ export const zh = {
 	"search.methodUnavailable":
 		"browser 方式现在不可用：Chrome 里的 JiaWriter 扩展没有连接。可以换一种方式，或按 /browser 的说明连接扩展。",
 	"search.noMethod": "这次调用要指定 method，没有默认方式。",
+	"search.ignored": "{method} 方式不使用这些参数，它们没有生效：{names}。",
+	"search.noYear": "fresh=year 在 {engines} 上没有生效。",
 	"server.noModel": "没有设置模型，无法请求上游。",
 	"server.noSearch": "上游没有执行搜索，这种方式在这里可能用不了。请换一种方式，或者告诉用户。",
 	"server.noOpen": "上游没有打开这个页面。请换一种方式。",

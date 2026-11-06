@@ -50,9 +50,9 @@ describe("buildSystemPrompt", () => {
 
 			// JiaWriter: writing assistant preamble.
 			// JiaWriter: the persona stands in <system_prompt> (the user, 2026-11-05).
-			expect(
-				defaultPrompt.startsWith("<system_prompt>\nYou are an expert writing assistant operating inside JiaWriter"),
-			).toBe(true);
+			expect(defaultPrompt.startsWith("<system_prompt>\nYou are JiaWriter, a general-purpose assistant.")).toBe(
+				true,
+			);
 			expect(customPrompt.startsWith("<system_prompt>\nYou are Exact.\n</system_prompt>\n\n<cwd>")).toBe(true);
 		});
 

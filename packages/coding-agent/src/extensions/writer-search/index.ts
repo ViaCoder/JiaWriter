@@ -20,11 +20,13 @@ import {
 	serverFetch,
 	serverSearch,
 } from "@earendil-works/pi-ai/api/server-search.lazy";
+// The record of a search.
+import { secretsOf, serverLog } from "@earendil-works/pi-ai/api/server-trace";
 // Parameter schemas.
 import { StringEnum } from "@earendil-works/pi-ai/utils/typebox-helpers";
 import { Type } from "typebox";
 // Agent directory, binary detection, the extension folder.
-import { getAgentDir, getWriterExtensionDir, isBunBinary } from "../../config.ts";
+import { getAgentDir, getWriterExtensionDir, isBunBinary, VERSION } from "../../config.ts";
 // Extension API types.
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
 // The bridge to Chrome.
@@ -72,6 +74,8 @@ import {
 	readSearchEnv,
 	type SearchResult,
 } from "../../writer/websearch/core.ts";
+// The search log.
+import { appendSearchLog } from "../../writer/websearch/log.ts";
 // sf backend.
 import { locateSf, parseSfFetch, runSf, sfChildEnv, sfError } from "../../writer/websearch/sf.ts";
 // The configured model's name.
@@ -308,7 +312,17 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			thinking: pi.getThinkingLevel(),
 			styles,
 			signal,
+			log: appendSearchLog,
 		};
+	}
+
+	/** The search log of this conversation, cleaned of its keys. */
+	async function searchLog(ctx: ExtensionContext) {
+		// The conversation's key and headers, when it has a model.
+		const auth = ctx.model ? await ctx.modelRegistry.getApiKeyAndHeaders(ctx.model) : undefined;
+		// Everything that must stay out of the file.
+		const secrets = auth?.ok ? secretsOf(auth.apiKey, auth.headers) : [];
+		return serverLog(appendSearchLog, [...secrets, ...secretsOf(config.anysearchKey)]);
 	}
 
 	/** Register the host with Chrome (release binaries only; source checkouts use /browser). */
@@ -322,6 +336,46 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	}
 
 	// At startup, a release binary keeps Chrome's host registration current (no network, small files).
+	// Each search and fetch as the model called it and what it got, whatever the method.
+	pi.on("tool_result", async (event, ctx) => {
+		if (event.toolName !== "web_search" && event.toolName !== "web_fetch") return;
+		// The result's own text, as the model reads it.
+		const text = event.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("\n");
+		(await searchLog(ctx))({
+			kind: "tool",
+			tool: event.toolName,
+			input: event.input,
+			error: event.isError,
+			text: text.slice(0, 2000),
+		});
+	});
+
+	// What the conversation's model did each turn: which tools it called, or why it stopped.
+	pi.on("turn_end", async (event, ctx) => {
+		const message = event.message;
+		if (message.role !== "assistant") return;
+		(await searchLog(ctx))({
+			kind: "turn",
+			index: event.turnIndex,
+			stop: message.stopReason,
+			error: message.errorMessage,
+			tools: message.content.flatMap((c) => (c.type === "toolCall" ? [c.name] : [])),
+		});
+	});
+
+	// Which program and setup the lines below come from.
+	pi.on("session_start", async (_event, ctx) => {
+		(await searchLog(ctx))({
+			kind: "session",
+			version: VERSION,
+			platform: process.platform,
+			runtime: process.release.name,
+			model: ctx.model?.id,
+			api: ctx.model?.api,
+			thinking: pi.getThinkingLevel(),
+		});
+	});
+
 	pi.on("session_start", (event) => {
 		if (event.reason !== "startup" || !isBunBinary) return;
 		try {
@@ -383,6 +437,9 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			let label: string = backend;
 			const notes: string[] = [];
 			let answer = "";
+			// Parameters this method does not use: the model is told, so it does not count on them.
+			const ignored = (params as { ignored?: string[] }).ignored ?? [];
+			if (ignored.length > 0) notes.push(t("search.ignored", { method: backend, names: ignored.join(", ") }));
 			if (backend === "browser") {
 				usedBrowser = true;
 				// The previous results pages are closed first.
@@ -391,6 +448,9 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				// Bing, then Google.
 				// The model's engines, else JW_ENGINES.
 				const engines = params.engines?.length ? parseEngines(params.engines) : config.engines;
+				// Two engines have no year filter.
+				const noYear = params.fresh === "year" ? engines.filter((e) => e === "bing" || e === "sogou") : [];
+				if (noYear.length > 0) notes.push(t("search.noYear", { engines: noYear.map(engineName).join(", ") }));
 				// Engines still resting after an uncleared verification.
 				const now = Date.now();
 				for (const [e, until] of resting) if (until <= now) resting.delete(e);
