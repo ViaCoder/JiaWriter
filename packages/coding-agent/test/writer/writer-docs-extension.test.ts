@@ -196,12 +196,12 @@ describe("automatic import before each run and export after it", () => {
 		const branch = [
 			{
 				role: "assistant",
-				content: [{ type: "toolCall", id: "f1", name: "web_fetch", arguments: { url: "https://example.com/b" } }],
+				content: [{ type: "toolCall", id: "f1", name: "fetch_web", arguments: { url: "https://example.com/b" } }],
 			},
 			{
 				role: "toolResult",
 				toolCallId: "f1",
-				toolName: "web_fetch",
+				toolName: "fetch_web",
 				isError: false,
 				details: { url: "https://example.com/b", chars: 900 },
 			},

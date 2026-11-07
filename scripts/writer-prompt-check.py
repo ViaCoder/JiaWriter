@@ -158,15 +158,15 @@ def main():
     # A topic, then searches.
     topic = Script([
         ("topic_open", {"name": "绿化"}),
-        ("web_search", {"query": "甲", "method": "claude"}),
-        ("web_search", {"query": "乙", "method": "claude", "engines": None, "pages": "x"}),
+        ("search_web", {"query": "甲", "method": "claude"}),
+        ("search_web", {"query": "乙", "method": "claude", "engines": None, "pages": "x"}),
         ("topic_open", {"name": "绿化"}),
     ])
     run(topic, ["写一份报告"])
     last = text_of(topic.requests[-1])
     check("只搜索时没有写作手册", "Writing rules:" not in last)
     check("工具结果不提稿件", "稿件放在" not in last)
-    check("第一次搜索出现检索手册和该方式规则，各一次", last.count("Research rules:") == 1 and last.count("Method claude of web_search:") == 1)
+    check("第一次搜索出现检索手册和该方式规则，各一次", last.count("Research rules:") == 1 and last.count("Method claude of search_web:") == 1)
     check("错误参数被清理，搜索照常完成", last.count("检索结果（claude") == 2)
     check("没有生效的参数告诉模型", "它们没有生效：pages" in last)
     check("工具结果不含时间", "检索时间" not in last)
@@ -178,7 +178,7 @@ def main():
     check("开始写时收到写作手册，只有一次", text_of(bare.requests[-1]).count("Writing rules:") == 1)
 
     # Compaction with a working summary.
-    full = Script([("topic_open", {"name": "绿化"}), ("web_search", {"query": "甲", "method": "claude"}), ("web_search", {"query": "乙", "method": "claude"})], tokens=110_000)
+    full = Script([("topic_open", {"name": "绿化"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000)
     run(full, ["写报告，要三节", "继续写"])
     check("用量到 80% 时压缩", len(full.summaries) >= 1)
     summary_in = full.summaries[0] if full.summaries else ""
@@ -190,20 +190,20 @@ def main():
     check("只有检索时压缩后不发写作手册", "Writing rules:" not in after)
 
     # Compaction with a document under way.
-    draft = Script([("topic_open", {"name": "绿化"}), ("write", {"path": f"{time.strftime('%Y%m%d')}-绿化/稿件/初稿.md", "content": "正文"}), ("web_search", {"query": "甲", "method": "claude"}), ("web_search", {"query": "乙", "method": "claude"})], tokens=110_000)
+    draft = Script([("topic_open", {"name": "绿化"}), ("write", {"path": f"{time.strftime('%Y%m%d')}-绿化/稿件/初稿.md", "content": "正文"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000)
     run(draft, ["写报告", "继续写"])
     after = text_of(draft.requests[-1])
     check("写作中压缩后要求先读大纲和稿件", "先读大纲和当前稿件" in after)
     check("写作中压缩后重发写作手册", "Writing rules:" in after)
 
     # Research before the topic has a name.
-    late = Script([("web_search", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "time": "2026年", "reporter": "路透社", "subject": "甲", "action": "乙", "url": "https://news.example.com/a"}]})])
+    late = Script([("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "time": "2026年", "reporter": "路透社", "subject": "甲", "action": "乙", "url": "https://news.example.com/a"}]})])
     run(late, ["查一下再写"])
     last = text_of(late.requests[-1])
     check("先搜索后开主题，资料并入主题", "已建立主题文件夹" in last and f"{time.strftime('%Y%m%d')}-绿化" in last and "已记录" in last)
 
     # Compaction when the summary fails.
-    broken = Script([("topic_open", {"name": "绿化"}), ("web_search", {"query": "甲", "method": "claude"}), ("web_search", {"query": "乙", "method": "claude"})], tokens=110_000, summary_fails=True)
+    broken = Script([("topic_open", {"name": "绿化"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000, summary_fails=True)
     out = run(broken, ["写报告，要三节", "继续写"])
     after = text_of(broken.requests[-1])
     check("摘要接口失败时状态和用户原话仍在", "写作状态" in after and "写报告，要三节" in after)

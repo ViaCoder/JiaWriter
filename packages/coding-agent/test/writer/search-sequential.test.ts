@@ -1,4 +1,4 @@
-// Functional test: several web_search calls in one model message run one at a time (the user, 2026-11-05:
+// Functional test: several search_web calls in one model message run one at a time (the user, 2026-11-05:
 // AnySearch fails on parallel requests).
 
 // Temp files.
@@ -16,7 +16,7 @@ import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
 // Harness with the faux provider.
 import { createHarness, type Harness } from "../suite/harness.ts";
 
-describe("web_search and web_fetch one at a time", () => {
+describe("search_web and fetch_web one at a time", () => {
 	let harness: Harness | undefined;
 	let dir = "";
 	afterEach(() => {
@@ -46,11 +46,11 @@ describe("web_search and web_fetch one at a time", () => {
 		});
 		harness = await createHarness({
 			extensionFactories: [writerSearchExtension],
-			initialActiveToolNames: ["web_search"],
+			initialActiveToolNames: ["search_web"],
 		});
 		harness.setResponses([
 			fauxAssistantMessage(
-				["甲", "乙", "丙"].map((query) => fauxToolCall("web_search", { query, method: "anysearch" })),
+				["甲", "乙", "丙"].map((query) => fauxToolCall("search_web", { query, method: "anysearch" })),
 				{ stopReason: "toolUse" },
 			),
 			fauxAssistantMessage("好了"),

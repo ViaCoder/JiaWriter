@@ -57,7 +57,7 @@ describe("slimForSummary", () => {
 		const page = `${"正文".repeat(5000)}\n已归档：/t/网页/002-新闻.md`;
 		const assistant = { role: "assistant", content: [{ type: "text", text: "好" }] } as unknown as AgentMessage;
 		const [a, b, c] = slimForSummary([
-			toolResult("web_fetch", page),
+			toolResult("fetch_web", page),
 			assistant,
 			toolResult("style_check", "问题列表"),
 		]);
@@ -75,7 +75,7 @@ describe("slimForSummary", () => {
 		const out = slimForSummary([
 			call,
 			toolResult("read", "全文".repeat(500), "r1"),
-			toolResult("web_search", "长".repeat(900)),
+			toolResult("search_web", "长".repeat(900)),
 		]);
 		expect(JSON.stringify(out[1])).toContain("Read 稿件/初稿.md");
 		expect(JSON.stringify(out[1])).not.toContain("全文");
@@ -83,7 +83,7 @@ describe("slimForSummary", () => {
 	});
 
 	it("does not change the messages it was given", () => {
-		const input = [toolResult("web_fetch", "正文\n已归档：x")];
+		const input = [toolResult("fetch_web", "正文\n已归档：x")];
 		slimForSummary(input);
 		expect(JSON.stringify(input)).toContain("正文");
 	});

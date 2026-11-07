@@ -1,7 +1,7 @@
 /**
  * Built-in JiaWriter extension: topic folders. The model opens a folder for each writing topic in the
  * course of the conversation (topic_open) and records the cases and data it will use (material_add);
- * web_search and web_fetch archive into the folder by themselves. There is nothing for the user to set up.
+ * search_web and fetch_web archive into the folder by themselves. There is nothing for the user to set up.
  */
 
 // Parameter schemas.

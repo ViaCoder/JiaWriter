@@ -1,5 +1,5 @@
 /**
- * web_search through the user's Chrome, the way a person searches: open the engine's home page,
+ * search_web through the user's Chrome, the way a person searches: open the engine's home page,
  * accept a consent dialog by clicking it, click the search box, type the query, press Enter, read
  * each results page (scrolling) and click "Next" for the following page. The model picks the engines
  * (Bing, Google, Baidu, Sogou); each gives 3–5 pages. The merged results are ranked locally (rank.ts).
@@ -41,7 +41,7 @@ export interface BrowserDeps {
 export interface VerifyEvent {
 	// What happened.
 	kind: "verify" | "verify_left" | "verify_ok" | "verify_timeout" | "verify_gone";
-	// On which engine, or "page" for a page web_fetch reads.
+	// On which engine, or "page" for a page fetch_web reads.
 	engine: EngineName | "page";
 	// Seconds (wait length, or seconds left).
 	seconds?: number;
@@ -83,7 +83,7 @@ export const DEFAULT_TIMING: BrowserTiming = {
 	humanWaitMs: VERIFY_WAIT_DEFAULT_S * 1000,
 };
 
-/** A results page left open so web_fetch can click its links. */
+/** A results page left open so fetch_web can click its links. */
 export interface SerpTab {
 	// Engine.
 	engine: EngineName;
@@ -93,7 +93,7 @@ export interface SerpTab {
 	url: string;
 	// Real result address → data-wa-r tag of its link on that page.
 	refs: Record<string, number>;
-	// Real result address → its title (web_fetch finds the link on screen by it).
+	// Real result address → its title (fetch_web finds the link on screen by it).
 	titles?: Record<string, string>;
 }
 
@@ -528,7 +528,7 @@ export async function searchEngine(
 		// Keep what was collected; report the reason.
 		stopped = e instanceof Error ? e.message : String(e);
 	}
-	// A tab without results is closed; the last results page stays for web_fetch.
+	// A tab without results is closed; the last results page stays for fetch_web.
 	if (!serp) await deps.call("close", { tab }, 10_000).catch(() => {});
 	return { engine, hits, pages, stopped, serp, read };
 }

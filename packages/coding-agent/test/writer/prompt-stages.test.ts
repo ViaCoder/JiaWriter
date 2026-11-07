@@ -92,8 +92,8 @@ describe("one place for each rule", () => {
 	it("has a unique name for every stage, and covers every method", () => {
 		const ids = PROMPT_STAGES.map((s) => s.id);
 		expect(new Set(ids).size).toBe(ids.length);
-		for (const m of ["browser", "anysearch", "claude", "codex"]) expect(ids).toContain(`web_search:${m}`);
-		for (const m of ["browser", "anysearch", "sf", "claude", "codex"]) expect(ids).toContain(`web_fetch:${m}`);
+		for (const m of ["browser", "anysearch", "claude", "codex"]) expect(ids).toContain(`search_web:${m}`);
+		for (const m of ["browser", "anysearch", "sf", "claude", "codex"]) expect(ids).toContain(`fetch_web:${m}`);
 	});
 });
 
@@ -131,7 +131,7 @@ describe("the user's requirements", () => {
 		const core = CORE_RULES.join("\n");
 		expect(core).toContain("never when told not to");
 		expect(core).toContain("a draft comes only when the user asks for one");
-		expect(core).toContain("one web_search or web_fetch at a time");
+		expect(core).toContain("one search_web or fetch_web at a time");
 		expect(core).toContain("none is the default");
 		expect(core).toContain("only when the user's prompt says the upstream supports them");
 	});
@@ -217,10 +217,10 @@ describe("a general-purpose assistant", () => {
 
 describe("dueStages", () => {
 	it("picks by tool and method, and leaves out what was given", () => {
-		const first = dueStages("web_search", { method: "codex" }, new Set()).map((s) => s.id);
-		expect(first).toEqual(["research", "web_search:codex"]);
-		expect(dueStages("web_search", { method: "browser" }, new Set(first)).map((s) => s.id)).toEqual([
-			"web_search:browser",
+		const first = dueStages("search_web", { method: "codex" }, new Set()).map((s) => s.id);
+		expect(first).toEqual(["research", "search_web:codex"]);
+		expect(dueStages("search_web", { method: "browser" }, new Set(first)).map((s) => s.id)).toEqual([
+			"search_web:browser",
 		]);
 		expect(dueStages("ls", {}, new Set())).toEqual([]);
 	});
@@ -228,8 +228,8 @@ describe("dueStages", () => {
 	it("gives the writing rules when writing starts, and never for research alone", () => {
 		const ids = (tool: string, input: Record<string, unknown>) => dueStages(tool, input, new Set()).map((s) => s.id);
 		expect(ids("topic_open", {})).toEqual([]);
-		expect(ids("web_search", { method: "codex" })).not.toContain(WRITING_STAGE);
-		expect(ids("web_fetch", { method: "sf" })).not.toContain(WRITING_STAGE);
+		expect(ids("search_web", { method: "codex" })).not.toContain(WRITING_STAGE);
+		expect(ids("fetch_web", { method: "sf" })).not.toContain(WRITING_STAGE);
 		expect(ids("read", { path: "notes.md" })).toEqual([]);
 		expect(ids("read", { path: "/skills/report-analysis/SKILL.md" })).toEqual([WRITING_STAGE]);
 		expect(ids("write", { path: "稿.md" })).toEqual([WRITING_STAGE]);
@@ -271,13 +271,13 @@ describe("the extension", () => {
 
 	it("gives research rules once, and each method's rules once", () => {
 		const on = handlers().get("tool_result");
-		const a = on?.(result("web_search", "codex")) as { content: { text: string }[] };
+		const a = on?.(result("search_web", "codex")) as { content: { text: string }[] };
 		expect(a.content[1].text).toContain("Research rules:");
-		expect(a.content[1].text).toContain("Method codex of web_search:");
-		const b = on?.(result("web_search", "browser")) as { content: { text: string }[] };
+		expect(a.content[1].text).toContain("Method codex of search_web:");
+		const b = on?.(result("search_web", "browser")) as { content: { text: string }[] };
 		expect(b.content[1].text).not.toContain("Research rules:");
-		expect(b.content[1].text).toContain("Method browser of web_search:");
-		expect(on?.(result("web_search", "codex"))).toBeUndefined();
+		expect(b.content[1].text).toContain("Method browser of search_web:");
+		expect(on?.(result("search_web", "codex"))).toBeUndefined();
 	});
 
 	it("forgets what was given after compaction", () => {
@@ -291,7 +291,7 @@ describe("the extension", () => {
 	it("adds nothing to a run in a topic where only research happened, also after compaction", () => {
 		const map = handlers();
 		setCurrentTopic("/tmp/主题");
-		map.get("tool_result")?.(result("web_search", "codex"));
+		map.get("tool_result")?.(result("search_web", "codex"));
 		expect(map.get("before_agent_start")?.()).toBeUndefined();
 		map.get("session_compact")?.();
 		expect(map.get("before_agent_start")?.()).toBeUndefined();

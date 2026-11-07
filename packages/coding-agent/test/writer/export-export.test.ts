@@ -115,7 +115,7 @@ describe("exportDraft: symbols, spaces and references", () => {
 			"参考文献：3 条；缺可用网址 1 条，缺描述性标题 1 条，网址不是本次会话中打开过的网页 1 条。",
 		);
 		expect(lines).toContain(
-			"- 1. [链接](https://example.com/a)……：缺描述性标题（写明网页标题、发布机构和日期）；本次会话没有用 web_fetch 打开过这个网址",
+			"- 1. [链接](https://example.com/a)……：缺描述性标题（写明网页标题、发布机构和日期）；本次会话没有用 fetch_web 打开过这个网址",
 		);
 		expect(lines).toContain("有 1 个 LaTeX 命令没有对应的字符，原样保留：\\foo。请在稿件里改成文字或 Unicode 符号。");
 		expect(lines).toContain("超链接：2 个，打不开的 0 个。");

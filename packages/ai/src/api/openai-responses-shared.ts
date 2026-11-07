@@ -501,6 +501,18 @@ function appendCustomToolCallInput(block: StreamingToolCall, nextInput: string, 
 	return delta;
 }
 
+/** The block that keeps a provider's search record for the next request. */
+function searchBlock(item: Extract<ResponseOutputItem, { type: "web_search_call" }>): ThinkingContent {
+	// What it did, for the interface.
+	const action = item.action as { query?: string; url?: string } | undefined;
+	return {
+		type: "thinking",
+		thinking: `Web search: ${action?.query ?? action?.url ?? ""}`.trim(),
+		thinkingSignature: JSON.stringify(item),
+		serverItem: true,
+	};
+}
+
 type ResponsesOutputSlot =
 	| { type: "thinking"; block: ThinkingContent; contentIndex: number }
 	| { type: "text"; block: TextContent; contentIndex: number }
@@ -518,6 +530,7 @@ export async function processResponsesStream<TApi extends Api>(
 	let sawTerminalResponseEvent = false;
 	const outputSlots = new Map<number, ResponsesOutputSlot>();
 	const reasoningBlocksById = new Map<string, ThinkingContent>();
+	const searchBlocksById = new Map<string, ThinkingContent>();
 	const applyMessagePhaseStopReason = (item: ResponseOutputItem): void => {
 		if (item.type === "message" && item.phase === "final_answer") {
 			output.stopReason = "stop";
@@ -615,6 +628,9 @@ export async function processResponsesStream<TApi extends Api>(
 	// multi-turn replay stateless. See https://github.com/earendil-works/pi/issues/6409.
 	const backfillReasoningSignatures = (responseOutput: ResponseOutputItem[]): void => {
 		for (const item of responseOutput) {
+			// The final list of a search record can hold more than the item did on the way.
+			const search = item.type === "web_search_call" ? searchBlocksById.get(item.id) : undefined;
+			if (search) search.thinkingSignature = JSON.stringify(item);
 			if (item.type !== "reasoning" || !item.encrypted_content) continue;
 			const block = reasoningBlocksById.get(item.id);
 			if (!block?.thinkingSignature) continue;
@@ -763,7 +779,15 @@ export async function processResponsesStream<TApi extends Api>(
 			applyMessagePhaseStopReason(item);
 			const slot = getOrCreateSlot(event.output_index, item);
 
-			if (item.type === "reasoning" && slot?.type === "thinking") {
+			if (item.type === "web_search_call") {
+				// The provider's own search: its record goes back on the next request, encrypted content included.
+				const block = searchBlock(item);
+				searchBlocksById.set(item.id, block);
+				output.content.push(block);
+				const contentIndex = output.content.length - 1;
+				stream.push({ type: "thinking_start", contentIndex, partial: output });
+				stream.push({ type: "thinking_end", contentIndex, content: block.thinking, partial: output });
+			} else if (item.type === "reasoning" && slot?.type === "thinking") {
 				const summaryText = item.summary?.map((s) => s.text).join("\n\n") || "";
 				const contentText = item.content?.map((c) => c.text).join("\n\n") || "";
 				slot.block.thinking = summaryText || contentText || slot.block.thinking;

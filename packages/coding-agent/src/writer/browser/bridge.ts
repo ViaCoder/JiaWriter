@@ -7,7 +7,7 @@
  *   messaging: stdio frames of a 32-bit native-order length plus UTF-8 JSON). The host also listens
  *   locally: a Unix socket in a private folder on Linux and macOS (the sf client uses it too), and a
  *   loopback TCP port guarded by a random token on Windows.
- * - client: every web_search / web_fetch call sends one JSON request line and reads one reply line.
+ * - client: every search_web / fetch_web call sends one JSON request line and reads one reply line.
  */
 
 // Token comparison and generation, extension id hashing.

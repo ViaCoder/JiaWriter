@@ -33,7 +33,7 @@ const MAX_RESULT_CHARS = 200;
 /** Where the program's part ends and the model's begins. */
 const MODEL_PART = "## Decisions";
 /** Tools whose results can be found again on disk. */
-const ARCHIVED_TOOLS = new Set(["web_search", "web_fetch", "read", "import_document"]);
+const ARCHIVED_TOOLS = new Set(["search_web", "fetch_web", "read", "import_document"]);
 
 /** Automatic compaction scaled to the context window; a value the user configured stays as it is. */
 export function writerCompactionSettings<T extends CompactionSettings>(settings: T, contextWindow: number): T {

@@ -142,8 +142,8 @@ describe("preparing a call", () => {
 			registerCommand: () => undefined,
 			on: () => undefined,
 		} as unknown as ExtensionAPI);
-		const prepared = map.get("web_search")?.prepareArguments?.({ query: "q", method: "codex", engines: ["bing"] });
+		const prepared = map.get("search_web")?.prepareArguments?.({ query: "q", method: "codex", engines: ["bing"] });
 		expect(prepared).toEqual({ query: "q", method: "codex", ignored: ["engines"] });
-		expect(map.get("web_fetch")?.prepareArguments?.({ url: "u", method: "SF" })).toEqual({ url: "u", method: "sf" });
+		expect(map.get("fetch_web")?.prepareArguments?.({ url: "u", method: "SF" })).toEqual({ url: "u", method: "sf" });
 	});
 });

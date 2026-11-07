@@ -144,9 +144,9 @@ describe.skipIf(UNIX_ONLY)("writer-search over sf", () => {
 		vi.stubEnv("JW_SF", fakeSf());
 		const map = tools();
 		// Fetch in print mode, then interactively.
-		const p = await run(map, "web_fetch", { url: "https://news.example.com/a", method: "sf" });
+		const p = await run(map, "fetch_web", { url: "https://news.example.com/a", method: "sf" });
 		expect(p.text.split("\n")[0]).toBe("网页正文（sf）：https://news.example.com/a");
-		const f = await run(map, "web_fetch", { url: "https://news.example.com/a", method: "sf" }, true);
+		const f = await run(map, "fetch_web", { url: "https://news.example.com/a", method: "sf" }, true);
 		expect(f.text).toContain("正文内容");
 		expect(f.details).toMatchObject({ date: "2026-10-31", backend: "sf" });
 		// What sf received: fetch only, no model, no human in print mode.
@@ -171,7 +171,7 @@ describe.skipIf(UNIX_ONLY)("writer-search over sf", () => {
 		vi.stubEnv("SF_MODEL", "flash");
 		// Works with no main model either; sf chosen by the model.
 		setWriterModel({ kind: "none" });
-		await run(tools(), "web_fetch", { url: "https://news.example.com/a", method: "sf" });
+		await run(tools(), "fetch_web", { url: "https://news.example.com/a", method: "sf" });
 		// sf saw all four cleared.
 		expect(sfLog()[0]).toMatchObject({ url: "", key: "", model: "", api: "" });
 	});
@@ -306,7 +306,7 @@ describe("writer-search over the browser", () => {
 		try {
 			const map = tools();
 			// The connected extension does the work.
-			const s = await run(map, "web_search", { query: "温州", method: "browser" });
+			const s = await run(map, "search_web", { query: "温州", method: "browser" });
 			// The report, with no time in it.
 			expect(s.text).not.toContain("检索时间");
 			expect(s.text.split("\n")[0]).toBe("检索结果（浏览器（Bing 3 页、Google 3 页），6 条）：温州");
@@ -314,7 +314,7 @@ describe("writer-search over the browser", () => {
 			// The marker that the extension was seen.
 			expect(existsSync(join(cwd, "agent", "browser", "seen"))).toBe(true);
 			// A result on Google's last page is clicked on that page, then the tab goes back.
-			const f = await run(map, "web_fetch", { url: "https://news.example.com/google-3", method: "browser" });
+			const f = await run(map, "fetch_web", { url: "https://news.example.com/google-3", method: "browser" });
 			expect(f.text.split("\n")[0]).toBe("网页正文（browser）：温州新闻");
 			expect(f.details).toMatchObject({ backend: "browser", date: "2026-11-01" });
 			expect(host.ops.slice(-10)).toEqual([
@@ -347,12 +347,12 @@ describe("writer-search over the browser", () => {
 			);
 		});
 		// The model asked for the browser: it learns that it cannot be used now.
-		await expect(run(tools(), "web_search", { query: "q", method: "browser" })).rejects.toThrow(
+		await expect(run(tools(), "search_web", { query: "q", method: "browser" })).rejects.toThrow(
 			"browser 方式现在不可用",
 		);
 		expect(requests).toEqual([]);
 		// The model asked for AnySearch: no note.
-		const a = await run(tools(), "web_search", { query: "q", method: "anysearch" });
+		const a = await run(tools(), "search_web", { query: "q", method: "anysearch" });
 		expect(a.text.split("\n")[0]).toContain("检索结果（anysearch");
 	});
 });
@@ -383,12 +383,12 @@ describe("writer-search over AnySearch", () => {
 		});
 		const map = tools();
 		// Search.
-		const s = await run(map, "web_search", { query: "温州", zone: "cn", method: "anysearch" });
+		const s = await run(map, "search_web", { query: "温州", zone: "cn", method: "anysearch" });
 		expect(s.text).toContain("检索结果（anysearch，1 条）：温州");
 		expect(s.text).not.toContain("spam.example");
 		expect(calls[0]).toBe("https://api.anysearch.com/v1/search");
 		// Quota exhausted: the body never surfaces.
-		const err = await run(map, "web_fetch", { url: "https://a.example/x", method: "anysearch" }).catch(
+		const err = await run(map, "fetch_web", { url: "https://a.example/x", method: "anysearch" }).catch(
 			(e: Error) => e,
 		);
 		expect((err as Error).message).toBe("AnySearch 匿名额度已用完，可设置 ANYSEARCH_KEY 后重试。");
@@ -404,7 +404,7 @@ describe("writer-search over AnySearch", () => {
 			body = JSON.parse(String(init.body));
 			return new Response(JSON.stringify({ code: 0, data: { results } }), { status: 200 });
 		});
-		const s = await run(tools(), "web_search", { query: "温州", method: "anysearch" });
+		const s = await run(tools(), "search_web", { query: "温州", method: "anysearch" });
 		expect(body.max_results).toBe(10);
 		expect(s.text).toContain("检索结果（anysearch，10 条）：温州");
 		// In their order: nothing is ranked, dropped or marked for the model.
@@ -419,18 +419,18 @@ describe("writer-search over AnySearch", () => {
 			return new Response("{}");
 		});
 		// No method.
-		await expect(run(tools(), "web_search", { query: "q" })).rejects.toThrow("要指定 method");
-		await expect(run(tools(), "web_fetch", { url: "https://a.example/x" })).rejects.toThrow("要指定 method");
+		await expect(run(tools(), "search_web", { query: "q" })).rejects.toThrow("要指定 method");
+		await expect(run(tools(), "fetch_web", { url: "https://a.example/x" })).rejects.toThrow("要指定 method");
 		// Empty query and file URL.
-		await expect(run(tools(), "web_search", { query: "  ", method: "anysearch" })).rejects.toThrow("请提供检索词");
-		await expect(run(tools(), "web_fetch", { url: "file:///etc/passwd", method: "anysearch" })).rejects.toThrow(
+		await expect(run(tools(), "search_web", { query: "  ", method: "anysearch" })).rejects.toThrow("请提供检索词");
+		await expect(run(tools(), "fetch_web", { url: "file:///etc/passwd", method: "anysearch" })).rejects.toThrow(
 			"只能抓取 http(s) 网址",
 		);
 		expect(requests).toEqual([]);
 	});
 	it("needs a method in both schemas", () => {
 		// The model sees it as required.
-		for (const name of ["web_search", "web_fetch"]) {
+		for (const name of ["search_web", "fetch_web"]) {
 			const required = (tools().get(name)?.parameters as { required?: string[] }).required;
 			expect(required).toContain("method");
 		}

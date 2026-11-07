@@ -1,4 +1,4 @@
-// The claude and codex methods of web_search and web_fetch, against a fake upstream on loopback.
+// The claude and codex methods of search_web and fetch_web, against a fake upstream on loopback.
 import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { createServer, type IncomingHttpHeaders, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -207,19 +207,19 @@ describe("codex's own search endpoint, through the tools", () => {
 			{ output: "含绿化的一段" },
 		];
 		const map = tools();
-		const s = await run(map, "web_search", { query: "温州", method: "codex", fresh: "week" });
+		const s = await run(map, "search_web", { query: "温州", method: "codex", fresh: "week" });
 		expect(direct[0].path).toBe("/v1/alpha/search");
 		expect(direct[0].body.id).toBe("session-1");
 		expect(direct[0].body.commands).toMatchObject({ search_query: [{ q: "温州", recency: 7 }] });
 		expect(s.text).toContain("检索到的正文");
 		expect(s.text).toContain(URL_A);
-		const f = await run(map, "web_fetch", { url: "turn0search0", method: "codex" });
+		const f = await run(map, "fetch_web", { url: "turn0search0", method: "codex" });
 		expect(direct[1].body.commands).toMatchObject({ open: [{ ref_id: "turn0search0" }] });
 		expect(f.text).toContain("页面原文");
 		expect(f.details.url).toBe(URL_A);
 		const topic = f.details.topicDir as string;
 		expect(readFileSync(join(topic, "网页", filesIn(topic, "网页")[0]), "utf-8")).toContain(page);
-		const part = await run(map, "web_fetch", { url: URL_A, method: "codex", find: "绿化" });
+		const part = await run(map, "fetch_web", { url: URL_A, method: "codex", find: "绿化" });
 		expect(direct[2].body.commands).toMatchObject({ find: [{ ref_id: URL_A, pattern: "绿化" }] });
 		expect(part.text).toContain("含绿化的一段");
 		// The part has its own file: the whole page is still there.
@@ -233,17 +233,17 @@ describe("codex's own search endpoint, through the tools", () => {
 	it("uses the hosted tool where the endpoint is missing, and asks once per session", async () => {
 		answers = [codex(CODEX_SEARCHED)];
 		const map = tools();
-		await run(map, "web_search", { query: "甲", method: "codex" });
-		await run(map, "web_search", { query: "乙", method: "codex" });
+		await run(map, "search_web", { query: "甲", method: "codex" });
+		await run(map, "search_web", { query: "乙", method: "codex" });
 		expect(direct).toHaveLength(1);
 		expect(seen.map((s) => s.path)).toEqual(["/v1/responses", "/v1/responses"]);
 	});
 });
 
-describe("web_search with the upstream methods", () => {
+describe("search_web with the upstream methods", () => {
 	it("claude: asks the upstream, reports, and archives where every search goes", async () => {
 		answers = [claude(SEARCHED)];
-		const s = await run(tools(), "web_search", { query: "温州", method: "claude" });
+		const s = await run(tools(), "search_web", { query: "温州", method: "claude" });
 		expect(seen).toHaveLength(1);
 		expect(seen[0].path).toBe("/v1/messages");
 		expect(seen[0].headers["x-api-key"]).toBe(KEY);
@@ -262,7 +262,7 @@ describe("web_search with the upstream methods", () => {
 		answers = [codex(CODEX_SEARCHED)];
 		const s = await run(
 			tools(),
-			"web_search",
+			"search_web",
 			{ query: "温州", method: "codex" },
 			context({ api: "openai-completions" }),
 		);
@@ -273,7 +273,7 @@ describe("web_search with the upstream methods", () => {
 
 	it("gives material_add its sources, without counting as pages that were opened", async () => {
 		answers = [claude(SEARCHED)];
-		const s = await run(tools(), "web_search", { query: "温州", method: "claude" });
+		const s = await run(tools(), "search_web", { query: "温州", method: "claude" });
 		const topic = s.details.topicDir as string;
 		expect(materialUrls(topic)).toContain("news.example.com/a");
 		expect(archivedUrls(topic)).toEqual([]);
@@ -295,7 +295,7 @@ describe("web_search with the upstream methods", () => {
 			return fetchReal(input, init);
 		});
 		answers = [claude(SEARCHED)];
-		await run(tools(), "web_search", { query: "q", method: "claude" });
+		await run(tools(), "search_web", { query: "q", method: "claude" });
 		expect(requests.filter((r) => !r.startsWith(upstream))).toEqual([]);
 	});
 
@@ -303,9 +303,9 @@ describe("web_search with the upstream methods", () => {
 		let level = "high";
 		const map = tools(() => level);
 		answers = [claude(SEARCHED)];
-		await run(map, "web_search", { query: "q", method: "claude" });
+		await run(map, "search_web", { query: "q", method: "claude" });
 		level = "low";
-		await run(map, "web_search", { query: "q", method: "claude" });
+		await run(map, "search_web", { query: "q", method: "claude" });
 		expect(seen[0].body.model).toBe("conversation-model");
 		expect(seen[0].body.output_config).toEqual({ effort: "high" });
 		expect(seen[1].body.output_config).toEqual({ effort: "low" });
@@ -313,15 +313,15 @@ describe("web_search with the upstream methods", () => {
 
 	it("reports an upstream that did not search, and sends nothing without a model", async () => {
 		answers = [claude([{ type: "text", text: "凭记忆回答" }])];
-		await expect(run(tools(), "web_search", { query: "q", method: "claude" })).rejects.toThrow("上游没有执行搜索");
+		await expect(run(tools(), "search_web", { query: "q", method: "claude" })).rejects.toThrow("上游没有执行搜索");
 		const ctx = { ...context(), model: undefined } as ExtensionToolContext;
-		await expect(run(tools(), "web_search", { query: "q", method: "claude" }, ctx)).rejects.toThrow("没有设置模型");
+		await expect(run(tools(), "search_web", { query: "q", method: "claude" }, ctx)).rejects.toThrow("没有设置模型");
 		expect(seen).toHaveLength(1);
 	});
 
 	it("tells the model which parameters had no effect, and sends none of them", async () => {
 		answers = [claude(SEARCHED)];
-		const s = await run(tools(), "web_search", { query: "q", method: "claude", ignored: ["pages", "fresh"] });
+		const s = await run(tools(), "search_web", { query: "q", method: "claude", ignored: ["pages", "fresh"] });
 		expect(s.text).toContain("claude 方式不使用这些参数，它们没有生效：pages, fresh。");
 		const sent = JSON.stringify(seen[0].body);
 		expect(sent).not.toContain("fresh");
@@ -332,16 +332,16 @@ describe("web_search with the upstream methods", () => {
 		answers = [claude(SEARCHED)];
 		const list = tools();
 		const args = { query: "q", method: "claude", ignored: ["pages"] };
-		expect((await run(list, "web_search", args)).text).toContain("没有生效");
-		expect((await run(list, "web_search", args)).text).not.toContain("没有生效");
+		expect((await run(list, "search_web", args)).text).toContain("没有生效");
+		expect((await run(list, "search_web", args)).text).not.toContain("没有生效");
 	});
 
 	it("runs one call at a time", () => {
-		for (const name of ["web_search", "web_fetch"]) expect(tools().get(name)?.executionMode).toBe("sequential");
+		for (const name of ["search_web", "fetch_web"]) expect(tools().get(name)?.executionMode).toBe("sequential");
 	});
 });
 
-describe("web_fetch with the upstream methods", () => {
+describe("fetch_web with the upstream methods", () => {
 	const page = [
 		{ type: "server_tool_use", id: "s2", name: "web_fetch", input: {} },
 		{
@@ -364,7 +364,7 @@ describe("web_fetch with the upstream methods", () => {
 
 	it("claude: keeps the page with the others, where material_add finds its source", async () => {
 		answers = [claude(page)];
-		const f = await run(tools(), "web_fetch", { url: URL_A, method: "claude" });
+		const f = await run(tools(), "fetch_web", { url: URL_A, method: "claude" });
 		expect(f.text).toContain("页面原文");
 		expect(f.details.backend).toBe("claude");
 		const topic = f.details.topicDir as string;
@@ -375,7 +375,7 @@ describe("web_fetch with the upstream methods", () => {
 
 	it("passes on an address the local methods would refuse", async () => {
 		answers = [claude(page)];
-		await run(tools(), "web_fetch", { url: "not a web address", method: "claude" });
+		await run(tools(), "fetch_web", { url: "not a web address", method: "claude" });
 		expect(JSON.stringify(seen[0].body.messages)).toContain("not a web address");
 	});
 
@@ -392,7 +392,7 @@ describe("web_fetch with the upstream methods", () => {
 				},
 			]),
 		];
-		const f = await run(tools(), "web_fetch", { url: URL_A, method: "codex" });
+		const f = await run(tools(), "fetch_web", { url: URL_A, method: "codex" });
 		expect(f.text).toContain("页面全文");
 		expect(filesIn(f.details.topicDir as string, "网页")).toHaveLength(1);
 		expect(archivedUrls(f.details.topicDir as string)).toContain("news.example.com/a");
@@ -419,8 +419,8 @@ describe("web_fetch with the upstream methods", () => {
 			]),
 			claude([{ type: "text", text: "打不开" }]),
 		];
-		await expect(run(tools(), "web_fetch", { url: URL_A, method: "claude" })).rejects.toThrow("method=sf");
-		await expect(run(tools(), "web_fetch", { url: URL_A, method: "claude" })).rejects.toThrow(
+		await expect(run(tools(), "fetch_web", { url: URL_A, method: "claude" })).rejects.toThrow("method=sf");
+		await expect(run(tools(), "fetch_web", { url: URL_A, method: "claude" })).rejects.toThrow(
 			"上游没有给出这个页面的内容",
 		);
 	});
@@ -428,7 +428,7 @@ describe("web_fetch with the upstream methods", () => {
 
 describe("the tool descriptions", () => {
 	it("name no default and no removed setting", () => {
-		for (const name of ["web_search", "web_fetch"]) {
+		for (const name of ["search_web", "fetch_web"]) {
 			const text = tools().get(name)?.description ?? "";
 			expect(text).not.toContain("Without method");
 			expect(text).not.toContain("JW_SEARCH");
@@ -436,9 +436,9 @@ describe("the tool descriptions", () => {
 	});
 
 	it("name the configured model when there is one", () => {
-		expect(tools().get("web_search")?.description).not.toContain("The configured model is");
+		expect(tools().get("search_web")?.description).not.toContain("The configured model is");
 		setWriterModel({ kind: "ready", model: "claude-test" } as unknown as WriterModelState);
-		expect(tools().get("web_search")?.description).toContain("The configured model is claude-test.");
+		expect(tools().get("search_web")?.description).toContain("The configured model is claude-test.");
 	});
 });
 

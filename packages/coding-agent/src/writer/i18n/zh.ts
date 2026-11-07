@@ -75,7 +75,7 @@ export const zh = {
 	"read.clean": "检查通过：没有生僻字和长句。",
 	// What to do with the findings.
 	"read.advice": "人名、地名、机构名和引文保持原样；其余生僻字换成常用字，长句拆成短句。",
-	// web_search heading.
+	// search_web heading.
 	"search.title": "检索结果（{backend}，{count} 条）：{query}",
 	// One search result.
 	"search.item": "{n}. {title}\n   {url}{date}\n   {snippet}",
@@ -83,7 +83,7 @@ export const zh = {
 	"search.date": "（{date}）",
 	// No results.
 	"search.none": "没有检索到结果：{query}",
-	// web_fetch heading.
+	// fetch_web heading.
 	"fetch.title": "网页正文（{backend}）：{title}\n网址：{url}{date}{site}",
 	"fetch.site": "\n网站：{site}",
 	// Content clipped.
@@ -164,11 +164,11 @@ export const zh = {
 	// Reference problems.
 	"export.ref.url": "缺可用的 http(s) 网址",
 	"export.ref.title": "缺描述性标题（写明网页标题、发布机构和日期）",
-	"export.ref.opened": "本次会话没有用 web_fetch 打开过这个网址",
+	"export.ref.opened": "本次会话没有用 fetch_web 打开过这个网址",
 	// Separator of a short list.
 	"export.listSep": "；",
 	// Reference URLs for the model to open and test.
-	"context.clipped": "（内容过长，已截断。原文共{chars}字，需要时用read或web_fetch重新读取其中的部分。）",
+	"context.clipped": "（内容过长，已截断。原文共{chars}字，需要时用read或fetch_web重新读取其中的部分。）",
 	"compact.localTitle": "本地摘要：模型摘要失败（{reason}），以下内容由程序整理，不含模型的归纳。",
 	"compact.localPrevious": "之前的摘要：",
 	"compact.localRequests": "用户的要求（按时间顺序）：",
@@ -183,7 +183,7 @@ export const zh = {
 	"topic.missingFields": "缺少 {fields}",
 	"topic.missingPage": "《{file}》缺少页码",
 	"topic.missingSource": "缺少来源：要有 url，或 file 加 page",
-	"topic.notArchived": "网址 {url} 不在本主题的检索结果或已读页面里，请先检索或用 web_fetch 读取",
+	"topic.notArchived": "网址 {url} 不在本主题的检索结果或已读页面里，请先检索或用 fetch_web 读取",
 	"topic.itemProblem": "第{n}条：{problem}",
 	"topic.materialAdded": "已记录 {count} 条，{file} 共 {total} 条。",
 	"rewind.pick": "回退到哪条消息之前？",
@@ -215,7 +215,7 @@ export const zh = {
 	"browser.unsure":
 		"这个页面可能不是要读的内容（可能被拦截或要求登录），页面留在 Chrome 里了。把这个网址告诉用户，用户处理后再读一次；这段文字不要当作来源。",
 	"export.testRefs":
-		"导出时发现参考文献里有 {count} 个网址本次会话还没打开过：\n{urls}\n请用 web_fetch 逐个打开。能打开、内容与条目标题相符的保留；打不开或不相符的，换成打开过的来源，或删去这一条。改完稿件后会再次自动导出。",
+		"导出时发现参考文献里有 {count} 个网址本次会话还没打开过：\n{urls}\n请用 fetch_web 逐个打开。能打开、内容与条目标题相符的保留；打不开或不相符的，换成打开过的来源，或删去这一条。改完稿件后会再次自动导出。",
 	// Skills list heading.
 	"skills.title": "写作 skill（{count} 个）：方向键选择，回车确认，Esc 返回",
 	// New skill entry.
@@ -314,17 +314,21 @@ export const zh = {
 	"browser.reason.resting": "上一次人工处理没有完成，这一轮暂不使用",
 	"clock.skew": "本机时钟和模型服务器相差约 {minutes} 分钟，已按服务器时间告诉模型当前时间。请检查系统的时间设置。",
 	"search.methodUnavailable":
-		"browser 方式现在不可用：Chrome 里的 JiaWriter 扩展没有连接。可以换一种方式，或按 /browser 的说明连接扩展。",
+		"browser 方式现在不可用：Chrome 里的 JiaWriter 扩展没有连接。请告诉用户，可以换一种方式，或按 /browser 的说明连接扩展。",
 	"search.noMethod": "这次调用要指定 method，没有默认方式。",
 	"search.ignored": "{method} 方式不使用这些参数，它们没有生效：{names}。",
 	"search.noYear": "fresh=year 在 {engines} 上没有生效。",
 	"server.noModel": "没有设置模型，无法请求上游。",
-	"server.noSearch": "上游没有执行搜索，这种方式在这里可能用不了。请换一种方式，或者告诉用户。",
-	"server.noOpen": "上游没有给出这个页面的内容。{detail}请换一种方式。",
-	"server.toolError": "上游的工具出错：{detail}。请换一种方式。",
-	"server.pdf": "上游返回的是 PDF，这种方式读不了。请用 method=sf。",
+	"server.noSearch": "上游没有执行搜索，这种方式在这里可能用不了。请告诉用户，换哪种方式由用户决定。",
+	"server.noOpen": "上游没有给出这个页面的内容。{detail}请告诉用户，换哪种方式由用户决定。",
+	"server.toolError": "上游的工具出错：{detail}。请告诉用户，换哪种方式由用户决定。",
+	"server.pdf": "上游返回的是 PDF，这种方式读不了。请告诉用户：method=sf 可以读 PDF。",
 	"server.upstream": "上游请求失败：{detail}",
 	"server.text": "上游的回答：\n{text}\n",
+	"server.mainOn":
+		"上游自带的 {tool} 工具已接入对话：之后上游搜索直接调用它，你自己读页面，不经过转述。页面内容到下一轮就没有了，要用的内容当场写下来。",
+	"server.originMissed": "有 {count} 个页面服务端没有读到，归档里只有地址。要不要换一种方式再抓，由你决定。",
+	"server.retold": "{way}（上游转述）",
 	"browser.connected": "Chrome 扩展已连接（扩展版本 {version}）。",
 	"browser.disconnected": "Chrome 扩展未连接。",
 	"browser.steps":

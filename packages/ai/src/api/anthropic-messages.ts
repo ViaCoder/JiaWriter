@@ -692,6 +692,8 @@ export const stream: StreamFunction<"anthropic-messages", AnthropicOptions> = (
 
 			type Block = (ThinkingContent | TextContent | (ToolCall & { partialJson: string })) & { index: number };
 			const blocks = output.content as Block[];
+			// Input of the provider's own tools as it streams in, by block.
+			const serverInput = new Map<number, string>();
 
 			for await (const event of iterateAnthropicEvents(response, options?.signal)) {
 				await options?.onProviderStreamEvent?.(event, model);
@@ -766,6 +768,11 @@ export const stream: StreamFunction<"anthropic-messages", AnthropicOptions> = (
 						};
 						output.content.push(block);
 						stream.push({ type: "toolcall_start", contentIndex: output.content.length - 1, partial: output });
+					} else if (isServerBlock(event.content_block)) {
+						// A tool the provider ran itself: its record goes back on the next request.
+						const block: Block = { ...serverBlock(event.content_block as ServerBlock), index: event.index };
+						output.content.push(block);
+						stream.push({ type: "thinking_start", contentIndex: output.content.length - 1, partial: output });
 					}
 				} else if (event.type === "content_block_delta") {
 					if (event.delta.type === "text_delta") {
@@ -804,6 +811,8 @@ export const stream: StreamFunction<"anthropic-messages", AnthropicOptions> = (
 								delta: event.delta.partial_json,
 								partial: output,
 							});
+						} else if (block?.type === "thinking" && block.serverItem) {
+							serverInput.set(event.index, (serverInput.get(event.index) ?? "") + event.delta.partial_json);
 						}
 					} else if (event.delta.type === "signature_delta") {
 						const index = blocks.findIndex((b) => b.index === event.index);
@@ -826,6 +835,16 @@ export const stream: StreamFunction<"anthropic-messages", AnthropicOptions> = (
 								partial: output,
 							});
 						} else if (block.type === "thinking") {
+							// A provider's tool gets its input in the record, now that it is whole.
+							const input = serverInput.get(event.index);
+							if (block.serverItem && input) {
+								const filled: ServerBlock = {
+									...(JSON.parse(block.thinkingSignature ?? "{}") as ServerBlock),
+									input: parseStreamingJson(input),
+								};
+								block.thinkingSignature = JSON.stringify(filled);
+								block.thinking = serverBlockText(filled);
+							}
 							stream.push({
 								type: "thinking_end",
 								contentIndex: index,
@@ -1350,6 +1369,48 @@ interface ConvertedAnthropicMessages {
 	assistantLevels: Map<number, AnthropicEffort>;
 }
 
+/** A block of a tool the provider ran itself, in the fields read here; the rest stays as it is. */
+interface ServerBlock {
+	type: string;
+	id?: string;
+	tool_use_id?: string;
+	name?: string;
+	input?: { query?: string; url?: string };
+}
+
+/** True for the call or the result of a tool the provider ran itself. */
+function isServerBlock(block: { type: string }): boolean {
+	return block.type === "server_tool_use" || (block.type !== "tool_result" && block.type.endsWith("_tool_result"));
+}
+
+/** What a provider's tool did, for the interface. */
+function serverBlockText(block: ServerBlock): string {
+	// The result says nothing readable: its text is encrypted or long.
+	if (block.type !== "server_tool_use") return block.type;
+	return `${block.name ?? "tool"}: ${block.input?.query ?? block.input?.url ?? ""}`.trim();
+}
+
+/** The block that keeps a provider's tool for the next request. */
+function serverBlock(block: ServerBlock): ThinkingContent {
+	return {
+		type: "thinking",
+		thinking: serverBlockText(block),
+		thinkingSignature: JSON.stringify(block),
+		serverItem: true,
+	};
+}
+
+/** True when a call has its result and a result its call: a pause or a cancel leaves one alone, which is refused. */
+function isPaired(item: ServerBlock, content: readonly AssistantMessage["content"][number][]): boolean {
+	// The records of this message.
+	const others = content.flatMap((block) =>
+		block.type === "thinking" && block.serverItem ? [JSON.parse(block.thinkingSignature ?? "{}") as ServerBlock] : [],
+	);
+	return item.type === "server_tool_use"
+		? others.some((other) => other.tool_use_id === item.id)
+		: others.some((other) => other.id === item.tool_use_id);
+}
+
 function convertMessages(
 	transformedMessages: Message[],
 	isOAuthToken: boolean,
@@ -1440,6 +1501,12 @@ function convertMessages(
 						text: sanitizeSurrogates(block.text),
 					});
 				} else if (block.type === "thinking") {
+					// A provider's tool goes back as it came, with its other half.
+					if (block.serverItem) {
+						const item = JSON.parse(block.thinkingSignature ?? "{}") as ServerBlock;
+						if (isPaired(item, msg.content)) blocks.push(item as unknown as ContentBlockParam);
+						continue;
+					}
 					// Redacted thinking: pass the opaque payload back as redacted_thinking
 					if (block.redacted) {
 						blocks.push({

@@ -1,9 +1,10 @@
 /**
- * Built-in JiaWriter extension: web_search and web_fetch. The model picks the method of every call,
- * there is no default: web_search browser (the user's Chrome through the JiaWriter extension; engines
- * Bing, Google, Baidu, Sogou, 3–5 pages each, ranked locally), anysearch, claude or codex; web_fetch
+ * Built-in JiaWriter extension: search_web and fetch_web. The model picks the method of every call,
+ * there is no default: search_web browser (the user's Chrome through the JiaWriter extension; engines
+ * Bing, Google, Baidu, Sogou, 3–5 pages each, ranked locally), anysearch, claude or codex; fetch_web
  * browser, anysearch, sf (search_fetch), claude or codex. claude and codex let the upstream model
- * do the work in a request of its own, with the conversation's model and thinking level.
+ * do the work in a request of its own, with the conversation's model and thinking level. Once that
+ * worked, the upstream's own tools join the main conversation where its API can carry them.
  */
 
 // The marker that the extension was seen once.
@@ -12,12 +13,15 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 // Folder of the running binary (release layout of sf), and paths.
 import { dirname, join } from "node:path";
+// The conversation's messages.
+import type { AssistantMessage } from "@earendil-works/pi-ai";
 // Search and page reads by the upstream.
 import {
 	type ServerCall,
 	type ServerStyle,
 	type ServerWay,
 	serverFetch,
+	serverOriginal,
 	serverSearch,
 } from "@earendil-works/pi-ai/api/server-search.lazy";
 // The record of a search.
@@ -38,12 +42,12 @@ import { bridgeAddress, bridgeCall } from "../../writer/browser/bridge.ts";
 // Host registration and starting Chrome.
 // Engine names.
 import { ALL_ENGINES, type EngineName, parseEngines } from "../../writer/browser/engines.ts";
-// web_fetch through Chrome.
+// fetch_web through Chrome.
 import { browserFetch } from "../../writer/browser/fetch.ts";
 import { ensureHost, startChrome } from "../../writer/browser/install.ts";
 // Request pacing.
 import { pace } from "../../writer/browser/pacing.ts";
-// web_search through Chrome.
+// search_web through Chrome.
 import {
 	type BrowserDeps,
 	browserSearch,
@@ -54,6 +58,8 @@ import {
 } from "../../writer/browser/search.ts";
 // The current time for reports.
 import { nowText } from "../../writer/clock.ts";
+// Addresses compared as the reference check does.
+import { normalizeUrl } from "../../writer/export/refs.ts";
 // Output messages.
 import { currentLang, t } from "../../writer/i18n/index.ts";
 // Secrets are taken out of upstream errors.
@@ -62,7 +68,7 @@ import { redactSecrets } from "../../writer/redact.ts";
 import { withSecrets } from "../../writer/secrets.ts";
 // The research archive.
 import { ensureTopic } from "../../writer/topic/current.ts";
-import { archiveFiltered, archivePage, archiveSearch } from "../../writer/topic/topic.ts";
+import { archivedUrls, archiveFiltered, archivePage, archiveSearch } from "../../writer/topic/topic.ts";
 // AnySearch backend.
 import { anysearchExtract, anysearchSearch } from "../../writer/websearch/anysearch.ts";
 // Arguments as models send them.
@@ -80,6 +86,16 @@ import {
 } from "../../writer/websearch/core.ts";
 // The search log.
 import { appendSearchLog } from "../../writer/websearch/log.ts";
+// The upstream's own tools in the main conversation.
+import {
+	citedAddresses,
+	type MainTool,
+	type MainWay,
+	mainWay,
+	readMainSearch,
+	replyText,
+	withMainSearch,
+} from "../../writer/websearch/main-search.ts";
 // sf backend.
 import { locateSf, parseSfFetch, runSf, sfChildEnv, sfError } from "../../writer/websearch/sf.ts";
 // The configured model's name.
@@ -89,6 +105,10 @@ import { getWriterModel } from "../../writer/writer-model.ts";
 const CHROME_START_WAIT_MS = 20_000;
 /** Shortest gap between two AnySearch requests (ms); several at once make it fail (the user, 2026-11-05). */
 const ANYSEARCH_GAP_MS = 1000;
+/** Most pages fetched for the archive after one reply. */
+const MAX_ORIGINS = 8;
+/** Most resumes of a paused reply in a row: a guard against one that never ends. */
+const MAX_RESUMES = 3;
 
 /** Engine names as shown to the user. */
 function engineName(engine: string): string {
@@ -186,6 +206,16 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	const styles = new Map<string, ServerStyle>();
 	// Addresses without Codex's own search endpoint, found in this session.
 	const refused = new Set<string>();
+	// Upstream tools shown to work, by address and model: only those go into the main conversation.
+	const proven = new Map<string, Set<MainTool>>();
+	// Pages being fetched for the archive, one after the other, beside the conversation.
+	let originQueue: Promise<void> = Promise.resolve();
+	// How many of them could not be fetched in this run.
+	let originsMissed = 0;
+	// Addresses the upstream's own tools listed in this session: a later reply may cite them.
+	const listed = new Set<string>();
+	// Resumes of a paused reply in a row.
+	let resumes = 0;
 
 	/** sf binary and child environment (no driver model, see sfModelOff) for one call. */
 	function sfContext(interactive: boolean) {
@@ -321,8 +351,124 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			styles,
 			signal,
 			log: appendSearchLog,
-			direct: { id: ctx.sessionManager.getSessionId(), refused },
+			// Where the upstream's tool can join the conversation, the request must show that it works.
+			direct: mainWay(ctx.model?.api) === "codex" ? undefined : { id: ctx.sessionManager.getSessionId(), refused },
 		};
+	}
+
+	/** Where a conversation's shown tools are kept. */
+	function provenKey(ctx: ExtensionContext): string {
+		return `${ctx.model?.baseUrl}\n${ctx.model?.id}`;
+	}
+
+	/** Note that a request of its own worked, so the tool can join the conversation; says so to the model once. */
+	function prove(ctx: ExtensionContext, way: ServerWay, tool: MainTool): string {
+		// A conversation on another API cannot carry it.
+		if (mainWay(ctx.model?.api) !== way) return "";
+		const key = provenKey(ctx);
+		const shown = proven.get(key) ?? new Set<MainTool>();
+		proven.set(key, shown);
+		if (shown.has(tool)) return "";
+		shown.add(tool);
+		// Codex's one tool does both.
+		if (way === "codex" && shown.size > 1) return "";
+		return t("server.mainOn", { tool: way === "claude" && tool === "fetch" ? "web_fetch" : "web_search" });
+	}
+
+	/** A page through sf. */
+	async function sfPage(ctx: ExtensionContext, url: string, signal?: AbortSignal): Promise<FetchResult> {
+		// sf fetch in the working folder (the URL after the separator).
+		const sf = sfContext(ctx.hasUI);
+		const runOut = await runSf(sf.bin, ["fetch", "--json", "--", url], {
+			cwd: ctx.cwd,
+			env: sf.env,
+			timeoutMs: config.timeoutMs,
+			signal,
+		});
+		if (runOut.code !== 0) throw sfError(runOut, config.timeoutMs);
+		return parseSfFetch(runOut.stdout, url);
+	}
+
+	/** The server's ways to a page for the archive, best first: moving to another channel is the user's choice. */
+	function originWays(ctx: ExtensionContext, way: MainWay, url: string): [string, () => Promise<FetchResult>][] {
+		/** A page through a request of its own. */
+		const report = async (): Promise<FetchResult> => {
+			const out = await serverFetch(await serverCall(ctx, way), url);
+			return { url: out.url || url, title: out.title, content: out.content, date: "" };
+		};
+		// Claude's fetch gives the text itself.
+		if (way === "claude") return [["claude", report]];
+		/** Codex's endpoint gives it too, where it exists. */
+		const endpoint = async (): Promise<FetchResult> => {
+			const call = await serverCall(ctx, "codex");
+			if (refused.has(call.baseUrl)) throw new Error("no endpoint");
+			const direct = { id: ctx.sessionManager.getSessionId(), refused };
+			const out = await serverOriginal({ ...call, direct }, url).catch((e: unknown) => {
+				// A page can fail on its own; anything else means no endpoint here.
+				if ((e as { code?: unknown }).code !== "no_open") refused.add(call.baseUrl);
+				throw e;
+			});
+			return { url: out.url || url, title: out.title, content: out.content, date: "" };
+		};
+		// Else the fullest report the server can write, marked as what it is.
+		return [
+			["codex", endpoint],
+			[t("server.retold", { way: "codex" }), report],
+		];
+	}
+
+	/** Keep a page's own text in the topic, by the first way that gives it. */
+	async function keepOrigin(ctx: ExtensionContext, way: MainWay, dir: string, url: string): Promise<void> {
+		const log = await searchLog(ctx);
+		for (const [method, read] of originWays(ctx, way, url)) {
+			try {
+				const page = await read();
+				const content = cleanWebText(page.content);
+				if (!content.trim()) continue;
+				archivePage(dir, { ...page, title: cleanWebText(page.title), content }, url, method, nowText());
+				log({ kind: "origin", method, chars: content.length });
+				return;
+			} catch (e) {
+				// The next way may have it.
+				log({ kind: "origin-attempt", method, message: e instanceof Error ? e.message : String(e) });
+			}
+		}
+		originsMissed++;
+		log({ kind: "origin-failed" });
+	}
+
+	/** Archive what the upstream's own tools did in a reply: the search, and every page read in the original. */
+	function recordMainSearch(ctx: ExtensionContext, message: AssistantMessage, way: MainWay): void {
+		const found = readMainSearch(message);
+		// The search, as any other: the list is what backs materials.
+		const results = normalizeResults(found.sources, config.blocklist);
+		for (const r of results) listed.add(normalizeUrl(r.url));
+		// What the reply cites of all that was listed, also by an earlier reply; a page merely named is left alone.
+		const cited = citedAddresses(message).filter((u) => listed.has(normalizeUrl(u)));
+		// Nothing happened.
+		if (results.length + found.queries.length + found.opened.length + found.pages.length + cited.length === 0) return;
+		const query = found.queries.join("；");
+		const answer = replyText(message);
+		const report = [answer && t("server.text", { text: answer }), formatSearch(query, way, results)];
+		const urls = results.map((r) => r.url);
+		const body = report.filter(Boolean).join("\n");
+		const hint = found.queries[0] ?? found.pages[0]?.title ?? "";
+		// A reply that only cites has no search to keep; its pages go into the topic all the same.
+		const kept = query
+			? keep(ctx, hint, (dir) => archiveSearch(dir, query, body, nowText(), urls))
+			: { dir: ensureTopic(ctx.cwd, hint) };
+		// Pages that came with their text.
+		for (const page of found.pages) {
+			const clean = { ...page, title: cleanWebText(page.title), content: cleanWebText(page.content), date: "" };
+			keep(ctx, hint, (dir) => archivePage(dir, clean, page.url, way, nowText()));
+		}
+		// The rest of what it read and cited is fetched beside the conversation.
+		const dir = kept.dir;
+		if (!dir) return;
+		const known = new Set(archivedUrls(dir));
+		const wanted = [...found.opened, ...cited].filter((u) => isHttpUrl(u));
+		const fresh = [...new Set(wanted)].filter((u) => !known.has(normalizeUrl(u))).slice(0, MAX_ORIGINS);
+		for (const url of fresh) originQueue = originQueue.then(() => keepOrigin(ctx, way, dir, url));
 	}
 
 	/** The search log of this conversation, cleaned of its keys. */
@@ -351,7 +497,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	// At startup, a release binary keeps Chrome's host registration current (no network, small files).
 	// Each search and fetch as the model called it and what it got, whatever the method.
 	pi.on("tool_result", async (event, ctx) => {
-		if (event.toolName !== "web_search" && event.toolName !== "web_fetch") return;
+		if (event.toolName !== "search_web" && event.toolName !== "fetch_web") return;
 		// The result's own text, as the model reads it.
 		const text = event.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("\n");
 		(await searchLog(ctx))({
@@ -374,7 +520,40 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			stop: message.stopReason,
 			error: message.errorMessage,
 			tools: message.content.flatMap((c) => (c.type === "toolCall" ? [c.name] : [])),
+			// Records of the upstream's own tools, which are no calls of ours.
+			upstreamTools: message.content.filter((c) => c.type === "thinking" && c.serverItem).length,
 		});
+		const way = mainWay(message.api);
+		if (way) recordMainSearch(ctx, message, way);
+		// A tool the upstream refused in the conversation must not fail the next request too.
+		if (message.stopReason === "error" && /\b400\b|tool|web_search|web_fetch/i.test(message.errorMessage ?? ""))
+			proven.delete(provenKey(ctx));
+		// The upstream's own loop stopped halfway: the reply goes on.
+		if (message.rawStopReason !== "pause_turn") resumes = 0;
+		else if (resumes < MAX_RESUMES) {
+			resumes++;
+			pi.sendMessage(
+				{ customType: "jiawriter-search-resume", content: "Continue.", display: false },
+				{ deliverAs: "followUp" },
+			);
+		}
+	});
+
+	// The upstream's own tools go into the main conversation once they are shown to work.
+	pi.on("before_provider_request", (event, ctx) => {
+		const way = mainWay(ctx.model?.api);
+		const shown = proven.get(provenKey(ctx));
+		return way && shown ? withMainSearch(event.payload, way, shown) : undefined;
+	});
+
+	// The conversation ends with the archive complete.
+	pi.on("agent_end", async (_event, ctx) => {
+		await originQueue;
+		if (originsMissed === 0) return;
+		const note = t("server.originMissed", { count: originsMissed });
+		originsMissed = 0;
+		if (ctx.hasUI) ctx.ui.notify(note, "warning");
+		else process.stderr.write(`${note}\n`);
 	});
 
 	// A shorter or another history may have lost the note about unused parameters.
@@ -416,10 +595,10 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		await bridgeCall(address, "close_run", { run }, 5000).catch(() => undefined);
 	});
 
-	// web_search.
+	// search_web.
 	pi.registerTool({
 		// Name the model calls.
-		name: "web_search",
+		name: "search_web",
 		// Name shown in the interface.
 		label: "Web search",
 		// Full description sent to the model.
@@ -445,7 +624,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		prepareArguments: (args) => cleanSearchArgs(args) as never,
 		// The call as it took effect; a model's unused fields would read as if they had been sent.
 		renderCall: (args, theme, context) =>
-			new Text(formatToolCallWithArgs("web_search", shownSearchArgs(args), theme, context.expanded), 0, 0),
+			new Text(formatToolCallWithArgs("search_web", shownSearchArgs(args), theme, context.expanded), 0, 0),
 		// Read-only, open world.
 		annotations: WEB,
 		// One at a time: AnySearch fails on parallel requests, and the browser shares one results tab.
@@ -522,6 +701,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				});
 				raw = out.sources;
 				answer = out.text;
+				notes.push(prove(ctx, backend, "search"));
 			} else {
 				// AnySearch.
 				await anysearchTurn();
@@ -542,10 +722,10 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	// web_fetch.
+	// fetch_web.
 	pi.registerTool({
 		// Name the model calls.
-		name: "web_fetch",
+		name: "fetch_web",
 		// Name shown in the interface.
 		label: "Web fetch",
 		// Full description sent to the model.
@@ -564,7 +744,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		annotations: WEB,
 		// The method in the form the schema uses.
 		prepareArguments: (args) => cleanFetchArgs(args) as never,
-		// One at a time, like web_search.
+		// One at a time, like search_web.
 		executionMode: "sequential",
 		// Fetch the page.
 		async execute(_id, params, signal, _onUpdate, ctx) {
@@ -575,20 +755,13 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			const backend = await pick(params.method);
 			// The page from the backend.
 			let page: FetchResult;
+			// A note when the upstream's own tool joins the conversation.
+			let joined = "";
 			if (backend === "browser") {
 				usedBrowser = true;
 				page = await browserFetch(deps(ctx, signal), params.url, serps, timing);
 			} else if (backend === "sf") {
-				// sf fetch in the working folder (the URL after the separator).
-				const sf = sfContext(ctx.hasUI);
-				const runOut = await runSf(sf.bin, ["fetch", "--json", "--", params.url], {
-					cwd: ctx.cwd,
-					env: sf.env,
-					timeoutMs: config.timeoutMs,
-					signal,
-				});
-				if (runOut.code !== 0) throw sfError(runOut, config.timeoutMs);
-				page = parseSfFetch(runOut.stdout, params.url);
+				page = await sfPage(ctx, params.url, signal);
 			} else if (isServerWay(backend)) {
 				// The upstream reads it.
 				const call = await serverCall(ctx, backend, signal);
@@ -597,6 +770,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 					throw serverFailure(e);
 				});
 				page = { url: out.url || params.url, title: out.title, content: out.content, date: "" };
+				joined = prove(ctx, backend, "fetch");
 			} else {
 				// AnySearch extract.
 				await anysearchTurn();
@@ -624,7 +798,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				: "";
 			// Report (with the notes) and structured page (without the long text).
 			const unsure = page.unsure ? t("browser.unsure", { url: params.url }) : "";
-			const text = [formatFetch(page, backend), unsure, kept.note, left].filter(Boolean).join("\n");
+			const text = [formatFetch(page, backend), unsure, joined, kept.note, left].filter(Boolean).join("\n");
 			return {
 				content: [{ type: "text", text }],
 				details: {

@@ -1,5 +1,5 @@
 /**
- * web_fetch through the user's Chrome: a result still shown on an open results page is clicked
+ * fetch_web through the user's Chrome: a result still shown on an open results page is clicked
  * there (and the tab goes back afterwards), any other address opens in a new tab. The page is
  * given time to load or to clear a bot check, scrolled like a reader, and its main text is taken
  * with Readability in the page. Documents (PDF, Word) are downloaded through Chrome and parsed here.

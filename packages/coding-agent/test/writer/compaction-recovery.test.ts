@@ -15,7 +15,7 @@ import { createHarness, type Harness } from "../suite/harness.ts";
 
 /** Context window of every test. */
 const WINDOW = 128_000;
-/** One fetched page of Chinese text, the size web_fetch returns at most. */
+/** One fetched page of Chinese text, the size fetch_web returns at most. */
 const PAGE = "城市绿化研究资料".repeat(3000);
 
 /** What only the model's own summary says (a local summary names the model's failure). */
@@ -53,7 +53,7 @@ function newLog(): Log {
 	return { rejected: 0, summaries: 0, summaryReasoning: [], input: 0, batches: 0 };
 }
 
-/** Fake model: rejects oversized requests, summarizes, calls web_fetch five times per user turn, then answers. */
+/** Fake model: rejects oversized requests, summarizes, calls fetch_web five times per user turn, then answers. */
 function brain(
 	log: Log,
 	summary: () => AssistantMessage = () => fauxAssistantMessage("摘要：已完成资料收集。"),

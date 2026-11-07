@@ -159,12 +159,12 @@ const CLAUDE_FETCH: BetaToolUnion = { type: "web_fetch_20250910", name: "web_fet
 const CODEX_INCLUDE = "web_search_call.action.sources";
 /** Instructions of a search. */
 const SEARCH_RULES =
-	"Research the user's question on the web until it is answered, in several rounds, and never answer from memory. Start broad, then search again with what you found: new terms, official names, other languages. Open the primary sources and the strongest reports and read them. Check key facts against a second source. Then write a complete, organized report of what the sources say, giving each fact its date and source link, and name what stayed unknown.";
+	"Research the user's question on the web until it is answered, in several rounds, and never answer from memory. Start broad, then search again with what you found: new terms, official names, other languages. Open the primary sources and the strongest reports and read them. Check key facts against a second source. When a page is blocked, look for the same document at another official source. Then write a complete, organized report of what the sources say, giving each fact its date and source link, and name every page you could not open and what stayed unknown.";
 /** Instructions of a page read on the "claude" way: the text comes from the tool, not the reply. */
 const FETCH_RULES = "Fetch the exact page the user names with the fetch tool, then reply with one short sentence.";
 /** Instructions of a page read on the "codex" way: the reply is all there is. */
 const OPEN_RULES =
-	"Open the exact page the user names with the web search tool, and never answer from memory. Report everything it says in full detail, in its own language: every fact, figure, date, name and section, in the page's order. Add no comments.";
+	"Open the exact page the user names with the web search tool, and never answer from memory. Report everything it says in full detail, in its own language: every fact, figure, date, name and section, in the page's order. Add no comments. If it cannot be opened, say so and stop.";
 
 /** Status of a failed request, or undefined when it never got one. */
 function statusOf(error: unknown): number | undefined {
@@ -675,6 +675,15 @@ async function viaDirect<T>(
 		call.direct.refused.add(call.baseUrl);
 		return hosted();
 	}
+}
+
+/** A page's own text from Codex's search endpoint, with no model in between; there is no other way to get it. */
+export function serverOriginal(call: ServerCall, url: string): Promise<ServerPage> {
+	// The style the hosted tool found, else plain.
+	const style = call.styles.get(`codex\n${call.baseUrl}`) ?? "plain";
+	/** One request: this is on the side, and the caller has other ways. */
+	const run = async () => directPage(await directReply(call, style, { open: [{ ref_id: url }] }, url), url, {});
+	return recorded(call, "fetch", undefined, run, (out) => ({ title: out.title, contentChars: out.content.length }));
 }
 
 /** Let the upstream search; the query goes out as given. */

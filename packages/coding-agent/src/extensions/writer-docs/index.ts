@@ -8,7 +8,7 @@
  *   after the symbol, punctuation and space passes, with a check of the written file and of the reference
  *   list. At the end of every run the drafts written or edited in it are exported to .docx automatically
  *   (JW_AUTO_EXPORT=off turns it off); reference URLs the session has not opened yet go back to the model
- *   once, to open and test with web_fetch.
+ *   once, to open and test with fetch_web.
  */
 
 // Whether a draft exists.
@@ -40,7 +40,7 @@ import { t } from "../../writer/i18n/index.ts";
 import { currentTopic } from "../../writer/topic/current.ts";
 import { archivedUrls, TOPIC_DIRS } from "../../writer/topic/topic.ts";
 
-/** URLs web_fetch opened with text on the session's active branch, plus those of the messages given. */
+/** URLs fetch_web opened with text on the session's active branch, plus those of the messages given. */
 function sessionOpened(ctx: ExtensionContext, extra: readonly unknown[] = []): string[] {
 	// The branch's messages, then the run's own (they may not be stored yet).
 	const branch = ctx.sessionManager

@@ -18,6 +18,11 @@ export async function serverSearch(call: ServerCall, query: string, fresh?: Serv
 	return (await import("./server-search.ts")).serverSearch(call, query, fresh);
 }
 
+/** A page's own text from Codex's search endpoint. */
+export async function serverOriginal(call: ServerCall, url: string): Promise<ServerPage> {
+	return (await import("./server-search.ts")).serverOriginal(call, url);
+}
+
 /** Let the upstream read a page. */
 export async function serverFetch(call: ServerCall, url: string, options?: ServerPageOptions): Promise<ServerPage> {
 	return (await import("./server-search.ts")).serverFetch(call, url, options);

@@ -30,8 +30,8 @@ const URL_A = "https://a.example/news";
 const TOOLS = [
 	"draft_restore",
 	"topic_open",
-	"web_search",
-	"web_fetch",
+	"search_web",
+	"fetch_web",
 	"material_add",
 	"write",
 	"edit",
@@ -93,12 +93,12 @@ describe("a writing topic", () => {
 		};
 		harness.setResponses([
 			call("topic_open", { name: "巴黎绿化" }),
-			call("web_search", { query: "巴黎 绿地", method: "anysearch" }),
+			call("search_web", { query: "巴黎 绿地", method: "anysearch" }),
 			// An address the topic has never seen is refused.
 			call("material_add", { items: [{ ...material, url: "https://elsewhere.example/x" }] }),
 			// A search result is enough.
 			call("material_add", { items: [material] }),
-			call("web_fetch", { url: URL_A, method: "anysearch" }),
+			call("fetch_web", { url: URL_A, method: "anysearch" }),
 			call("write", {
 				path: draft,
 				content: "# 巴黎绿化\n\n正文。\n\n## 参考文献\n\n1．[巴黎新增绿地，法新社](https://a.example/news)\n",
@@ -127,7 +127,7 @@ describe("a writing topic", () => {
 		expect(readFileSync(join(topic, "稿件", "初稿.md"), "utf-8")).toContain("修改后的正文");
 		expect(existsSync(join(topic, "稿件", "初稿.docx"))).toBe(true);
 		expect(readdirSync(join(topic, "网页")).some((f) => f.endsWith(".docx"))).toBe(false);
-		expect(getToolResult(harness, "web_fetch").details).toMatchObject({ topicDir: topic });
+		expect(getToolResult(harness, "fetch_web").details).toMatchObject({ topicDir: topic });
 	});
 
 	it("saves the materials file before a change, so going back covers it", async () => {
@@ -160,7 +160,7 @@ describe("a writing topic", () => {
 
 	it("archives into a folder named after the search when the model never opened a topic", async () => {
 		harness = await setup();
-		harness.setResponses([call("web_search", { query: "绿地", method: "anysearch" }), fauxAssistantMessage("好")]);
+		harness.setResponses([call("search_web", { query: "绿地", method: "anysearch" }), fauxAssistantMessage("好")]);
 		await harness.session.prompt("查一下");
 		const folder = readdirSync(harness.tempDir).find((f) => /^\d{8}-绿地$/.test(f));
 		expect(folder).toBeDefined();

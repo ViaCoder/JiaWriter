@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hands-on check of the claude and codex methods of web_search and web_fetch in the real program: a local mock
+"""Hands-on check of the claude and codex methods of search_web and fetch_web in the real program: a local mock
 plays the model and the upstream (nothing leaves 127.0.0.1, the key is a dummy). The main conversation runs on Chat
 Completions, the claude way answers only in the OAuth style, the codex way answers plain requests: first on Codex's
 own search endpoint, then, when that endpoint stops answering, through the hosted tool.
@@ -25,13 +25,13 @@ KEY = "sk-dummy-server-check"
 URL = "https://news.example.com/a"
 # The calls the mock model makes, in order.
 CALLS = [
-    ("web_search", {"query": "甲", "method": "claude"}),
-    ("web_fetch", {"url": URL, "method": "claude"}),
-    ("web_search", {"query": "丁", "method": "codex", "fresh": "week"}),
-    ("web_fetch", {"url": URL + "?c=1", "method": "codex", "find": "绿化"}),
-    ("web_search", {"query": "乙", "method": "codex"}),
-    ("web_fetch", {"url": URL + "?b=1", "method": "codex"}),
-    ("web_search", {"query": "丙"}),
+    ("search_web", {"query": "甲", "method": "claude"}),
+    ("fetch_web", {"url": URL, "method": "claude"}),
+    ("search_web", {"query": "丁", "method": "codex", "fresh": "week"}),
+    ("fetch_web", {"url": URL + "?c=1", "method": "codex", "find": "绿化"}),
+    ("search_web", {"query": "乙", "method": "codex"}),
+    ("fetch_web", {"url": URL + "?b=1", "method": "codex"}),
+    ("search_web", {"query": "丙"}),
 ]
 # What the upstream saw: (path, style or "", model).
 seen = []

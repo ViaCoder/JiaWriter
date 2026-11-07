@@ -30,7 +30,7 @@ describe("lax message content handling", () => {
 		const extensionFactories: ExtensionFactory[] = [
 			(pi) => {
 				pi.registerTool({
-					name: "web_search",
+					name: "search_web",
 					label: "Web Search",
 					description: "Custom tool that returns a result without content",
 					parameters: Type.Object({}),
@@ -43,7 +43,7 @@ describe("lax message content handling", () => {
 
 		try {
 			harness.setResponses([
-				fauxAssistantMessage(fauxToolCall("web_search", {}), { stopReason: "toolUse" }),
+				fauxAssistantMessage(fauxToolCall("search_web", {}), { stopReason: "toolUse" }),
 				fauxAssistantMessage("done"),
 			]);
 
@@ -125,7 +125,7 @@ describe("lax message content handling", () => {
 			{
 				role: "toolResult",
 				toolCallId: "call_1",
-				toolName: "web_search",
+				toolName: "search_web",
 				isError: false,
 				timestamp: Date.now(),
 			},

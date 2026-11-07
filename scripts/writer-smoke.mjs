@@ -130,7 +130,7 @@ export const REPLY = "冒烟测试回复";
 /** Dummy key; it must appear nowhere in the output. */
 export const SECRET = "sk-smoke-0000-dummy";
 /** Tools the writing agent must offer. */
-export const TOOLS = ["export_document", "gongwen_check", "import_document", "read", "style_check", "web_search", "write"];
+export const TOOLS = ["export_document", "gongwen_check", "import_document", "read", "style_check", "search_web", "write"];
 
 /** A minimal one-page PDF with an ASCII text line (Helvetica). */
 export function onePagePdf(text) {

@@ -1,7 +1,7 @@
 /**
  * The reference list of a draft (the user, 2026-11-04: every reference has a working, accessible URL and a
  * descriptive title). Finds the 参考文献 / References section, and checks each entry for an http(s) URL, a
- * descriptive title, and that the URL is a page web_fetch opened in this session (it loaded and had text).
+ * descriptive title, and that the URL is a page fetch_web opened in this session (it loaded and had text).
  */
 
 /** What one entry lacks. */
@@ -139,7 +139,7 @@ export function checkReferences(markdown: string, opened?: readonly string[]): R
 	return { entries: entries.length, issues };
 }
 
-/** URLs of the reference list that this session has not opened yet, each once (to open and test with web_fetch). */
+/** URLs of the reference list that this session has not opened yet, each once (to open and test with fetch_web). */
 export function unopenedUrls(report: RefReport): string[] {
 	// Entries flagged "opened", their URLs, without repeats.
 	const out: string[] = [];
@@ -148,7 +148,7 @@ export function unopenedUrls(report: RefReport): string[] {
 	return out;
 }
 
-/** One message of the session, as far as web_fetch calls and results go. */
+/** One message of the session, as far as fetch_web calls and results go. */
 interface SessionMessage {
 	role?: string;
 	toolName?: string;
@@ -158,21 +158,21 @@ interface SessionMessage {
 	content?: unknown;
 }
 
-/** URLs of pages web_fetch opened with text in these messages: the requested URL and the final one. */
+/** URLs of pages fetch_web opened with text in these messages: the requested URL and the final one. */
 export function openedUrls(messages: readonly unknown[]): string[] {
 	// Requested URLs by tool call id.
 	const asked = new Map<string, string>();
 	for (const m of messages as SessionMessage[]) {
 		if (m?.role !== "assistant" || !Array.isArray(m.content)) continue;
 		for (const b of m.content as { type?: string; id?: string; name?: string; arguments?: { url?: unknown } }[]) {
-			if (b?.type === "toolCall" && b.name === "web_fetch" && typeof b.arguments?.url === "string" && b.id)
+			if (b?.type === "toolCall" && b.name === "fetch_web" && typeof b.arguments?.url === "string" && b.id)
 				asked.set(b.id, b.arguments.url);
 		}
 	}
 	// Successful results with text.
 	const urls: string[] = [];
 	for (const m of messages as SessionMessage[]) {
-		if (m?.role !== "toolResult" || m.toolName !== "web_fetch" || m.isError) continue;
+		if (m?.role !== "toolResult" || m.toolName !== "fetch_web" || m.isError) continue;
 		if (typeof m.details?.chars !== "number" || m.details.chars <= 0) continue;
 		if (typeof m.details.url === "string") urls.push(m.details.url);
 		const a = m.toolCallId ? asked.get(m.toolCallId) : undefined;

@@ -11,7 +11,7 @@ export const CORE_RULES: readonly string[] = [
 	"When writing a document, keep it in a Markdown file and say in chat only what you wrote and where",
 	"Before the first search or document of a topic, call topic_open with 1–3 key words; the same words continue it",
 	"Search when the request needs it, and never when told not to",
-	"Run one web_search or web_fetch at a time and name its method: none is the default. When one fails, use another or tell the user",
+	"Run one search_web or fetch_web at a time and name its method: none is the default. If it fails, let the user choose the next",
 	"Use methods claude and codex only when the user's prompt says the upstream supports them: claude for Claude models, codex for Codex and GPT models",
 	"In a document, take every case and figure from the reference materials or search results",
 ];

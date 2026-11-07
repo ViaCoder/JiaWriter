@@ -87,7 +87,7 @@ export const en: Record<MessageKey, string> = {
 	// What to do with the findings.
 	"read.advice":
 		"Keep names of people, places and organizations and quotations as they are; replace other rare characters with common ones and split long sentences.",
-	// web_search heading.
+	// search_web heading.
 	"search.title": "Search results ({backend}, {count}): {query}",
 	// One search result.
 	"search.item": "{n}. {title}\n   {url}{date}\n   {snippet}",
@@ -95,7 +95,7 @@ export const en: Record<MessageKey, string> = {
 	"search.date": " ({date})",
 	// No results.
 	"search.none": "No results for: {query}",
-	// web_fetch heading.
+	// fetch_web heading.
 	"fetch.title": "Page text ({backend}): {title}\nAddress: {url}{date}{site}",
 	"fetch.site": "\nSite: {site}",
 	// Content clipped.
@@ -181,12 +181,12 @@ export const en: Record<MessageKey, string> = {
 	// Reference problems.
 	"export.ref.url": "no usable http(s) URL",
 	"export.ref.title": "no descriptive title (name the page title, the publisher and the date)",
-	"export.ref.opened": "this URL was not opened with web_fetch in this session",
+	"export.ref.opened": "this URL was not opened with fetch_web in this session",
 	// Separator of a short list.
 	"export.listSep": "; ",
 	// Reference URLs for the model to open and test.
 	"context.clipped":
-		"(Too long, clipped. The original has {chars} characters; use read or web_fetch to read a part of it again.)",
+		"(Too long, clipped. The original has {chars} characters; use read or fetch_web to read a part of it again.)",
 	"compact.localTitle":
 		"Local summary: the model summary failed ({reason}). This text was assembled by the program, without the model's own reading.",
 	"compact.localPrevious": "Earlier summary:",
@@ -204,7 +204,7 @@ export const en: Record<MessageKey, string> = {
 	"topic.missingPage": "no page for {file}",
 	"topic.missingSource": "no source: give url, or file and page",
 	"topic.notArchived":
-		"{url} is not among this topic's search results or pages: search for it or read it with web_fetch first",
+		"{url} is not among this topic's search results or pages: search for it or read it with fetch_web first",
 	"topic.itemProblem": "Item {n}: {problem}",
 	"topic.materialAdded": "Recorded {count}; {file} now holds {total}.",
 	"rewind.pick": "Go back to before which message?",
@@ -238,7 +238,7 @@ export const en: Record<MessageKey, string> = {
 	"browser.unsure":
 		"This may not be the page asked for (a wall or a login, perhaps); it stays open in Chrome. Tell the user this address and read it again once they have dealt with it; use none of this text as a source.",
 	"export.testRefs":
-		"The export found {count} reference URL(s) this session has not opened yet:\n{urls}\nOpen each with web_fetch. Keep an entry when its page loads and matches the entry's title; otherwise replace it with a source you opened or remove the entry. The draft is exported again after the edit.",
+		"The export found {count} reference URL(s) this session has not opened yet:\n{urls}\nOpen each with fetch_web. Keep an entry when its page loads and matches the entry's title; otherwise replace it with a source you opened or remove the entry. The draft is exported again after the edit.",
 	// Skills list heading.
 	"skills.title": "Writing skills ({count}): arrows to choose, Enter to confirm, Esc to go back",
 	// New skill entry.
@@ -340,17 +340,23 @@ export const en: Record<MessageKey, string> = {
 	"clock.skew":
 		"This machine's clock differs from the model server by about {minutes} min; the model is given the server's time. Check the system time settings.",
 	"search.methodUnavailable":
-		"The browser method is not available now: the JiaWriter extension in Chrome is not connected. Use another method, or connect the extension as /browser explains.",
+		"The browser method is not available now: the JiaWriter extension in Chrome is not connected. Tell the user, who can choose another method or connect the extension as /browser explains.",
 	"search.noMethod": "Name a method for this call: there is no default.",
 	"search.ignored": "Method {method} does not use these, so they had no effect: {names}.",
 	"search.noYear": "fresh=year had no effect on {engines}.",
 	"server.noModel": "No model is set, so the upstream cannot be asked.",
 	"server.noSearch":
-		"The upstream did not run a search, so this method may not work here. Use another method, or tell the user.",
-	"server.noOpen": "The upstream gave no content for this page. {detail} Use another method.",
-	"server.toolError": "The upstream's tool failed: {detail}. Use another method.",
-	"server.pdf": "The upstream returned a PDF, which this method cannot read. Use method=sf.",
+		"The upstream did not run a search, so this method may not work here. Tell the user, who chooses the next method.",
+	"server.noOpen": "The upstream gave no content for this page. {detail} Tell the user, who chooses the next method.",
+	"server.toolError": "The upstream's tool failed: {detail}. Tell the user, who chooses the next method.",
+	"server.pdf":
+		"The upstream returned a PDF, which this method cannot read. Tell the user that method=sf can read it.",
 	"server.upstream": "The upstream request failed: {detail}",
+	"server.mainOn":
+		"The upstream's own {tool} tool is now in this conversation: call it for upstream search from now on, and you read the pages yourself, with nothing retold. Page text is gone by the next turn, so write down what you need at once.",
+	"server.originMissed":
+		"The server could not read {count} pages, so the archive holds only their addresses. Whether to try another method is your choice.",
+	"server.retold": "{way} (retold by the upstream)",
 	"server.text": "The upstream's answer:\n{text}\n",
 	"browser.connected": "Chrome extension connected (extension version {version}).",
 	"browser.disconnected": "Chrome extension not connected.",

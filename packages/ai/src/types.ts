@@ -433,6 +433,10 @@ export interface ThinkingContent {
 	 *  encrypted payload is stored in `thinkingSignature` so it can be passed back
 	 *  to the API for multi-turn continuity. */
 	redacted?: boolean;
+	/** When true, this is no thinking but the record of a tool the provider ran itself, such as its web
+	 *  search. `thinking` says what it did, and `thinkingSignature` holds the record as JSON, sent back
+	 *  as it is on the next request so the model keeps what the tool read. */
+	serverItem?: boolean;
 }
 
 export interface ImageContent {

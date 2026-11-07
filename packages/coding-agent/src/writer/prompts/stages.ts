@@ -52,9 +52,9 @@ function methodStages(tool: string, methods: Readonly<Record<string, readonly st
 export const PROMPT_STAGES: readonly PromptStage[] = [
 	// Searching is not writing: these rules wait until a document is really started.
 	{ id: WRITING_STAGE, title: "Writing rules", rules: WRITING_MANUAL, tools: ["write", "edit"], onSkill: true },
-	{ id: "research", title: "Research rules", rules: RESEARCH_MANUAL, tools: ["web_search", "web_fetch"] },
-	...methodStages("web_search", SEARCH_METHODS),
-	...methodStages("web_fetch", FETCH_METHODS),
+	{ id: "research", title: "Research rules", rules: RESEARCH_MANUAL, tools: ["search_web", "fetch_web"] },
+	...methodStages("search_web", SEARCH_METHODS),
+	...methodStages("fetch_web", FETCH_METHODS),
 	{ id: "material", title: "Material rules", rules: MATERIAL_MANUAL, tools: ["material_add"] },
 	...Object.entries(CHECK_MANUALS).map(([tool, rules]) => ({
 		id: tool,

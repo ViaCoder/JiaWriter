@@ -73,16 +73,16 @@ describe("checkReferences / unopenedUrls", () => {
 });
 
 describe("openedUrls", () => {
-	it("returns the requested and final URLs of web_fetch calls that loaded text", () => {
+	it("returns the requested and final URLs of fetch_web calls that loaded text", () => {
 		// A redirect that loaded, a failure and an empty page.
 		const call = (id: string, url: string) => ({
 			role: "assistant",
-			content: [{ type: "toolCall", id, name: "web_fetch", arguments: { url } }],
+			content: [{ type: "toolCall", id, name: "fetch_web", arguments: { url } }],
 		});
 		const result = (id: string, url: string, chars: number, isError = false) => ({
 			role: "toolResult",
 			toolCallId: id,
-			toolName: "web_fetch",
+			toolName: "fetch_web",
 			isError,
 			details: { url, chars },
 		});

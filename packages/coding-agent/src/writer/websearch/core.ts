@@ -197,7 +197,7 @@ export function normalizeResults(raw: readonly SearchResult[], blocklist: readon
 	return out;
 }
 
-/** The web_search report: heading and numbered results. */
+/** The search_web report: heading and numbered results. */
 export function formatSearch(
 	query: string,
 	backend: string,
@@ -224,7 +224,7 @@ export function formatSearch(
 	return [t("search.title", { backend, count: results.length, query }, lang), ...items].join("\n");
 }
 
-/** The web_fetch report: heading with source and date, then the bounded text. */
+/** The fetch_web report: heading with source and date, then the bounded text. */
 export function formatFetch(page: FetchResult, backend: string, lang?: WriterLang): string {
 	// Bounded text.
 	const clipped = page.content.length > MAX_FETCH_CHARS;

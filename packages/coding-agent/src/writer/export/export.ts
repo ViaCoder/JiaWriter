@@ -31,7 +31,7 @@ export interface ExportOptions {
 	profile?: string;
 	// Output path (default next to the draft).
 	output?: string;
-	// URLs web_fetch opened in this session (openedUrls); undefined: the check is skipped.
+	// URLs fetch_web opened in this session (openedUrls); undefined: the check is skipped.
 	opened?: readonly string[];
 }
 

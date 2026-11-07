@@ -12,7 +12,7 @@ export const WRITING_MANUAL: readonly string[] = [
 	"Parts with cases or data: each paragraph opens with a summary, then a case (time, reporter, subject, action) or data point (time, region, industry, indicator, value). Other parts are plain prose",
 	"A case names the company, body or person, date, act and figures; failing that, official data with period, scope and value. Never 某企业",
 	"Cite in the text as 2026年10月31日《路透社》报道 or 《文件名》第3页, never an address",
-	"End with 参考文献: every source used, numbered, as [page title, publisher, date](full URL) of a page opened with web_fetch",
+	"End with 参考文献: every source used, numbered, as [page title, publisher, date](full URL) of a page opened with fetch_web",
 	"Write mainly in Chinese with full-width punctuation; no spaces around Chinese (使用GPT-5模型), only between English words",
 	"Use common words and explain a needed term once. State facts directly and attribute opinions, with no remarks on reliability and no verification markers",
 	"Show the mechanism behind each claim, and keep 不是……而是 for real prohibitions",
@@ -27,6 +27,7 @@ export const RESEARCH_MANUAL: readonly string[] = [
 	"For recent events put the year and month in the query; a fact is current only when its page shows the date",
 	"Read the whole list and choose by address and title: major outlets (Reuters, AP, AFP, Bloomberg, BBC, NYT, WSJ, FT, and national ones) and official sources with named actors or data. Forums, blogs, Q&A sites and reposts are only leads",
 	"When nothing fits, search again in English, with an outlet named, or with the official name",
+	"When a site blocks a page, look for the same document at another official source, within the same method, and name what stayed closed",
 	"Keep each fact's URL. In a document, name the outlet as Chinese readers do, as 路透社 for reuters.com",
 ];
 
@@ -50,7 +51,7 @@ export const CHECK_MANUALS: Readonly<Record<string, readonly string[]>> = {
 /** What to do with an export's report: the first export. */
 export const EXPORT_MANUAL: readonly string[] = [
 	"Drafts are exported to .docx at the end of each run; use export_document for another format or profile",
-	"Fix unpaired quotes with edit. Open each reference URL reported as unopened with web_fetch: keep it when it loads and matches, else replace or remove it. Then export again",
+	"Fix unpaired quotes with edit. Open each reference URL reported as unopened with fetch_web: keep it when it loads and matches, else replace or remove it. Then export again",
 ];
 
 /** Going back: the first draft_restore. */

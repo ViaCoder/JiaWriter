@@ -7,7 +7,7 @@
 // The engine names.
 import { ALL_ENGINES } from "../browser/engines.ts";
 
-/** The parameters each web_search method takes, besides query and method. */
+/** The parameters each search_web method takes, besides query and method. */
 const SEARCH_PARAMS: Readonly<Record<string, readonly string[]>> = {
 	browser: ["engines", "pages", "fresh"],
 	anysearch: ["zone", "language"],
@@ -22,7 +22,7 @@ const ZONES = ["cn", "intl"];
 /** Other names of the engines. */
 const ENGINE_NAMES: Readonly<Record<string, string>> = { 必应: "bing", 谷歌: "google", 百度: "baidu", 搜狗: "sogou" };
 
-/** Every option of web_search. */
+/** Every option of search_web. */
 const OPTION_NAMES = ["engines", "pages", "fresh", "zone", "language"];
 
 /** True when a field really holds a value. */
@@ -67,7 +67,7 @@ function engineList(value: unknown): string[] {
 	return [...new Set(items.map(engineName).filter(Boolean))];
 }
 
-/** web_search arguments that hold only what the method can use. */
+/** search_web arguments that hold only what the method can use. */
 export function cleanSearchArgs(raw: unknown): Record<string, unknown> {
 	const args = record(raw);
 	// A list of words is still a query.
@@ -99,7 +99,7 @@ export function cleanSearchArgs(raw: unknown): Record<string, unknown> {
 	return out;
 }
 
-/** web_fetch arguments: the address as given, the method in the form the schema uses, codex's own options. */
+/** fetch_web arguments: the address as given, the method in the form the schema uses, codex's own options. */
 export function cleanFetchArgs(raw: unknown): Record<string, unknown> {
 	const args = record(raw);
 	// The address is never touched.
