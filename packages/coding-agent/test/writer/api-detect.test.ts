@@ -173,7 +173,7 @@ describe("detectApi", () => {
 	it("goes past routes a relay refuses with 403 to the one it opens", async () => {
 		// Calls made.
 		const calls: string[] = [];
-		// A PassManager relay that allows only Chat Completions.
+		// A relay that allows only Chat Completions.
 		const fetchFn = mockFetch(
 			{
 				"/v1/messages": [403, "not allowed"],

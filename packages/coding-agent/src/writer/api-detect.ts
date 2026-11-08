@@ -74,7 +74,7 @@ const NOT_HERE =
 export function classifyProbe(status: number, body: string): ProbeVerdict {
 	// Wrong key: stop probing.
 	if (status === 401) return "auth";
-	// Forbidden here: maybe the key, maybe a route this gateway does not open (a PassManager relay policy).
+	// Forbidden here: maybe the key, maybe a route this gateway does not open (a relay policy).
 	if (status === 403) return "refused";
 	// Missing route or method: try the next API.
 	if (status === 404 || status === 405) return "next";
