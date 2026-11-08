@@ -33,6 +33,26 @@ export const zh = {
 	"style.listOver": "列表行超过三分之一，正文宜改写成段落。",
 	// Too much bold.
 	"style.boldOver": "加粗过多（每千字超过 {limit} 处），只保留真正需要强调的地方。",
+	// Measures of the whole text.
+	"style.prose":
+		"通篇：文体 {register}，句长变化 {spread}，模糊量词每千字 {vague}，数据每千字 {facts}，破折号每千字 {dashes}。",
+	// Sentences of one size.
+	"style.spreadLow": "句子长短过于整齐：按意思调整句子长短，不要每句、每条都一个模子。",
+	// Vague words.
+	"style.vagueOver":
+		"模糊量词过多（每千字超过 {limit} 个，如部分、一些、逐步、有所）：换成材料里的具体数字、地点、对象和案例。",
+	// No facts in a report.
+	"style.factsLow":
+		"报告里几乎没有数据：从已有材料（话题的素材.md、参考资料/.parsed/、检索/ 和 网页/ 里保存的结果）取数字、时间、地点和案例写进去，注明出处；材料里没有的不编造，把空话改成平实的陈述或删去。",
+	// Too many dashes.
+	"style.dashOver": "破折号过多（每千字超过 {limit} 个）：多数改成逗号、冒号或拆句。",
+	// The semantic review's findings.
+	"style.reviewFound": "语义审查发现 {count} 处：",
+	// Where facts come from in a revision.
+	"style.materials":
+		"修改用到的事实和案例只取自已有材料：话题的素材.md、参考资料/.parsed/、检索/ 和 网页/ 里保存的结果，并注明出处；材料里没有的不编造，也不留待补标记。",
+	// An automatic round of revision.
+	"style.round": "自动检查：草稿还有问题，请按下面的报告修改（第 {round}/{max} 轮）。",
 	// Clean result.
 	"style.clean": "检查通过：没有命中。",
 	// What to do with the hits.

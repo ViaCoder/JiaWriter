@@ -9,12 +9,20 @@ import { t, type WriterLang } from "../i18n/index.ts";
 import { lineColumn, splitSentences } from "../text-stats.ts";
 // Pattern packs and negation lists.
 import {
+	DASH_PER_1000,
+	DASHES,
 	DEFAULT_NEGATION_THRESHOLD,
 	DEFAULT_PACKS,
+	FACTS,
+	FACTS_PER_1000,
 	NEGATION_EN,
 	NEGATION_ZH,
+	SPREAD_FLOOR,
 	STYLE_PACKS,
 	type StylePattern,
+	VAGUE_PER_1000,
+	VAGUE_ZH,
+	WEAK_PER_1000,
 } from "./patterns.ts";
 
 /** One finding. */
@@ -35,6 +43,8 @@ export interface StyleHit {
 	column: number;
 	// Matched text.
 	matched: string;
+	// A weak sign, counted by density only.
+	weak?: boolean;
 }
 
 /** Negative-assertion density. */
@@ -67,6 +77,35 @@ export interface StructureStats {
 	boldOver: boolean;
 }
 
+/** The kind of text: a report must carry facts; other prose need not. */
+export type StyleRegister = "report" | "general";
+
+/** Measures of the whole text, where machine prose shows more than in any one phrase. */
+export interface ProseStats {
+	// The register the limits were taken for.
+	register: StyleRegister;
+	// Visible characters.
+	chars: number;
+	// Sentences ending in a full stop, question or exclamation mark (headings left out).
+	sentences: number;
+	// Standard deviation over mean of their lengths, two decimals.
+	spread: number;
+	// Every sentence cut to one size: at least 10 sentences and spread under SPREAD_FLOOR.
+	spreadLow: boolean;
+	// Vague quantities per 1,000 characters, one decimal, and whether over VAGUE_PER_1000 (from 300 characters).
+	vaguePer1000: number;
+	vagueOver: boolean;
+	// Numbers with units per 1,000 characters, and whether a report of 600 characters or more has under FACTS_PER_1000.
+	factsPer1000: number;
+	factsLow: boolean;
+	// Dashes per 1,000 characters, and whether over DASH_PER_1000.
+	dashPer1000: number;
+	dashOver: boolean;
+	// Weak signs per 1,000 characters, and whether over WEAK_PER_1000.
+	weakPer1000: number;
+	weakOver: boolean;
+}
+
 /** Full report. */
 export interface StyleReport {
 	// Packs that were applied.
@@ -77,6 +116,8 @@ export interface StyleReport {
 	negation: NegationStats;
 	// Format usage.
 	structure: StructureStats;
+	// Measures of the whole text.
+	prose: ProseStats;
 }
 
 /** Options of styleCheck. */
@@ -85,6 +126,8 @@ export interface StyleOptions {
 	packs?: readonly string[];
 	// Negative assertions allowed per 10 sentences.
 	negationThreshold?: number;
+	// The kind of text; inferred from its title when not given.
+	register?: StyleRegister;
 }
 
 /** Bold spans allowed per 1,000 characters. */
@@ -125,7 +168,9 @@ export function findHits(text: string, patterns: readonly StylePattern[]): Style
 	// Code, URLs and quotations are not the author's own prose.
 	const masked = maskText(text);
 	// Every match of every pattern.
-	const all = patterns.flatMap((p) => matchAll(text, masked, p.re, p.id, p.zh, p.en));
+	const all = patterns.flatMap((p) =>
+		matchAll(text, masked, p.re, p.id, p.zh, p.en).map((hit) => (p.weak ? { ...hit, weak: true } : hit)),
+	);
 	// By start, longer first at the same start.
 	all.sort((a, b) => a.start - b.start || b.end - a.end);
 	// Kept hits.
@@ -175,6 +220,54 @@ export function structureStats(text: string): StructureStats {
 	};
 }
 
+/** A report when the title says so (报告, 调研, 总结, 情况, report, survey), else general prose. */
+export function inferRegister(text: string): StyleRegister {
+	// The first line with words: the title, or the opening.
+	const title = text.split("\n").find((line) => line.trim() !== "") ?? "";
+	return /报告|调研|调查|总结|情况|白皮书|\breport\b|\bsurvey\b/i.test(title) ? "report" : "general";
+}
+
+/** Count per 1,000 characters, one decimal. */
+function per1000(count: number, chars: number): number {
+	return chars > 0 ? Math.round((count * 10000) / chars) / 10 : 0;
+}
+
+/** The measures of the whole text, for its register. */
+export function proseStats(text: string, register: StyleRegister = inferRegister(text), weakHits = 0): ProseStats {
+	// Code, links and quotations do not count, nor do headings.
+	const body = maskText(text)
+		.split("\n")
+		.filter((line) => !/^\s*#/.test(line))
+		.join("\n");
+	const chars = body.replace(/\s/g, "").length;
+	// Sentences with their own end mark, so list items and headings without one stay out.
+	const lengths = (body.match(/[^。！？!?\n]+?(?:[。！？!?]|\.(?=\s|$))/g) ?? []).map((s) => s.trim().length);
+	const mean = lengths.reduce((a, b) => a + b, 0) / Math.max(1, lengths.length);
+	const deviation = Math.sqrt(lengths.reduce((a, b) => a + (b - mean) ** 2, 0) / Math.max(1, lengths.length));
+	const spread = mean > 0 ? Math.round((deviation / mean) * 100) / 100 : 0;
+	// The three densities.
+	const vaguePer1000 = per1000(body.match(VAGUE_ZH)?.length ?? 0, chars);
+	const factsPer1000 = per1000(body.match(FACTS)?.length ?? 0, chars);
+	const dashPer1000 = per1000(body.match(DASHES)?.length ?? 0, chars);
+	const weakPer1000 = per1000(weakHits, chars);
+	return {
+		register,
+		chars,
+		sentences: lengths.length,
+		spread,
+		spreadLow: lengths.length >= 10 && spread < SPREAD_FLOOR,
+		vaguePer1000,
+		vagueOver: chars >= 300 && vaguePer1000 > VAGUE_PER_1000,
+		factsPer1000,
+		factsLow: register === "report" && chars >= 600 && factsPer1000 < FACTS_PER_1000,
+		dashPer1000,
+		dashOver: chars >= 300 && dashPer1000 > DASH_PER_1000,
+		weakPer1000,
+		// A short text with one weak sign is not judged by density.
+		weakOver: weakHits >= 2 && weakPer1000 > WEAK_PER_1000,
+	};
+}
+
 /** Run every check; throws on an unknown pack name. */
 export function styleCheck(text: string, options: StyleOptions = {}): StyleReport {
 	// Requested packs, or the defaults.
@@ -185,19 +278,32 @@ export function styleCheck(text: string, options: StyleOptions = {}): StyleRepor
 			throw new Error(t("style.badPack", { pack, packs: Object.keys(STYLE_PACKS).join(", ") }));
 	// Patterns of all packs.
 	const patterns = packs.flatMap((p) => STYLE_PACKS[p]);
-	// The three checks.
+	// The checks; weak signs count by their density.
+	const hits = findHits(text, patterns);
 	return {
 		packs,
-		hits: findHits(text, patterns),
+		hits,
 		negation: negationDensity(text, options.negationThreshold),
 		structure: structureStats(text),
+		prose: proseStats(text, options.register, hits.filter((hit) => hit.weak).length),
 	};
 }
 
 /** True when the report has nothing to fix. */
 export function styleClean(report: StyleReport): boolean {
 	// No hits, density and format inside their limits.
-	return report.hits.length === 0 && !report.negation.over && !report.structure.listOver && !report.structure.boldOver;
+	const p = report.prose;
+	return (
+		report.hits.every((hit) => hit.weak) &&
+		!p.weakOver &&
+		!report.negation.over &&
+		!report.structure.listOver &&
+		!report.structure.boldOver &&
+		!p.spreadLow &&
+		!p.vagueOver &&
+		!p.factsLow &&
+		!p.dashOver
+	);
 }
 
 /** Report text in lang. */
@@ -248,6 +354,25 @@ export function formatStyleReport(report: StyleReport, lang?: WriterLang): strin
 	if (s.listOver) out.push(t("style.listOver", {}, lang));
 	// Too much bold.
 	if (s.boldOver) out.push(t("style.boldOver", { limit: BOLD_PER_1000 }, lang));
+	// Measures of the whole text, with what to do about each that is out of bounds.
+	const p = report.prose;
+	out.push(
+		t(
+			"style.prose",
+			{
+				register: p.register,
+				spread: p.spread,
+				vague: p.vaguePer1000,
+				facts: p.factsPer1000,
+				dashes: p.dashPer1000,
+			},
+			lang,
+		),
+	);
+	if (p.spreadLow) out.push(t("style.spreadLow", {}, lang));
+	if (p.vagueOver) out.push(t("style.vagueOver", { limit: VAGUE_PER_1000 }, lang));
+	if (p.factsLow) out.push(t("style.factsLow", {}, lang));
+	if (p.dashOver) out.push(t("style.dashOver", { limit: DASH_PER_1000 }, lang));
 	// Closing line.
 	out.push(t(styleClean(report) ? "style.clean" : "style.advice", {}, lang));
 	// One block of text.

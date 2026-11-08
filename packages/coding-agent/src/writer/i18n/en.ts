@@ -39,6 +39,29 @@ export const en: Record<MessageKey, string> = {
 	"style.listOver": "More than a third of the lines are list items; rewrite the body as paragraphs.",
 	// Too much bold.
 	"style.boldOver": "Too much bold (over {limit} per 1,000 characters); keep it for real emphasis.",
+	// Measures of the whole text.
+	"style.prose":
+		"Whole text: register {register}, sentence-length spread {spread}, vague words per 1,000 characters {vague}, facts {facts}, dashes {dashes}.",
+	// Sentences of one size.
+	"style.spreadLow":
+		"Sentences all of one length: vary them with the sense; do not cut every sentence or item to one mould.",
+	// Vague words.
+	"style.vagueOver":
+		"Too many vague quantities (over {limit} per 1,000 characters): use the material's numbers, places, actors and cases.",
+	// No facts in a report.
+	"style.factsLow":
+		"A report with almost no facts: take numbers, dates, places and cases from the materials at hand (the topic's 素材.md, 参考资料/.parsed/, and the results saved in 检索/ and 网页/) and cite them; never invent one, and where the materials have none, state the point plainly or cut it.",
+	// Too many dashes.
+	"style.dashOver":
+		"Too many dashes (over {limit} per 1,000 characters): use commas or colons, or split the sentence.",
+	// The semantic review's findings.
+	"style.reviewFound": "The semantic review found {count}:",
+	// Where facts come from in a revision.
+	"style.materials":
+		"Facts and cases in a revision come only from the materials at hand: the topic's 素材.md, 参考资料/.parsed/, and the results saved in 检索/ and 网页/, cited; nothing the materials lack is invented, and no placeholder is left.",
+	// An automatic round of revision.
+	"style.round":
+		"Automatic check: the draft still has problems; revise it by the report below (round {round} of {max}).",
 	// Clean result.
 	"style.clean": "Check passed: no hits.",
 	// What to do with the hits.

@@ -8,7 +8,7 @@ import { MATERIAL_FILE, TOPIC_DIRS } from "../topic/topic.ts";
 
 /** How a document is written: only once the user has asked for one and writing starts. */
 export const WRITING_MANUAL: readonly string[] = [
-	`Order: confirm purpose, audience and length; outline in ${TOPIC_DIRS.drafts}/大纲.md; ask once which parts need cases or data, unless the user's plan says; research those parts and record what you will use with material_add; check ${MATERIAL_FILE} against the outline; draft; run style_check, word_count and readability_check, and gongwen_check on 公文; revise only what they flag`,
+	`Order: confirm purpose, audience and length; outline in ${TOPIC_DIRS.drafts}/大纲.md; ask once which parts need cases or data, unless the user's plan says; research those parts and record what you will use with material_add; check ${MATERIAL_FILE} against the outline; draft (each write gets an AI-style check); run word_count, readability_check and on 公文 gongwen_check; revise what they flag`,
 	"Parts with cases or data: each paragraph opens with a summary, then a case (time, reporter, subject, action) or data point (time, region, industry, indicator, value). Other parts are plain prose",
 	"A case names the company, body or person, date, act and figures; failing that, official data with period, scope and value. Never 某企业",
 	"Cite in the text as 2026年10月31日《路透社》报道 or 《文件名》第3页, never an address",
@@ -78,3 +78,7 @@ export const COMPUTER_MANUAL: readonly string[] = [
 ];
 
 export const RESTORE_MANUAL: readonly string[] = ["List the versions, restore the matching one, and say what changed"];
+
+/** The semantic review added to every automatic check of a draft: what rules cannot see. */
+export const STYLE_REVIEW =
+	"Then reread the draft as its editor and fix, adding no facts: denials of claims nobody made; figures that are mixed, worn or fail read literally; causes and comparisons the text does not support; importance the facts do not carry; unnamed sources (研究表明, 专家认为); vague words where the materials hold facts (use them); lists and headings cut to one mould; filler piled up (a reasonable amount of set phrases is fine); good-and-bad lists with no position; words to a requester; endings lifted into feeling or slogans; statements that hide who acted.";

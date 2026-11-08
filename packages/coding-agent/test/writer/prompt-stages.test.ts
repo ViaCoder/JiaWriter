@@ -110,7 +110,9 @@ describe("the user's requirements", () => {
 		["the reference list", "参考文献"],
 		["a list entry", "[page title, publisher, date](full URL)"],
 		["asking once about cases", "ask once which parts need cases or data"],
-		["running the checks", "run style_check, word_count and readability_check, and gongwen_check on 公文"],
+		["running the checks", "run word_count, readability_check and on 公文 gongwen_check"],
+		// The AI-style check runs by itself after each write (the user, 2026-11-08).
+		["checking each draft", "each write gets an AI-style check"],
 		["recording materials", "record what you will use with material_add"],
 		["the paragraph form", "each paragraph opens with a summary"],
 		["case fields", "time, reporter, subject, action"],

@@ -7,15 +7,17 @@ import { describe, expect, it } from "vitest";
 import {
 	findHits,
 	formatStyleReport,
+	inferRegister,
 	MAX_LISTED,
 	maskText,
 	negationDensity,
+	proseStats,
 	structureStats,
 	styleCheck,
 	styleClean,
 } from "../../src/writer/style/check.ts";
 // Packs and lists under test.
-import { DEFAULT_PACKS, STYLE_PACKS } from "../../src/writer/style/patterns.ts";
+import { DEFAULT_PACKS, STYLE_PACKS, WEAK_PER_1000 } from "../../src/writer/style/patterns.ts";
 
 /** One hit example per pattern id. */
 const HIT_EXAMPLES: Record<string, string> = {
@@ -43,7 +45,7 @@ const HIT_EXAMPLES: Record<string, string> = {
 	"zh-bushiwei": "此举不失为稳妥选择。",
 	"zh-rangwomen": "让我们共同努力。",
 	"zh-zhenzheng": "真正重要的是执行。",
-	"zh-pozhe": "东部领先——中西部追赶。",
+	"zh-placeholder": "[学校名称]于[日期]举办论坛，202X年X月X日在某市召开。",
 	// core-en.
 	"en-not-just-but": "It is not just a tool but a habit.",
 	"en-not-about": "It's not about speed, it's about trust.",
@@ -62,7 +64,6 @@ const HIT_EXAMPLES: Record<string, string> = {
 	"en-game-changer": "This is a game-changer.",
 	"en-unlock": "It will unlock the full potential of data.",
 	"en-crucial-role": "Banks play a crucial role.",
-	"en-em-dash": "The plan—once approved—will start.",
 	// gongwen-zh.
 	"gw-raner": "然而，进展缓慢。",
 	"gw-shouxian": "首先，要健全机制。",
@@ -76,6 +77,8 @@ const HIT_EXAMPLES: Record<string, string> = {
 
 /** Plain prose that must trip no pattern of any pack (false-positive guards). */
 const GUARDS = [
+	// Note marks, links and 某些 are no placeholders.
+	"据统计[1]，见[报告全文](https://example.com/a)，某些地区仍有困难。",
 	// 不 without a contrast frame.
 	"该市不动产交易量持续上升。",
 	// 而在 is not 而是/而在于.
@@ -282,5 +285,84 @@ describe("formatStyleReport", () => {
 		const text = formatStyleReport(styleCheck("让我们。".repeat(MAX_LISTED + 5)), "zh");
 		// The remainder line.
 		expect(text).toContain("- 另有 5 处未列出");
+	});
+});
+
+// The measures of the whole text, with limits from official documents of 2011-2021 against generated drafts.
+describe("inferRegister", () => {
+	it("takes a report by its title, and anything else as general prose", () => {
+		expect(inferRegister("# 关于某区课后服务开展情况的调研报告\n正文")).toBe("report");
+		expect(inferRegister("\n\n2025年工作总结\n正文")).toBe("report");
+		expect(inferRegister("# Survey of reading habits")).toBe("report");
+		expect(inferRegister("# 故乡的秋天\n正文")).toBe("general");
+	});
+});
+
+// Sentences of very different lengths, as people write them.
+const varied =
+	"他走了。调研组走访了3个乡镇、11个行政村，召开座谈会4场，收回问卷286份。老人们说饭是热的。助餐点每月补贴2万元，人手只有2名，都没有护理证书，冬天天黑得早，晚饭多半在家里随便对付。".repeat(
+		3,
+	);
+
+// proseStats, with per1000 giving its densities.
+describe("proseStats", () => {
+	it("finds sentences cut to one size, and not sentences of mixed lengths", () => {
+		expect(proseStats("今天天气很好。".repeat(12)).spreadLow).toBe(true);
+		expect(proseStats(varied).spreadLow).toBe(false);
+		// Fewer than 10 sentences are not judged.
+		expect(proseStats("今天天气很好。".repeat(5)).spreadLow).toBe(false);
+	});
+
+	it("finds vague words standing in for facts", () => {
+		const vague = "部分村庄的服务逐步改善，一些设施有所增加，工作不断推进，能力进一步提升，取得一定成效。".repeat(8);
+		expect(proseStats(vague).vagueOver).toBe(true);
+		expect(proseStats(varied).vagueOver).toBe(false);
+	});
+
+	it("asks a report, and only a report, for facts", () => {
+		const empty = "这项工作得到了推进，大家都很满意，也提出了意见和建议，下一步还要继续做好。".repeat(20);
+		expect(proseStats(empty, "report").factsLow).toBe(true);
+		expect(proseStats(empty, "general").factsLow).toBe(false);
+		expect(proseStats(varied.repeat(3), "report").factsLow).toBe(false);
+	});
+
+	it("counts dashes by density, so a few are fine", () => {
+		expect(proseStats(`东部领先——中西部追赶。${"正文内容很长。".repeat(60)}`).dashOver).toBe(false);
+		expect(proseStats("甲——乙——丙——丁——戊——己。".repeat(20)).dashOver).toBe(true);
+	});
+
+	it("leaves headings and code out", () => {
+		const s = proseStats("# 标题——副题\n\n```\n——\n```\n正文。");
+		expect([s.dashPer1000, s.sentences]).toEqual([0, 1]);
+	});
+});
+
+// weakStock marks the packs that zhp and enp build; makeHit builds each hit, and findHits keeps the mark on it.
+describe("weak signs", () => {
+	it("marks stock phrases and the 公文 pack as weak, and contrast frames as strong", () => {
+		const weak = (id: string) =>
+			Object.values(STYLE_PACKS)
+				.flat()
+				.find((p) => p.id === id)?.weak === true;
+		expect([
+			weak("zh-zongshang"),
+			weak("en-delve"),
+			weak("gw-raner"),
+			weak("zh-bushi-ershi"),
+			weak("en-not-but"),
+		]).toEqual([true, true, true, false, false]);
+	});
+
+	it("allows a reasonable amount and stops a pile of them", () => {
+		const long = varied.repeat(4);
+		// One in a long text: listed, and clean.
+		const one = styleCheck(`综上所述，${long}`);
+		expect([one.hits.length, one.hits[0].weak, styleClean(one)]).toEqual([1, true, true]);
+		// Over WEAK_PER_1000: not clean.
+		const pile = styleCheck("综上所述，值得一提的是，总而言之，让我们努力。不难看出，形势向好。");
+		expect(pile.prose.weakPer1000).toBeGreaterThan(WEAK_PER_1000);
+		expect(styleClean(pile)).toBe(false);
+		// A strong sign counts at once.
+		expect(styleClean(styleCheck(`${long}这不是问题，而是机会。`))).toBe(false);
 	});
 });

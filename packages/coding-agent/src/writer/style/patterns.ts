@@ -17,6 +17,8 @@ export interface StylePattern {
 	en: string;
 	// Global regular expression.
 	re: RegExp;
+	// A weak sign: careful human writers use it now and then, so only a density of them counts (WEAK_PER_1000).
+	weak?: boolean;
 }
 
 /** Characters that end a clause frame in Chinese (a frame never spans them). */
@@ -88,10 +90,15 @@ const CORE_ZH: readonly StylePattern[] = [
 	zhp("zh-bushiwei", "套话", "stock phrase", "不失为"),
 	// Inclusive call to action.
 	zhp("zh-rangwomen", "套话", "stock phrase", "让我们"),
+	// Template placeholders left for someone to fill: a finished document has none. [1] and [text](url) are spared.
+	zhp(
+		"zh-placeholder",
+		"模板占位",
+		"placeholder",
+		"\\[(?!\\d+\\])[^\\]\\n]{1,16}\\](?!\\()|20\\d[XxＸ]年|[XxＸ]{1,2}月[XxＸ]{1,2}日|[XＸ]{2,}|某(?:省|市|县|区|镇|乡|村|单位|部门|企业|公司|学校|高校|医院)",
+	),
 	// "What really matters is".
 	zhp("zh-zhenzheng", "套话", "stock phrase", "真正(?:重要|关键|难|值钱)的[是在]"),
-	// Dash used as a break (the single — that joins two Chinese words is not counted).
-	zhp("zh-pozhe", "破折号 ——", "dash ——", "——"),
 ];
 
 /** General English pack. */
@@ -167,8 +174,6 @@ const CORE_EN: readonly StylePattern[] = [
 	enp("en-unlock", "套话", "stock phrase", "\\bunlock(?:s|ed|ing)? (?:the |its |their )?(?:full )?potential\\b"),
 	// Plays a crucial role.
 	enp("en-crucial-role", "套话", "stock phrase", "\\bplay(?:s|ed|ing)? a (?:crucial|pivotal|vital|key) role\\b"),
-	// Em dash between words, with or without spaces (a dash next to Chinese text is not counted).
-	enp("en-em-dash", "破折号 —", "em dash —", "(?<=[A-Za-z,]) ?— ?(?=[A-Za-z])"),
 ];
 
 /** 公文 pack: connectors and academic or consultancy jargon that a 公文 does not use. */
@@ -206,14 +211,22 @@ const GONGWEN_ZH: readonly StylePattern[] = [
 	),
 ];
 
+/** A stock phrase as a weak sign; every other pattern as it is. */
+function weakStock(pattern: StylePattern): StylePattern {
+	return pattern.en === "stock phrase" ? { ...pattern, weak: true } : pattern;
+}
+
+/** Weak signs allowed per 1,000 characters: official documents had 0.1 to 0.3, generated drafts up to 8. */
+export const WEAK_PER_1000 = 1;
+
 /** All packs by name. */
 export const STYLE_PACKS: Readonly<Record<string, readonly StylePattern[]>> = {
-	// General Chinese.
-	"core-zh": CORE_ZH,
-	// General English.
-	"core-en": CORE_EN,
-	// 公文 extension.
-	"gongwen-zh": GONGWEN_ZH,
+	// General Chinese and English. Stock phrases are weak signs: a reasonable amount is fine, only piling them up
+	// counts (the user, 2026-11-08); contrast frames and denials count each time.
+	"core-zh": CORE_ZH.map(weakStock),
+	"core-en": CORE_EN.map(weakStock),
+	// 公文 extension: every one a weak sign, found in State Council documents too.
+	"gongwen-zh": GONGWEN_ZH.map((pattern) => ({ ...pattern, weak: true })),
 };
 
 /** Packs used when the caller names none. */
@@ -228,3 +241,27 @@ export const NEGATION_EN =
 
 /** Default limit of negative assertions per 10 sentences. */
 export const DEFAULT_NEGATION_THRESHOLD = 3;
+
+// Measures of the whole text. A dash, or a single 不是, appears in careful human prose as often as in machine
+// prose (official documents 0.4 dashes per 1,000 characters, generated drafts 0.9, Lu Xun 0.9), so only these
+// densities tell the two apart. The limits come from twelve State Council and provincial documents of 2011-2021
+// against generated drafts of the same registers (2026-11-08).
+
+/** Dashes: counted, and reported only when they are many. */
+export const DASHES = /——|(?<=[A-Za-z,]) ?— ?(?=[A-Za-z])/g;
+/** Dashes allowed per 1,000 characters. */
+export const DASH_PER_1000 = 3;
+
+/** Vague quantities and stock verbs that stand in for facts. */
+export const VAGUE_ZH = /部分|一些|较多|较为|逐步|有所|不断|持续|进一步|日益|一定程度|取得(?:一定|明显|显著)?成效/g;
+/** Vague words allowed per 1,000 characters: official documents had 2.6 to 5.9, generated reports 5.6 to 19.6. */
+export const VAGUE_PER_1000 = 6;
+
+/** A fact with a unit: numbers with what they count. */
+export const FACTS =
+	/\d+(?:\.\d+)?\s*(?:%|％|万|亿|个|人|户|元|次|所|家|项|年|月|日|名|岁|公里|平方米|亩|吨|天|小时|percent)/g;
+/** Facts needed per 1,000 characters in a report: official reports had 8 to 18, generated ones none. */
+export const FACTS_PER_1000 = 1;
+
+/** Sentence-length spread (standard deviation over mean) below which every sentence is cut to one size. */
+export const SPREAD_FLOOR = 0.45;

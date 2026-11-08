@@ -20,6 +20,10 @@ const FILES = [
 	"packages/coding-agent/src/extensions/writer-browser/index.ts",
 	"packages/coding-agent/src/writer/websearch/main-search.ts",
 	"packages/coding-agent/src/extensions/writer-rewind/index.ts",
+	"packages/coding-agent/src/writer/style/check.ts",
+	"packages/coding-agent/src/writer/style/patterns.ts",
+	"packages/coding-agent/src/writer/style/review.ts",
+	"packages/coding-agent/src/extensions/writer-tools/index.ts",
 	"search_fetch/src/search_fetch/extension/agent.js",
 ];
 
