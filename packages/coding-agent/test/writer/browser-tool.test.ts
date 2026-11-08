@@ -2,7 +2,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import writerBrowserExtension, {
 	browserWanted,
@@ -76,5 +76,64 @@ describe("resultContent", () => {
 		expect(JSON.stringify(text)).not.toContain("UElD");
 		expect(image).toMatchObject({ type: "image", data: "UElD", detail: "low" });
 		expect(resultContent(outcome("confirmed", "read", "model")).length).toBe(1);
+	});
+});
+
+// settleTool (src/extensions/writer-browser/index.ts), through session_start: whether a conversation has the tool,
+// settled once and kept, so the tool set never changes inside a conversation.
+describe("settleTool", () => {
+	afterEach(() => vi.unstubAllEnvs());
+
+	/** The extension with a given tool set and session entries; what it sets and records is kept. */
+	function started(active: string[], entries: unknown[]) {
+		const handlers: Record<string, (event: unknown, ctx: unknown) => unknown> = {};
+		const set: string[][] = [];
+		const named: Record<string, unknown> = {
+			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
+				handlers[name] = fn;
+			},
+			getActiveTools: () => active,
+			setActiveTools: (names: string[]) => set.push(names),
+			appendEntry: (customType: string, data: unknown) => entries.push({ type: "custom", customType, data }),
+		};
+		// Anything else registered is ignored.
+		const pi = new Proxy(named, { get: (target, key: string) => target[key] ?? (() => undefined) });
+		writerBrowserExtension(pi as unknown as ExtensionAPI);
+		const ctx = { hasUI: false, sessionManager: { getEntries: () => entries } };
+		return { start: () => handlers.session_start({}, ctx) as Promise<void>, set, entries };
+	}
+
+	it("joins a new conversation when asked to, and records the choice", async () => {
+		vi.stubEnv("JW_BROWSER", "on");
+		const { start, set, entries } = started(["read", "search_web"], []);
+		await start();
+		expect(set).toEqual([["read", "search_web", "browser"]]);
+		expect(entries).toEqual([{ type: "custom", customType: "jiawriter-browser-tool", data: true }]);
+	});
+
+	it("stays out when turned off", async () => {
+		vi.stubEnv("JW_BROWSER", "off");
+		const { start, set, entries } = started(["search_web"], []);
+		await start();
+		expect(set).toEqual([]);
+		expect(entries).toEqual([{ type: "custom", customType: "jiawriter-browser-tool", data: false }]);
+	});
+
+	it("keeps what a resumed conversation chose, whatever the setting is now", async () => {
+		vi.stubEnv("JW_BROWSER", "on");
+		const { start, set, entries } = started(
+			["search_web"],
+			[{ type: "custom", customType: "jiawriter-browser-tool", data: false }],
+		);
+		await start();
+		expect(set).toEqual([]);
+		expect(entries.length).toBe(1);
+	});
+
+	it("leaves an allowlist alone", async () => {
+		vi.stubEnv("JW_BROWSER", "on");
+		const { start, set, entries } = started(["read"], []);
+		await start();
+		expect([set, entries]).toEqual([[], []]);
 	});
 });

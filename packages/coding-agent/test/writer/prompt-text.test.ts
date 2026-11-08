@@ -91,3 +91,39 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 		expect(prompt).not.toMatch(/coding assistant|coding agent|editing code|executing commands/i);
 	});
 });
+
+// buildRules (src/core/system-prompt.ts), through the prompt it builds: one ordered list of rules, each once.
+describe("buildRules", () => {
+	afterEach(() => vi.unstubAllEnvs());
+
+	/** The lines of the rules section of a prompt. */
+	function rules(prompt: string): string[] {
+		const section = prompt.split("# Rules\n")[1]?.split("\n\n")[0] ?? "";
+		return section.split("\n").map((line) => line.replace(/^ - /, ""));
+	}
+
+	it("puts the language first, then the chat rule and the core rules, then what the tools need", () => {
+		vi.stubEnv("JW_LANG", "zh");
+		const listed = rules(
+			buildSystemPrompt({ selectedTools: ["bash"], contextFiles: [], skills: [], cwd: "/tmp/wa" }),
+		);
+		expect(listed[0]).toBe(writerLanguageRule("zh"));
+		expect(listed[1]).toBe(WRITER_CHAT_RULE);
+		expect(listed.slice(2, 2 + CORE_RULES.length)).toEqual([...CORE_RULES]);
+		// Without its own file tools, the shell does the listing and searching.
+		expect(listed.slice(2 + CORE_RULES.length)).toContain("Use bash for file operations like ls, rg, find");
+	});
+
+	it("keeps each rule once, also when an extension repeats one", () => {
+		const listed = rules(
+			buildSystemPrompt({
+				promptGuidelines: [CORE_RULES[0], ` ${CORE_RULES[0]} `, "Own rule"],
+				contextFiles: [],
+				skills: [],
+				cwd: "/tmp/wa",
+			}),
+		);
+		expect(listed.filter((rule) => rule === CORE_RULES[0]).length).toBe(1);
+		expect(listed).toContain("Own rule");
+	});
+});

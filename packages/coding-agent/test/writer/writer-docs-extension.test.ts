@@ -93,6 +93,7 @@ describe("import_document and export_document", () => {
 		writeFileSync(join(cwd, "参考资料", "a.txt"), "资料正文");
 		writeFileSync(join(cwd, "参考资料", "scan.pdf"), makePdf([""]));
 		const { tools } = load();
+		// runImport (src/extensions/writer-docs/index.ts) behind import_document: every new file, then one by path.
 		const imp = await tools.get("import_document")?.execute("1", {}, undefined, undefined, ctx([]));
 		expect(
 			text(imp as never)

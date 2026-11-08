@@ -311,3 +311,21 @@ describe("the extension", () => {
 		expect(map.get("before_agent_start")?.()).toBeUndefined();
 	});
 });
+
+// methodStages (src/writer/prompts/stages.ts), through PROMPT_STAGES: one stage per method of each web tool.
+describe("methodStages", () => {
+	it("gives every search and fetch method its own stage, with that method's rules", () => {
+		for (const [tool, methods] of [
+			["search_web", SEARCH_METHODS],
+			["fetch_web", FETCH_METHODS],
+		] as const) {
+			for (const [method, rules] of Object.entries(methods)) {
+				expect(PROMPT_STAGES.find((stage) => stage.id === `${tool}:${method}`)).toMatchObject({
+					tools: [tool],
+					method,
+					rules,
+				});
+			}
+		}
+	});
+});

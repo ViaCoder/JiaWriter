@@ -69,6 +69,7 @@ describe("computerSetup", () => {
 	}, 30000);
 });
 
+// session_start runs settleTool (src/extensions/writer-computer/index.ts): the cases below are its tests.
 describe("writerComputerExtension", () => {
 	/** The extension, with what it registers kept. */
 	function loaded(active: string[]) {

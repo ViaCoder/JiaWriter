@@ -12,6 +12,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { detectCacheKey, loadDetectCache, saveDetectCache } from "../../src/writer/api-detect.ts";
 // Functions under test.
 import {
+	buildImagesProvider,
 	buildProviderConfig,
 	detectCachePath,
 	dropReasoningLevel,
@@ -302,5 +303,42 @@ describe("buildProviderConfig, formatDetectFailure, getWriterDefaultModel", () =
 		);
 		// Default model is wa/m1 at level max (pi clamps it later).
 		expect(getWriterDefaultModel()).toEqual({ provider: "jw", modelId: "m1", thinkingLevel: "max" });
+	});
+});
+
+describe("buildImagesProvider", () => {
+	afterEach(() => setWriterModel({ kind: "none" }));
+
+	it("re-registers the JW provider with image input once the upstream takes pictures", () => {
+		// A ready model whose provider takes text only.
+		const ready = {
+			kind: "ready",
+			root: "https://h.example.com",
+			api: "anthropic-messages",
+			source: "detect",
+			model: "m1",
+			contextWindow: 4_000,
+			maxTokens: 128_000,
+			thinkingLevel: "off",
+			cachePath: "",
+			cacheKey: "",
+			provider: buildProviderConfig("https://h.example.com", "anthropic-messages", "m1", 4_000, 128_000),
+		} as unknown as WriterModelReady;
+		setWriterModel(ready);
+		expect(ready.provider.models[0].input).toEqual(["text"]);
+		const provider = buildImagesProvider();
+		// Pictures pass, everything else stays as it was, and the state holds the new provider.
+		expect(provider?.models[0].input).toEqual(["text", "image"]);
+		expect([provider?.baseUrl, provider?.models[0].contextWindow, provider?.models[0].maxTokens]).toEqual([
+			"https://h.example.com",
+			4_000,
+			128_000,
+		]);
+		expect((getWriterModel() as WriterModelReady).provider).toBe(provider);
+	});
+
+	it("has nothing to give without a ready model", () => {
+		setWriterModel({ kind: "none" });
+		expect(buildImagesProvider()).toBeUndefined();
 	});
 });
