@@ -33,6 +33,7 @@ export const REVIEW_CATEGORIES = [
 	"missing-actor",
 	"unsupported-method",
 	"weak-evidence",
+	"spoken-register",
 ] as const;
 
 /** Most findings kept from one review, so a long draft's list stays readable. */
@@ -41,7 +42,7 @@ export const MAX_ISSUES = 30;
 /** The reviewer's instructions. */
 export const REVIEW_PROMPT = `You review a draft for the marks of machine-written prose and report each one you are sure of. You do not rewrite it.
 
-First decide the register: official document (通知, 意见, 报告, 调研报告, 工作总结), news, academic, promotional, speech, essay, or other. Judge every line by what careful human writers of that register do. Fixed forms of official Chinese (一是……二是……, 进一步, 抓手, 推动, 加强) and a reasonable amount of set phrases are normal; report them only when they carry no content or pile up.
+First decide the register: official document (通知, 意见, 报告, 调研报告, 工作总结), news, academic, promotional, speech, essay, or other. Judge every line by what careful human writers of that register do. Fixed forms of official Chinese (一是……二是……, 进一步, 抓手, 推动, 加强) and a reasonable amount of set phrases are normal; report them only when they carry no content or pile up. A slogan that stands where a measure or fact should be carries no content.
 
 Categories, by id:
 - defensive-negation: denies a claim nobody made, to set up its own point (不是……而是, 并不意味着, 不只是, "isn't just", "it's not X, it's Y").
@@ -58,6 +59,7 @@ Categories, by id:
 - missing-actor: statements that hide who did what (相关工作得到推进, 有关问题得到解决, "steps have been taken").
 - unsupported-method: fieldwork, visits, interviews, surveys or analysis the text claims but does not show (实地走访, 座谈了解到, 问卷显示, 调研发现 with no record of who, when or how many).
 - weak-evidence: a case or figure that does not prove the point of its paragraph, proves a neighbouring point instead, or repeats material used elsewhere in the text.
+- spoken-register: in an official, report or academic register, a spoken or casual word where the written term exists, or a slogan made of matched or rhyming phrases standing in for a concrete measure or fact.
 
 Rules:
 - Quote the exact words from the draft, at most 40 characters, copied character for character.

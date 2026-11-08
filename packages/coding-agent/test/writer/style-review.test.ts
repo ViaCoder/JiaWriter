@@ -96,3 +96,15 @@ describe("the reviewer and our own knowledge", () => {
 		expect(t("style.materials", {}, "zh")).toContain("检查意见不是检索的理由");
 	});
 });
+
+describe("spoken-register", () => {
+	it("is a category the prompt explains and the parser keeps", () => {
+		// 2026-11-09: drafts kept 随手可承受 and 以快制快 at language score 4; no category named them.
+		expect(REVIEW_PROMPT).toContain("- spoken-register:");
+		const kept = parseReview(
+			`{"issues":[{"category":"spoken-register","quote":"以快制快","why":"口号","fix":"写出具体时限"}]}`,
+			"要以快制快。",
+		);
+		expect(kept?.map((i) => i.category)).toEqual(["spoken-register"]);
+	});
+});
