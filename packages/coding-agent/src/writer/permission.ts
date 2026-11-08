@@ -102,9 +102,12 @@ export function riskOfLabel(label: string): Risk {
 	return HIGH_RISK_LABEL.test(label) ? "high" : "act";
 }
 
-/** True for a field that holds a password: no mode types into one. */
-export function isSecretField(role: string, inputType: string): boolean {
-	return inputType.toLowerCase() === "password" || /secure|password/i.test(role);
+/** Names a secret field goes by, for systems that mark none: UI Automation's password flag is not passed on by the driver. */
+const SECRET_NAME = /密码|口令|验证码|passwor|passcode|\bpin\b|\bpwd\b/i;
+
+/** True for a field that holds a password or a one-time code: no mode types into one. */
+export function isSecretField(role: string, inputType: string, name = ""): boolean {
+	return inputType.toLowerCase() === "password" || /secure|password/i.test(role) || SECRET_NAME.test(name);
 }
 
 /** The gate of one session. */

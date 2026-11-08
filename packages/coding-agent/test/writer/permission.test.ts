@@ -116,6 +116,14 @@ describe("isSecretField", () => {
 		expect(isSecretField("AXSecureTextField", "")).toBe(true);
 		expect(isSecretField("textbox", "text")).toBe(false);
 	});
+	it("knows them by name where the system marks none, as UI Automation through the driver", () => {
+		expect(isSecretField("Edit", "", "口令")).toBe(true);
+		expect(isSecretField("Edit", "", "短信验证码")).toBe(true);
+		expect(isSecretField("Edit", "", "Enter PIN")).toBe(true);
+		expect(isSecretField("Edit", "", "Password")).toBe(true);
+		expect(isSecretField("Edit", "", "姓名")).toBe(false);
+		expect(isSecretField("Edit", "", "Pinyin")).toBe(false);
+	});
 });
 
 describe("createPermissionGate", () => {

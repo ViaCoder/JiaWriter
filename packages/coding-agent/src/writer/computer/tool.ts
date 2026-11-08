@@ -142,7 +142,11 @@ export async function readWindow(driver: DriverClient, deps: ComputerDeps, since
 	});
 }
 
-/** After an action the driver could not confirm: one read of what changed, then it is the model's to judge. */
+/** Reads of the window after an action that the driver could not confirm, and the pause between them (ms). */
+export const SETTLE_READS = 3;
+const SETTLE_PAUSE_MS = 250;
+
+/** After an action the driver could not confirm: a few reads of what changed, then it is the model's to judge. */
 export async function settled(
 	driver: DriverClient,
 	deps: ComputerDeps,
@@ -151,17 +155,23 @@ export async function settled(
 ): Promise<Outcome> {
 	const result = replyOutcome(action, reply);
 	if (result.effect !== "unverifiable") return result;
-	const after = await driver.call("get_window_state", {
-		pid: deps.state.pid,
-		window_id: deps.state.window,
-		include_screenshot: false,
-		since: "latest",
-	});
-	// A new read retires the old tokens.
-	deps.state.snapshot = String(after.structured.snapshot_id ?? deps.state.snapshot);
-	const diff = after.structured.diff_counts as { added?: number; changed?: number; removed?: number } | undefined;
-	const moved = (diff?.added ?? 0) + (diff?.changed ?? 0) + (diff?.removed ?? 0) > 0;
-	return moved ? outcome("confirmed", result.route, "model") : result;
+	// UI Automation shows a new value a moment later, so the window is read a few times; each read is compared
+	// with the one before it, so a change between two reads is seen too.
+	for (let attempt = 0; attempt < SETTLE_READS; attempt++) {
+		if (attempt > 0) await new Promise((done) => setTimeout(done, SETTLE_PAUSE_MS));
+		const after = await driver.call("get_window_state", {
+			pid: deps.state.pid,
+			window_id: deps.state.window,
+			include_screenshot: false,
+			since: "latest",
+		});
+		// A new read retires the old tokens.
+		deps.state.snapshot = String(after.structured.snapshot_id ?? deps.state.snapshot);
+		const diff = after.structured.diff_counts as { added?: number; changed?: number; removed?: number } | undefined;
+		if ((diff?.added ?? 0) + (diff?.changed ?? 0) + (diff?.removed ?? 0) > 0)
+			return outcome("confirmed", result.route, "model");
+	}
+	return result;
 }
 
 /** Put text into a field: by value when it can, since keys lose anything but ASCII. */
@@ -211,7 +221,7 @@ export async function runComputer(input: ComputerInput, deps: ComputerDeps): Pro
 		const refused = tierRefusal(input, appTier(scope));
 		if (refused) return outcome("refused", action, "user", refused);
 		const label = state.labels.get(input.ref ?? "");
-		if (action === "type" && isSecretField(label?.role ?? "", ""))
+		if (action === "type" && isSecretField(label?.role ?? "", "", label?.name ?? ""))
 			return outcome("refused", "type", "user", "password-field");
 		if (action !== "look") {
 			const risk =

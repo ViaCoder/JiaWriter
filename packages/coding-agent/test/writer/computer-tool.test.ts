@@ -10,6 +10,7 @@ import {
 	readWindow,
 	replyOutcome,
 	runComputer,
+	SETTLE_READS,
 	sameRow,
 	settled,
 	tierRefusal,
@@ -189,9 +190,25 @@ describe("settled", () => {
 		expect(await settled(same.client, same.deps, "click", reply({ effect: "unverifiable" }))).toMatchObject({
 			effect: "unverifiable",
 		});
+		expect(same.calls.length).toBe(SETTLE_READS);
 		const sure = fake();
 		await settled(sure.client, sure.deps, "click", reply({ effect: "confirmed" }));
 		expect(sure.calls.length).toBe(0);
+	});
+});
+
+describe("settled, when the change shows a moment later", () => {
+	it("reads again, as UI Automation needs on Windows", async () => {
+		const { client, deps, calls } = fake();
+		client.call = async (tool, args) => {
+			calls.push([tool, args]);
+			// Nothing at the first read, the new value at the second.
+			return reply({ diff_counts: { changed: calls.length >= 2 ? 1 : 0 } });
+		};
+		expect(await settled(client, deps, "type", reply({ effect: "unverifiable" }))).toMatchObject({
+			effect: "confirmed",
+		});
+		expect(calls.length).toBe(2);
 	});
 });
 

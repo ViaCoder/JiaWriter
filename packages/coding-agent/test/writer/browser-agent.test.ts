@@ -379,12 +379,14 @@ describe("runBrowser with a dialog open", () => {
 });
 
 describe("how long the rules take", () => {
-	it("handles a page of 20000 lines in under 100 ms", () => {
+	// The limit guards against a slower kind of algorithm (a quadratic one takes seconds here), not against a slow
+	// machine: shared CI runners took up to 144 ms (macos-15-intel, 2026-11-08), so it leaves room for them.
+	it("handles a page of 20000 lines in under 400 ms", () => {
 		const lines = Array.from({ length: 20000 }, (_, i) => `[e${i}] link "条目${i}"`).join("\n");
 		const started = performance.now();
 		expect(labelsOf(lines).size).toBe(20000);
 		expect(matchLines(lines, "条目19999").length).toBe(1);
-		expect(performance.now() - started).toBeLessThan(100);
+		expect(performance.now() - started).toBeLessThan(400);
 	});
 });
 

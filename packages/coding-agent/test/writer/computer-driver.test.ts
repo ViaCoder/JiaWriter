@@ -1,5 +1,6 @@
 // The pinned desktop driver (src/writer/computer/driver.ts).
 import { createHash } from "node:crypto";
+import { userInfo } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
@@ -11,6 +12,7 @@ import {
 	driverEnv,
 	driverPath,
 	MAC_APP,
+	macAccountHome,
 } from "../../src/writer/computer/driver.ts";
 
 describe("driverAsset", () => {
@@ -74,6 +76,24 @@ describe("driverEnv", () => {
 		});
 		expect(env.JW_KEY).toBeUndefined();
 		expect(env.ANYTHING).toBeUndefined();
+	});
+	it("falls back on the runtime's answer when the directory service cannot be asked", () => {
+		expect(
+			macAccountHome(() => {
+				throw new Error("no dscl");
+			}),
+		).toBe(userInfo().homedir);
+	});
+	it("finds the account's home through the directory service, whatever HOME says", () => {
+		const asked: string[] = [];
+		const read = (command: string, args: string[]) => {
+			asked.push([command, ...args].join(" "));
+			return command.endsWith("id") ? "runner\n" : "NFSHomeDirectory: /Users/runner\n";
+		};
+		expect(macAccountHome(read)).toBe("/Users/runner");
+		expect(asked).toEqual(["/usr/bin/id -un", "/usr/bin/dscl . -read /Users/runner NFSHomeDirectory"]);
+		// Found once, kept.
+		expect(macAccountHome(() => "")).toBe("/Users/runner");
 	});
 	it("uses the account's own home on macOS, where the system starts the daemon", () => {
 		expect(driverEnv({ HOME: "/tmp/x" }, "darwin", () => "/Users/u").HOME).toBe("/Users/u");

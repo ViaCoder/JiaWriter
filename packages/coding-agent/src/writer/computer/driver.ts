@@ -5,6 +5,8 @@
  */
 
 // Checking and paths.
+// The account's home on macOS, from the directory service.
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { userInfo } from "node:os";
 import { join } from "node:path";
@@ -78,6 +80,34 @@ export function driverPath(agentDir: string, platform: NodeJS.Platform, env: Nod
 	return join(driverDir(agentDir), platform === "win32" ? "cua-driver.exe" : "cua-driver");
 }
 
+/** How a command's output is read: execFileSync, or a stand-in in tests. */
+export type ReadCommand = (command: string, args: string[]) => string;
+
+/** The account home once found, for the life of the program. */
+let knownHome: string | undefined;
+
+/**
+ * The home the system records for this account on macOS. Bun's os.userInfo().homedir gives $HOME instead
+ * (checked with bun 1.4.4), so the directory service is asked; failing that, what the runtime says.
+ */
+export function macAccountHome(
+	read: ReadCommand = (command, args) => execFileSync(command, args, { encoding: "utf-8", timeout: 5000 }),
+): string {
+	if (knownHome) return knownHome;
+	try {
+		const name = read("/usr/bin/id", ["-un"]).trim();
+		const entry = read("/usr/bin/dscl", [".", "-read", `/Users/${name}`, "NFSHomeDirectory"]);
+		const home = /NFSHomeDirectory:\s*(\S.*)$/m.exec(entry)?.[1]?.trim();
+		if (home) {
+			knownHome = home;
+			return home;
+		}
+	} catch {
+		// No directory service: the runtime's answer below.
+	}
+	return userInfo().homedir;
+}
+
 /**
  * What the driver may see of the environment: no keys, and its telemetry off. On macOS the system starts the
  * daemon with the account's own home, and the socket and settings live there, so every driver command uses it too.
@@ -85,7 +115,7 @@ export function driverPath(agentDir: string, platform: NodeJS.Platform, env: Nod
 export function driverEnv(
 	env: NodeJS.ProcessEnv,
 	platform: NodeJS.Platform = process.platform,
-	accountHome: () => string = () => userInfo().homedir,
+	accountHome: () => string = () => macAccountHome(),
 ): NodeJS.ProcessEnv {
 	const kept = [
 		"PATH",
