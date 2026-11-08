@@ -200,10 +200,13 @@ export function negationDensity(text: string, threshold = DEFAULT_NEGATION_THRES
 
 /** List-line and bold usage. */
 export function structureStats(text: string): StructureStats {
-	// Non-empty lines outside code blocks.
-	const lines = maskText(text)
-		.split("\n")
-		.filter((l) => l.trim() !== "");
+	// Non-empty lines outside code blocks, before a reference list: its entries are a list by nature (a 2026-11-08
+	// brief merged its references into one line to quiet this check).
+	const all = maskText(text).split("\n");
+	const refs = all.findIndex((l) =>
+		/^\s*#{0,6}\s*(?:参考文献|参考资料|资料来源|References|Sources)\s*[:：]?\s*$/i.test(l),
+	);
+	const lines = (refs >= 0 ? all.slice(0, refs) : all).filter((l) => l.trim() !== "");
 	// Bullet or numbered list items (1、 needs no space after it).
 	const listLines = lines.filter((l) => /^\s*(?:[-*+•]\s+|\d+[.)．]\s+|\d+、)/.test(l)).length;
 	// **bold** spans.

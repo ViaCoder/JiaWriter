@@ -392,3 +392,20 @@ describe("inferRegister: numbered headings", () => {
 		expect(inferRegister("# 春天的早晨\n\n## 第一章\n\n正文")).toBe("general");
 	});
 });
+
+describe("structureStats: references", () => {
+	it("counts no lines of the reference list", () => {
+		const body = "第一段正文。\n\n第二段正文。\n\n第三段正文。";
+		const refs = [
+			"## 参考文献",
+			"1. [甲, 路透社, 2026-11-06](https://example.com/a)",
+			"2. [乙, 美联社, 2026-11-05](https://example.com/b)",
+			"3. [丙, 新华社, 2026-11-04](https://example.com/c)",
+			"4. [丁, 彭博社, 2026-11-03](https://example.com/d)",
+		];
+		const s = structureStats(`${body}\n\n${refs.join("\n")}`);
+		expect([s.lines, s.listLines, s.listOver]).toEqual([3, 0, false]);
+		// The same items in the body still count.
+		expect(structureStats(`${body}\n\n${refs.slice(1).join("\n")}`).listOver).toBe(true);
+	});
+});
