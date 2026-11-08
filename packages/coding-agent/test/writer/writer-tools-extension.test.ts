@@ -21,12 +21,14 @@ import writerToolsExtension, {
 	finishedChecks,
 	gongwenGenre,
 	hasMaterials,
+	itemMarks,
 	lacksReferences,
 	MAX_ROUNDS,
 	materialsNameSources,
 	modelAsker,
 	referenceTitles,
 	requestedLength,
+	unusedMaterials,
 } from "../../src/extensions/writer-tools/index.ts";
 // The semantic review line the automatic check ends with.
 import { STYLE_REVIEW } from "../../src/writer/prompts/manuals.ts";
@@ -326,6 +328,26 @@ describe("hasMaterials", () => {
 		rmSync(join(topic, "检索"), { recursive: true });
 		writeFileSync(join(topic, "素材.md"), "- 案例");
 		expect(hasMaterials(draft, cwd)).toBe(true);
+	});
+});
+
+describe("unusedMaterials", () => {
+	it("names the items of a short fact list whose marks the draft lacks", () => {
+		expect(itemMarks("2026年3月26日，FakeAgent技术侦测发现，“跨模态对齐”。")).toEqual(["FakeAgent", "跨模态对齐"]);
+		const topic = join(cwd, "20261109-材料");
+		mkdirSync(join(topic, "稿件"), { recursive: true });
+		const draft = join(topic, "稿件", "段.md");
+		const parsed = join(cwd, "参考资料", ".parsed");
+		mkdirSync(parsed, { recursive: true });
+		writeFileSync(
+			join(parsed, "材料.md.md"),
+			"# 材料\n\n1. FakeAgent技术侦测发现，伪造已能跨模态对齐。\n\n2. 伯克利大学教授Hany Farid表示，伪造技术正向全球普及。\n",
+		);
+		expect(unusedMaterials("Hany Farid表示，伪造技术正向全球普及。", draft, cwd)).toEqual([
+			"FakeAgent技术侦测发现，伪造已能跨模态对齐。",
+		]);
+		expect(unusedMaterials("FakeAgent侦测……Hany Farid表示……", draft, cwd)).toEqual([]);
+		rmSync(join(cwd, "参考资料"), { recursive: true });
 	});
 });
 

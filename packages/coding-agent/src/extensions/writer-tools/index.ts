@@ -154,6 +154,39 @@ export function lacksReferences(text: string, file: string, cwd: string): boolea
 	return draftFolders(file, cwd).some((dir) => [join(dir, TOPIC_DIRS.search), join(dir, TOPIC_DIRS.web)].some(filled));
 }
 
+/** Most numbered items the material check looks at: beyond that the materials serve a longer document. */
+export const MATERIAL_CHECK_MAX = 12;
+
+/** The marks that tell one material item apart: figures, Latin names, titles in 《》 and quoted terms. */
+export function itemMarks(item: string): string[] {
+	// Dates say when, not which: another item's date must not count as this one's mark.
+	const undated = item.replace(/\d{4}年(?:\d{1,2}月(?:\d{1,2}日)?)?|\d{1,2}月\d{1,2}日/g, " ");
+	const marks = [
+		...(undated.match(/\d+(?:\.\d+)?(?:万|亿|%|元|个|起|人|辆|艘)?/g) ?? []).filter((m) => m.length >= 2),
+		...(undated.match(/[A-Za-z][A-Za-z0-9.-]{2,}/g) ?? []),
+		// The words inside 《》 and quotes: a draft may drop the marks.
+		...[...undated.matchAll(/《([^》]{2,20})》|“([^”]{2,20})”/g)].map((m) => m[1] ?? m[2]),
+	];
+	return [...new Set(marks)];
+}
+
+/**
+ * The numbered items of a short fact list beside a draft that the draft does not use: none of their marks appears in
+ * it (2026-11-09: two drafts each left out one of two or three given items although each proved a judgment).
+ */
+export function unusedMaterials(text: string, file: string, cwd: string): string[] {
+	const items = draftFolders(file, cwd)
+		.flatMap(parsedFiles)
+		.flatMap((path) => readFileSync(path, "utf-8").split("\n"))
+		.map((line) => line.match(/^\s*\d+[.、．]\s*(.+)$/)?.[1]?.trim() ?? "")
+		.filter(Boolean);
+	if (items.length === 0 || items.length > MATERIAL_CHECK_MAX) return [];
+	return items.filter((item) => {
+		const marks = itemMarks(item);
+		return marks.length > 0 && !marks.some((m) => text.includes(m));
+	});
+}
+
 /** The titles of the references imported beside a draft: 报告 for 参考资料/.parsed/报告.pdf.md. */
 export function referenceTitles(file: string, cwd: string): string[] {
 	return draftFolders(file, cwd)
@@ -288,6 +321,9 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			if (inferRegister(text) === "report" && /\d/.test(text) && !cites && materialsNameSources(file, ctx.cwd))
 				own.push(t("style.noCitation"));
 			if (lacksReferences(text, file, ctx.cwd)) own.push(t("style.noReferences"));
+			const unused = unusedMaterials(text, file, ctx.cwd);
+			if (unused.length > 0)
+				own.push(t("style.unusedMaterials", { items: unused.map((i) => `“${i.slice(0, 40)}”`).join("；") }));
 			const chars = countText(bodyBeforeReferences(text)).total;
 			if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)
 				own.push(t("style.length", { chars, target }));
