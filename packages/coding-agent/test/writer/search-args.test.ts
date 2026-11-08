@@ -211,7 +211,8 @@ describe("writer-search: methods down for the session", () => {
 		const handlers: Record<string, ((event: unknown, ctx: unknown) => unknown)[]> = {};
 		writerSearchExtension({
 			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
-				(handlers[name] ??= []).push(fn);
+				if (!handlers[name]) handlers[name] = [];
+				handlers[name].push(fn);
 			},
 			registerTool: () => {},
 			registerCommand: () => {},
