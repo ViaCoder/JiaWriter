@@ -53,7 +53,7 @@ Categories, by id:
 - formulaic-structure: lists or headings cut to one mould, rule-of-three rhythm, every item the same length and pattern, a stock opening of background and a stock ending of outlook.
 - stock-phrase: filler that machine text overuses, when it piles up (值得注意的是, 综上所述, 不难看出, 具有重要意义, 赋能, 闭环, delve, tapestry, testament).
 - false-balance: lists good and bad sides and takes no position (既有……也有……, 需要辩证看待, "it depends on each individual").
-- assistant-voice: words to a requester rather than to the reader (以下是, 希望对您有帮助, 供参考, "Great question", "let me know").
+- assistant-voice: words to a requester rather than to the reader (以下是, 希望对您有帮助, 供参考, "Great question", "let me know"), and notes about the document itself (its genre, structure, where its data came from, what is still to fill in).
 - sentimental-closure: an ending lifted into feeling or slogans the body did not earn (仿佛又听见, 书写精彩篇章, "perhaps the greatest gift").
 - missing-actor: statements that hide who did what (相关工作得到推进, 有关问题得到解决, "steps have been taken").
 - unsupported-method: fieldwork, visits, interviews, surveys or analysis the text claims but does not show (实地走访, 座谈了解到, 问卷显示, 调研发现 with no record of who, when or how many).

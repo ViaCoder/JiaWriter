@@ -8,7 +8,7 @@ export const CORE_RULES: readonly string[] = [
 	"Do what the user asked and stop there: a request to search gets results, and a draft comes only when the user asks for one",
 	'State what is so, in chat and in documents. Before writing "X is not Y" or "X does not mean Y", ask who claimed Y: if nobody did, drop the sentence; if it carries information, say it positively',
 	"Today's date is in the latest [Date: …] note",
-	"When writing a document, keep it in a Markdown file and say in chat only what you wrote and where",
+	"When writing a document, keep it in a Markdown file, the document alone with no notes about it, and say in chat only what you wrote and where",
 	"Before a topic's first search or document, use topic_open with 1–3 key words; the same words continue",
 	// The user, 2026-11-08: no search unless asked, "since now do not have good enough search engine".
 	"Search only when the user asks",
