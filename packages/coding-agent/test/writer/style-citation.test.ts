@@ -80,3 +80,27 @@ describe("citationIssues: outlets named 新闻, 周刊 or 杂志", () => {
 		]);
 	});
 });
+
+describe("citationIssues: an outlet with no date", () => {
+	it("finds it in the body and gives the user's form", () => {
+		// A 2026-11-08 research brief wrote the first one.
+		expect(citationIssues("伊朗称三艘油轮遇袭，路透社援引澳新银行称通行量不足六成。")).toEqual([
+			{ quote: "路透社", form: "YYYY年MM月DD日《路透社》" },
+		]);
+		expect(citationIssues("据新华社报道，谈判将于下周举行。")).toEqual([
+			{ quote: "据新华社报道", form: "YYYY年MM月DD日《新华社》报道" },
+		]);
+		// Words before 据 are not the outlet's name.
+		expect(citationIssues("但据路透社援引消息人士称，……")).toEqual([
+			{ quote: "据路透社", form: "YYYY年MM月DD日《路透社》" },
+		]);
+	});
+	it("leaves generic words, dated forms, open source brackets and reference entries to other rules", () => {
+		expect(citationIssues("相关新闻报道显示，本报报道后，各地电视台报道了此事。")).toEqual([]);
+		expect(citationIssues("11月7日，据路透社报道，……").map((f) => f.quote)).toEqual(["11月7日，据路透社"]);
+		expect(citationIssues("销量翻倍（来源：央视网援引中汽协）。")).toHaveLength(1);
+		expect(
+			citationIssues("正文。\n\n## 参考文献\n\n[油价周报，Rigzone刊发彭博社报道，2026-11-05](https://example.com)"),
+		).toEqual([]);
+	});
+});

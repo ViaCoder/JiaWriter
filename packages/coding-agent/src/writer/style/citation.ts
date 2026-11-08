@@ -5,6 +5,8 @@
  * a date put after the title in brackets.
  */
 
+import { bodyBeforeReferences } from "../text-stats.ts";
+
 /** One citation in a wrong form: the words in the draft and the form they should take. */
 export interface CitationIssue {
 	// The words, character for character.
@@ -19,6 +21,9 @@ const FULL_DATE = /^\d{4}年\d{1,2}月\d{1,2}日$/;
 // 新闻, 周刊 and 杂志 since 2026-11-09 (CBS新闻 was not taken for an outlet).
 const OUTLET = "[\\u4e00-\\u9fa5A-Za-z]{1,12}?(?:通讯社|电视台|新闻社|新闻|周刊|杂志|社|日报|晚报|报|网|台)";
 
+/** The opening words of a phrase that ends like an outlet but names none. */
+const GENERIC = /^(?:相关|有关|各|多家|该|此|本|这|那|上述|其他|其它|境外|境内|国内|国外|海外|主流|官方|地方|新闻)/;
+
 /** The citations in a wrong form, in the order they come. */
 export function citationIssues(text: string): CitationIssue[] {
 	const issues: CitationIssue[] = [];
@@ -31,6 +36,22 @@ export function citationIssues(text: string): CitationIssue[] {
 		// A date without its year gets a mark for the year the materials give.
 		const date = FULL_DATE.test(m[1]) ? m[1] : `YYYY年${m[1]}`;
 		issues.push({ quote: m[0], form: `${date}《${m[2]}》报道` });
+	}
+	// An outlet with no date at all: 路透社援引澳新银行称 / 据新华社报道 (2026-11-09, a research brief). Only in the
+	// body, since a reference entry names its outlet in its own way.
+	const body = bodyBeforeReferences(text);
+	for (const m of body.matchAll(new RegExp(`据?(${OUTLET})(报道|(?=援引))`, "g"))) {
+		const at = m.index ?? 0;
+		// A date just before it is the rule above (the match may start at its 日: 31日新华网); an open bracket is the
+		// 来源 rule below.
+		if (/\d{1,2}月\d{1,2}(?:日[，,、\s]{0,2})?$/.test(body.slice(Math.max(0, at - 14), at))) continue;
+		if (/[（(][^）)]*$/.test(body.slice(Math.max(0, at - 40), at))) continue;
+		// The quote starts at 据 when the words before it were taken in (但据路透社 is 据路透社).
+		const quote = m[0].slice(Math.max(0, m[0].lastIndexOf("据")));
+		const name = m[1].slice(m[1].lastIndexOf("据") + 1);
+		// Words that name no outlet: 相关新闻报道, 本报报道, 各地电视台报道.
+		if (GENERIC.test(name)) continue;
+		issues.push({ quote, form: `YYYY年MM月DD日《${name}》${m[2]}` });
 	}
 	// Forms found by the patterns below, with where they start.
 	const found: [number, CitationIssue][] = [];
