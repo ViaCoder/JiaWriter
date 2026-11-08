@@ -180,6 +180,9 @@ const CORE_EN: readonly StylePattern[] = [
 
 /** 公文 pack: connectors and academic or consultancy jargon that a 公文 does not use. */
 const GONGWEN_ZH: readonly StylePattern[] = [
+	// Spoken words where the written term exists: 0 times in 217,000 characters of human official documents, 4 times in
+	// JiaWriter's eval drafts (随手可承受, 2026-11-09). Each one is looked at, not counted by density.
+	zhp("gw-casual", "公文 口语词", "official style spoken word", "随手|顺手|压根|没啥|一下子|搞定"),
 	// Contrast connector.
 	zhp("gw-raner", "公文 然而", "official style 然而", "然而"),
 	// 首先，其次， skeleton; mid-sentence uses are spared by the comma.
@@ -228,7 +231,7 @@ export const STYLE_PACKS: Readonly<Record<string, readonly StylePattern[]>> = {
 	"core-zh": CORE_ZH.map(weakStock),
 	"core-en": CORE_EN.map(weakStock),
 	// 公文 extension: every one a weak sign, found in State Council documents too.
-	"gongwen-zh": GONGWEN_ZH.map((pattern) => ({ ...pattern, weak: true })),
+	"gongwen-zh": GONGWEN_ZH.map((pattern) => (pattern.id === "gw-casual" ? pattern : { ...pattern, weak: true })),
 };
 
 /** Packs used when the caller names none. */

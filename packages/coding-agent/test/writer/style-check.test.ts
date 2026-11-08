@@ -22,6 +22,7 @@ import { DEFAULT_PACKS, STYLE_PACKS, WEAK_PER_1000 } from "../../src/writer/styl
 /** One hit example per pattern id. */
 const HIT_EXAMPLES: Record<string, string> = {
 	"zh-denial": "这不是目的",
+	"gw-casual": "成本已降到随手可承受的水平",
 	"en-denial": "This is not it",
 	// core-zh.
 	"zh-bushi-ershi": "这一举措不是为了短期收益，而是着眼长远布局。",
