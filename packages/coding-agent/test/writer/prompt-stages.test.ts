@@ -66,8 +66,9 @@ describe("budgets", () => {
 		expect(size(WORKING_RULES)).toBeLessThanOrEqual(700);
 		// Raised from 1500 for the evidence rule (2026-11-08); the user: no "arbitrary or nonsensical limitations" of my own making.
 		// The analysis method moved here from the gongwen skill on 2026-11-08, so it is in one place for every document;
-		// the rest of the growth is the user's citation rule with its exception and the measured placement rule.
-		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(2300);
+		// the rest of the growth is the user's citation rule with its exception, the measured placement rule, and the name
+		// of a requested outline (a 提纲 written to 大纲.md skipped the checks and the export).
+		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(2350);
 		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);

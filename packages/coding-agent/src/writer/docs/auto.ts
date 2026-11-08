@@ -22,8 +22,13 @@ export interface RunMessage {
 	isError?: boolean;
 }
 
-// File names that are working material, not a draft: notes, materials, outlines, plans, to-do lists.
-const NOT_DRAFT = /笔记|素材|大纲|提纲|计划|待办|notes?\b|outline|todo|plan\b|readme|changelog/i;
+// Names of working material, not a draft: notes, materials, the working outline, plans, to-do lists. Only the whole
+// name: a deliverable named after its document, such as 工作方案提纲, is a draft and is checked and exported (a
+// 2026-11-08 outline the user asked for skipped both under the old rule, which matched any name containing 提纲).
+// Notes, materials and to-do lists whatever comes first (素材笔记); an outline or plan only by that name alone, since
+// 工作计划 and 方案提纲 are documents.
+const NOT_DRAFT =
+	/(?:笔记|素材|待办|notes?|todo|readme|changelog)(?:[-_ ]?\d+)?$|^(?:大纲|提纲|计划|outline|plan)(?:[-_ ]?\d+)?$/i;
 
 /** True unless JW_AUTO_EXPORT is off, 0, false or no. */
 export function autoExportEnabled(env: NodeJS.ProcessEnv): boolean {

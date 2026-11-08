@@ -265,6 +265,12 @@ describe("editedDrafts / isDraftPath / autoExportEnabled", () => {
 	it("accepts Markdown drafts in the working folder only", () => {
 		expect(isDraftPath(join(cwd, "报告.md"), cwd)).toBe(true);
 		expect(isDraftPath(join(cwd, "章节", "第一章.markdown"), cwd)).toBe(true);
+		// A deliverable outline named after its document is a draft; the working outline is not.
+		expect(isDraftPath(join(cwd, "工作方案提纲.md"), cwd)).toBe(true);
+		expect(isDraftPath(join(cwd, "提纲.md"), cwd)).toBe(false);
+		expect(isDraftPath(join(cwd, "notes-2.md"), cwd)).toBe(false);
+		expect(isDraftPath(join(cwd, "2026年工作计划.md"), cwd)).toBe(true);
+		expect(isDraftPath(join(cwd, "素材笔记.md"), cwd)).toBe(false);
 		for (const p of [
 			"报告.txt",
 			"报告.export.md",

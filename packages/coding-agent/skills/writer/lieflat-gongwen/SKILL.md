@@ -27,7 +27,7 @@ Purpose: each measure answers one problem named earlier, at its cause, in a form
 - One verb-object heading per measure and one paragraph under it, without restating earlier text.
 - Open by naming the problem it answers, with the genre's openers (针对, 面向, 围绕, 着眼, 鉴于), varied across measures; state measures as decisions, not hypotheses.
 - Then a few sentences of 要 plus a concrete action, each followed by how: channel, mechanism, timing or focus. Write 要, not 应, and no ordinals.
-- Concrete actions, not slogans that only name a goal; vary the main verbs.
+- Concrete actions, not slogans that only name a goal; vary the main verbs. Measures and the points a notice or plan sets out may draw on the field's usual practice (what to check, procedures, mechanisms); facts and figures still come only from the materials.
 - Name the responsible party when it is clear, by the body's name or its function; give platforms and standards their full names.
 - No cases, dates or sources in countermeasures.
 
@@ -52,7 +52,7 @@ Purpose: official prose persuades by stating facts and judgments plainly; spoken
 - Keep obligation words and dashes rare; colons only for quotations, the addressee and the level headings of statutory documents.
 - Gloss a term only when it is genuinely obscure.
 - Acknowledge achievements before criticizing a system; experience materials leave out the unit's unsolved problems.
-- Use only facts in the materials; without data, make the point by reasoning.
+- Take facts and figures only from the materials; without data, make the point by reasoning.
 - Sentences get their length from parallel elements; read `句子对照库.md` when unsure how to fix one.
 
 Pass: 审批时限由20个工作日压缩至5个工作日。
