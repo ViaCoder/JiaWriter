@@ -75,4 +75,8 @@ describe("driverEnv", () => {
 		expect(env.JW_KEY).toBeUndefined();
 		expect(env.ANYTHING).toBeUndefined();
 	});
+	it("uses the account's own home on macOS, where the system starts the daemon", () => {
+		expect(driverEnv({ HOME: "/tmp/x" }, "darwin", () => "/Users/u").HOME).toBe("/Users/u");
+		expect(driverEnv({ HOME: "/tmp/x" }, "linux", () => "/Users/u").HOME).toBe("/tmp/x");
+	});
 });

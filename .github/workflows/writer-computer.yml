@@ -77,7 +77,8 @@ jobs:
           JW_TCC_SEED: ${{ runner.os == 'macOS' && format('{0}/scripts/computer-app/seed-macos-tcc.sh', github.workspace) || '' }}
         run: |
           python="$(command -v python3 || command -v python)"
-          "$python" -I scripts/writer-computer-check.py "$BINARY" 2>&1 | tee computer-check.log
+          # UTF-8 mode: on Windows Python otherwise reads and prints with the ANSI code page, and -I ignores PYTHONUTF8.
+          "$python" -I -X utf8 scripts/writer-computer-check.py "$BINARY" 2>&1 | tee computer-check.log
           exit "${PIPESTATUS[0]}"
 
       - name: Keep the log

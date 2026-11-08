@@ -6,6 +6,7 @@
 
 // Checking and paths.
 import { createHash } from "node:crypto";
+import { userInfo } from "node:os";
 import { join } from "node:path";
 
 /** The pinned version; it changes with a JiaWriter release, never by itself. */
@@ -77,8 +78,15 @@ export function driverPath(agentDir: string, platform: NodeJS.Platform, env: Nod
 	return join(driverDir(agentDir), platform === "win32" ? "cua-driver.exe" : "cua-driver");
 }
 
-/** What the driver may see of the environment: no keys, and its telemetry off. */
-export function driverEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+/**
+ * What the driver may see of the environment: no keys, and its telemetry off. On macOS the system starts the
+ * daemon with the account's own home, and the socket and settings live there, so every driver command uses it too.
+ */
+export function driverEnv(
+	env: NodeJS.ProcessEnv,
+	platform: NodeJS.Platform = process.platform,
+	accountHome: () => string = () => userInfo().homedir,
+): NodeJS.ProcessEnv {
 	const kept = [
 		"PATH",
 		"HOME",
@@ -100,6 +108,8 @@ export function driverEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
 	];
 	const out: NodeJS.ProcessEnv = {};
 	for (const name of kept) if (env[name] !== undefined) out[name] = env[name];
+	// The home the system gives the daemon, not one a caller set.
+	if (platform === "darwin") out.HOME = accountHome();
 	return {
 		...out,
 		CUA_DRIVER_RS_TELEMETRY_ENABLED: "0",

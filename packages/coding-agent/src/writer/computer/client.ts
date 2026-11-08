@@ -2,6 +2,8 @@
 
 // The driver process.
 import { spawn } from "node:child_process";
+// The home directory, kept out of what is shown.
+import { homedir } from "node:os";
 // Lines of its output.
 import { createInterface } from "node:readline";
 // Its pipes.
@@ -54,10 +56,24 @@ export function driverReply(result: {
 	};
 }
 
+/** Longest part of the driver's last complaint that is kept (characters). */
+const REASON_CHARS = 300;
+
+/** Why the driver stopped, from its last line of errors, with the home directory shown as ~. */
+export function stopReason(lastLine: string, home: string): string {
+	// Without a line, nothing more is known.
+	const line = lastLine.trim().slice(0, REASON_CHARS);
+	if (!line) return "driver stopped";
+	// The account's path is nobody else's business.
+	return `driver stopped: ${home ? line.split(home).join("~") : line}`;
+}
+
 /** What is used of a running driver. */
 export interface DriverProcess {
 	stdin: Writable;
 	stdout: Readable;
+	// Its errors, when they are kept: the last line says why it stopped.
+	stderr?: Readable | null;
 	on(event: "exit" | "error", listener: () => void): unknown;
 	kill(): unknown;
 }
@@ -74,18 +90,24 @@ export async function connectDriver(child: DriverProcess): Promise<DriverClient>
 			// A line that is not the protocol.
 		}
 	});
+	// The last line the driver complained with.
+	let lastLine = "";
+	if (child.stderr)
+		createInterface({ input: child.stderr }).on("line", (line) => {
+			if (line.trim()) lastLine = line;
+		});
 	// The driver gone, or never there: nothing more will come.
 	let stopped = false;
 	const stop = () => {
 		stopped = true;
-		for (const done of waiting.values()) done({ error: { message: "driver stopped" } });
+		for (const done of waiting.values()) done({ error: { message: stopReason(lastLine, homedir()) } });
 	};
 	child.on("exit", stop);
 	child.on("error", stop);
 	/** One request. */
 	const request = (method: string, params: unknown) =>
 		new Promise<{ result?: unknown; error?: { message?: string } }>((done, fail) => {
-			if (stopped) return done({ error: { message: "driver stopped" } });
+			if (stopped) return done({ error: { message: stopReason(lastLine, homedir()) } });
 			const id = ++next;
 			const timer = setTimeout(() => fail(new Error("driver: no reply")), CALL_MS);
 			waiting.set(id, (reply) => {
@@ -112,7 +134,7 @@ export async function connectDriver(child: DriverProcess): Promise<DriverClient>
 	};
 }
 
-/** Start the driver. */
+/** Start the driver; its errors are read, so it can say why it stopped. */
 export function startDriver(path: string, env: NodeJS.ProcessEnv): Promise<DriverClient> {
-	return connectDriver(spawn(path, ["mcp"], { env, stdio: ["pipe", "pipe", "ignore"] }));
+	return connectDriver(spawn(path, ["mcp"], { env, stdio: ["pipe", "pipe", "pipe"] }));
 }

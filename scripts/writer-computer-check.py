@@ -31,6 +31,13 @@ WINDOW_WAIT = 12
 ACTION_LIMIT = 8
 
 
+def account_home():
+    """The home directory the system records for this account, whatever HOME says."""
+    # pwd exists on Unix only, so it is imported here, where only macOS comes.
+    import pwd
+    return pwd.getpwuid(os.getuid()).pw_dir
+
+
 def load_browser_check():
     """The mock model and helpers of the browser check."""
     spec = importlib.util.spec_from_file_location("browser_check", os.path.join(ROOT, "scripts", "writer-browser-check.py"))
@@ -108,10 +115,12 @@ def inner():
         return finish(checks, model, tmp)
     if os.environ.get("JW_TCC_SEED"):
         subprocess.run([os.environ["JW_TCC_SEED"]], check=False)
-    state = subprocess.run([driver, "telemetry", "status"], env={"HOME": env["HOME"], "USERPROFILE": tmp, "PATH": os.environ["PATH"], "SystemRoot": os.environ.get("SystemRoot", "")}, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+    # On macOS the system starts the daemon with the account's home, and the program hands the driver that one too.
+    driver_home = account_home() if sys.platform == "darwin" else env["HOME"]
+    state = subprocess.run([driver, "telemetry", "status"], env={"HOME": driver_home, "USERPROFILE": tmp, "PATH": os.environ["PATH"], "SystemRoot": os.environ.get("SystemRoot", "")}, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     print(state.stdout.strip()[:200])
     checks.append(("驱动的遥测已持久关闭，不靠环境变量", "disabled" in state.stdout))
-    doctor = subprocess.run([driver, "doctor"], env={**os.environ, "HOME": env["HOME"], "CUA_TELEMETRY": "0"}, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
+    doctor = subprocess.run([driver, "doctor"], env={**os.environ, "HOME": driver_home, "CUA_TELEMETRY": "0"}, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     print(doctor.stdout[:1500])
     out_file = os.path.join(tmp, "结果.txt")
     app = start_app(out_file, {**env, "DISPLAY": os.environ.get("DISPLAY", "")} if sys.platform == "linux" else {**os.environ}, tmp)
@@ -197,6 +206,9 @@ def finish(checks, model, tmp):
 
 def main():
     """On Linux start a display and a D-Bus session and go inside; elsewhere the session is already there."""
+    # Windows defaults to its ANSI code page, and -I ignores PYTHONUTF8: run again in UTF-8 mode, with the same exit code.
+    if sys.platform == "win32" and not sys.flags.utf8_mode:
+        return subprocess.run([sys.executable, "-I", "-X", "utf8", os.path.abspath(__file__)] + sys.argv[1:]).returncode
     if sys.platform != "linux" or os.environ.get("JW_CHECK_INNER"):
         return inner()
     if not shutil.which("Xvfb") or not shutil.which("dbus-run-session"):

@@ -1,4 +1,5 @@
-# The Windows test window of the computer check: pressing the button writes the field to the file named first.
+﻿# The Windows test window of the computer check: pressing the button writes the field to the file named first.
+# Saved as UTF-8 with a byte order mark: without one, Windows PowerShell 5.1 reads the Chinese as its ANSI code page.
 param([string]$Out)
 Add-Type -AssemblyName System.Windows.Forms
 $form = New-Object System.Windows.Forms.Form

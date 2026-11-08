@@ -228,6 +228,11 @@ describe("runComputer", () => {
 			reason: "no-window",
 			next: "model",
 		});
+		// A process alone is not enough: the driver is never asked without a window.
+		expect(await runComputer({ action: "read", pid: 7 }, deps)).toMatchObject({
+			reason: "no-window",
+			effect: "refused",
+		});
 	});
 	it("asks by what a click presses", async () => {
 		const { deps, asked } = await reading();

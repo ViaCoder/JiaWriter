@@ -204,7 +204,9 @@ export async function runComputer(input: ComputerInput, deps: ComputerDeps): Pro
 		if (action === "windows") return await listWindows(driver);
 		if (input.pid !== undefined) state.pid = input.pid;
 		if (input.window !== undefined) state.window = input.window;
-		if (action !== "launch" && state.pid === undefined) return outcome("refused", action, "model", "no-window");
+		// Every action but launch is on one known window: the driver is never asked without one.
+		if (action !== "launch" && (state.pid === undefined || state.window === undefined))
+			return outcome("refused", action, "model", "no-window");
 		const scope = input.name ?? (state.app || String(state.pid));
 		const refused = tierRefusal(input, appTier(scope));
 		if (refused) return outcome("refused", action, "user", refused);

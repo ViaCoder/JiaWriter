@@ -2,12 +2,13 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { connectDriver, driverReply, startDriver } from "../../src/writer/computer/client.ts";
+import { connectDriver, driverReply, startDriver, stopReason } from "../../src/writer/computer/client.ts";
 
 /** A driver that answers every request. */
 function fakeProcess(answer: (method: string, params: { name?: string }) => unknown) {
 	const stdin = new PassThrough();
 	const stdout = new PassThrough();
+	const stderr = new PassThrough();
 	const events = new EventEmitter();
 	let killed = false;
 	stdin.on("data", (chunk: Buffer) => {
@@ -20,6 +21,7 @@ function fakeProcess(answer: (method: string, params: { name?: string }) => unkn
 	return {
 		stdin,
 		stdout,
+		stderr,
 		on: (event: "exit" | "error", listener: () => void) => events.on(event, listener),
 		kill: () => {
 			killed = true;
@@ -76,6 +78,28 @@ describe("connectDriver", () => {
 		silent.stop();
 		await expect(pending).rejects.toThrow("driver stopped");
 		expect(child).toBeDefined();
+	});
+
+	it("says why the driver stopped, from its last line of errors", async () => {
+		const child = fakeProcess(() => ({ result: {} }));
+		const client = await connectDriver(child);
+		child.stdin.removeAllListeners("data");
+		const pending = client.call("x", {});
+		child.stderr.write("starting\ndaemon did not appear\n");
+		// The line is read before the process is gone.
+		await new Promise((done) => setTimeout(done, 20));
+		child.stop();
+		await expect(pending).rejects.toThrow("driver stopped: daemon did not appear");
+	});
+});
+
+describe("stopReason", () => {
+	it("gives the driver's last complaint, with the home directory as ~", () => {
+		expect(stopReason("", "/Users/u")).toBe("driver stopped");
+		expect(stopReason("no daemon on /Users/u/Library/x.sock", "/Users/u")).toBe(
+			"driver stopped: no daemon on ~/Library/x.sock",
+		);
+		expect(stopReason("x".repeat(500), "").length).toBeLessThan(330);
 	});
 });
 
