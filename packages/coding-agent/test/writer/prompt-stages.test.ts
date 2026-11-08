@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
-import writerPromptsExtension, { NO_USER_NOTE } from "../../src/extensions/writer-prompts/index.ts";
+import writerPromptsExtension, { NO_USER_NOTE, withStageTexts } from "../../src/extensions/writer-prompts/index.ts";
 import { t } from "../../src/writer/i18n/index.ts";
 import { WRITER_PREAMBLE } from "../../src/writer/prompt-text.ts";
 import { SUMMARY_PROMPT, SUMMARY_TURN_PROMPT, SUMMARY_UPDATE_PROMPT } from "../../src/writer/prompts/compact.ts";
@@ -264,10 +264,28 @@ describe("dueStages", () => {
 	});
 });
 
+/** A tool result as the request carries it: the stages it brought after its own text. */
+function staged(out: unknown): { content: { text: string }[] } {
+	const o = out as { content: unknown[]; details: unknown };
+	const message = {
+		role: "toolResult",
+		toolCallId: "1",
+		toolName: "t",
+		content: o.content,
+		details: o.details,
+		isError: false,
+		timestamp: 0,
+	};
+	return withStageTexts([message as never])[0] as unknown as { content: { text: string }[] };
+}
+
 describe("the extension", () => {
-	it("appends a stage to the first success only, after the tool's own text", () => {
+	it("adds a stage to the first success only, after the tool's own text, in the request and not on screen", () => {
 		const on = handlers().get("tool_result");
-		const first = on?.(result("write")) as { content: { text: string }[] };
+		const out = on?.(result("write")) as { content: { text: string }[] };
+		// The result as stored and shown keeps only the tool's text.
+		expect(out.content.map((c) => c.text)).toEqual(["结果"]);
+		const first = staged(out);
 		expect(first.content[0].text).toBe("结果");
 		expect(first.content[1].text).toContain("Writing rules:");
 		expect(on?.(result("write"))).toBeUndefined();
@@ -284,16 +302,16 @@ describe("the extension", () => {
 	});
 
 	it("gives the writing rules to a draft written without a topic", () => {
-		const out = handlers().get("tool_result")?.(result("write")) as { content: { text: string }[] };
+		const out = staged(handlers().get("tool_result")?.(result("write")));
 		expect(out.content[1].text).toContain("Writing rules:");
 	});
 
 	it("gives research rules once, and each method's rules once", () => {
 		const on = handlers().get("tool_result");
-		const a = on?.(result("search_web", "codex")) as { content: { text: string }[] };
+		const a = staged(on?.(result("search_web", "codex")));
 		expect(a.content[1].text).toContain("Research rules:");
 		expect(a.content[1].text).toContain("Method codex of search_web:");
-		const b = on?.(result("search_web", "browser")) as { content: { text: string }[] };
+		const b = staged(on?.(result("search_web", "browser")));
 		expect(b.content[1].text).not.toContain("Research rules:");
 		expect(b.content[1].text).toContain("Method browser of search_web:");
 		expect(on?.(result("search_web", "codex"))).toBeUndefined();
