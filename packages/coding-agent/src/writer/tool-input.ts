@@ -19,6 +19,20 @@ export interface TextInput {
 	text?: string;
 }
 
+/** Where the last draft written is kept: one place per process, as every copy of this module reads it. */
+const LAST_DRAFT = Symbol.for("jiawriter.lastDraft");
+const holder = globalThis as Record<symbol, string | undefined>;
+
+/** Remember the draft the model wrote last (absolute path). */
+export function setLastDraft(path: string | undefined): void {
+	holder[LAST_DRAFT] = path;
+}
+
+/** The draft the model wrote last, if any. */
+export function lastDraft(): string | undefined {
+	return holder[LAST_DRAFT];
+}
+
 /** Binary document formats these tools do not read. */
 const BINARY_EXTENSIONS = new Set([".doc", ".docx", ".pdf", ".odt", ".rtf", ".xls", ".xlsx", ".ppt", ".pptx"]);
 
@@ -44,7 +58,10 @@ export async function loadToolText(input: TextInput, cwd: string): Promise<strin
 		}
 	}
 	// Inline text.
-	if (input.text !== undefined) return input.text;
-	// Neither was given.
+	if (input.text !== undefined && input.text !== "") return input.text;
+	// Neither was given: the last draft written, which is what a check after writing means (a model on 2026-11-08
+	// called gongwen_check without either 89 times).
+	const draft = lastDraft();
+	if (draft) return loadToolText({ path: draft }, cwd);
 	throw new Error(t("input.none"));
 }

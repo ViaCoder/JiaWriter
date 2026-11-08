@@ -1,7 +1,7 @@
 // Unit tests for the built-in writer-tools extension (src/extensions/writer-tools/index.ts).
 
 // Temp working directory.
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
@@ -15,9 +15,16 @@ import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 // Extension under test.
 import writerToolsExtension, {
 	type Complete,
+	citesMaterials,
 	draftCheck,
+	draftFolders,
+	finishedChecks,
+	gongwenGenre,
+	hasMaterials,
 	MAX_ROUNDS,
 	modelAsker,
+	referenceTitles,
+	requestedLength,
 } from "../../src/extensions/writer-tools/index.ts";
 // The semantic review line the automatic check ends with.
 import { STYLE_REVIEW } from "../../src/writer/prompts/manuals.ts";
@@ -190,10 +197,133 @@ describe("draftCheck", () => {
 		// Facts come from the materials at hand; nothing asks for more (the user, 2026-11-08).
 		expect(vague.text).toContain("参考资料/.parsed/");
 		expect(vague.text).not.toContain("需补充");
-		expect(vague.text.endsWith(STYLE_REVIEW)).toBe(true);
+		// The reread instruction is added by the callers, once per draft.
+		expect(vague.text).not.toContain(STYLE_REVIEW);
 	});
 	it("passes a report that carries its facts", () => {
 		expect(draftCheck(FACT_REPORT).clean).toBe(true);
+	});
+	it("lists citations in another form than the user's, and is not clean with them", () => {
+		const check = draftCheck(`${FACT_REPORT}\n\n11月7日，路透社称谈判将继续。`);
+		expect(check.clean).toBe(false);
+		expect(check.text).toContain("“11月7日，路透社” → YYYY年11月7日《路透社》报道");
+		expect(draftCheck(FACT_REPORT).text).not.toContain("引用格式不符");
+	});
+	it("notes report paragraphs that open with their evidence, without failing the draft for it", () => {
+		const report = "# 关于禁渔情况的调研报告\n\n2020年，退捕渔船11万艘、渔民22.8万人。禁捕退捕总体平稳。";
+		expect(draftCheck(report).text).toContain("“2020年，退捕渔船11万艘、渔民22.8万人。”");
+		// A note only: a method paragraph may open with specifics too.
+		expect(draftCheck(FACT_REPORT).clean).toBe(true);
+		expect(draftCheck("# 关于做好防汛工作的通知\n\n2026年5月6日起执行。各单位要落实责任。").text).not.toContain(
+			"开头就是",
+		);
+	});
+	it("lists heading numbers and in-text ordinals of documents, and not of general prose", () => {
+		const report = `${FACT_REPORT}\n\n## 1、存在问题\n\n一是人手不足。二是经费短缺。`;
+		const check = draftCheck(report);
+		expect(check.clean).toBe(false);
+		expect(check.text).toContain("“## 1、存在问题” → ## 一、存在问题");
+		expect(check.text).toContain("一是、二是");
+		expect(draftCheck("# 故乡的秋天\n\n## 1、秋天\n\n一是风大。").text).not.toContain("标题编号不符");
+	});
+	it("asks to use each figure once", () => {
+		const check = draftCheck(`${FACT_REPORT}\n\n东坡村现有60岁以上老人412人。`);
+		expect(check.clean).toBe(false);
+		expect(check.text).toContain("同一素材用了不止一处：412人");
+	});
+	it("asks for Chinese quotes around Chinese words", () => {
+		const check = draftCheck(`${FACT_REPORT}\n\n攻击者发布"A股交易时间调整"的消息。`);
+		expect(check.clean).toBe(false);
+		expect(check.text).toContain("1 处中文用了英文引号");
+		expect(draftCheck(`${FACT_REPORT}\n\n他说 "OK" 就走了。`).text).not.toContain("英文引号");
+	});
+	it("checks an official document against official-document habits, and says only that a clean draft passed", () => {
+		const flagged = "这不是一个技术问题，而是一个管理问题。";
+		expect(draftCheck(`# 临江市人民政府办公室关于做好防汛工作的通知\n\n${flagged}`).text).toContain("gongwen-zh");
+		expect(draftCheck(`# 故乡的秋天\n\n${flagged}`).text).not.toContain("gongwen-zh");
+		expect(draftCheck("# 故乡的秋天\n\n秋天来了。").text).toBe("AI 腔检查通过。");
+	});
+});
+
+describe("gongwenGenre and finishedChecks", () => {
+	it("names the genre from the title, or none", () => {
+		expect(gongwenGenre("# 关于长江流域生态环境保护情况的调研报告")).toBe("调研报告");
+		expect(gongwenGenre("# 在全市安全生产工作会议上的讲话")).toBe("领导讲话");
+		expect(gongwenGenre("# 低空经济应用场景培育工作方案")).toBe("工作方案");
+		expect(gongwenGenre("# 故乡的秋天")).toBe("");
+	});
+	it("reports long sentences, rare characters and hard conflicts, but never the corpus length", () => {
+		const long = `# 关于禁渔情况的调研报告\n\n${"退捕渔民转产就业".repeat(14)}。`;
+		expect(finishedChecks(long)[0]).toContain("超过 100 字");
+		// Level-3 characters are reported, level-2 ones (饕餮) are common enough.
+		expect(finishedChecks("# 故乡\n\n桌上放着一坛鬯酒。")[0]).toContain("鬯");
+		expect(finishedChecks("# 故乡\n\n他住在饕餮楼。")).toEqual([]);
+		// A short report is not told to reach 1200 characters.
+		expect(finishedChecks(FACT_REPORT)).toEqual([]);
+		// A speech with a third-level heading is.
+		expect(finishedChecks("# 在全市安全生产工作会议上的讲话\n\n#### 1．抓好排查\n\n要抓好排查。").join("")).toContain(
+			"三级标题",
+		);
+	});
+});
+
+describe("requestedLength", () => {
+	it("reads the length a message asks for", () => {
+		expect(requestedLength("写一篇约1500字的调研报告")).toBe(1500);
+		expect(requestedLength("3000字左右")).toBe(3000);
+		expect(requestedLength("写一篇调研报告")).toBeUndefined();
+	});
+});
+
+describe("citesMaterials and referenceTitles", () => {
+	it("knows a cited text from one that names no source", () => {
+		const titles = ["国务院关于长江流域生态环境保护工作情况的报告"];
+		expect(citesMaterials("据《国务院关于长江流域生态环境保护工作情况的报告》，退捕渔船11万艘。", titles)).toBe(true);
+		expect(citesMaterials("2026年10月31日《新华网》报道，……", [])).toBe(true);
+		expect(citesMaterials("正文。\n\n## 参考文献\n1. ……", [])).toBe(true);
+		// A law's name is not a source of the facts.
+		expect(citesMaterials("依托《长江保护法》，退捕渔船11万艘。", titles)).toBe(false);
+	});
+	it("takes the titles of the references beside a draft", () => {
+		mkdirSync(join(cwd, "参考资料", ".parsed"), { recursive: true });
+		writeFileSync(join(cwd, "参考资料", ".parsed", "长江报告.pdf.md"), "x");
+		mkdirSync(join(cwd, "主题", "稿件"), { recursive: true });
+		expect(referenceTitles(join(cwd, "主题", "稿件", "稿.md"), cwd)).toEqual(["长江报告"]);
+	});
+});
+
+describe("draftFolders", () => {
+	it("goes from the draft's folder up to the writing folder, and stops at once outside it", () => {
+		expect(draftFolders(join(cwd, "主题", "稿件", "稿.md"), cwd)).toEqual([
+			join(cwd, "主题", "稿件"),
+			join(cwd, "主题"),
+			cwd,
+		]);
+		expect(draftFolders("/elsewhere/稿.md", cwd)).toEqual(["/elsewhere"]);
+	});
+});
+
+describe("hasMaterials", () => {
+	it("finds materials in the draft's folder or above it, up to the writing folder", () => {
+		const topic = join(cwd, "20261108-防汛");
+		mkdirSync(join(topic, "稿件"), { recursive: true });
+		const draft = join(topic, "稿件", "通知.md");
+		// Empty folders and the archive index are no materials.
+		mkdirSync(join(topic, "检索"));
+		writeFileSync(join(topic, "检索", ".index.jsonl"), "{}");
+		writeFileSync(join(topic, "素材.md"), "");
+		expect(hasMaterials(draft, cwd)).toBe(false);
+		// Imported references in the writing folder count.
+		mkdirSync(join(cwd, "参考资料", ".parsed"), { recursive: true });
+		writeFileSync(join(cwd, "参考资料", ".parsed", "报告.txt.md"), "资料");
+		expect(hasMaterials(draft, cwd)).toBe(true);
+		rmSync(join(cwd, "参考资料"), { recursive: true });
+		// So do the topic's saved searches and its materials file.
+		writeFileSync(join(topic, "检索", "001-防汛.md"), "结果");
+		expect(hasMaterials(draft, cwd)).toBe(true);
+		rmSync(join(topic, "检索"), { recursive: true });
+		writeFileSync(join(topic, "素材.md"), "- 案例");
+		expect(hasMaterials(draft, cwd)).toBe(true);
 	});
 });
 
@@ -225,6 +355,8 @@ describe("the automatic check of each draft", () => {
 		const { wrote } = started();
 		const result = wrote("稿.md", VAGUE_REPORT);
 		expect(result?.content.map((c) => c.text)).toEqual(["ok", expect.stringContaining(STYLE_REVIEW)]);
+		// The next write of the same draft gets the check without the reread instruction.
+		expect(wrote("稿.md", VAGUE_REPORT)?.content[1]?.text).not.toContain(STYLE_REVIEW);
 		expect(wrote("notes.txt", VAGUE_REPORT)).toBeUndefined();
 		expect(wrote("稿2.md", VAGUE_REPORT, true)).toBeUndefined();
 	});
@@ -256,6 +388,35 @@ describe("the automatic check of each draft", () => {
 		expect(sent.length).toBe(1);
 		expect(sent[0].message.content).toContain("[sentimental-closure] “王大爷说”");
 		expect(sent[0].message.content).toContain("素材.md");
+	});
+
+	it("drops findings that ask for facts when the draft has no materials, and keeps them when it has", async () => {
+		const answer = JSON.stringify({
+			issues: [{ category: "vague-no-facts", quote: "王大爷说", why: "x", fix: "给出数据" }],
+		});
+		const { handlers, sent, wrote } = started(fakeComplete(answer));
+		wrote("稿.md", FACT_REPORT);
+		await handlers.agent_end({}, reviewCtx());
+		expect(sent).toEqual([]);
+		writeFileSync(join(cwd, "素材.md"), "- 案例");
+		await handlers.agent_end({}, reviewCtx());
+		expect(sent[0]?.message.content).toContain("[vague-no-facts]");
+	});
+
+	it("asks for sources and the requested length when a report lacks them", async () => {
+		const { handlers, sent, wrote } = started();
+		mkdirSync(join(cwd, "参考资料", ".parsed"), { recursive: true });
+		writeFileSync(join(cwd, "参考资料", ".parsed", "东坡村调查.txt.md"), "资料");
+		handlers.input({ text: "写一篇约3000字的调研报告" }, { cwd });
+		wrote("稿.md", FACT_REPORT);
+		await handlers.agent_end({}, { cwd });
+		expect(sent[0]?.message.content).toContain("没有注明出处");
+		expect(sent[0]?.message.content).toContain("要求约 3000 字");
+		// Cited and of the asked length: nothing to say.
+		handlers.input({ text: "写一篇调研报告" }, { cwd });
+		wrote("稿.md", `${FACT_REPORT}\n\n资料来源：《东坡村调查》。`);
+		await handlers.agent_end({}, { cwd });
+		expect(sent.length).toBe(1);
 	});
 
 	it("goes on without the review when the model cannot be asked", async () => {

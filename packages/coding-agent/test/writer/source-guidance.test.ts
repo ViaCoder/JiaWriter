@@ -9,9 +9,11 @@ describe("rules of a document", () => {
 	const writing = WRITING_MANUAL.join("\n");
 	const research = RESEARCH_MANUAL.join("\n");
 
-	it("asks for the outlet's name in the text, never its address", () => {
+	it("asks for the date and the site's Chinese name in the text, never its address", () => {
+		// The user, 2026-11-08: "xx年xx月xx日《xx》报道".
 		expect(writing).toContain("2026年10月31日《路透社》报道");
-		expect(writing).toContain("never an address");
+		expect(writing).toContain("研究成果摘要");
+		expect(writing).toContain("no address");
 		expect(research).toContain("as 路透社 for reuters.com");
 	});
 
@@ -23,11 +25,11 @@ describe("rules of a document", () => {
 	});
 
 	it("asks for specific cases, or authoritative data in their place", () => {
-		expect(writing).toMatch(/names the company, body or person, date, act and figures/);
+		expect(writing).toMatch(/names the body or person, date, act and figures/);
 		expect(writing).toMatch(/official data with period, scope and value/);
 		expect(writing).toContain("某企业");
 		expect(writing).toMatch(/instead of arrows/);
-		expect(writing).toMatch(/without LaTeX/);
+		expect(writing).toMatch(/not LaTeX/);
 		expect(writing).not.toContain("→");
 	});
 });

@@ -2,7 +2,7 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
-import writerPromptsExtension from "../../src/extensions/writer-prompts/index.ts";
+import writerPromptsExtension, { NO_USER_NOTE } from "../../src/extensions/writer-prompts/index.ts";
 import { t } from "../../src/writer/i18n/index.ts";
 import { WRITER_PREAMBLE } from "../../src/writer/prompt-text.ts";
 import { SUMMARY_PROMPT, SUMMARY_TURN_PROMPT, SUMMARY_UPDATE_PROMPT } from "../../src/writer/prompts/compact.ts";
@@ -33,14 +33,17 @@ import { setCurrentTopic } from "../../src/writer/topic/current.ts";
 const size = (rules: readonly string[]) => rules.join("\n").length;
 
 /** Handlers of a fresh extension. */
-function handlers(): Map<string, (event?: unknown) => unknown> {
+function handlers(): Map<string, (event?: unknown, ctx?: unknown) => unknown> {
 	givenStages().clear();
-	const map = new Map<string, (event?: unknown) => unknown>();
+	const map = new Map<string, (event?: unknown, ctx?: unknown) => unknown>();
 	writerPromptsExtension({
-		on: (name: string, handler: (event?: unknown) => unknown) => map.set(name, handler),
+		on: (name: string, handler: (event?: unknown, ctx?: unknown) => unknown) => map.set(name, handler),
 	} as unknown as ExtensionAPI);
 	return map;
 }
+
+/** The context of an interactive session. */
+const UI = { hasUI: true };
 
 /** A successful tool result as the hook gets it. */
 const result = (toolName: string, method?: string) => ({
@@ -59,7 +62,8 @@ afterEach(() => {
 describe("budgets", () => {
 	it("keeps every text short", () => {
 		expect(size(CORE_RULES)).toBeLessThanOrEqual(1000);
-		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(1500);
+		// Raised from 1500 for the evidence rule (2026-11-08); the user: no "arbitrary or nonsensical limitations" of my own making.
+		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(1600);
 		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);
@@ -105,29 +109,38 @@ describe("the user's requirements", () => {
 	const writing = WRITING_MANUAL.join("\n");
 
 	it.each([
-		["the citation form", "2026年10月31日《路透社》报道"],
-		["reference files", "《文件名》第3页"],
+		// Citations only where the type expects them, by kind of source (the user, 2026-11-08).
+		["citing only when expected", "Cite only where the type expects it"],
+		["the citation form", "reports as 2026年10月31日《路透社》报道"],
+		["research summaries", "研究成果摘要"],
+		["reference files", "files as 2021年6月7日《文件名》第3页"],
 		["the reference list", "参考文献"],
 		["a list entry", "[page title, publisher, date](full URL)"],
-		["asking once about cases", "ask once which parts need cases or data"],
-		["running the checks", "run word_count, readability_check and on 公文 gongwen_check"],
+		// No search unless the user asks (the user, 2026-11-08).
+		["cases from the materials", "take cases and data from the materials"],
+		["running the checks", "the program checks each write and, at the end, length, readability and 公文 parameters"],
+		// Old material keeps its date (a 2026 report called 2021 "the first year", 2026-11-08).
+		["dated material", "Give old material its own date"],
 		// The AI-style check runs by itself after each write (the user, 2026-11-08).
-		["checking each draft", "each write gets an AI-style check"],
-		["recording materials", "record what you will use with material_add"],
-		["the paragraph form", "each paragraph opens with a summary"],
+		["recording materials", "for long documents recording them with material_add"],
+		// Analysis: general sentences, then the evidence (the user, 2026-11-08).
+		[
+			"the paragraph form",
+			"a few general sentences that show the mechanism, without named people, events or figures",
+		],
 		["case fields", "time, reporter, subject, action"],
 		["data fields", "time, region, industry, indicator, value"],
-		["other parts", "Other parts are plain prose"],
+		["other parts", "other content needs none"],
 		["no generic cases", "某企业"],
-		["punctuation", "full-width punctuation"],
+		["punctuation", "Full-width punctuation"],
 		["spaces", "only between English words"],
 		["no remarks on reliability", "no remarks on reliability"],
-		["the mechanism behind claims", "the mechanism behind each claim"],
+		["the mechanism behind claims", "general sentences that show the mechanism"],
 		["attributed opinions", "attribute opinions"],
 		["no verification markers", "no verification markers"],
 		["positive argument", "不是……而是"],
 		["no closing summary", "no summary or uplifting close"],
-		["headings", "## to ####"],
+		["headings", "## 一、, ### （一）, two levels; no 一是 or 一要"],
 		["arrows", "instead of arrows"],
 	])("keeps %s", (_name, words) => {
 		expect(writing).toContain(words);
@@ -135,7 +148,7 @@ describe("the user's requirements", () => {
 
 	it("keeps search on the user's request, one call at a time, with no default", () => {
 		const core = CORE_RULES.join("\n");
-		expect(core).toContain("never when told not to");
+		expect(core).toContain("Search only when the user asks");
 		expect(core).toContain("a draft comes only when the user asks for one");
 		expect(core).toContain("one search_web or fetch_web at a time");
 		expect(core).toContain("none is the default");
@@ -298,19 +311,32 @@ describe("the extension", () => {
 		const map = handlers();
 		setCurrentTopic("/tmp/主题");
 		map.get("tool_result")?.(result("search_web", "codex"));
-		expect(map.get("before_agent_start")?.()).toBeUndefined();
+		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
 		map.get("session_compact")?.();
-		expect(map.get("before_agent_start")?.()).toBeUndefined();
+		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
+	});
+
+	it("tells a session without an interface once that nobody answers, and an interactive one never", () => {
+		const map = handlers();
+		const out = map.get("before_agent_start")?.({}, { hasUI: false }) as {
+			message: { content: string; customType: string };
+		};
+		expect(out.message).toMatchObject({ customType: "jiawriter-no-user", content: NO_USER_NOTE });
+		expect(map.get("before_agent_start")?.({}, { hasUI: false })).toBeUndefined();
+		// A new session is told again; an interactive one is not.
+		map.get("session_start")?.();
+		expect(map.get("before_agent_start")?.({}, { hasUI: false })).toBeDefined();
+		expect(handlers().get("before_agent_start")?.({}, UI)).toBeUndefined();
 	});
 
 	it("gives the writing rules back after compaction when a document is under way, once", () => {
 		const map = handlers();
 		map.get("tool_result")?.(result("write"));
 		map.get("session_compact")?.();
-		const out = map.get("before_agent_start")?.() as { message: { content: string; display: boolean } };
+		const out = map.get("before_agent_start")?.({}, UI) as { message: { content: string; display: boolean } };
 		expect(out.message.content).toBe(stageText(PROMPT_STAGES[0]));
 		expect(out.message.display).toBe(false);
-		expect(map.get("before_agent_start")?.()).toBeUndefined();
+		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
 	});
 });
 

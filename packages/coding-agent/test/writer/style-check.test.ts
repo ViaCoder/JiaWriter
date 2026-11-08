@@ -45,7 +45,7 @@ const HIT_EXAMPLES: Record<string, string> = {
 	"zh-bushiwei": "此举不失为稳妥选择。",
 	"zh-rangwomen": "让我们共同努力。",
 	"zh-zhenzheng": "真正重要的是执行。",
-	"zh-placeholder": "[学校名称]于[日期]举办论坛，202X年X月X日在某市召开。",
+	"zh-placeholder": "[学校名称]于[日期]举办论坛，202X年X月X日在某市召开。临政办发〔2026〕 号",
 	// core-en.
 	"en-not-just-but": "It is not just a tool but a habit.",
 	"en-not-about": "It's not about speed, it's about trust.",
@@ -295,6 +295,11 @@ describe("inferRegister", () => {
 		expect(inferRegister("\n\n2025年工作总结\n正文")).toBe("report");
 		expect(inferRegister("# Survey of reading habits")).toBe("report");
 		expect(inferRegister("# 故乡的秋天\n正文")).toBe("general");
+		// Official documents by their kind at the end of the title.
+		expect(inferRegister("# 临江市人民政府办公室关于做好2026年全市防汛抗洪救灾工作的通知\n正文")).toBe("official");
+		expect(inferRegister("《关于推进全域旅游发展的实施方案》")).toBe("official");
+		// A kind word inside a title is not the kind of the text.
+		expect(inferRegister("# 通知送达以后")).toBe("general");
 	});
 });
 

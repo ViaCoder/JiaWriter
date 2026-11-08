@@ -8,17 +8,17 @@ import { MATERIAL_FILE, TOPIC_DIRS } from "../topic/topic.ts";
 
 /** How a document is written: only once the user has asked for one and writing starts. */
 export const WRITING_MANUAL: readonly string[] = [
-	`Order: confirm purpose, audience and length; outline in ${TOPIC_DIRS.drafts}/大纲.md; ask once which parts need cases or data, unless the user's plan says; research those parts and record what you will use with material_add; check ${MATERIAL_FILE} against the outline; draft (each write gets an AI-style check); run word_count, readability_check and on 公文 gongwen_check; revise what they flag`,
-	"Parts with cases or data: each paragraph opens with a summary, then a case (time, reporter, subject, action) or data point (time, region, industry, indicator, value). Other parts are plain prose",
-	"A case names the company, body or person, date, act and figures; failing that, official data with period, scope and value. Never 某企业",
-	"Cite in the text as 2026年10月31日《路透社》报道 or 《文件名》第3页, never an address",
-	"End with 参考文献: every source used, numbered, as [page title, publisher, date](full URL) of a page opened with fetch_web",
-	"Write mainly in Chinese with full-width punctuation; no spaces around Chinese (使用GPT-5模型), only between English words",
-	"Use common words and explain a needed term once. State facts directly and attribute opinions, with no remarks on reliability and no verification markers",
-	"Show the mechanism behind each claim, and keep 不是……而是 for real prohibitions",
-	"Open with the substance: no summary or uplifting close",
-	"Use # for the title, ## to #### for levels 1–3, Unicode symbols (×, ≤, x²) without LaTeX, and — instead of arrows",
-	`Read 参考资料/.parsed for parsed files, quote them as written, and check ${TOPIC_DIRS.search}/ and ${TOPIC_DIRS.web}/ before repeating a search`,
+	`Order: confirm purpose, audience and length; outline long documents in ${TOPIC_DIRS.drafts}/大纲.md; take cases and data from the materials, for long documents recording them with material_add and checking ${MATERIAL_FILE} against the outline; draft; the program checks each write and, at the end, length, readability and 公文 parameters: revise what it flags`,
+	"Analysis (situation, risks, trends): a few general sentences that show the mechanism, without named people, events or figures, then a case (time, reporter, subject, action) or data point (time, region, industry, indicator, value) as evidence; other content needs none",
+	"A case names the body or person, date, act and figures, else official data with period, scope and value; never 某企业; use the strongest for each point, each case and figure once",
+	"Cite only where the type expects it (reports, research; not notices or speeches unless asked): reports as 2026年10月31日《路透社》报道, files as 2021年6月7日《文件名》第3页, research summaries as 研究成果摘要, else the usual standard; no address; then 参考文献, numbered, as [page title, publisher, date](full URL) of pages opened with fetch_web",
+	"Full-width punctuation; spaces only between English words (使用GPT-5模型)",
+	"Use common words, explain a term once, state facts and attribute opinions; no remarks on reliability, no verification markers",
+	"不是……而是 only for real prohibitions",
+	"Open with substance; no summary or uplifting close",
+	"Give old material its own date, not today's",
+	"# title, ## 一、, ### （一）, two levels; no 一是 or 一要; Unicode (×, ≤, x²) not LaTeX, — instead of arrows",
+	"Quote materials as written",
 ];
 
 /** How to research: the first search or fetch. */
@@ -43,7 +43,9 @@ export const CHECK_MANUALS: Readonly<Record<string, readonly string[]>> = {
 		"Edit only flagged passages; keep a denial that answers a real claim, and stop when only those remain",
 		'For 公文 add packs: ["core-zh", "gongwen-zh"]',
 	],
-	word_count: ["Lengthen or shorten the sections it reports, against the target in the brief"],
+	word_count: [
+		"Lengthen or shorten the sections it reports, against the target in the brief, never padding with repetition or facts the materials lack",
+	],
 	readability_check: ["Replace the rare characters and split the long sentences, keeping names and quotations"],
 	gongwen_check: ["Fix every ✗ and explain each deliberate ⚠"],
 };

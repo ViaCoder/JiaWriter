@@ -6,6 +6,7 @@
  */
 
 // Files.
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 // Path helpers.
 import { basename, dirname, extname, join, relative, sep } from "node:path";
@@ -20,6 +21,17 @@ import { decodeXml, docxToPages } from "./docx-read.ts";
 export const SOURCE_DIRS = ["参考资料", "sources"];
 /** Folder of the parsed files inside a reference folder. */
 export const PARSED_DIR = ".parsed";
+/** The imported files under a folder's reference folders, sorted. */
+export function parsedFiles(root: string): string[] {
+	return SOURCE_DIRS.flatMap((d) => {
+		const dir = join(root, d, PARSED_DIR);
+		if (!existsSync(dir)) return [];
+		// Markdown files at any depth, as paths.
+		const names = readdirSync(dir, { recursive: true, encoding: "utf-8" }).filter((name) => name.endsWith(".md"));
+		return names.sort().map((name) => join(dir, name));
+	});
+}
+
 /** File types read. */
 export const IMPORT_EXTS = [".pdf", ".docx", ".txt", ".md", ".html", ".htm"];
 /** Below this many visible characters per page a PDF counts as scanned. */

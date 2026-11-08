@@ -4,8 +4,10 @@
  * JW_LANG language; none of them changes the text.
  */
 
-// The drafts an automatic check reads.
-import { existsSync, readFileSync } from "node:fs";
+// The drafts an automatic check reads, and the materials beside them.
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+// Walking from a draft up to the writing folder.
+import { basename, dirname, join, relative } from "node:path";
 // One request to the session's model, for the semantic review.
 import { type Api, completeSimple, type Model } from "@earendil-works/pi-ai/compat";
 // Parameter schemas.
@@ -16,20 +18,36 @@ import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types
 import { resolveToCwd } from "../../core/tools/path-utils.ts";
 // Which files are drafts.
 import { isDraftPath } from "../../writer/docs/auto.ts";
+// The imported references beside a draft.
+import { parsedFiles } from "../../writer/docs/import.ts";
+// The 公文 parameter check, run by the program at the end of a turn.
+import { analyze, hardFails } from "../../writer/gongwen/check.ts";
 // Output messages.
 import { t } from "../../writer/i18n/index.ts";
 // The semantic review line.
 import { STYLE_REVIEW } from "../../writer/prompts/manuals.ts";
 // Readability check.
-import { DEFAULT_SENTENCE_LIMIT, formatReadability, readabilityCheck } from "../../writer/readability.ts";
+import {
+	DEFAULT_SENTENCE_LIMIT,
+	formatReadability,
+	longSentences,
+	rareChars,
+	readabilityCheck,
+} from "../../writer/readability.ts";
 // AI-style check.
 import { formatStyleReport, inferRegister, styleCheck, styleClean } from "../../writer/style/check.ts";
+// The program's checks of a draft, as one table.
+import { runDraftChecks } from "../../writer/style/draft-checks.ts";
 // The default threshold for the schema description.
 import { DEFAULT_NEGATION_THRESHOLD } from "../../writer/style/patterns.ts";
 // The semantic review by a separate request.
-import { formatReview, reviewDraft, reviewEnabled } from "../../writer/style/review.ts";
+import { formatReview, keepAnswerable, reviewDraft, reviewEnabled } from "../../writer/style/review.ts";
+// Length as writers count it.
+import { countText } from "../../writer/text-stats.ts";
 // Shared input loading.
-import { loadToolText } from "../../writer/tool-input.ts";
+import { loadToolText, setLastDraft } from "../../writer/tool-input.ts";
+// The materials folders and file of a topic.
+import { MATERIAL_FILE, TOPIC_DIRS } from "../../writer/topic/topic.ts";
 // Length check.
 import { DEFAULT_TOLERANCE, formatWordCount, wordCount } from "../../writer/word-count.ts";
 
@@ -49,13 +67,103 @@ export const MAX_ROUNDS = 2;
 
 /** The automatic check of a draft: the rules for its register, then the semantic review only a reader can do. */
 export function draftCheck(text: string): { clean: boolean; text: string } {
-	// A report is checked against official-document habits too.
+	// Reports and official documents are checked against official-document habits too.
 	const register = inferRegister(text);
 	const report = styleCheck(text, {
 		register,
-		packs: register === "report" ? ["core-zh", "core-en", "gongwen-zh"] : undefined,
+		packs: register === "general" ? undefined : ["core-zh", "core-en", "gongwen-zh"],
 	});
-	return { clean: styleClean(report), text: `${formatStyleReport(report)}\n${STYLE_REVIEW}` };
+	// The program's other checks, one table (writer/style/draft-checks.ts).
+	const found = runDraftChecks(text, register);
+	// A clean report is one line: the full measures each time were noise the model reread after every edit.
+	const styleText = styleClean(report) ? t("style.passShort") : formatStyleReport(report);
+	const lines = [...found.fail, ...found.note].map((line) => `\n${line}`).join("");
+	return { clean: styleClean(report) && found.fail.length === 0, text: `${styleText}${lines}` };
+}
+
+/** The folders from a draft's own up to the writing folder, where its materials may be. */
+export function draftFolders(file: string, cwd: string): string[] {
+	const dirs: string[] = [];
+	for (let dir = dirname(file); ; dir = dirname(dir)) {
+		dirs.push(dir);
+		// Stop at the writing folder, at the root, or at once for a draft outside the writing folder.
+		if (relative(cwd, dir) === "" || relative(cwd, dir).startsWith("..") || dirname(dir) === dir) return dirs;
+	}
+}
+
+/** Whether a draft has materials to take facts from: 素材.md, imported references, saved searches or pages, in its folder
+ * or any folder above it up to the writing folder. */
+export function hasMaterials(file: string, cwd: string): boolean {
+	// A folder with at least one entry (dot files such as the archive index do not count).
+	const filled = (dir: string) => existsSync(dir) && readdirSync(dir).some((name) => !name.startsWith("."));
+	return draftFolders(file, cwd).some((dir) => {
+		const material = join(dir, MATERIAL_FILE);
+		if (existsSync(material) && statSync(material).size > 0) return true;
+		return [join(dir, TOPIC_DIRS.refs, ".parsed"), join(dir, TOPIC_DIRS.search), join(dir, TOPIC_DIRS.web)].some(
+			filled,
+		);
+	});
+}
+
+/** The titles of the references imported beside a draft: 报告 for 参考资料/.parsed/报告.pdf.md. */
+export function referenceTitles(file: string, cwd: string): string[] {
+	return draftFolders(file, cwd)
+		.flatMap(parsedFiles)
+		.map((path) => basename(path, ".md").replace(/\.[^.]+$/, ""));
+}
+
+/** Whether a text names a source: a reference list, a research summary, a reference's title, or a dated citation
+ * (2026年10月31日《路透社》报道). */
+export function citesMaterials(text: string, titles: readonly string[]): boolean {
+	if (/参考文献|研究成果摘要|\d{4}年\d{1,2}月\d{1,2}日《[^》\n]+》/.test(text)) return true;
+	return titles.some((title) => title.length > 0 && text.includes(title));
+}
+
+/** The length the user asked for in a message (约1500字, 1500字左右), if any. */
+export function requestedLength(message: string): number | undefined {
+	const found = /约\s*(\d{3,6})\s*字|(\d{3,6})\s*字左右/.exec(message);
+	return found ? Number(found[1] ?? found[2]) : undefined;
+}
+
+/** Most a draft may be off its requested length before the round asks to fix it: the same as word_count's, so the two
+ * never disagree (a 2026-11-08 run kept cutting a draft word_count called long while the round passed it). */
+export const LENGTH_TOLERANCE = DEFAULT_TOLERANCE;
+
+/** The 公文 genre a draft's title names, as gongwen_check calls them; "" when it names none. */
+export function gongwenGenre(text: string): string {
+	const title = text.split("\n").find((line) => line.trim() !== "") ?? "";
+	if (/调研报告|考察报告/.test(title)) return "调研报告";
+	if (/讲话/.test(title)) return "领导讲话";
+	if (/意见/.test(title)) return "工作意见";
+	if (/方案/.test(title)) return "工作方案";
+	if (/交流材料|经验总结/.test(title)) return "经验总结";
+	if (/经验材料|做法和启示|的做法/.test(title)) return "经验材料";
+	return "";
+}
+
+/** What the program checks in a finished draft instead of the model calling the tools: sentences over the limit,
+ * rare characters and, for a 公文 whose title names its genre, the hard conflicts of gongwen_check. */
+export function finishedChecks(text: string): string[] {
+	const out: string[] = [];
+	const long = longSentences(text);
+	if (long.length > 0)
+		out.push(
+			t("style.longSentences", {
+				count: long.length,
+				limit: DEFAULT_SENTENCE_LIMIT,
+				heads: long.map((s) => `“${s.head}”`).join("、"),
+			}),
+		);
+	// Level-2 characters are common enough; only those beyond them.
+	const rare = rareChars(text).filter((c) => c.level !== 2);
+	if (rare.length > 0) out.push(t("style.rareChars", { chars: rare.map((c) => c.char).join("、") }));
+	// A title that names a 公文 genre is enough: a speech's title names no document kind.
+	const genre = gongwenGenre(text);
+	const metrics = genre ? analyze(text) : null;
+	// Length is the user's to set: the corpus minimum (1200 characters, else "write it as 党建") is left out.
+	const fails = metrics ? hardFails(metrics, genre).filter((f) => f.key !== "chars") : [];
+	if (fails.length > 0) out.push(t("style.gongwenFails", { genre, items: fails.map((f) => f.msg).join("；") }));
+	return out;
 }
 
 /** How one request reaches a model: completeSimple, or a stand-in in tests. */
@@ -89,9 +197,12 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	const written = new Set<string>();
 	let rounds = 0;
 	// A new message from the user starts again.
-	pi.on("input", () => {
+	// The length the user's message asked for, if it named one.
+	let target: number | undefined;
+	pi.on("input", (event) => {
 		written.clear();
 		rounds = 0;
+		target = requestedLength(event.text ?? "");
 	});
 	// After each write or edit of a draft, the program checks it: the model never has to remember to.
 	pi.on("tool_result", (event, ctx) => {
@@ -99,8 +210,13 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		const path = (event.input as { path?: unknown }).path;
 		const file = typeof path === "string" ? resolveToCwd(path, ctx.cwd) : "";
 		if (!file || !isDraftPath(file, ctx.cwd) || !existsSync(file)) return;
+		// The reread instruction once per draft per message; the check itself after every write.
+		const first = !written.has(file);
 		written.add(file);
-		return { content: [...event.content, { type: "text", text: draftCheck(readFileSync(file, "utf-8")).text }] };
+		// The checks called without a file read this one.
+		setLastDraft(file);
+		const text = draftCheck(readFileSync(file, "utf-8")).text;
+		return { content: [...event.content, { type: "text", text: first ? `${text}\n${STYLE_REVIEW}` : text }] };
 	});
 	// When a reply ends, each draft it wrote gets the rules and one separate semantic review; while either finds
 	// something, the program asks for another round, at most MAX_ROUNDS.
@@ -112,12 +228,23 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			if (!existsSync(file)) continue;
 			const text = readFileSync(file, "utf-8");
 			const check = draftCheck(text);
-			const issues = ask ? await reviewDraft(text, ask) : undefined;
-			if (check.clean && !issues?.length) continue;
+			const found = ask ? await reviewDraft(text, ask) : undefined;
+			// Findings that ask for facts only where there are materials to take them from.
+			const materials = hasMaterials(file, ctx.cwd);
+			const issues = found && keepAnswerable(found, materials);
+			// What the program itself sees: a report with materials that names none, a length far from the one asked.
+			const own: string[] = [];
+			if (materials && inferRegister(text) === "report" && !citesMaterials(text, referenceTitles(file, ctx.cwd)))
+				own.push(t("style.noCitation"));
+			const chars = countText(text).total;
+			if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)
+				own.push(t("style.length", { chars, target }));
+			own.push(...finishedChecks(text));
+			if (check.clean && !issues?.length && own.length === 0) continue;
 			const review = issues?.length
 				? `\n${t("style.reviewFound", { count: issues.length })}\n${formatReview(issues)}`
 				: "";
-			open.push(`${file}\n${check.text}${review}`);
+			open.push([`${file}\n${check.text}${review}`, ...own, STYLE_REVIEW].join("\n"));
 		}
 		if (open.length === 0) return;
 		rounds++;

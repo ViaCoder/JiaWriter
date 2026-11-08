@@ -32,6 +32,7 @@ export const REVIEW_CATEGORIES = [
 	"sentimental-closure",
 	"missing-actor",
 	"unsupported-method",
+	"weak-evidence",
 ] as const;
 
 /** Most findings kept from one review, so a long draft's list stays readable. */
@@ -45,7 +46,7 @@ First decide the register: official document (通知, 意见, 报告, 调研报�
 Categories, by id:
 - defensive-negation: denies a claim nobody made, to set up its own point (不是……而是, 并不意味着, 不只是, "isn't just", "it's not X, it's Y").
 - bad-metaphor: a figure that is mixed, worn out, wrong for the register, or fails when read literally; also stock imagery standing in for the real thing, in a text that names nothing specific.
-- far-fetched-link: a cause, consequence or comparison the text does not support; a jump from a small fact to a sweeping conclusion; a statement that cannot be true as written (events in the wrong order, a contradiction).
+- far-fetched-link: a cause, consequence or comparison the text does not support; a jump from a small fact to a sweeping conclusion; a statement that cannot be true as written (an action timed before its cause, such as evacuating people before the flood season; a contradiction).
 - significance-inflation: importance, milestones or new chapters that the facts given do not carry.
 - vague-attribution: 研究表明, 专家认为, 越来越多的人, "studies show", "experts agree" with no source named.
 - vague-no-facts: the register needs facts (numbers, names, dates, places, cases, quotes) and the text gives only 部分, 一些, 逐步, 有所, 不断, 取得成效.
@@ -56,10 +57,12 @@ Categories, by id:
 - sentimental-closure: an ending lifted into feeling or slogans the body did not earn (仿佛又听见, 书写精彩篇章, "perhaps the greatest gift").
 - missing-actor: statements that hide who did what (相关工作得到推进, 有关问题得到解决, "steps have been taken").
 - unsupported-method: fieldwork, visits, interviews, surveys or analysis the text claims but does not show (实地走访, 座谈了解到, 问卷显示, 调研发现 with no record of who, when or how many).
+- weak-evidence: a case or figure that does not prove the point of its paragraph, proves a neighbouring point instead, or repeats material used elsewhere in the text.
 
 Rules:
 - Quote the exact words from the draft, at most 40 characters, copied character for character.
 - Report nothing for sentences that state concrete facts plainly, and nothing you would not defend to an editor of that register.
+- A statement given with its source (据……, ……报道, according to) is the source's: you do not see the writer's materials, so judge only the writer's own reasoning, never ask more support for a sourced statement.
 - For each issue give a fix direction. Never invent facts; where facts are missing, the fix is to take them from the writer's materials, or else to state the point plainly or cut it. Never ask for more content.
 - A clean draft gets an empty list.
 
@@ -96,6 +99,15 @@ export function parseReview(answer: string, draft: string): ReviewIssue[] | unde
 			];
 		})
 		.slice(0, MAX_ISSUES);
+}
+
+/** Categories whose fix is facts: without materials to take them from, they would only invite invented ones. */
+export const NEEDS_MATERIALS: ReadonlySet<string> = new Set(["vague-no-facts"]);
+
+/** The findings the writer can act on: those asking for facts only when there are materials (the user, 2026-11-08: no
+ * request for content that is not there). */
+export function keepAnswerable(issues: readonly ReviewIssue[], materials: boolean): ReviewIssue[] {
+	return materials ? [...issues] : issues.filter((issue) => !NEEDS_MATERIALS.has(issue.category));
 }
 
 /** The findings as lines the drafting model works through. */

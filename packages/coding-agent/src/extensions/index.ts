@@ -12,6 +12,8 @@ import writerDocsExtension from "./writer-docs/index.ts";
 import writerEnvExtension from "./writer-env/index.ts";
 // JiaWriter: gongwen_check for the lieflat-gongwen skill (PolyForm Noncommercial, see its LICENSE).
 import writerGongwenExtension from "./writer-gongwen/index.ts";
+// JiaWriter: stops a call repeated where it cannot help.
+import writerGuardExtension from "./writer-guard/index.ts";
 // JiaWriter: search_web and fetch_web (AnySearch or search_fetch in the user's Chrome).
 import writerPromptsExtension from "./writer-prompts/index.ts";
 // JiaWriter: read-only writing checks (style_check, word_count, readability_check).
@@ -29,6 +31,8 @@ import writerUiExtension from "./writer-ui/index.ts";
 import writerVisionExtension from "./writer-vision/index.ts";
 
 export const builtInExtensions: InlineExtension[] = [
+	// JiaWriter: the loop guard sees every call first.
+	{ name: "writer-guard", factory: writerGuardExtension, builtin: true },
 	// JiaWriter: registers the JW_* model and clamps its output limit.
 	{ name: "writer-env", factory: writerEnvExtension, builtin: true },
 	// JiaWriter: the writing checks.

@@ -55,6 +55,8 @@ describe("formatWordCount", () => {
 		// Lead section label.
 		expect(text).toContain("- (before the first heading): 3");
 		// Band.
-		expect(text).toContain("Target 3, difference 0 (0%), within the allowed range (±10%).");
+		expect(text).toContain(
+			"Target 3, difference 0 (0%), within the allowed range (±20%); no need to change the length.",
+		);
 	});
 });

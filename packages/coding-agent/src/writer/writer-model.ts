@@ -236,6 +236,8 @@ export function formatDetectFailure(result: Extract<DetectResult, { ok: false }>
 		.join("；");
 	// Wrong key.
 	if (result.reason === "auth") return `JW_KEY 无效或没有权限（${statuses}）。请检查 JW_KEY 和 JW_URL。`;
+	// The upstream failed for now.
+	if (result.reason === "transient") return `上游暂时不可用（${statuses}）。请稍后重试。`;
 	// Nothing matched.
 	return `无法自动识别 JW_URL 的 API 类型（${statuses}）。请检查 JW_URL 和 JW_MODEL，或用 JW_API 手动指定：anthropic-messages / openai-responses / openai-completions。`;
 }

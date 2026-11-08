@@ -23,7 +23,16 @@ const FILES = [
 	"packages/coding-agent/src/writer/style/check.ts",
 	"packages/coding-agent/src/writer/style/patterns.ts",
 	"packages/coding-agent/src/writer/style/review.ts",
+	"packages/coding-agent/src/writer/style/citation.ts",
+	"packages/coding-agent/src/writer/style/shape.ts",
+	"packages/coding-agent/src/writer/style/numbering.ts",
+	"packages/coding-agent/src/writer/style/draft-checks.ts",
 	"packages/coding-agent/src/extensions/writer-tools/index.ts",
+	"packages/coding-agent/src/writer/websearch/deepseek.ts",
+	"packages/coding-agent/src/writer/websearch/firecrawl.ts",
+	"packages/coding-agent/src/writer/loop-guard.ts",
+	"packages/coding-agent/src/extensions/writer-guard/index.ts",
+	"packages/coding-agent/src/writer/tool-input.ts",
 	"search_fetch/src/search_fetch/extension/agent.js",
 ];
 

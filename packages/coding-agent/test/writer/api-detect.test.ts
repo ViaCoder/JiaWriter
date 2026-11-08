@@ -17,6 +17,7 @@ import {
 	detectApi,
 	detectCacheKey,
 	detectReasoning,
+	isTransient,
 	loadDetectCache,
 	markReasoningUnsupported,
 	probeEndpoint,
@@ -91,8 +92,8 @@ describe("classifyProbe", () => {
 		expect(classifyProbe(400, "Unrecognized request URL")).toBe("next");
 		// Missing route or method.
 		expect([classifyProbe(404, ""), classifyProbe(405, "")]).toEqual(["next", "next"]);
-		// Bad key.
-		expect([classifyProbe(401, ""), classifyProbe(403, "")]).toEqual(["auth", "auth"]);
+		// Bad key; a 403 may also be a route the gateway does not open.
+		expect([classifyProbe(401, ""), classifyProbe(403, "")]).toEqual(["auth", "refused"]);
 		// Rate limit and server errors prove nothing.
 		expect([classifyProbe(429, ""), classifyProbe(500, "")]).toEqual(["next", "next"]);
 	});
@@ -167,6 +168,65 @@ describe("detectApi", () => {
 		const r = await detectApi("https://h.example.com", "k", "m", fetchFn);
 		// Auth failure after a single request.
 		expect([r.ok, !r.ok && r.reason, calls.length]).toEqual([false, "auth", 1]);
+	});
+
+	it("goes past routes a relay refuses with 403 to the one it opens", async () => {
+		// Calls made.
+		const calls: string[] = [];
+		// A PassManager relay that allows only Chat Completions.
+		const fetchFn = mockFetch(
+			{
+				"/v1/messages": [403, "not allowed"],
+				"/v1/responses": [403, "not allowed"],
+				"/v1/chat/completions": [400, "bad"],
+			},
+			calls,
+		);
+		// Detect.
+		const r = await detectApi("https://h.example.com", "k", "m", fetchFn);
+		// Chat found on the third request.
+		expect([r.ok && r.api, calls.length]).toEqual(["openai-completions", 3]);
+	});
+
+	it("reports auth when every route refuses", async () => {
+		// Calls made.
+		const calls: string[] = [];
+		// Forbidden everywhere.
+		const fetchFn = mockFetch(
+			{ "/v1/messages": [403, ""], "/v1/responses": [403, ""], "/v1/chat/completions": [403, ""] },
+			calls,
+		);
+		// Detect.
+		const r = await detectApi("https://h.example.com", "k", "m", fetchFn);
+		// A key problem, after all three probes.
+		expect([r.ok, !r.ok && r.reason, calls.length]).toEqual([false, "auth", 3]);
+	});
+
+	it("retries a transient failure once, and finds the route behind it", async () => {
+		const calls: string[] = [];
+		let first = true;
+		const fetchFn = (async (url: string) => {
+			calls.push(url);
+			if (url.endsWith("/v1/chat/completions") && first) {
+				first = false;
+				return new Response("bad gateway", { status: 502 });
+			}
+			if (url.endsWith("/v1/chat/completions")) return new Response("bad", { status: 400 });
+			return new Response("", { status: 403 });
+		}) as typeof fetch;
+		const r = await detectApi("https://h.example.com", "k", "m", fetchFn, async () => {});
+		expect([r.ok && r.api, calls.length]).toEqual(["openai-completions", 4]);
+	});
+
+	it("reports the upstream as down, not the key, when a route keeps failing", async () => {
+		const calls: string[] = [];
+		const fetchFn = mockFetch(
+			{ "/v1/messages": [403, ""], "/v1/responses": [403, ""], "/v1/chat/completions": [502, ""] },
+			calls,
+		);
+		const r = await detectApi("https://h.example.com", "k", "m", fetchFn, async () => {});
+		expect([r.ok, !r.ok && r.reason]).toEqual([false, "transient"]);
+		expect(isTransient(429) && isTransient(0) && !isTransient(404)).toBe(true);
 	});
 
 	it("reports none when no route matches", async () => {

@@ -40,8 +40,8 @@ export interface Probe {
 	init: RequestInit;
 }
 
-/** What a probe response means. */
-export type ProbeVerdict = "match" | "next" | "auth";
+/** What a probe response means: "refused" is a 403, which a gateway that opens only some routes also sends. */
+export type ProbeVerdict = "match" | "next" | "auth" | "refused";
 
 /** Request bodies that fail validation on every API: an output limit of 0 and no input. */
 const PROBE_BODIES: Record<WriterApi, (model: string) => Record<string, unknown>> = {
@@ -72,8 +72,10 @@ const NOT_HERE =
 
 /** Classify a probe response from its status code and (short) body. */
 export function classifyProbe(status: number, body: string): ProbeVerdict {
-	// Wrong or unauthorized key: stop probing.
-	if (status === 401 || status === 403) return "auth";
+	// Wrong key: stop probing.
+	if (status === 401) return "auth";
+	// Forbidden here: maybe the key, maybe a route this gateway does not open (a PassManager relay policy).
+	if (status === 403) return "refused";
 	// Missing route or method: try the next API.
 	if (status === 404 || status === 405) return "next";
 	// The server accepted the request: the route and the model work here.
@@ -99,12 +101,32 @@ export interface ProbeOutcome {
 	body: string;
 }
 
-/** Send one probe and classify the answer; network failures count as "next". */
+/** Wait before the one retry of a probe that met a transient failure (ms). */
+export const PROBE_RETRY_MS = 1500;
+
+/** Real sleep. */
+const realSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+/** Whether a status says the upstream failed for now (no response, rate limit, server error), not that the route is wrong. */
+export function isTransient(status: number): boolean {
+	return status === 0 || status === 429 || status >= 500;
+}
+
+/** Send one probe and classify the answer; a transient failure is retried once (a 502 once made detection report a bad key). */
 export async function probeEndpoint(
 	fetchFn: typeof fetch,
 	probe: Probe,
 	timeoutMs = PROBE_TIMEOUT_MS,
+	sleep: (ms: number) => Promise<void> = realSleep,
 ): Promise<ProbeOutcome> {
+	const first = await probeOnce(fetchFn, probe, timeoutMs);
+	if (!isTransient(first.status)) return first;
+	await sleep(PROBE_RETRY_MS);
+	return probeOnce(fetchFn, probe, timeoutMs);
+}
+
+/** One probe request, classified; network failures count as "next". */
+async function probeOnce(fetchFn: typeof fetch, probe: Probe, timeoutMs: number): Promise<ProbeOutcome> {
 	try {
 		// One request with a hard timeout.
 		const response = await fetchFn(probe.url, { ...probe.init, signal: AbortSignal.timeout(timeoutMs) });
@@ -122,22 +144,23 @@ export async function probeEndpoint(
 export type DetectResult =
 	// Found the API.
 	| { ok: true; api: WriterApi; outcomes: ProbeOutcome[] }
-	// Stopped on an auth error, or nothing matched.
-	| { ok: false; reason: "auth" | "none"; outcomes: ProbeOutcome[] };
+	// Stopped on an auth error, the upstream failed for now, or nothing matched.
+	| { ok: false; reason: "auth" | "transient" | "none"; outcomes: ProbeOutcome[] };
 
-/** Probe the APIs in order; stop at the first match or at an auth error. */
+/** Probe the APIs in order; stop at the first match or at a 401; a 403 is a key problem only if nothing matches. */
 export async function detectApi(
 	root: string,
 	key: string,
 	model: string,
 	fetchFn: typeof fetch,
+	sleep: (ms: number) => Promise<void> = realSleep,
 ): Promise<DetectResult> {
 	// Every probe that was sent.
 	const outcomes: ProbeOutcome[] = [];
 	// Anthropic first, then Responses, then Chat Completions.
 	for (const api of WRITER_APIS) {
 		// Exactly one request per API.
-		const outcome = await probeEndpoint(fetchFn, buildProbe(root, api, key, model));
+		const outcome = await probeEndpoint(fetchFn, buildProbe(root, api, key, model), PROBE_TIMEOUT_MS, sleep);
 		// Keep it for the report.
 		outcomes.push(outcome);
 		// Found it.
@@ -145,8 +168,10 @@ export async function detectApi(
 		// Bad key: further probes would fail the same way.
 		if (outcome.verdict === "auth") return { ok: false, reason: "auth", outcomes };
 	}
-	// Nothing matched.
-	return { ok: false, reason: "none", outcomes };
+	// Nothing matched. A route that failed for now may be the right one, so that is said first; then a refusal points
+	// at the key or its permissions.
+	if (outcomes.some((o) => isTransient(o.status))) return { ok: false, reason: "transient", outcomes };
+	return { ok: false, reason: outcomes.some((o) => o.verdict === "refused") ? "auth" : "none", outcomes };
 }
 
 /** How the endpoint accepts reasoning parameters. */

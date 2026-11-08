@@ -77,8 +77,8 @@ export interface StructureStats {
 	boldOver: boolean;
 }
 
-/** The kind of text: a report must carry facts; other prose need not. */
-export type StyleRegister = "report" | "general";
+/** The kind of text: a report must carry facts; an official document (通知, 意见, 方案) follows official habits; other prose neither. */
+export type StyleRegister = "report" | "official" | "general";
 
 /** Measures of the whole text, where machine prose shows more than in any one phrase. */
 export interface ProseStats {
@@ -220,11 +220,15 @@ export function structureStats(text: string): StructureStats {
 	};
 }
 
-/** A report when the title says so (报告, 调研, 总结, 情况, report, survey), else general prose. */
+/** A report when the title says so (报告, 调研, 总结, 情况, report, survey); official when it ends in a document kind; else general. */
 export function inferRegister(text: string): StyleRegister {
 	// The first line with words: the title, or the opening.
 	const title = text.split("\n").find((line) => line.trim() !== "") ?? "";
-	return /报告|调研|调查|总结|情况|白皮书|\breport\b|\bsurvey\b/i.test(title) ? "report" : "general";
+	if (/报告|调研|调查|总结|情况|白皮书|\breport\b|\bsurvey\b/i.test(title)) return "report";
+	// The kinds of official document, named at the end of the title (……的通知, 实施方案).
+	return /(通知|通报|意见|决定|办法|方案|规定|细则|规划|请示|批复|公告|通告|纪要|函)[》」\s*]*$/.test(title)
+		? "official"
+		: "general";
 }
 
 /** Count per 1,000 characters, one decimal. */

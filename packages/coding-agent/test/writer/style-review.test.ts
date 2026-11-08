@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
 	formatReview,
+	keepAnswerable,
 	MAX_ISSUES,
 	parseReview,
 	REVIEW_CATEGORIES,
@@ -36,6 +37,17 @@ describe("parseReview", () => {
 	});
 });
 
+describe("keepAnswerable", () => {
+	it("drops the findings that ask for facts when there are no materials to take them from", () => {
+		const issues = [
+			{ category: "vague-no-facts", quote: "有所增加", why: "", fix: "给出数据" },
+			{ category: "bad-metaphor", quote: "春雨", why: "", fix: "直说" },
+		];
+		expect(keepAnswerable(issues, true)).toEqual(issues);
+		expect(keepAnswerable(issues, false).map((i) => i.category)).toEqual(["bad-metaphor"]);
+	});
+});
+
 describe("formatReview", () => {
 	it("gives one line per finding", () => {
 		expect(formatReview([{ category: "bad-metaphor", quote: "春雨", why: "混用", fix: "直说" }])).toBe(
@@ -65,6 +77,9 @@ describe("reviewDraft", () => {
 });
 
 describe("REVIEW_PROMPT", () => {
+	it("leaves sourced statements to their source", () => {
+		expect(REVIEW_PROMPT).toContain("A statement given with its source");
+	});
 	it("explains every category, asks for no new content and for exact quotes", () => {
 		for (const category of REVIEW_CATEGORIES) expect(REVIEW_PROMPT).toContain(`- ${category}:`);
 		expect(REVIEW_PROMPT).toContain("Never ask for more content");

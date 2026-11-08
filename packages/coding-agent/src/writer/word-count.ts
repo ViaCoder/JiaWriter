@@ -38,7 +38,7 @@ export interface WordCountOptions {
 }
 
 /** Default allowed deviation from the target. */
-export const DEFAULT_TOLERANCE = 0.1;
+export const DEFAULT_TOLERANCE = 0.2;
 
 /** Count the text. */
 export function wordCount(text: string, options: WordCountOptions = {}): WordCountReport {

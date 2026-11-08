@@ -90,12 +90,13 @@ const CORE_ZH: readonly StylePattern[] = [
 	zhp("zh-bushiwei", "套话", "stock phrase", "不失为"),
 	// Inclusive call to action.
 	zhp("zh-rangwomen", "套话", "stock phrase", "让我们"),
-	// Template placeholders left for someone to fill: a finished document has none. [1] and [text](url) are spared.
+	// Template placeholders left for someone to fill: a finished document has none. [1] and [text](url) are spared;
+	// 〔2026〕 号 is a document number left blank.
 	zhp(
 		"zh-placeholder",
 		"模板占位",
 		"placeholder",
-		"\\[(?!\\d+\\])[^\\]\\n]{1,16}\\](?!\\()|20\\d[XxＸ]年|[XxＸ]{1,2}月[XxＸ]{1,2}日|[XＸ]{2,}|某(?:省|市|县|区|镇|乡|村|单位|部门|企业|公司|学校|高校|医院)",
+		"\\[(?!\\d+\\])[^\\]\\n]{1,16}\\](?!\\()|20\\d[XxＸ]年|[XxＸ]{1,2}月[XxＸ]{1,2}日|[XＸ]{2,}|某(?:省|市|县|区|镇|乡|村|单位|部门|企业|公司|学校|高校|医院)|〔20\\d{2}〕\\s*号",
 	),
 	// "What really matters is".
 	zhp("zh-zhenzheng", "套话", "stock phrase", "真正(?:重要|关键|难|值钱)的[是在]"),

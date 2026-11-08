@@ -153,6 +153,26 @@ describe("automatic import before each run and export after it", () => {
 		content: [{ type: "toolCall", id, name, arguments: { path } }],
 	});
 
+	it("tells the model once which imported references there are", async () => {
+		mkdirSync(join(cwd, "参考资料"));
+		writeFileSync(join(cwd, "参考资料", "报告.txt"), "长江流域水质优良断面比例为96.7%。");
+		const { handlers } = load();
+		const start = () =>
+			handlers.get("before_agent_start")?.({ type: "before_agent_start" }, ctx([])) as unknown as Promise<
+				{ message: { customType: string; content: string } } | undefined
+			>;
+		const first = await start();
+		expect(first?.message.customType).toBe("jiawriter-references");
+		expect(first?.message.content).toContain(join(cwd, "参考资料", ".parsed", "报告.txt.md"));
+		// Nothing new: nothing said.
+		expect(await start()).toBeUndefined();
+		// A file added later is told about on its own.
+		writeFileSync(join(cwd, "参考资料", "新.txt"), "新资料");
+		const next = await start();
+		expect(next?.message.content).toContain("新.txt.md");
+		expect(next?.message.content).not.toContain("报告.txt.md");
+	});
+
 	it("imports files added during the session before the run, and exports the drafts the run changed", async () => {
 		mkdirSync(join(cwd, "参考资料"));
 		const { handlers } = load();

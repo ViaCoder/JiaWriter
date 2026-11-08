@@ -303,13 +303,24 @@ const REQUIRED: Readonly<Record<Material["kind"], readonly (keyof Material)[]>> 
 	data: ["time", "region", "industry", "indicator", "value"],
 };
 
+/** Reference files with no pages to cite (text, Markdown, HTML, as imported or as they stand). */
+const PAGELESS = /\.(txt|md|html?)(\.md)?$/i;
+
+/** The material with a local path given as its url taken as its file (a model on 2026-11-08 did that three times). */
+export function asFileSource(item: Material): Material {
+	const url = item.url?.trim() ?? "";
+	if (item.file?.trim() || !url || /^[a-z][a-z0-9+.-]*:/i.test(url)) return item;
+	return { ...item, file: url, url: undefined };
+}
+
 /** What is wrong with one material, as a sentence; empty when it is complete. */
 export function materialProblem(item: Material, archived: readonly string[]): string {
 	// Missing fields first.
 	const missing = REQUIRED[item.kind].filter((f) => !String(item[f] ?? "").trim());
 	if (missing.length > 0) return t("topic.missingFields", { fields: missing.join("、") });
-	// A reference file needs its page.
-	if (item.file?.trim()) return item.page?.trim() ? "" : t("topic.missingPage", { file: item.file });
+	// A reference file needs its page, unless it has none.
+	if (item.file?.trim())
+		return item.page?.trim() || PAGELESS.test(item.file.trim()) ? "" : t("topic.missingPage", { file: item.file });
 	// A web source must be a page or a search result of this topic.
 	if (!item.url?.trim()) return t("topic.missingSource");
 	return archived.includes(materialKey(item.url)) ? "" : t("topic.notArchived", { url: item.url });
@@ -318,7 +329,8 @@ export function materialProblem(item: Material, archived: readonly string[]): st
 /** One material as a Markdown list item. */
 export function renderMaterial(item: Material): string {
 	// The source line ends every item.
-	const source = item.file?.trim() ? `《${item.file}》第${item.page}页` : (item.url ?? "");
+	const page = item.page?.trim() ? `第${item.page.trim()}页` : "";
+	const source = item.file?.trim() ? `《${item.file}》${page}` : (item.url ?? "");
 	const body =
 		item.kind === "case"
 			? `案例｜时间：${item.time}｜报道方：${item.reporter}｜主体：${item.subject}｜行为：${item.action}`
@@ -327,7 +339,9 @@ export function renderMaterial(item: Material): string {
 }
 
 /** Add materials to 素材.md, all or none; returns how many it holds now. */
-export function addMaterials(dir: string, items: readonly Material[]): number {
+export function addMaterials(dir: string, given: readonly Material[]): number {
+	// Local paths in url are files.
+	const items = given.map(asFileSource);
 	// Every item is checked before anything is written.
 	const archived = materialUrls(dir);
 	const problems = items.flatMap((item, i) => {

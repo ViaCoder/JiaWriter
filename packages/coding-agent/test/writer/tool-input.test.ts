@@ -9,7 +9,7 @@ import { join } from "node:path";
 // Test API; stubEnv fixes the message language.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Function under test.
-import { loadToolText } from "../../src/writer/tool-input.ts";
+import { lastDraft, loadToolText, setLastDraft } from "../../src/writer/tool-input.ts";
 
 // Working directory of each test.
 let cwd = "";
@@ -46,5 +46,20 @@ describe("loadToolText", () => {
 		await expect(loadToolText({ path: "无.md" }, cwd)).rejects.toThrow("无法读取 无.md");
 		// Neither path nor text.
 		await expect(loadToolText({}, cwd)).rejects.toThrow("请提供 path");
+	});
+});
+
+describe("setLastDraft and lastDraft", () => {
+	it("reads the last draft written when a check is called with neither path nor text", async () => {
+		const draft = join(cwd, "稿.md");
+		writeFileSync(draft, "正文");
+		setLastDraft(undefined);
+		await expect(loadToolText({}, cwd)).rejects.toThrow();
+		setLastDraft(draft);
+		expect(lastDraft()).toBe(draft);
+		expect(await loadToolText({}, cwd)).toBe("正文");
+		expect(await loadToolText({ text: "" }, cwd)).toBe("正文");
+		expect(await loadToolText({ text: "给定" }, cwd)).toBe("给定");
+		setLastDraft(undefined);
 	});
 });

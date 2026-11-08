@@ -17,6 +17,7 @@ import {
 	archiveFiltered,
 	archivePage,
 	archiveSearch,
+	asFileSource,
 	isUnnamedTopic,
 	type Material,
 	materialProblem,
@@ -257,6 +258,17 @@ describe("materials", () => {
 		for (const part of ["【二、问题】", "2026年10月31日", "法新社", "巴黎市政府", "新增绿地", "https://a.example/x"])
 			expect(line).toContain(part);
 		expect(renderMaterial(DATA)).toContain("《年鉴.pdf》第12页");
+		// A file without pages is cited by its name alone.
+		expect(renderMaterial({ ...DATA, file: "报告.txt", page: "" }).endsWith("来源：《报告.txt》")).toBe(true);
+	});
+
+	it("takes a local path given as url for the file, and asks no page of a file that has none", () => {
+		const local = { ...DATA, file: undefined, page: undefined, url: "参考资料/报告.txt" };
+		expect(asFileSource(local)).toMatchObject({ file: "参考资料/报告.txt", url: undefined });
+		expect(asFileSource(CASE)).toBe(CASE);
+		expect(materialProblem(asFileSource(local), [])).toBe("");
+		expect(materialProblem({ ...DATA, file: "参考资料/.parsed/报告.txt.md", page: "" }, [])).toBe("");
+		expect(materialProblem({ ...DATA, file: "年鉴.pdf", page: "" }, [])).toContain("页码");
 	});
 
 	it("writes all items or none, and counts what the file holds", () => {

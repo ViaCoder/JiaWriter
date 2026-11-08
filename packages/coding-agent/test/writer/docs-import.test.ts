@@ -16,6 +16,7 @@ import {
 	importFile,
 	importSources,
 	isScanned,
+	parsedFiles,
 	parsedPathFor,
 	pdfPages,
 	renderParsed,
@@ -115,6 +116,23 @@ describe("importFile", () => {
 		expect((await importFile(put("参考资料/x.xyz", "x"), cwd)).status).toBe("unsupported");
 		const bad = await importFile(put("参考资料/bad.docx", "not a zip"), cwd);
 		expect([bad.status, bad.out, (bad.error ?? "").length > 0]).toEqual(["failed", "", true]);
+	});
+});
+
+describe("parsedFiles", () => {
+	it("lists the imported files of both reference folders, nested ones too, sorted", () => {
+		mkdirSync(join(cwd, "参考资料", ".parsed", "子"), { recursive: true });
+		mkdirSync(join(cwd, "sources", ".parsed"), { recursive: true });
+		writeFileSync(join(cwd, "参考资料", ".parsed", "乙.txt.md"), "x");
+		writeFileSync(join(cwd, "参考资料", ".parsed", "子", "甲.pdf.md"), "x");
+		writeFileSync(join(cwd, "参考资料", ".parsed", "说明.json"), "{}");
+		writeFileSync(join(cwd, "sources", ".parsed", "a.md.md"), "x");
+		expect(parsedFiles(cwd).map((f) => f.slice(cwd.length + 1))).toEqual([
+			join("参考资料", ".parsed", "乙.txt.md"),
+			join("参考资料", ".parsed", "子", "甲.pdf.md"),
+			join("sources", ".parsed", "a.md.md"),
+		]);
+		expect(parsedFiles(join(cwd, "无"))).toEqual([]);
 	});
 });
 

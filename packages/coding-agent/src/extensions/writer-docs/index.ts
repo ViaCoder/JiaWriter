@@ -13,7 +13,7 @@
 
 // Whether a draft exists.
 // Copying a file into the topic.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { copyFile, mkdir } from "node:fs/promises";
 // Paths.
 import { basename, join, resolve } from "node:path";
@@ -29,7 +29,7 @@ import { resolveReadPathAsync } from "../../core/tools/path-utils.ts";
 // Automatic export.
 import { autoExportEnabled, editedDrafts, type RunMessage } from "../../writer/docs/auto.ts";
 // Import.
-import { formatImport, importFile, importSources } from "../../writer/docs/import.ts";
+import { formatImport, importFile, importSources, parsedFiles } from "../../writer/docs/import.ts";
 // Export.
 import { exportDraft, formatExport } from "../../writer/export/export.ts";
 // Reference URLs opened in the session, and those still to test.
@@ -218,9 +218,32 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		if (event.reason === "startup") void scan(ctx);
 	});
 
-	// Before every run: files added since are imported before the model reads the folder.
+	// Imported references the model has been told about in this session.
+	const told = new Set<string>();
+	/** List lines for the imported references of the working folder and the topic that the model has not been told about,
+	 * with absolute paths (a model in a topic folder once read a relative one from there). */
+	function untold(cwd: string): string[] {
+		const topic = currentTopic();
+		const files = [cwd, ...(topic && topic !== cwd ? [topic] : [])].flatMap(parsedFiles).filter((f) => !told.has(f));
+		for (const file of files) told.add(file);
+		return files.map((file) =>
+			t("refs.item", { path: file, kb: String(Math.max(1, Math.round(statSync(file).size / 1024))) }),
+		);
+	}
+
+	// Before every run: files added since are imported before the model reads the folder, and the model learns
+	// which ones there are (a run on 2026-11-08 searched the web with the report it was given unread).
 	pi.on("before_agent_start", async (_event, ctx) => {
 		await scan(ctx);
+		const lines = untold(ctx.cwd);
+		if (lines.length === 0) return;
+		return {
+			message: {
+				customType: "jiawriter-references",
+				content: `${t("refs.available")}\n${lines.join("\n")}`,
+				display: true,
+			},
+		};
 	});
 
 	// Reference URLs already handed to the model for testing, so each goes back only once.
