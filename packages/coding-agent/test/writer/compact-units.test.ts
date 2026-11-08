@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 import type { CompactionPreparation } from "../../src/core/compaction/compaction.ts";
 import { serializeConversation } from "../../src/core/compaction/utils.ts";
 import { isAuthFailure, isWriterOverflow, localCompaction, localSummary } from "../../src/writer/compact-fallback.ts";
-import { fitToolResults, resultCap } from "../../src/writer/context-fit.ts";
+import { CLEAR_SHARE, clearOldResults, fitToolResults, KEEP_TURNS, resultCap } from "../../src/writer/context-fit.ts";
 import {
 	isSummaryOverflow,
 	shortenMessage,
@@ -323,5 +323,46 @@ describe("compactionErrorText", () => {
 		process.env.JW_LANG = "en";
 		expect(compactionErrorText("Auto-compaction failed: boom")).toBe("Auto-compaction failed: boom");
 		delete process.env.JW_LANG;
+	});
+});
+
+describe("clearOldResults", () => {
+	/** A call of a tool and its result. */
+	const pair = (id: string, toolName: string, path: string, text: string): AgentMessage[] => [
+		{
+			role: "assistant",
+			content: [{ type: "toolCall", id, name: toolName, arguments: { path } }],
+			timestamp: 0,
+		} as unknown as AgentMessage,
+		{ role: "toolResult", toolCallId: id, toolName, content: [{ type: "text", text }], isError: false, timestamp: 0 },
+	];
+	const long = "资料".repeat(4000);
+	/** An old read, an old tool that cannot be had again, then KEEP_TURNS turns with a fresh read. */
+	const conversation = (): AgentMessage[] => [
+		user("第一轮"),
+		...pair("a", "read", "参考资料/报告.md", long),
+		...pair("b", "write", "稿件/稿.md", long),
+		...Array.from({ length: KEEP_TURNS }, (_, n) => [
+			user(`第${n + 2}轮`),
+			...pair(`c${n}`, "read", `f${n}.md`, long),
+		]).flat(),
+	];
+
+	it("leaves a request below the share alone", () => {
+		const messages = conversation();
+		expect(clearOldResults(messages, 10_000_000)).toBe(messages);
+		expect(CLEAR_SHARE).toBeLessThan(1);
+	});
+
+	it("clears old long results that can be had again, naming where, and keeps the latest turns", () => {
+		const out = clearOldResults(conversation(), 1000);
+		const text = (m: AgentMessage) => ((m as { content: { text: string }[] }).content[0]?.text ?? "") as string;
+		// The old read gives way to a note with its path; the session's own array is untouched.
+		expect(text(out[2])).toContain("参考资料/报告.md");
+		expect(text(out[2]).length).toBeLessThan(300);
+		// write cannot be had again by reading: it stays.
+		expect(text(out[4])).toBe(long);
+		// The reads of the latest turns stay whole.
+		for (let n = 0; n < KEEP_TURNS; n++) expect(text(out[7 + n * 3])).toBe(long);
 	});
 });

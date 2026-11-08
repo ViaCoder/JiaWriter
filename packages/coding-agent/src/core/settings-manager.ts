@@ -82,8 +82,9 @@ function deepMergeObjects(base: Record<string, unknown>, overrides: Record<strin
 }
 
 /** Tools enabled at startup when `defaultTools` does not change them. */
-// JiaWriter: writing tools by default; bash is available but off unless the user enables it.
-export const DEFAULT_TOOL_NAMES: readonly string[] = ["read", "write", "edit", "ls", "find", "grep"];
+// JiaWriter: writing tools and bash by default; bash, write and edit ask under the permission modes
+// (writer-permission, 2026-11-08: the user chose permissions "the same as Claude Code").
+export const DEFAULT_TOOL_NAMES: readonly string[] = ["read", "bash", "write", "edit", "ls", "find", "grep"];
 
 /** Whether a tool selection entry is a `+name` or `-name` modifier. */
 export function isToolModifier(entry: unknown): boolean {

@@ -1,6 +1,7 @@
 /**
  * Permission modes for tools that act on the user's pages and desktop: manual, auto and bypass. What needs asking
- * comes from a fixed table and fixed rules here, never from the model. Older tools such as bash are not covered.
+ * comes from a fixed table and fixed rules here, never from the model. bash, write and edit use the same gate
+ * through writer-permission, with their risk from tool-risk.ts.
  */
 
 // The settings file shared with /lang.

@@ -13,7 +13,7 @@ import { markReasoningUnsupported } from "../../writer/api-detect.ts";
 // The time each user message carries, and the clock check.
 import { clockOffset, correction, setClockOffset, skewFromDate, withDateNotes } from "../../writer/clock.ts";
 // Request size guard.
-import { CONTEXT_SHARE, fitToolResults } from "../../writer/context-fit.ts";
+import { CONTEXT_SHARE, clearOldResults, fitToolResults } from "../../writer/context-fit.ts";
 // Output clamp and the provider name.
 import { applyOutputClamp, JW_PROVIDER } from "../../writer/env-config.ts";
 // Messages.
@@ -33,7 +33,9 @@ export default function writerEnvExtension(pi: ExtensionAPI): void {
 		const messages = withDateNotes(event.messages, clockOffset());
 		// Tool results too large to compact away are clipped in the request (the session keeps them).
 		const window = ctx.model?.contextWindow ?? 0;
-		return { messages: window > 0 ? fitToolResults(messages, Math.floor(window * CONTEXT_SHARE)) : messages };
+		// Older long results first give way to a note on where they are, then what still does not fit is clipped.
+		const cleared = clearOldResults(messages, window);
+		return { messages: window > 0 ? fitToolResults(cleared, Math.floor(window * CONTEXT_SHARE)) : cleared };
 	});
 	// The first model response with a Date header shows how far the machine clock is off.
 	let clockChecked = false;

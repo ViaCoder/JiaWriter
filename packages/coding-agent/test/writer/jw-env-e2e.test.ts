@@ -355,11 +355,13 @@ describe("JW_* end to end", () => {
 		expect(JSON.stringify(realRequest()?.body.messages)).toMatch(/\[Date: \d{4}-\d{2}-\d{2} \w+, /);
 		// The request carries the writing system prompt.
 		expect(JSON.stringify(realRequest()?.body.system)).toContain("general-purpose agent");
-		// The built-in Chinese writing skills are offered (JW_LANG unset: zh).
-		expect(JSON.stringify(realRequest()?.body.system)).toContain("<name>report-analysis</name>");
-		expect(JSON.stringify(realRequest()?.body.system)).toContain("用于写企业和研究类的报告、分析和总结");
-		// The default writing tools, the four checks, web search, import and export are offered, bash is not.
+		// The built-in writing skills are offered, with their descriptions.
+		expect(JSON.stringify(realRequest()?.body.system)).toContain("<name>deep-research</name>");
+		expect(JSON.stringify(realRequest()?.body.system)).toContain("Researches a question across many sources");
+		// The default writing tools, bash (under the permission modes), the four checks, web search, import and export.
 		expect(((realRequest()?.body.tools as { name: string }[]) ?? []).map((t) => t.name).sort()).toEqual([
+			"ask_user",
+			"bash",
 			"draft_restore",
 			"edit",
 			"export_document",
@@ -374,6 +376,7 @@ describe("JW_* end to end", () => {
 			"readability_check",
 			"search_web",
 			"style_check",
+			"todo_write",
 			"topic_open",
 			"word_count",
 			"write",

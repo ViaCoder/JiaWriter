@@ -57,3 +57,46 @@ export function fitToolResults(messages: AgentMessage[], budget: number): AgentM
 	if (cap === Number.POSITIVE_INFINITY) return messages;
 	return messages.map((m, i) => (m.role === "toolResult" && sizes[i] > cap ? clipResult(m, sizes[i], cap) : m));
 }
+
+/** Share of the context window above which older long results are cleared from the request. */
+export const CLEAR_SHARE = 0.5;
+/** The latest user turns whose tool results always stay whole. */
+export const KEEP_TURNS = 3;
+/** Results smaller than this stay (tokens). */
+const CLEAR_MIN_TOKENS = 1500;
+/** Tools whose results can be had again: from the file, the command, or the topic's archive. */
+const AGAIN = new Set(["read", "fetch_web", "search_web", "import_document", "grep", "find", "ls", "bash"]);
+
+/** What a call worked on, for the note: its path, address, query or command. */
+function callTarget(messages: AgentMessage[], id: string): string {
+	for (const m of messages) {
+		if (m.role !== "assistant") continue;
+		for (const c of (m as { content: { type: string; id?: string; arguments?: Record<string, unknown> }[] })
+			.content ?? []) {
+			if (c.type !== "toolCall" || c.id !== id) continue;
+			const a = c.arguments ?? {};
+			return String(a.path ?? a.url ?? a.query ?? a.command ?? a.pattern ?? "").slice(0, 200);
+		}
+	}
+	return "";
+}
+
+/**
+ * Older long results that can be had again, replaced in the request by a note on where they are (microcompaction):
+ * only once the messages pass CLEAR_SHARE of the window, never in the latest KEEP_TURNS user turns. The session keeps
+ * the full text. Once cleared, a result stays cleared, so the cached prefix changes only when the boundary moves.
+ */
+export function clearOldResults(messages: AgentMessage[], window: number): AgentMessage[] {
+	const sizes = messages.map((m) => estimateTokens(m));
+	if (window <= 0 || sizes.reduce((a, b) => a + b, 0) <= window * CLEAR_SHARE) return messages;
+	// The first message of the latest KEEP_TURNS user turns.
+	const users = messages.flatMap((m, i) => (m.role === "user" ? [i] : []));
+	const boundary = users.length > KEEP_TURNS ? users[users.length - KEEP_TURNS] : 0;
+	return messages.map((m, i) => {
+		if (i >= boundary || m.role !== "toolResult" || sizes[i] < CLEAR_MIN_TOKENS) return m;
+		const r = m as { toolName: string; toolCallId: string };
+		if (!AGAIN.has(r.toolName)) return m;
+		const note = t("context.cleared", { tool: r.toolName, target: callTarget(messages, r.toolCallId) });
+		return { ...m, content: [{ type: "text", text: note }] } as AgentMessage;
+	});
+}
