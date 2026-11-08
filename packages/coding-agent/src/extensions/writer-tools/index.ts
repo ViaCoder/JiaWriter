@@ -43,7 +43,7 @@ import { DEFAULT_NEGATION_THRESHOLD } from "../../writer/style/patterns.ts";
 // The semantic review by a separate request.
 import { formatReview, keepAnswerable, reviewDraft, reviewEnabled } from "../../writer/style/review.ts";
 // Length as writers count it.
-import { countText } from "../../writer/text-stats.ts";
+import { bodyBeforeReferences, countText, REFERENCES_HEADING } from "../../writer/text-stats.ts";
 // Shared input loading.
 import { loadToolText, setLastDraft } from "../../writer/tool-input.ts";
 // The materials folders and file of a topic.
@@ -148,7 +148,7 @@ export function materialsNameSources(file: string, cwd: string): boolean {
  * are on disk and the reader gets none (two 2026-11-09 research briefs cited 《路透社》 and 央广网 inline only).
  */
 export function lacksReferences(text: string, file: string, cwd: string): boolean {
-	if (/^\s*#{0,6}\s*(?:参考文献|参考资料|资料来源|References|Sources)\s*[:：]?\s*$/im.test(text)) return false;
+	if (REFERENCES_HEADING.test(text)) return false;
 	if (!/《[^》\n]{1,20}》报道|据[^，。\n]{1,12}(?:社|报|网|台)|https?:\/\//.test(text)) return false;
 	const filled = (dir: string) => existsSync(dir) && readdirSync(dir).some((name) => !name.startsWith("."));
 	return draftFolders(file, cwd).some((dir) => [join(dir, TOPIC_DIRS.search), join(dir, TOPIC_DIRS.web)].some(filled));
@@ -288,7 +288,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			if (inferRegister(text) === "report" && /\d/.test(text) && !cites && materialsNameSources(file, ctx.cwd))
 				own.push(t("style.noCitation"));
 			if (lacksReferences(text, file, ctx.cwd)) own.push(t("style.noReferences"));
-			const chars = countText(text).total;
+			const chars = countText(bodyBeforeReferences(text)).total;
 			if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)
 				own.push(t("style.length", { chars, target }));
 			own.push(...finishedChecks(text));

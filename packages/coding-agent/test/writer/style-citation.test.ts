@@ -72,3 +72,11 @@ describe("citationIssues: a bracketed source with no date", () => {
 		expect(citationIssues("2026年1月14日《央广网》报道，产销1649万辆。")).toEqual([]);
 	});
 });
+
+describe("citationIssues: outlets named 新闻, 周刊 or 杂志", () => {
+	it("takes them for outlets", () => {
+		expect(citationIssues("2026年11月7日CBS新闻报道，油轮遇袭。").map((f) => f.form)).toEqual([
+			"2026年11月7日《CBS新闻》报道",
+		]);
+	});
+});

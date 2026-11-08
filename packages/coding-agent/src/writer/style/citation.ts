@@ -16,7 +16,8 @@ export interface CitationIssue {
 /** A date with its year, as the form wants it. */
 const FULL_DATE = /^\d{4}年\d{1,2}月\d{1,2}日$/;
 /** An outlet's name: what news agencies, papers, sites and stations end in. */
-const OUTLET = "[\\u4e00-\\u9fa5A-Za-z]{1,12}?(?:通讯社|电视台|新闻社|社|日报|晚报|报|网|台)";
+// 新闻, 周刊 and 杂志 since 2026-11-09 (CBS新闻 was not taken for an outlet).
+const OUTLET = "[\\u4e00-\\u9fa5A-Za-z]{1,12}?(?:通讯社|电视台|新闻社|新闻|周刊|杂志|社|日报|晚报|报|网|台)";
 
 /** The citations in a wrong form, in the order they come. */
 export function citationIssues(text: string): CitationIssue[] {

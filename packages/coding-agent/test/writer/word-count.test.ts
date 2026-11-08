@@ -2,6 +2,7 @@
 
 // Test API.
 import { describe, expect, it } from "vitest";
+import { bodyBeforeReferences } from "../../src/writer/text-stats.ts";
 // Functions under test.
 import { DEFAULT_TOLERANCE, formatWordCount, wordCount } from "../../src/writer/word-count.ts";
 
@@ -58,5 +59,15 @@ describe("formatWordCount", () => {
 		expect(text).toContain(
 			"Target 3, difference 0 (0%), within the allowed range (±20%); no need to change the length.",
 		);
+	});
+});
+
+describe("wordCount: references", () => {
+	it("counts the body only, not the reference list", () => {
+		// A 2026-11-09 brief: six English titles in the references made a fitting body read as 69% too long.
+		const body = "国".repeat(300);
+		const refs = "\n\n## 参考文献\n\n1. [Oil slumps after the midterms, Reuters, 2026-11-04](https://example.com/a)";
+		expect(wordCount(`${body}${refs}`, { target: 300 }).counts.total).toBe(300);
+		expect(bodyBeforeReferences(`${body}${refs}`)).toBe(body);
 	});
 });

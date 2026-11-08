@@ -5,7 +5,14 @@
 // Output messages.
 import { t, type WriterLang } from "./i18n/index.ts";
 // Counting, sections and the target comparison.
-import { compareTarget, countText, splitSections, type TargetCheck, type TextCounts } from "./text-stats.ts";
+import {
+	bodyBeforeReferences,
+	compareTarget,
+	countText,
+	splitSections,
+	type TargetCheck,
+	type TextCounts,
+} from "./text-stats.ts";
 
 /** Counts of one section. */
 export interface SectionCount {
@@ -42,8 +49,8 @@ export const DEFAULT_TOLERANCE = 0.2;
 
 /** Count the text. */
 export function wordCount(text: string, options: WordCountOptions = {}): WordCountReport {
-	// Whole-text counts.
-	const counts = countText(text);
+	// Whole-text counts, without the reference list.
+	const counts = countText(bodyBeforeReferences(text));
 	// Section counts include the heading text itself.
 	const sections = options.bySection
 		? splitSections(text).map((s) => ({ title: s.title, level: s.level, counts: countText(`${s.title}\n${s.text}`) }))

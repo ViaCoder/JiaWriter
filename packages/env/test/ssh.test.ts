@@ -70,6 +70,20 @@ async function waitForPort(port: number): Promise<void> {
 	throw new Error("sshd did not start");
 }
 
+/** A key type this machine's OpenSSH makes: ed25519, or ECDSA P-384 where FIPS mode refuses ed25519. */
+const KEY_TYPE = (() => {
+	const probe = join(tmpdir(), `pi-env-keytype-${process.pid}`);
+	try {
+		execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", probe], { stdio: "ignore" });
+		return ["-t", "ed25519"];
+	} catch {
+		return ["-t", "ecdsa", "-b", "384"];
+	} finally {
+		rmSync(probe, { force: true });
+		rmSync(`${probe}.pub`, { force: true });
+	}
+})();
+
 // A disposable sshd on localhost with its own host key, client key and home directory.
 describe.skipIf(sshd === undefined)("SSH bootstrap", () => {
 	const root = mkdtempSync(join(tmpdir(), "pi-env-ssh-"));
@@ -79,8 +93,8 @@ describe.skipIf(sshd === undefined)("SSH bootstrap", () => {
 
 	beforeAll(async () => {
 		execFileSync("mkdir", ["-p", home]);
-		execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", join(root, "host_key")]);
-		execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", join(root, "client_key")]);
+		execFileSync("ssh-keygen", ["-q", ...KEY_TYPE, "-N", "", "-f", join(root, "host_key")]);
+		execFileSync("ssh-keygen", ["-q", ...KEY_TYPE, "-N", "", "-f", join(root, "client_key")]);
 		writeFileSync(join(root, "authorized_keys"), readFileSync(join(root, "client_key.pub")));
 		const port = await freePort();
 		writeFileSync(
@@ -268,7 +282,7 @@ describe.skipIf(sshd === undefined)("SSH bootstrap", () => {
 		const scoped = { ...target, knownHostsFile: knownHosts };
 		const key = (name: string) => {
 			const file = join(root, name);
-			execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", file]);
+			execFileSync("ssh-keygen", ["-q", ...KEY_TYPE, "-N", "", "-f", file]);
 			return readFileSync(`${file}.pub`, "utf8").split(" ").slice(0, 2).join(" ");
 		};
 		const first = key("accept_first");
@@ -288,7 +302,7 @@ describe.skipIf(sshd === undefined)("SSH bootstrap", () => {
 
 	it("refuses a changed host key", async () => {
 		const other = join(root, "other_key");
-		execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", other]);
+		execFileSync("ssh-keygen", ["-q", ...KEY_TYPE, "-N", "", "-f", other]);
 		const key = readFileSync(`${other}.pub`, "utf8").split(" ").slice(0, 2).join(" ");
 		const knownHosts = join(root, "changed_known_hosts");
 		writeFileSync(knownHosts, `pi-env-test ${key}\n`);

@@ -31,6 +31,10 @@ Purpose: each measure answers one problem named earlier, at its cause, in a form
 - Name the responsible party when it is clear, by the body's name or its function; give platforms and standards their full names.
 - No cases, dates or sources in countermeasures.
 
+## Speeches
+
+- Spoken order: a short review of what was done, then the tasks. Give each task its own paragraph that opens with the task in one sentence, so a listener can follow without ordinals; then how it is done.
+
 ## Statutory documents
 
 - The transition sentence fixes the genre: a notice uses “现将有关事项通知如下：”; a reply uses “……收悉。现批复如下：”.

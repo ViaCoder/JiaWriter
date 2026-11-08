@@ -194,3 +194,15 @@ export function compareTarget(total: number, target: number, tolerance: number):
 	// The comparison.
 	return { diff, ratio, status };
 }
+
+/** The heading line of a reference list: 参考文献, 资料来源, References and the like. */
+export const REFERENCES_HEADING = /^\s*#{0,6}\s*(?:参考文献|参考资料|资料来源|References|Sources)\s*[:：]?\s*$/im;
+
+/**
+ * The text before its reference list: the body that length and shape are judged on (2026-11-09: six English titles
+ * in the references took a 300-character brief to 508, and the writer cut a body that already fit).
+ */
+export function bodyBeforeReferences(text: string): string {
+	const m = REFERENCES_HEADING.exec(text);
+	return m ? text.slice(0, m.index).trimEnd() : text;
+}
