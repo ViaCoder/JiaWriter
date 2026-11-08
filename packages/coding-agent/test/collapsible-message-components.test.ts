@@ -1,5 +1,14 @@
 import type { Box, TuiMouseEvent } from "@earendil-works/pi-tui";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
+
+// JiaWriter shows Chinese by default; these tests check the upstream components in English.
+beforeEach(() => {
+	vi.stubEnv("JW_LANG", "en");
+});
+afterEach(() => {
+	vi.unstubAllEnvs();
+});
+
 import { BranchSummaryMessageComponent } from "../src/modes/interactive/components/branch-summary-message.ts";
 import { CompactionSummaryMessageComponent } from "../src/modes/interactive/components/compaction-summary-message.ts";
 import { SkillInvocationMessageComponent } from "../src/modes/interactive/components/skill-invocation-message.ts";

@@ -1,5 +1,6 @@
 import { Box, Container, Markdown, type MarkdownTheme, MouseRegion, Text } from "@earendil-works/pi-tui";
 import type { ParsedSkillBlock } from "../../../core/agent-session.ts";
+import { uiText } from "../../../writer/ui-text.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
 import { keyText } from "./keybinding-hints.ts";
 
@@ -51,9 +52,9 @@ export class SkillInvocationMessageComponent extends Box {
 		} else {
 			// Collapsed: single line - [skill] name (hint to expand)
 			const line =
-				theme.fg("customMessageLabel", `\x1b[1m[skill]\x1b[22m `) +
+				theme.fg("customMessageLabel", `\x1b[1m${uiText("[skill]")}\x1b[22m `) +
 				theme.fg("customMessageText", this.skillBlock.name) +
-				theme.fg("dim", ` (${keyText("app.tools.expand")} to expand)`);
+				theme.fg("dim", ` (${keyText("app.tools.expand")} ${uiText("to expand")})`);
 			content.addChild(new Text(line, 0, 0));
 		}
 

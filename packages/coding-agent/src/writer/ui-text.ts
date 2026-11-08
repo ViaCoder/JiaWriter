@@ -19,6 +19,10 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Thinking...": "思考过程已折叠",
 	"Operation aborted": "已中断",
 	"↓ Jump to latest message": "↓ 回到最新消息",
+	// Collapsed lines of a skill, a compaction summary and a branch summary.
+	"[skill]": "[技能]",
+	"Compacted from {tokens} tokens": "上下文已压缩，原 {tokens} token",
+	"Branch summary": "分支摘要",
 	// Startup help, full form.
 	"to interrupt": "中断",
 	"to clear": "清空输入",

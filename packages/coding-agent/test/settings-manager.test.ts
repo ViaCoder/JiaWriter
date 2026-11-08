@@ -648,9 +648,10 @@ describe("SettingsManager", () => {
 		});
 
 		it("applies +name and -name to the default selection", () => {
-			// JiaWriter: default tools are read, write, edit, ls, find, grep (bash is off by default).
+			// JiaWriter: default tools are read, bash, write, edit, ls, find, grep (bash asks under the permission modes).
 			expect(SettingsManager.inMemory({ defaultTools: ["+codemode", "-write"] }).getDefaultTools()).toEqual([
 				"read",
+				"bash",
 				"edit",
 				"ls",
 				"find",
@@ -683,9 +684,10 @@ describe("SettingsManager", () => {
 		it("applies project modifiers to the built-in defaults without a global setting", () => {
 			writeFileSync(join(projectDir, ".pi", "settings.json"), JSON.stringify({ defaultTools: ["+codemode"] }));
 
-			// JiaWriter: default tools are read, write, edit, ls, find, grep (bash is off by default).
+			// JiaWriter: default tools are read, bash, write, edit, ls, find, grep (bash asks under the permission modes).
 			expect(SettingsManager.create(projectDir, agentDir).getDefaultTools()).toEqual([
 				"read",
+				"bash",
 				"write",
 				"edit",
 				"ls",
