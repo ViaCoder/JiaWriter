@@ -73,6 +73,8 @@ export const en: Record<MessageKey, string> = {
 		"{count} citations in another form; write reports as 2026年10月31日《路透社》报道 and files as 2021年6月7日《文件名》:",
 	"style.noCitation":
 		"The report uses materials but names no source: cite search results and published files as the citation rule says; from the user's notes and fact lists cite the sources they name, never the notes file.",
+	"style.noReferences":
+		"The text cites reports from the searches but ends with no references: list each source's title, outlet, date and address as the citation rule says.",
 	"style.length":
 		"{chars} characters against about {target} asked: cut or add to fit; when the materials run short, do not repeat or add what they lack, and say so in the reply.",
 	"style.reviewFound": "The semantic review found {count}:",

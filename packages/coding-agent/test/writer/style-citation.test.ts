@@ -46,3 +46,29 @@ describe("formatCitationIssues", () => {
 		);
 	});
 });
+
+describe("citationIssues: outlet before the date, and in brackets", () => {
+	it("finds them and gives the user's form", () => {
+		// A 2026-11-09 research brief wrote these.
+		const found = citationIssues(
+			"据路透社2026年11月6日报道，油价重挫。WTI报90.83美元（路透社，11月6日）。彭博社11月7日调查显示，产量增加。",
+		);
+		expect(found.map((f) => f.form)).toEqual([
+			"2026年11月6日《路透社》报道",
+			"YYYY年11月6日《路透社》报道",
+			"YYYY年11月7日《彭博社》",
+		]);
+		// The user's own form is not flagged.
+		expect(citationIssues("2026年11月6日《路透社》报道，油价重挫。")).toEqual([]);
+	});
+});
+
+describe("citationIssues: a bracketed source with no date", () => {
+	it("asks for the date in the user's form", () => {
+		expect(citationIssues("产销1649万辆（来源：央广网援引中汽协）。").map((f) => f.form)).toEqual([
+			"YYYY年MM月DD日《央广网》报道",
+		]);
+		// A dated source in the user's form stays.
+		expect(citationIssues("2026年1月14日《央广网》报道，产销1649万辆。")).toEqual([]);
+	});
+});

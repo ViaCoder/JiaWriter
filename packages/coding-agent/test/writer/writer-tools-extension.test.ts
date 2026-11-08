@@ -21,6 +21,7 @@ import writerToolsExtension, {
 	finishedChecks,
 	gongwenGenre,
 	hasMaterials,
+	lacksReferences,
 	MAX_ROUNDS,
 	materialsNameSources,
 	modelAsker,
@@ -325,6 +326,25 @@ describe("hasMaterials", () => {
 		rmSync(join(topic, "检索"), { recursive: true });
 		writeFileSync(join(topic, "素材.md"), "- 案例");
 		expect(hasMaterials(draft, cwd)).toBe(true);
+	});
+});
+
+describe("lacksReferences", () => {
+	it("asks for a reference list when a draft cites searched reports without one", () => {
+		const topic = join(cwd, "20261109-油价");
+		mkdirSync(join(topic, "稿件"), { recursive: true });
+		const draft = join(topic, "稿件", "简报.md");
+		const cited = "2026年11月6日《路透社》报道，油价下跌。";
+		// No searches in the topic: nothing to list.
+		expect(lacksReferences(cited, draft, cwd)).toBe(false);
+		mkdirSync(join(topic, "检索"));
+		writeFileSync(join(topic, "检索", "001-油价.md"), "结果");
+		expect(lacksReferences(cited, draft, cwd)).toBe(true);
+		// With a list, or with no citation at all, nothing to ask.
+		expect(
+			lacksReferences(`${cited}\n\n## 参考文献\n\n1. [油价, 路透社, 2026-11-06](https://example.com/a)`, draft, cwd),
+		).toBe(false);
+		expect(lacksReferences("油价下跌。", draft, cwd)).toBe(false);
 	});
 });
 

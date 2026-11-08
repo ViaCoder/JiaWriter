@@ -143,6 +143,17 @@ export function materialsNameSources(file: string, cwd: string): boolean {
 	});
 }
 
+/**
+ * True when a draft cites outlets from the topic's searches or pages but has no reference list: the facts' addresses
+ * are on disk and the reader gets none (two 2026-11-09 research briefs cited 《路透社》 and 央广网 inline only).
+ */
+export function lacksReferences(text: string, file: string, cwd: string): boolean {
+	if (/^\s*#{0,6}\s*(?:参考文献|参考资料|资料来源|References|Sources)\s*[:：]?\s*$/im.test(text)) return false;
+	if (!/《[^》\n]{1,20}》报道|据[^，。\n]{1,12}(?:社|报|网|台)|https?:\/\//.test(text)) return false;
+	const filled = (dir: string) => existsSync(dir) && readdirSync(dir).some((name) => !name.startsWith("."));
+	return draftFolders(file, cwd).some((dir) => [join(dir, TOPIC_DIRS.search), join(dir, TOPIC_DIRS.web)].some(filled));
+}
+
 /** The titles of the references imported beside a draft: 报告 for 参考资料/.parsed/报告.pdf.md. */
 export function referenceTitles(file: string, cwd: string): string[] {
 	return draftFolders(file, cwd)
@@ -276,6 +287,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			const cites = citesMaterials(text, referenceTitles(file, ctx.cwd));
 			if (inferRegister(text) === "report" && /\d/.test(text) && !cites && materialsNameSources(file, ctx.cwd))
 				own.push(t("style.noCitation"));
+			if (lacksReferences(text, file, ctx.cwd)) own.push(t("style.noReferences"));
 			const chars = countText(text).total;
 			if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)
 				own.push(t("style.length", { chars, target }));
