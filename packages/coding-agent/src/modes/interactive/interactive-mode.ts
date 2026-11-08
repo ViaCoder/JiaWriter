@@ -2017,9 +2017,13 @@ export class InteractiveMode {
 				fork: async (entryId, options) => {
 					try {
 						const result = await this.runtimeHost.fork(entryId, options);
-						if (!result.cancelled) {
+						// JiaWriter: a caller with its own follow-up (withSession) has already said what happened and
+						// filled the editor; its words stay. /rewind tells the user what came back this way.
+						if (!result.cancelled && !options?.withSession) {
 							this.editor.setText(result.selectedText ?? "");
 							this.showStatus("Forked to new session");
+						} else if (!result.cancelled && !this.editor.getText().trim()) {
+							this.editor.setText(result.selectedText ?? "");
 						}
 						return { cancelled: result.cancelled };
 					} catch (error: unknown) {

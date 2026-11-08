@@ -1,6 +1,7 @@
 /**
  * Built-in JiaWriter extension: going back. Every write and edit first saves the file (src/writer/rewind).
- * - /rewind: pick a user message; the conversation, the files, or both return to the moment before it.
+ * - /rewind: pick a user message; the conversation, the files, or both return to the moment before it. The
+ *   conversation goes on as a new session holding only what came before, so nothing taken back is seen again.
  * - draft_restore: the same for one file in conversation, when the user asks for an earlier version.
  * Restored drafts are exported again, so the .docx matches the Markdown.
  */
@@ -14,7 +15,12 @@ import { Type } from "typebox";
 // Agent directory.
 import { getAgentDir } from "../../config.ts";
 // Extension API types.
-import { type ExtensionAPI, type ExtensionContext, isToolCallEventType } from "../../core/extensions/types.ts";
+import {
+	type ExtensionAPI,
+	type ExtensionCommandContext,
+	type ExtensionContext,
+	isToolCallEventType,
+} from "../../core/extensions/types.ts";
 // Upstream path resolution (cwd, ~).
 import { resolveToCwd } from "../../core/tools/path-utils.ts";
 // Which files are drafts.
@@ -161,21 +167,24 @@ export default function writerRewindExtension(pi: ExtensionAPI): void {
 			const files = t("rewind.files", { count: targets.length });
 			const mode = targets.length > 0 ? await ctx.ui.select(t("rewind.mode"), [both, talk, files]) : talk;
 			if (mode === undefined) return;
-			// Files first: a failure leaves the conversation where it was.
-			// The conversation first: when that is cancelled, the files stay as they are.
-			if (mode !== files) {
-				const result = await ctx.navigateTree(target.id, { summarize: false });
-				if (result.cancelled) return;
-				ctx.ui.setEditorText(target.text);
-			}
-			if (mode !== talk) {
-				for (const snapshot of targets) restoreSnapshot(store(ctx), snapshot);
-				await exportAgain(
-					targets.map((s) => s.file),
-					ctx,
-				);
-			}
-			ctx.ui.notify(t("rewind.done", { count: mode === talk ? 0 : targets.length }), "info");
+			/** The files back, then the message back in the editor and the note, all in the session that goes on. */
+			const finish = async (now: ExtensionCommandContext) => {
+				if (mode !== talk) {
+					for (const snapshot of targets) restoreSnapshot(store(now), snapshot);
+					await exportAgain(
+						targets.map((s) => s.file),
+						now,
+					);
+				}
+				if (mode !== files) now.ui.setEditorText(target.text);
+				now.ui.notify(t("rewind.done", { count: mode === talk ? 0 : targets.length }), "info");
+			};
+			// Only the files: the conversation stays as it is.
+			if (mode === files) return finish(ctx);
+			// The conversation goes on as a new session that holds only what came before the message, with its own
+			// id: the screen, the model's context and the upstream no longer see what was taken back. The old session
+			// stays in its own file. When this is cancelled, the files stay as they are too.
+			await ctx.fork(target.id, { position: "before", withSession: finish });
 		},
 	});
 }

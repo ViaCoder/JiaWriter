@@ -2,7 +2,7 @@
 // over the real write and edit tools.
 
 // Temp files.
-import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
@@ -131,30 +131,45 @@ describe("going back in a session", () => {
 	/** The draft's path and text. */
 	const path = () => join(harness?.tempDir ?? "", "稿.md");
 	const text = () => readFileSync(path(), "utf-8");
+	/** The exported documents in the working folder (automatic export is off, so only a restore makes one). */
+	const docx = () => readdirSync(harness?.tempDir ?? "").filter((f) => f.endsWith(".docx"));
 
 	/** Run /rewind with scripted menu answers; returns what it told the user and put into the editor. */
 	async function rewind(answers: (labels: string[]) => string | undefined, idle = true) {
 		const h = harness as Harness;
 		const notes: string[] = [];
 		const editor: string[] = [];
-		const navigated: string[] = [];
+		// Each fork asked for: the message, and where the new session starts.
+		const forked: { id: string; position?: string }[] = [];
+		// What the old session's interface was told after the fork: it must be nothing.
+		const stale: string[] = [];
+		/** An interface that keeps what it is told. */
+		const ui = (into: string[]) => ({
+			select: async (_title: string, labels: string[]) => answers(labels),
+			notify: (m: string) => into.push(m),
+			setEditorText: (t: string) => editor.push(t),
+		});
+		let gone = false;
 		const command = h.session.extensionRunner?.getCommand("rewind");
 		await command?.handler("", {
 			cwd: h.tempDir,
 			sessionManager: h.sessionManager,
 			isIdle: () => idle,
-			navigateTree: async (id: string) => {
-				navigated.push(id);
+			// No navigateTree: going back must never stay in the old session.
+			fork: async (id: string, options?: { position?: string; withSession?: (ctx: unknown) => Promise<void> }) => {
+				forked.push({ id, position: options?.position });
+				// The new session holds what came before the message; the test's session is moved there to stand in.
 				await h.session.navigateTree(id, { summarize: false });
+				gone = true;
+				await options?.withSession?.({ cwd: h.tempDir, sessionManager: h.sessionManager, ui: ui(notes) });
 				return { cancelled: false };
 			},
 			ui: {
-				select: async (_title: string, labels: string[]) => answers(labels),
-				notify: (m: string) => notes.push(m),
-				setEditorText: (t: string) => editor.push(t),
+				...ui(notes),
+				notify: (m: string) => (gone ? stale : notes).push(m),
 			},
 		} as never);
-		return { notes, editor, navigated };
+		return { notes, editor, forked, stale };
 	}
 
 	it("goes back with the conversation and the files, and the message returns to the input box", async () => {
@@ -166,6 +181,13 @@ describe("going back in a session", () => {
 		// Only the first turn is left.
 		expect(harness?.session.messages.filter((m) => m.role === "user")).toHaveLength(1);
 		expect(r.notes[0]).toContain("1");
+		// A new session, starting before the message; nothing more goes to the old one.
+		const second = userTurns({ sessionManager: harness?.sessionManager } as never);
+		expect(r.forked).toEqual([{ id: expect.any(String), position: "before" }]);
+		expect(second.map((turn) => turn.text)).toEqual(["写一篇"]);
+		expect(r.stale).toEqual([]);
+		// exportAgain: the restored draft is exported again.
+		expect(docx()).toEqual(["稿.docx"]);
 	});
 
 	it("goes back to the very first message: the draft is gone", async () => {
@@ -175,11 +197,13 @@ describe("going back in a session", () => {
 	});
 
 	it("moves only the conversation or only the files when asked", async () => {
-		await rewind((labels) =>
+		const onlyFiles = await rewind((labels) =>
 			labels[0].startsWith("2.") ? labels[0] : labels.find((l) => l.startsWith("只退回文件")),
 		);
 		expect(text()).toBe("第一版");
 		expect(harness?.session.messages.filter((m) => m.role === "user")).toHaveLength(2);
+		// The conversation is untouched, so the session stays the same one.
+		expect(onlyFiles.forked).toEqual([]);
 		// The file was restored, so the undo of it is a snapshot too; now the conversation alone.
 		writeFileSync(path(), "手改");
 		await rewind((labels) =>
@@ -212,6 +236,8 @@ describe("going back in a session", () => {
 		const results = h.session.messages.filter((m) => m.role === "toolResult").slice(-2);
 		expect(JSON.stringify(results[0])).toContain("版本 1");
 		expect(JSON.stringify(results[1])).toContain("已恢复到版本 1");
+		// exportAgain: the restored draft is exported again, so the .docx matches it.
+		expect(docx()).toEqual(["稿.docx"]);
 	});
 
 	it("reads the user messages of the active branch", () => {

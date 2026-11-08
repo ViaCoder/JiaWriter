@@ -235,6 +235,15 @@ jobs:
         timeout-minutes: 5
         run: python3 -I scripts/writer-tui-check.py "${{ steps.pkg.outputs.binary }}"
 
+      # The screen of the interface checks is judged through a headless xterm: that one package, at the locked version.
+      - name: Screen renderer
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          version="$(node -p "require('./package-lock.json').packages['node_modules/@xterm/headless'].version")"
+          npm install --prefix "$RUNNER_TEMP/screen" --no-save --ignore-scripts --no-audit --no-fund "@xterm/headless@${version}"
+          echo "JW_SCREEN_MODULES=$RUNNER_TEMP/screen" >> "$GITHUB_ENV"
+
       # Going back through the real interface: draft, edit, /effort and /rewind against a local mock model.
       - name: Rewind check
         if: runner.os != 'Windows'

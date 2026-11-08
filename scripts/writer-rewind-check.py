@@ -17,6 +17,10 @@ import re
 import select
 import shutil
 import signal
+import struct
+import subprocess
+import termios
+import fcntl
 import sys
 import tempfile
 import threading
@@ -52,6 +56,12 @@ def answer(messages):
     return {"content": "好的"}, "stop"
 
 
+# Every request's messages, in order: what the model was given.
+REQUESTS = []
+# Everything the terminal received, escapes included: the screen is judged after its last clearing.
+RAW = bytearray()
+
+
 class Mock(http.server.BaseHTTPRequestHandler):
     """A streaming Chat Completions endpoint."""
 
@@ -59,6 +69,7 @@ class Mock(http.server.BaseHTTPRequestHandler):
         """Answer one request as an event stream."""
         # The request.
         body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))) or b"{}")
+        REQUESTS.append(body.get("messages") or [])
         delta, finish = answer(body.get("messages") or [{}])
         # The reply in two chunks.
         self.send_response(200)
@@ -82,9 +93,11 @@ def read_until(fd, wanted, seconds):
         ready, _, _ = select.select([fd], [], [], 0.3)
         if ready:
             try:
-                out += os.read(fd, 65536)
+                chunk = os.read(fd, 65536)
             except OSError:
                 break
+            out += chunk
+            RAW.extend(chunk)
         text = ANSI.sub("", out.decode("utf-8", "replace"))
         if wanted and wanted in text:
             return text
@@ -110,6 +123,36 @@ def docx_text(path):
             return re.sub(r"<[^>]+>", "", z.read("word/document.xml").decode("utf-8"))
     except (zipfile.BadZipFile, KeyError):
         return ""
+
+
+def shown_screen(columns=120, rows=40):
+    """The lines the terminal shows now, played through a headless xterm (scripts/screen-render.mjs)."""
+    # The bytes so far, in a file next to nothing else.
+    folder = tempfile.mkdtemp(prefix="jw-screen-")
+    raw = os.path.join(folder, "raw.bin")
+    with open(raw, "wb") as f:
+        f.write(bytes(RAW))
+    shown = subprocess.run(["node", os.path.join(ROOT, "scripts", "screen-render.mjs"), raw, str(columns), str(rows)], capture_output=True, text=True, encoding="utf-8", cwd=ROOT, timeout=60)
+    shutil.rmtree(folder, ignore_errors=True)
+    return "\n".join(json.loads(shown.stdout or '{"lines": []}')["lines"])
+
+
+def sessions(agent):
+    """The session files under the agent folder, each with its id from the header line."""
+    found = {}
+    for folder, _dirs, files in os.walk(os.path.join(agent, "sessions")):
+        for name in files:
+            if name.endswith(".jsonl"):
+                path = os.path.join(folder, name)
+                with open(path, encoding="utf-8") as f:
+                    header = json.loads(f.readline() or "{}")
+                found[path] = header.get("id")
+    return found
+
+
+def said(messages, words):
+    """How many user messages of a request hold the words."""
+    return sum(1 for m in messages if m.get("role") == "user" and words in json.dumps(m.get("content", ""), ensure_ascii=False))
 
 
 def wait_for(fd, ready, seconds):
@@ -155,6 +198,8 @@ def main():
         program = ["node", "--import", resolver, os.path.join(coding, "src", "cli.ts")]
     pid, fd = pty.fork()
     if pid == 0:
+        # The size the screen is rendered at.
+        fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
         os.chdir(work)
         os.execvpe(program[0], program, env)
     os.set_blocking(fd, False)
@@ -180,6 +225,8 @@ def main():
         os.write(fd, b"\r")
         screen = read_until(fd, "最接近", 6)
         check("/effort 说明实际生效的档位", "最接近" in screen)
+        # Before going back, the second turn is on the screen: what follows is a real disappearance.
+        check("回退前界面上有第二轮", "第二版" in shown_screen())
         # Go back to before the second message, with the files.
         send(fd, "/rewind")
         # The last line of the list: a packaged binary draws the title first, the list after it.
@@ -188,6 +235,7 @@ def main():
         if debug:
             print(screen[-500:])
         os.write(fd, b"\r")
+        before = sessions(os.path.join(tmp, "agent"))
         screen = read_until(fd, "恢复 1 个文件", 6)
         check("/rewind 问退回什么，写明文件数", "恢复 1 个文件" in screen)
         os.write(fd, b"\r")
@@ -199,6 +247,32 @@ def main():
         check("稿件回到第一版", "第一版" in read() and "第二版" not in read())
         check("docx 也回到第一版", wait_for(fd, lambda: "第一版" in docx_text(os.path.join(work, "稿.docx")), 20))
         check("原消息回到输入框", "改稿" in screen)
+        # A new session: one more file, its own id, and nothing of the turn taken back.
+        after = sessions(os.path.join(tmp, "agent"))
+        new = [path for path in after if path not in before]
+        fresh = open(new[0], encoding="utf-8").read() if len(new) == 1 else ""
+        check("回退后另起新会话，ID 不同", len(before) == 1 and len(new) == 1 and after[new[0]] not in before.values())
+        check("新会话只有回退点之前的内容", "写稿" in fresh and "改稿" not in fresh and "第二版" not in fresh)
+        # The screen as it is now, and the history above it, page by page: the turn taken back is nowhere.
+        now = shown_screen()
+        pages = [now]
+        for _ in range(3):
+            os.write(fd, b"\x1b[5~")
+            settle(fd, 0.8)
+            pages.append(shown_screen())
+        os.write(fd, b"\x1b[6~" * 3)
+        settle(fd, 0.8)
+        if debug:
+            print("screen now:", now[-900:])
+        check("界面上没有被回退的内容", "写稿" in now and "第二版" not in now)
+        check("往上翻也看不到被回退的内容", all("第二版" not in page for page in pages) and any("写稿" in page for page in pages))
+        # The message in the editor is sent again: the model gets the first turn and this one, nothing taken back.
+        asked = len(REQUESTS)
+        os.write(fd, b"\r")
+        read_until(fd, "完成了", 20)
+        settle(fd, 2)
+        context = REQUESTS[asked] if len(REQUESTS) > asked else []
+        check("上下文不含被回退的一轮", said(context, "写稿") == 1 and said(context, "改稿") == 1 and "第二版" not in json.dumps(context, ensure_ascii=False))
     finally:
         # Stop the interface and clean up.
         try:

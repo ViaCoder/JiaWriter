@@ -19,6 +19,7 @@ const FILES = [
 	"packages/coding-agent/src/extensions/writer-vision/index.ts",
 	"packages/coding-agent/src/extensions/writer-browser/index.ts",
 	"packages/coding-agent/src/writer/websearch/main-search.ts",
+	"packages/coding-agent/src/extensions/writer-rewind/index.ts",
 	"search_fetch/src/search_fetch/extension/agent.js",
 ];
 
