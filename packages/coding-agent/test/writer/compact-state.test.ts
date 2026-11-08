@@ -126,8 +126,8 @@ describe("writingState", () => {
 	it("names the skill read last", () => {
 		const read = (path: string) =>
 			entry({ role: "assistant", content: [{ type: "toolCall", id: "r", name: "read", arguments: { path } }] });
-		const state = writingState([read("/s/lieflat-gongwen/SKILL.md"), read("/s/report-analysis/SKILL.md")], undefined);
-		expect(state).toContain("文体：report-analysis");
+		const state = writingState([read("/s/lieflat-gongwen/SKILL.md"), read("/s/deep-research/SKILL.md")], undefined);
+		expect(state).toContain("文体：deep-research");
 	});
 });
 

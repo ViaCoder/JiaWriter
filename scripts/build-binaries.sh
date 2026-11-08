@@ -177,9 +177,9 @@ for platform in "${PLATFORMS[@]}"; do
     mkdir -p "$OUTPUT_DIR/$platform/$native_path"
     cp -R "../tui/$native_path/$native_platform" "$OUTPUT_DIR/$platform/$native_path/"
 
-    # JiaWriter: built-in writing skills, one folder per language (getWriterSkillsDir).
+    # JiaWriter: built-in writing skills, one folder per skill (getWriterSkillsDir).
     mkdir -p "$OUTPUT_DIR/$platform/writer-skills"
-    cp -R skills/writer/zh skills/writer/en "$OUTPUT_DIR/$platform/writer-skills/"
+    cp -R skills/writer/. "$OUTPUT_DIR/$platform/writer-skills/"
     # JiaWriter: pinned fd and rg with SHA256 checks (bin/).
     node ../../scripts/writer-tools.mjs "$platform" "$OUTPUT_DIR/$platform"
     # JiaWriter: the Chrome extension (loaded once in chrome://extensions), the Chinese guide with
@@ -201,7 +201,7 @@ for platform in "${PLATFORMS[@]}"; do
         cp ../../scripts/ocr/ocr.ps1 "$OUTPUT_DIR/$platform/ocr/"
     fi
     # JiaWriter: the license files that came along with the copied folders stay in the repository only.
-    rm -f "$OUTPUT_DIR/$platform/writer-skills/zh/lieflat-gongwen/LICENSE" "$OUTPUT_DIR/$platform/chrome-extension/vendor/Readability-LICENSE.md"
+    rm -f "$OUTPUT_DIR/$platform/writer-skills/lieflat-gongwen/LICENSE" "$OUTPUT_DIR/$platform/chrome-extension/vendor/Readability-LICENSE.md"
     mkdir -p "$OUTPUT_DIR/$platform/参考资料"
 
     # JiaWriter: the search_fetch binary of this platform, where locateSf looks.

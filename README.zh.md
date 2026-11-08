@@ -136,7 +136,7 @@ JiaWriter 不做文字识别（OCR）：没有文字层的扫描件会列在导�
 
 skill 的正文用到时才读取，系统提示词里只有一句话的索引。写文档且没有指定文体时，默认用公文 skill（lieflat-gongwen），在 `/skills` 里停用后这条默认也随之取消。
 
-内置 9 个 skill，中英文各一套，按界面语言提供：通用文章、报告分析、新闻特稿、学术写作、商务邮件和备忘录、营销文案、叙事小说、skill-creator，以及公文写作 [lieflat-gongwen](https://github.com/larashero3-dotcom/lieflat-gongwen)。lieflat-gongwen 覆盖调研报告、领导讲话、工作意见、经验材料、工作方案、经验总结和千字级党建材料，参数来自公文语料统计，写完用 `gongwen_check` 工具自检；它的材料只有中文，英文界面也读中文目录。自己的 skill 放在 `~/.jiawriter/agent/skills/<名称>/SKILL.md`，同名时优先于内置版本。
+内置 4 个 skill，各种界面语言共用一套，规则用英文写：公文写作 [lieflat-gongwen](https://github.com/larashero3-dotcom/lieflat-gongwen)（调研报告、领导讲话、工作意见、经验材料、工作方案和通知等法定公文，参数来自公文语料统计，写完由程序对照检查）、深度研究（多来源检索后写带出处的报告或新闻综述）、学术写作，以及 skill-creator。分析段落的写法放在写作规则里，所有文档都按它写。自己的 skill 放在 `~/.jiawriter/agent/skills/<名称>/SKILL.md`，同名时优先于内置版本。
 
 从会话生成 skill 时，只收集你在当前会话里发出的内容和否决工具调用时附带的意见，模型回复不收集；key、令牌、密码一类内容先去掉；同一主题以最后一次要求为准。草稿先显示给你确认，确认后才写入。
 
@@ -180,4 +180,4 @@ MIT，见 [LICENSE](LICENSE)，保留 pi 原作者的版权声明。发布包里
 - 本仓库：Readability（`search_fetch/src/search_fetch/extension/vendor/Readability-LICENSE.md`）、Unicode 数据（`packages/coding-agent/src/writer/data/UNICODE-LICENSE.txt`）、lieflat-gongwen（见下文），以及摘录到 `search_fetch/src/search_fetch/vendor/crawl4ai/` 的 crawl4ai 部分（crawl4ai 和 rank_bm25 为 Apache-2.0，html2text 为 GPL-3.0）；
 - 上游项目：fd、ripgrep、unpdf（含 pdf.js 及其解码器）、docx、fflate、Python，以及 sf 内置的 Python 包（版本见 `search_fetch/pyproject.toml`）。
 
-例外：`skills/writer/*/lieflat-gongwen/`、`src/writer/gongwen/` 和 `src/extensions/writer-gongwen/` 按 [PolyForm Noncommercial 1.0.0](packages/coding-agent/skills/writer/zh/lieflat-gongwen/LICENSE) 提供，只限非商业用途。商业使用前要删除这三处，或者向原作者取得授权。sf 里的 `search_fetch/src/search_fetch/vendor/crawl4ai/html2text/` 按 GPL-3.0 提供（见其中的 COPYING）。
+例外：`skills/writer/lieflat-gongwen/`、`src/writer/gongwen/` 和 `src/extensions/writer-gongwen/` 按 [PolyForm Noncommercial 1.0.0](packages/coding-agent/skills/writer/lieflat-gongwen/LICENSE) 提供，只限非商业用途。商业使用前要删除这三处，或者向原作者取得授权。sf 里的 `search_fetch/src/search_fetch/vendor/crawl4ai/html2text/` 按 GPL-3.0 提供（见其中的 COPYING）。

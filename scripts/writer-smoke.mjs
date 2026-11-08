@@ -258,7 +258,7 @@ export async function smoke(command, args) {
 		rows.push(["writing tools", TOOLS.every((t) => names.includes(t)), names.join(",")]);
 		const system = JSON.stringify(body.messages?.[0] ?? "");
 		rows.push(["writing prompt", system.includes("general-purpose agent"), ""]);
-		rows.push(["built-in skills", system.includes("report-analysis") && system.includes("lieflat-gongwen"), ""]);
+		rows.push(["built-in skills", system.includes("deep-research") && system.includes("lieflat-gongwen"), ""]);
 		rows.push(["key hidden", !p.stdout.includes(SECRET) && !p.stderr.includes(SECRET) && !anyFileContains(home, SECRET), ""]);
 		// Import a PDF and export a .docx through tool calls (pdf.js, docx and fflate inside the build).
 		const work = join(home, "work");

@@ -23,10 +23,10 @@ export const SEARCH_METHODS: Readonly<Record<string, readonly string[]>> = {
 	],
 	deepseek: [
 		"Query: a topic, not just news, at most 128 characters",
-		"Operators: site:a.com site:b.com, after:2026-01-01, lang:en",
+		"Operators in the query: site:a.com site:b.com, lang:en; dates go in after and before",
 	],
 	firecrawl: [
-		"news: true for news hours old from major outlets; fresh then has no effect",
+		"news: true for news hours old from major outlets; after, before and fresh filter web results only",
 		"site:domain in the query limits the outlets",
 	],
 	claude: [

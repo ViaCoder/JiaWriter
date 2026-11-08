@@ -371,3 +371,24 @@ describe("weak signs", () => {
 		expect(styleClean(styleCheck(`${long}这不是问题，而是机会。`))).toBe(false);
 	});
 });
+
+describe("zh-denial: 不再是", () => {
+	it("finds the no-longer move, and leaves 不再 with other verbs alone", () => {
+		const ids = (text: string) => styleCheck(text).hits.map((h) => h.id);
+		// The sentence a 2026-11-08 draft passed with.
+		expect(ids("技术也不再是挡在普通人面前的障碍。")).toContain("zh-denial");
+		expect(ids("该平台不再局限于文字内容。")).toContain("zh-denial");
+		expect(ids("该办法自2026年1月1日起不再执行。")).not.toContain("zh-denial");
+	});
+});
+
+describe("inferRegister: numbered headings", () => {
+	it("reads 一、 and （一） headings as a document when the title names no kind", () => {
+		expect(inferRegister("# AI发展对舆论引导的风险挑战及对策建议\n\n## 一、主要风险\n\n正文")).toBe("report");
+		// One section written alone.
+		expect(inferRegister("### （一）伪造内容成本骤降\n\n正文")).toBe("report");
+		// An official title still wins, and plain prose stays general.
+		expect(inferRegister("# 关于开展安全检查的通知\n\n## 一、检查范围")).toBe("official");
+		expect(inferRegister("# 春天的早晨\n\n## 第一章\n\n正文")).toBe("general");
+	});
+});

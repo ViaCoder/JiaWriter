@@ -11,8 +11,8 @@ import { ALL_ENGINES } from "../browser/engines.ts";
 const SEARCH_PARAMS: Readonly<Record<string, readonly string[]>> = {
 	browser: ["engines", "pages", "fresh"],
 	anysearch: ["zone", "language", "tag"],
-	deepseek: [],
-	firecrawl: ["fresh", "news"],
+	deepseek: ["after", "before"],
+	firecrawl: ["fresh", "news", "after", "before"],
 	claude: [],
 	codex: ["fresh"],
 };
@@ -27,7 +27,24 @@ const TAGS = ["academic.paper"];
 const ENGINE_NAMES: Readonly<Record<string, string>> = { 必应: "bing", 谷歌: "google", 百度: "baidu", 搜狗: "sogou" };
 
 /** Every option of search_web. */
-const OPTION_NAMES = ["engines", "pages", "fresh", "zone", "language", "tag", "news"];
+const OPTION_NAMES = ["engines", "pages", "fresh", "zone", "language", "tag", "news", "after", "before"];
+
+/**
+ * A date as YYYY-MM-DD, or "" when it is none. A year or a month alone means its first day for after and its last
+ * day for before, so "after 2025, before 2026-03" covers 2025-01-01 to 2026-03-31.
+ */
+export function dateArg(value: unknown, end: boolean): string {
+	const m = (typeof value === "string" ? value.trim() : "").match(/^(\d{4})(?:[-/.](\d{1,2})(?:[-/.](\d{1,2}))?)?$/);
+	if (!m) return "";
+	const year = Number(m[1]);
+	const month = m[2] ? Number(m[2]) : end ? 12 : 1;
+	if (month < 1 || month > 12) return "";
+	// Day 0 of the next month is the last day of this one.
+	const last = new Date(Date.UTC(year, month, 0)).getUTCDate();
+	const day = m[3] ? Number(m[3]) : end ? last : 1;
+	if (day < 1 || day > last) return "";
+	return `${m[1]}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
 
 /** True when a field really holds a value. */
 function filled(value: unknown): boolean {
@@ -100,6 +117,9 @@ export function cleanSearchArgs(raw: unknown): Record<string, unknown> {
 	if (allowed.includes("tag") && TAGS.includes(word(args.tag))) out.tag = word(args.tag);
 	// News results only when really asked for: true, or "true" as some models write it.
 	if (allowed.includes("news") && (args.news === true || word(args.news) === "true")) out.news = true;
+	// Dates in one form; one that cannot be read is dropped like any unusable field.
+	if (allowed.includes("after") && dateArg(args.after, false)) out.after = dateArg(args.after, false);
+	if (allowed.includes("before") && dateArg(args.before, true)) out.before = dateArg(args.before, true);
 	// What the model asked for and this method does not use, so the result can say so.
 	const ignored = OPTION_NAMES.filter((name) => filled(args[name]) && !allowed.includes(name));
 	if (SEARCH_PARAMS[method] && ignored.length > 0) out.ignored = ignored;

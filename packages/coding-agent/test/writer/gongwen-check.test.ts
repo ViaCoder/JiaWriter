@@ -7,7 +7,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 // Test API.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 // Built-in skills folder.
@@ -33,7 +33,7 @@ import {
 import { listSkills, readSkillInfo } from "../../src/writer/skills/manage.ts";
 
 /** The bundled Chinese skill. */
-const SKILL = join(getWriterSkillsDir(), "zh", "lieflat-gongwen");
+const SKILL = join(getWriterSkillsDir(), "lieflat-gongwen");
 /** The synthetic samples the skill once shipped, kept only for these measurements (they use 一是 and placeholders). */
 const SAMPLES = join(__dirname, "fixtures", "gongwen-samples");
 /** Where a measured file is: the samples here, the official documents in the skill. */
@@ -284,8 +284,8 @@ describe("bundled lieflat-gongwen skill", () => {
 		expect(readFileSync(join(SKILL, "LICENSE"), "utf-8")).toContain("PolyForm Noncommercial License 1.0.0");
 		const md = readFileSync(join(SKILL, "SKILL.md"), "utf-8");
 		// The rewritten skill (2026-11-08): the paragraph method, the tool instead of Python, no placeholder rule.
-		expect(md).toContain("## 分析段落");
-		expect(md).toContain("自动做公文参数检查");
+		expect(md).toContain("Analysis paragraphs follow the writing rules");
+		expect(md).toContain("runs the official-document parameter check");
 		expect(md).not.toContain("python3 scripts/check_params.py");
 		expect(md).not.toContain("宁可占位");
 		// Every file the reference table names exists.
@@ -301,16 +301,9 @@ describe("bundled lieflat-gongwen skill", () => {
 		}
 	});
 
-	it("is listed in both languages and the English entry points to the Chinese folder", () => {
-		// Both built-in folders list it.
+	it("is listed among the built-in skills", () => {
 		const agentDir = mkdtempSync(join(tmpdir(), "wa-gongwen-agent-"));
-		for (const lang of ["zh", "en"]) {
-			expect(listSkills(agentDir, join(getWriterSkillsDir(), lang)).map((s) => s.name)).toContain("lieflat-gongwen");
-		}
+		expect(listSkills(agentDir, getWriterSkillsDir()).map((s) => s.name)).toContain("lieflat-gongwen");
 		rmSync(agentDir, { recursive: true, force: true });
-		// The relative path in the English entry resolves to the Chinese SKILL.md.
-		const en = join(getWriterSkillsDir(), "en", "lieflat-gongwen", "SKILL.md");
-		const rel = readFileSync(en, "utf-8").match(/`(\.\.\/\.\.\/zh\/lieflat-gongwen\/SKILL\.md)`/)?.[1] ?? "";
-		expect(resolve(dirname(en), rel)).toBe(join(SKILL, "SKILL.md"));
 	});
 });

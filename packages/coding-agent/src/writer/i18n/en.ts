@@ -56,7 +56,7 @@ export const en: Record<MessageKey, string> = {
 		"Too many dashes (over {limit} per 1,000 characters): use commas or colons, or split the sentence.",
 	// The semantic review's findings.
 	"style.evidenceFirst":
-		"Note: {count} paragraphs open with specifics. In analysis, give general sentences first, then the case or data; paragraphs that are not analysis need no change:",
+		"Note: {count} paragraphs open with specifics. In analysis, state the judgment first in a few general sentences, then the case or data that proves it; paragraphs that are not analysis need no change:",
 	"style.passShort": "AI-style check passed.",
 	"style.longSentences": "{count} sentences over {limit} characters; split them: {heads}.",
 	"style.rareChars": "Rare characters {chars}: use common ones, except in names and quotations.",
@@ -71,7 +71,8 @@ export const en: Record<MessageKey, string> = {
 		"No in-text ordinals {markers}: use numbered headings where items are needed, else plain sentences.",
 	"style.citation":
 		"{count} citations in another form; write reports as 2026年10月31日《路透社》报道 and files as 2021年6月7日《文件名》:",
-	"style.noCitation": "The report uses materials but names no source: cite them as the citation rule says.",
+	"style.noCitation":
+		"The report uses materials but names no source: cite search results and published files as the citation rule says; from the user's notes and fact lists cite the sources they name, never the notes file.",
 	"style.length":
 		"{chars} characters against about {target} asked: cut or add to fit; when the materials run short, do not repeat or add what they lack, and say so in the reply.",
 	"style.reviewFound": "The semantic review found {count}:",
@@ -155,6 +156,8 @@ export const en: Record<MessageKey, string> = {
 	"firecrawl.noKey": "The firecrawl method needs FIRECRAWL_KEY.",
 	"firecrawl.auth": "firecrawl rejected the key (HTTP {status}); check FIRECRAWL_KEY and JW_FIRECRAWL_URL.",
 	"firecrawl.credits": "firecrawl credits are used up (HTTP 402).",
+	"firecrawl.newsDates":
+		"Note: firecrawl news is not filtered by date; after and before apply to web results only. To bound the dates, search again without news.",
 	"firecrawl.rate": "firecrawl rate limit (HTTP 429); try again later.",
 	"firecrawl.page": "firecrawl could not read the page (HTTP {status}): {url}",
 	"firecrawl.http": "firecrawl request failed (HTTP {status}).",
@@ -252,6 +255,8 @@ export const en: Record<MessageKey, string> = {
 	// Reference URLs for the model to open and test.
 	"context.clipped":
 		"(Too long, clipped. The original has {chars} characters; use read or fetch_web to read a part of it again.)",
+	"context.cleared":
+		"(An earlier {tool} result was removed from the context to save room: {target}. To have it again, read the file again with read; pages and search results are kept in the topic folder's 网页/ and 检索/.)",
 	"compact.localTitle":
 		"Local summary: the model summary failed ({reason}). This text was assembled by the program, without the model's own reading.",
 	"compact.localPrevious": "Earlier summary:",
@@ -405,6 +410,27 @@ export const en: Record<MessageKey, string> = {
 	"browserTool.askLook": "Send a picture of {site} to the upstream model? This uses your upstream quota.",
 	"browserTool.askFile": "Send this picture to the upstream model? This uses your upstream quota.",
 	"browserTool.fileRefused": "The picture {path} was not sent: not allowed, or the image limit is reached.",
+	"permission.askCommand": "Run this command?",
+	"permission.askFile": "Allow writing and editing files in the working directory?",
+	"permission.askOutside": "Allow changing a file outside the working directory?",
+	"permission.declined":
+		"The user did not allow it, so it did not run: {what}. Do not retry another way; ask the user what they want.",
+	"permission.noUser":
+		"Nobody can confirm, so it did not run: {what}. Tell the user this step needs confirming in the interactive interface, or running with JW_PERMISSION=bypass.",
+	"todo.title": "Tasks ({done}/{total})",
+	"todo.saved": "Task list saved: {done}/{total} done; in progress: {now}.",
+	"ask.other": "Other (type your own)",
+	"ask.answer": "The user's answer: {answer}",
+	"ask.cancelled": "The user did not answer. Go on with the usual choice and name it in the reply.",
+	"ask.noUser": "Nobody can answer. Go on with the usual choice and name it in the reply.",
+	"ask.fewChoices": "Give at least two choices; with none to offer, go on with the usual choice and name it.",
+	"plan.description":
+		"Plan mode: look without changing anything and give a plan; /plan again to turn it off and carry it out",
+	"plan.on": "Plan mode is on: reading and searching only, then a plan. Once the plan is agreed, /plan turns it off.",
+	"plan.off": "Plan mode is off: the plan can be carried out.",
+	"plan.status": "Plan mode",
+	"plan.refused":
+		"Nothing can be changed in plan mode ({tool}). Give a numbered plan and stop until the user turns plan mode off with /plan.",
 	"computerTool.ask": 'Allow {action} in "{site}"?',
 	"computerTool.setup": "Desktop control is not installed. Run /jw computer and the program will walk you through it.",
 	"setup.none": "No desktop control component exists for this machine.",

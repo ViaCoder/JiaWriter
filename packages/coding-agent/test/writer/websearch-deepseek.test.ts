@@ -121,3 +121,19 @@ describe("deepseekSearch and deepseekFetch", () => {
 		expect(page.date).not.toBe("");
 	});
 });
+
+describe("deepseek dates", () => {
+	it("adds the date parameters as the API's operators", () => {
+		expect(deepseekQuery("budget", { after: "2026-01-01", before: "2026-06-30" })).toBe(
+			"budget after:2026-01-01 before:2026-06-30",
+		);
+		expect(deepseekQuery("budget", {})).toBe("budget");
+	});
+	it("measures the query with its operators against the limit", async () => {
+		const f = fakeFetch(json(200, { results: [] }));
+		const q = "x".repeat(DEEPSEEK_QUERY_MAX - 5);
+		await expect(deepseekSearch(cfg, q, undefined, undefined, f.fn, { after: "2026-01-01" })).rejects.toThrow();
+		await deepseekSearch(cfg, "budget", undefined, undefined, f.fn, { before: "2026-06-30" });
+		expect(JSON.parse(String(f.calls[0].init.body)).query).toBe("budget before:2026-06-30");
+	});
+});

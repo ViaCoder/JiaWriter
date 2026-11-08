@@ -651,7 +651,10 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		label: "Web search",
 		// Full description sent to the model.
 		description:
-			"Searches the web.\n\nUsage:\n - browser = the user's Chrome\n - anysearch, deepseek, firecrawl = APIs\n" +
+			"Searches the web. Choose the method by the sources needed:\n - deepseek: Chinese sources, and searches bounded by dates\n" +
+			" - firecrawl: international news and pages, news hours old with news\n" +
+			" - anysearch: quick results in cn or intl, papers with tag academic.paper\n" +
+			" - browser: the user's Chrome on baidu, sogou (WeChat), bing or google, when the APIs miss\n" +
 			` - ${UPSTREAM_METHODS.trim()}`,
 		// Argument schema.
 		parameters: Type.Object({
@@ -670,6 +673,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			news: Type.Optional(
 				Type.Boolean({ description: "firecrawl only: dated news articles, for recent reporting" }),
 			),
+			after: Type.Optional(Type.String({ description: "deepseek and firecrawl only: first day, YYYY-MM-DD" })),
+			before: Type.Optional(Type.String({ description: "deepseek and firecrawl only: last day, YYYY-MM-DD" })),
 		}),
 		// Models fill in fields of other methods: each call keeps only what its method uses.
 		prepareArguments: (args) => cleanSearchArgs(args) as never,
@@ -754,9 +759,20 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				answer = out.text;
 				notes.push(prove(ctx, backend, "search"));
 			} else if (backend === "deepseek") {
-				raw = await deepseekSearch(config, params.query, undefined, signal);
+				raw = await deepseekSearch(config, params.query, undefined, signal, fetch, {
+					after: params.after,
+					before: params.before,
+				});
 			} else if (backend === "firecrawl") {
-				raw = await firecrawlSearch(config, params.query, { news: params.news, fresh: params.fresh }, signal);
+				const range = { after: params.after, before: params.before };
+				raw = await firecrawlSearch(
+					config,
+					params.query,
+					{ news: params.news, fresh: params.fresh, ...range },
+					signal,
+				);
+				// News is not filtered by date: say so rather than return undated news as if it were.
+				if (params.news && (params.after || params.before)) notes.push(t("firecrawl.newsDates"));
 			} else {
 				// AnySearch.
 				await anysearchTurn();

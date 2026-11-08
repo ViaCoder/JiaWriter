@@ -6,7 +6,7 @@
  *
  * License: this file is a change to that skill and is under the PolyForm Noncommercial License 1.0.0
  * (https://polyformproject.org/licenses/noncommercial/1.0.0), not under JiaWriter's MIT license; the full
- * terms are in skills/writer/zh/lieflat-gongwen/LICENSE.
+ * terms are in skills/writer/lieflat-gongwen/LICENSE.
  */
 
 /** Corpus reference of one metric: p25, p75 and the median. */

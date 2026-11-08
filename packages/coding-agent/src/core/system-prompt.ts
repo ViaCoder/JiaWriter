@@ -6,7 +6,7 @@ import { getSystemMessageText } from "@earendil-works/pi-ai";
 import { getDocsPath, getReadmePath } from "../config.ts";
 import { personaBlock, promptAddText } from "../writer/prompt-add.ts";
 import { WRITER_CHAT_RULE, WRITER_PREAMBLE, writerDocsSection, writerLanguageRule } from "../writer/prompt-text.ts";
-import { CORE_RULES, defaultSkillRule } from "../writer/prompts/core.ts";
+import { CORE_RULES, defaultSkillRule, WORKING_RULES } from "../writer/prompts/core.ts";
 import { formatSkillsForPrompt, type Skill } from "./skills.ts";
 
 /** JiaWriter: built-in tools whose upstream guidelines are replaced by their descriptions and the stages. */
@@ -110,6 +110,7 @@ function buildRules(
 	addRule(writerLanguageRule(process.env.JW_LANG));
 	addRule(WRITER_CHAT_RULE);
 	for (const rule of CORE_RULES) addRule(rule);
+	for (const rule of WORKING_RULES) addRule(rule);
 
 	const hasBash = selectedTools.includes("bash");
 	const hasPowerShell = selectedTools.includes("powershell");

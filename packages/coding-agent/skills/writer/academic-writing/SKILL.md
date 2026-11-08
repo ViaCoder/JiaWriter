@@ -1,19 +1,19 @@
 ---
 name: academic-writing
-description: For papers, literature reviews, proposals and abstracts.
+description: Papers, literature reviews, proposals and abstracts.
 metadata:
-  title: Academic writing
-  style_packs: core-en
+  title: Academic writing（学术写作）
+  style_packs: core-zh,core-en
   negation_threshold: 3
 ---
 
 # Academic writing
 
-Writes papers, literature reviews, proposals and abstracts: a clear question, traceable evidence, conclusions within their limits.
+Papers, literature reviews, proposals and abstracts: a clear question, traceable evidence, conclusions within their limits.
 
 ## Preparation
 
-- Confirm the discipline, the journal or school format, the citation style (such as APA or GB/T 7714) and the length.
+- Confirm the discipline, the journal or school format, the citation style (such as GB/T 7714 or APA) and the length.
 - Import the user's literature and record, for each source, its claims, methods, findings and page numbers.
 
 ## Structure

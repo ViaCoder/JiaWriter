@@ -7,6 +7,7 @@ import {
 	firecrawlError,
 	firecrawlFetch,
 	firecrawlPost,
+	firecrawlRange,
 	firecrawlSearch,
 } from "../../src/writer/websearch/firecrawl.ts";
 
@@ -127,5 +128,27 @@ describe("firecrawlFetch", () => {
 		await expect(firecrawlFetch(cfg, "https://a.example/gone", undefined, f.fn)).rejects.toThrow(
 			"https://a.example/gone",
 		);
+	});
+});
+
+describe("firecrawlRange", () => {
+	it("writes dates as Firecrawl's custom range, month/day/year", () => {
+		expect(firecrawlRange("2024-12-01", "2024-12-31")).toBe("cdr:1,cd_min:12/1/2024,cd_max:12/31/2024");
+		expect(firecrawlRange("2026-03-05")).toBe("cdr:1,cd_min:3/5/2026");
+		expect(firecrawlRange(undefined, "2026-01-31")).toBe("cdr:1,cd_max:1/31/2026");
+	});
+	it("limits web results by dates, ahead of fresh, and leaves news unfiltered", async () => {
+		const web = fakeFetch(json(200, { success: true, data: { web: [] } }));
+		await firecrawlSearch(
+			cfg,
+			"budget",
+			{ fresh: "week", after: "2026-10-01", before: "2026-10-31" },
+			undefined,
+			web.fn,
+		);
+		expect(JSON.parse(String(web.calls[0].init.body)).tbs).toBe("cdr:1,cd_min:10/1/2026,cd_max:10/31/2026");
+		const news = fakeFetch(json(200, { success: true, data: { news: [] } }));
+		await firecrawlSearch(cfg, "budget", { news: true, after: "2026-10-01" }, undefined, news.fn);
+		expect(JSON.parse(String(news.calls[0].init.body)).tbs).toBeUndefined();
 	});
 });

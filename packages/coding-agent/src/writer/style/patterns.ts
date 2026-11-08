@@ -39,11 +39,12 @@ function enp(id: string, zh: string, en: string, source: string): StylePattern {
 /** General Chinese pack: contrast frames and stock phrases that fit no register. */
 const CORE_ZH: readonly StylePattern[] = [
 	// "X is not Y": each one is looked at, whatever the density. 是不是 and 要不是 ask or suppose, and deny nothing.
+	// 不再是 ("no longer Y") is the same move; 0 times in 217,000 characters of human official documents (2026-11-08).
 	zhp(
 		"zh-denial",
 		"否定判断 不是/不等于",
 		"denial 不是/不等于",
-		"(?<![是要若还])(?:并不意味着|不意味着|不代表|不等于|并非|不在于|不只是|不仅仅是|不单是|不是)",
+		"(?<![是要若还])(?:并不意味着|不意味着|不代表|不等于|并非|不在于|不只是|不仅仅是|不单是|不是|不再(?:是|只是|仅仅是|仅是|局限于))",
 	),
 	// 不是……而是 (bounded to one clause frame).
 	zhp("zh-bushi-ershi", "对比框架 不是……而是", "contrast 不是……而是", `不是[^${ZH_END}]{0,40}?而是`),

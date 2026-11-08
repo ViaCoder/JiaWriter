@@ -1,6 +1,6 @@
 /**
  * Built-in JiaWriter extension: writing skills.
- * - Offers the built-in skills of the JW_LANG language (zh by default) that are turned on and not
+ * - Offers the built-in skills (one set, rules in English since 2026-11-08) that are turned on and not
  *   replaced by a user skill of the same name.
  * - /skills: list with on/off marks; turn one or all on or off, edit (built-ins are copied to the
  *   user's skills first), update from this session (shown as a diff), delete after a backup.
@@ -36,12 +36,6 @@ import {
 	resolveLatest,
 	skillNameProblems,
 } from "../../writer/skills/session-skill.ts";
-
-/** Built-in skills folder of the output language. */
-function builtinLangDir(lang: WriterLang): string {
-	// zh/ or en/.
-	return join(getWriterSkillsDir(), lang);
-}
 
 /** Today as YYYY-MM-DD in local time. */
 function today(): string {
@@ -183,7 +177,7 @@ async function askMeta(
 export default function writerSkillsExtension(pi: ExtensionAPI): void {
 	// Built-in skills of the output language, minus turned-off and replaced ones.
 	pi.on("resources_discover", () => ({
-		skillPaths: enabledBuiltinDirs(getAgentDir(), builtinLangDir(currentLang())),
+		skillPaths: enabledBuiltinDirs(getAgentDir(), getWriterSkillsDir()),
 	}));
 
 	// /skills.
@@ -193,7 +187,7 @@ export default function writerSkillsExtension(pi: ExtensionAPI): void {
 			// Until the user leaves the list.
 			const agentDir = getAgentDir();
 			for (;;) {
-				const skills = listSkills(agentDir, builtinLangDir(currentLang()));
+				const skills = listSkills(agentDir, getWriterSkillsDir());
 				const labels = skills.map((s) => skillLabel(s));
 				const choice = await ctx.ui.select(t("skills.title", { count: skills.length }), [
 					t("skills.new"),

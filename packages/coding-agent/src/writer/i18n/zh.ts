@@ -49,7 +49,7 @@ export const zh = {
 	// The semantic review's findings.
 	// Program checks of the automatic round.
 	"style.evidenceFirst":
-		"提示：{count} 段一开头就是具体数据或事例。分析性段落先用几句话概括，再举案例或数据；不是分析的段落不必改：",
+		"提示：{count} 段一开头就是具体数据或事例。分析段先用几句话写出这段的判断（不出现具体的人、事、数），再给证明它的案例或数据；不是分析的段落不必改：",
 	"style.passShort": "AI 腔检查通过。",
 	"style.longSentences": "{count} 句超过 {limit} 字，拆开：{heads}。",
 	"style.rareChars": "生僻字 {chars}：换成常用字，人名、地名和引文除外。",
@@ -62,7 +62,8 @@ export const zh = {
 	"style.listMarkers": "不用段内序号 {markers}：需要分条时用标题编号，否则写成连贯的句子。",
 	"style.citation":
 		"引用格式不符 {count} 处，报道写成 2026年10月31日《路透社》报道，文件写成 2021年6月7日《文件名》：",
-	"style.noCitation": "报告用了素材却没有注明出处：按引用规则写明来源。",
+	"style.noCitation":
+		"报告用了素材却没有注明出处：检索结果和发表的文件按引用规则写明来源；用户的笔记和事实清单引用其中写明的来源，不引用笔记文件本身。",
 	"style.length":
 		"篇幅 {chars} 字，要求约 {target} 字：按要求增删；材料不够时不复述、不加材料里没有的内容来凑字数，在回复里说明。",
 	"style.reviewFound": "语义审查发现 {count} 处：",
@@ -138,6 +139,8 @@ export const zh = {
 	"firecrawl.noKey": "firecrawl 方式需要 FIRECRAWL_KEY。",
 	"firecrawl.auth": "firecrawl 拒绝了 key（HTTP {status}），请检查 FIRECRAWL_KEY 和 JW_FIRECRAWL_URL。",
 	"firecrawl.credits": "firecrawl 积分不足（HTTP 402）。",
+	"firecrawl.newsDates":
+		"注意：firecrawl 的新闻结果不按日期筛选，after/before 只对网页结果生效；要限定日期，去掉 news 再搜。",
 	"firecrawl.rate": "firecrawl 请求过于频繁（HTTP 429），请稍后再试。",
 	"firecrawl.page": "firecrawl 无法读取该网页（HTTP {status}）：{url}",
 	"firecrawl.http": "firecrawl 请求失败（HTTP {status}）。",
@@ -232,6 +235,8 @@ export const zh = {
 	"export.listSep": "；",
 	// Reference URLs for the model to open and test.
 	"context.clipped": "（内容过长，已截断。原文共{chars}字，需要时用read或fetch_web重新读取其中的部分。）",
+	"context.cleared":
+		"（较早的 {tool} 结果已从上下文移除，以节省篇幅：{target}。需要时再取：文件用 read 重新读取，网页和检索结果存在主题文件夹的 网页/ 和 检索/ 里。）",
 	"compact.localTitle": "本地摘要：模型摘要失败（{reason}），以下内容由程序整理，不含模型的归纳。",
 	"compact.localPrevious": "之前的摘要：",
 	"compact.localRequests": "用户的要求（按时间顺序）：",
@@ -377,6 +382,24 @@ export const zh = {
 	"browserTool.askLook": "把 {site} 的截图发给上游模型吗？这会消耗你的上游额度。",
 	"browserTool.askFile": "把这张图片发给上游模型吗？这会消耗你的上游额度。",
 	"browserTool.fileRefused": "没有发送图片 {path}，用户未同意或已到图片上限。",
+	"permission.askCommand": "允许执行这条命令？",
+	"permission.askFile": "允许在工作目录里写入和修改文件？",
+	"permission.askOutside": "允许修改工作目录以外的文件？",
+	"permission.declined": "用户没有同意，未执行：{what}。不要换一种方式重试，问用户想怎么做。",
+	"permission.noUser":
+		"没有人可以确认，未执行：{what}。告诉用户这一步需要在交互界面里确认，或用 JW_PERMISSION=bypass 运行。",
+	"todo.title": "任务清单（{done}/{total}）",
+	"todo.saved": "任务清单已更新：完成 {done}/{total}，进行中：{now}。",
+	"ask.other": "其他（自己输入）",
+	"ask.answer": "用户的回答：{answer}",
+	"ask.cancelled": "用户没有回答。按通常的做法继续，并在回复里说明选了什么。",
+	"ask.noUser": "没有人可以回答。按通常的做法继续，并在回复里说明选了什么。",
+	"ask.fewChoices": "至少要给两个选项；没有可选的就按通常的做法继续，并说明选了什么。",
+	"plan.description": "规划模式：只看不改，先给出计划；再输入 /plan 关闭后按计划执行",
+	"plan.on": "规划模式已打开：只读取和检索，给出计划后停下。确认计划后再输入 /plan 关闭，开始执行。",
+	"plan.off": "规划模式已关闭，可以按计划执行。",
+	"plan.status": "规划模式",
+	"plan.refused": "规划模式下不能修改（{tool}）。先给出编号的计划并停下，等用户用 /plan 关闭规划模式。",
 	"computerTool.ask": "允许在「{site}」执行 {action} 吗？",
 	"computerTool.setup": "还没有安装计算机操作组件。运行 /jw computer，程序会一步步带你装好。",
 	"setup.none": "这台机器没有可用的计算机操作组件。",

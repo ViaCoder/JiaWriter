@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import type { ExtensionAPI, ToolDefinition } from "../../src/core/extensions/types.ts";
 import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
-import { cleanFetchArgs, cleanSearchArgs, shownSearchArgs } from "../../src/writer/websearch/args.ts";
+import { cleanFetchArgs, cleanSearchArgs, dateArg, shownSearchArgs } from "../../src/writer/websearch/args.ts";
 
 describe("cleanSearchArgs", () => {
 	it("drops what a method does not use", () => {
@@ -178,5 +178,30 @@ describe("preparing a call", () => {
 		const prepared = map.get("search_web")?.prepareArguments?.({ query: "q", method: "codex", engines: ["bing"] });
 		expect(prepared).toEqual({ query: "q", method: "codex", ignored: ["engines"] });
 		expect(map.get("fetch_web")?.prepareArguments?.({ url: "u", method: "SF" })).toEqual({ url: "u", method: "sf" });
+	});
+});
+
+describe("dateArg", () => {
+	it("reads full dates, and a year or month as its first or last day", () => {
+		expect(dateArg("2026-03-05", false)).toBe("2026-03-05");
+		expect(dateArg("2026/3/5", true)).toBe("2026-03-05");
+		expect(dateArg("2025", false)).toBe("2025-01-01");
+		expect(dateArg("2025", true)).toBe("2025-12-31");
+		expect(dateArg("2024-02", true)).toBe("2024-02-29");
+		expect(dateArg("2026-13-01", false)).toBe("");
+		expect(dateArg("last week", false)).toBe("");
+	});
+	it("keeps dates for deepseek and firecrawl only", () => {
+		expect(cleanSearchArgs({ query: "q", method: "deepseek", after: "2026", before: "2026-06" })).toEqual({
+			query: "q",
+			method: "deepseek",
+			after: "2026-01-01",
+			before: "2026-06-30",
+		});
+		expect(cleanSearchArgs({ query: "q", method: "anysearch", after: "2026-01-01" })).toEqual({
+			query: "q",
+			method: "anysearch",
+			ignored: ["after"],
+		});
 	});
 });

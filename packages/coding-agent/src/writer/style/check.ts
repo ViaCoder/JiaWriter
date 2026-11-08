@@ -226,9 +226,11 @@ export function inferRegister(text: string): StyleRegister {
 	const title = text.split("\n").find((line) => line.trim() !== "") ?? "";
 	if (/报告|调研|调查|总结|情况|白皮书|\breport\b|\bsurvey\b/i.test(title)) return "report";
 	// The kinds of official document, named at the end of the title (……的通知, 实施方案).
-	return /(通知|通报|意见|决定|办法|方案|规定|细则|规划|请示|批复|公告|通告|纪要|函)[》」\s*]*$/.test(title)
-		? "official"
-		: "general";
+	if (/(通知|通报|意见|决定|办法|方案|规定|细则|规划|请示|批复|公告|通告|纪要|函)[》」\s*]*$/.test(title))
+		return "official";
+	// Headings numbered 一、 or （一） mark a Chinese document even when its title names no kind, or when only one
+	// section of it is written ("（一）……" alone; such drafts skipped the document checks before 2026-11-08).
+	return /^#{1,6}\s*(?:[一二三四五六七八九十]+、|（[一二三四五六七八九十]+）)/m.test(text) ? "report" : "general";
 }
 
 /** Count per 1,000 characters, one decimal. */

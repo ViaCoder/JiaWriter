@@ -71,17 +71,32 @@ export async function firecrawlPost(
 	return json.data;
 }
 
-/** Search the web, or the news when news is set; fresh (day, week, month, year) limits web results only. */
+/** A custom date range in Firecrawl's tbs form, month/day/year (docs.firecrawl.dev/features/search, 2026-11-08). */
+export function firecrawlRange(after?: string, before?: string): string {
+	const mdy = (d: string) => {
+		const [y, m, day] = d.split("-").map(Number);
+		return `${m}/${day}/${y}`;
+	};
+	return ["cdr:1", after ? `cd_min:${mdy(after)}` : "", before ? `cd_max:${mdy(before)}` : ""]
+		.filter(Boolean)
+		.join(",");
+}
+
+/**
+ * Search the web, or the news when news is set. Dates (YYYY-MM-DD) or else fresh (day, week, month, year) limit
+ * web results only: Firecrawl's tbs does not filter news.
+ */
 export async function firecrawlSearch(
 	cfg: SearchConfig,
 	query: string,
-	opts: { news?: boolean; fresh?: string },
+	opts: { news?: boolean; fresh?: string; after?: string; before?: string },
 	signal?: AbortSignal,
 	fetchFn: FetchFn = fetch,
 ): Promise<SearchResult[]> {
 	// Request body: one source, the time window where it applies.
 	const body: Record<string, unknown> = { query, limit: FIRECRAWL_LIMIT, sources: [opts.news ? "news" : "web"] };
-	if (!opts.news && opts.fresh && TBS[opts.fresh]) body.tbs = TBS[opts.fresh];
+	if (!opts.news && (opts.after || opts.before)) body.tbs = firecrawlRange(opts.after, opts.before);
+	else if (!opts.news && opts.fresh && TBS[opts.fresh]) body.tbs = TBS[opts.fresh];
 	const data = (await firecrawlPost(cfg, "/v2/search", body, signal, fetchFn)) as Record<string, unknown> | unknown[];
 	// Results grouped by source, or a flat list.
 	const group = Array.isArray(data) ? data : (data[opts.news ? "news" : "web"] ?? []);

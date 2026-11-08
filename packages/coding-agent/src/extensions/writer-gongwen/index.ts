@@ -1,10 +1,10 @@
 /**
  * Built-in JiaWriter extension: gongwen_check, the parameter self-check of the lieflat-gongwen skill
- * (skills/writer/zh/lieflat-gongwen). It replaces the skill's `python3 scripts/check_params.py` so the check
+ * (skills/writer/lieflat-gongwen). It replaces the skill's `python3 scripts/check_params.py` so the check
  * runs on every platform without Python or bash. The report is Chinese, like the documents it checks.
  *
  * License: part of the lieflat-gongwen adaptation, under the PolyForm Noncommercial License 1.0.0
- * (see skills/writer/zh/lieflat-gongwen/LICENSE), not under JiaWriter's MIT license.
+ * (see skills/writer/lieflat-gongwen/LICENSE), not under JiaWriter's MIT license.
  */
 
 // Parameter schemas.

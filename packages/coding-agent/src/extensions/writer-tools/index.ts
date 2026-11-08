@@ -105,6 +105,44 @@ export function hasMaterials(file: string, cwd: string): boolean {
 	});
 }
 
+/** Marks of a named source in a text: a title in 《》, an address, or a report. */
+const SOURCE_MARK = /《[^》\n]{2,}》|https?:\/\/|报道/;
+/** Kinds of imported file that are published documents, whose title is itself a source. */
+const DOCUMENT_TYPES = new Set([
+	"pdf",
+	"doc",
+	"docx",
+	"wps",
+	"ofd",
+	"rtf",
+	"ppt",
+	"pptx",
+	"xls",
+	"xlsx",
+	"html",
+	"htm",
+	"epub",
+]);
+
+/**
+ * True when the materials beside a draft name a source the draft could cite: search results or fetched pages, a
+ * published document imported as a reference, or notes and recorded materials that name an outlet, title or address.
+ * A fact list that names none is nothing to cite (2026-11-08: drafts cited 《材料》第1条 and 参考资料/前文风险段.md).
+ */
+export function materialsNameSources(file: string, cwd: string): boolean {
+	const filled = (dir: string) => existsSync(dir) && readdirSync(dir).some((name) => !name.startsWith("."));
+	return draftFolders(file, cwd).some((dir) => {
+		if ([join(dir, TOPIC_DIRS.search), join(dir, TOPIC_DIRS.web)].some(filled)) return true;
+		const material = join(dir, MATERIAL_FILE);
+		if (existsSync(material) && SOURCE_MARK.test(readFileSync(material, "utf-8"))) return true;
+		return parsedFiles(dir).some((path) => {
+			// 报告.pdf.md was imported from 报告.pdf.
+			const kind = (basename(path, ".md").match(/\.([^.]+)$/)?.[1] ?? "").toLowerCase();
+			return DOCUMENT_TYPES.has(kind) || SOURCE_MARK.test(readFileSync(path, "utf-8"));
+		});
+	});
+}
+
 /** The titles of the references imported beside a draft: 报告 for 参考资料/.parsed/报告.pdf.md. */
 export function referenceTitles(file: string, cwd: string): string[] {
 	return draftFolders(file, cwd)
@@ -234,7 +272,9 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			const issues = found && keepAnswerable(found, materials);
 			// What the program itself sees: a report with materials that names none, a length far from the one asked.
 			const own: string[] = [];
-			if (materials && inferRegister(text) === "report" && !citesMaterials(text, referenceTitles(file, ctx.cwd)))
+			// A report that states figures from materials naming their sources, and cites none of them.
+			const cites = citesMaterials(text, referenceTitles(file, ctx.cwd));
+			if (inferRegister(text) === "report" && /\d/.test(text) && !cites && materialsNameSources(file, ctx.cwd))
 				own.push(t("style.noCitation"));
 			const chars = countText(text).total;
 			if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)

@@ -2,11 +2,12 @@
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
+import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 import writerPromptsExtension, { NO_USER_NOTE } from "../../src/extensions/writer-prompts/index.ts";
 import { t } from "../../src/writer/i18n/index.ts";
 import { WRITER_PREAMBLE } from "../../src/writer/prompt-text.ts";
 import { SUMMARY_PROMPT, SUMMARY_TURN_PROMPT, SUMMARY_UPDATE_PROMPT } from "../../src/writer/prompts/compact.ts";
-import { CORE_RULES, DEFAULT_SKILL, defaultSkillRule } from "../../src/writer/prompts/core.ts";
+import { CORE_RULES, DEFAULT_SKILL, defaultSkillRule, WORKING_RULES } from "../../src/writer/prompts/core.ts";
 import {
 	BROWSER_MANUAL,
 	CHECK_MANUALS,
@@ -62,8 +63,11 @@ afterEach(() => {
 describe("budgets", () => {
 	it("keeps every text short", () => {
 		expect(size(CORE_RULES)).toBeLessThanOrEqual(1000);
+		expect(size(WORKING_RULES)).toBeLessThanOrEqual(700);
 		// Raised from 1500 for the evidence rule (2026-11-08); the user: no "arbitrary or nonsensical limitations" of my own making.
-		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(1600);
+		// The analysis method moved here from the gongwen skill on 2026-11-08, so it is in one place for every document;
+		// the rest of the growth is the user's citation rule with its exception and the measured placement rule.
+		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(2300);
 		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);
@@ -76,24 +80,20 @@ describe("budgets", () => {
 	});
 
 	it("keeps the short skills short", () => {
-		for (const name of [
-			"academic-writing",
-			"business-email",
-			"general-article",
-			"marketing-copy",
-			"narrative-fiction",
-			"news-feature",
-			"report-analysis",
-		]) {
-			expect(readFileSync(`skills/writer/zh/${name}/SKILL.md`, "utf-8").length).toBeLessThanOrEqual(600);
+		// English rules since 2026-11-08; the gongwen skill is longer because it carries the genre's method.
+		for (const name of ["academic-writing", "deep-research"]) {
+			expect(readFileSync(`skills/writer/${name}/SKILL.md`, "utf-8").length).toBeLessThanOrEqual(2000);
 		}
+		expect(readFileSync("skills/writer/lieflat-gongwen/SKILL.md", "utf-8").length).toBeLessThanOrEqual(6000);
 	});
 });
 
 describe("one place for each rule", () => {
 	it("repeats no rule across the stages, apart from the human check of browser", () => {
 		const shared = /human check|Only addresses in the results list/;
-		const rules = [...CORE_RULES, ...PROMPT_STAGES.flatMap((s) => s.rules)].filter((r) => !shared.test(r));
+		const rules = [...CORE_RULES, ...WORKING_RULES, ...PROMPT_STAGES.flatMap((s) => s.rules)].filter(
+			(r) => !shared.test(r),
+		);
 		expect(new Set(rules).size).toBe(rules.length);
 	});
 
@@ -354,6 +354,17 @@ describe("methodStages", () => {
 					rules,
 				});
 			}
+		}
+	});
+});
+
+describe("working rules", () => {
+	it("reach the system prompt after the fixed rules, once each", () => {
+		const prompt = buildSystemPrompt({ cwd: "/work", selectedTools: ["read", "write", "edit"], toolSnippets: {} });
+		const core = prompt.indexOf(CORE_RULES[CORE_RULES.length - 1]);
+		for (const rule of WORKING_RULES) {
+			expect(prompt.split(rule).length - 1).toBe(1);
+			expect(prompt.indexOf(rule)).toBeGreaterThan(core);
 		}
 	});
 });

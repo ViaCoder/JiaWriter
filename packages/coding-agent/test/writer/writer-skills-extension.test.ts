@@ -93,86 +93,71 @@ function ctx(ui: unknown, messages: string[] = []) {
 const pick = (text: string) => (options: string[]) => options.find((o) => o.includes(text)) ?? "";
 
 describe("shipped skills", () => {
-	it("has the same nine valid skills in zh and en, each of our own free of style_check hits", () => {
-		// Names per language.
-		const names = (lang: string) => readdirSync(join(getWriterSkillsDir(), lang)).sort();
-		expect(names("zh")).toEqual([
+	it("has one set of four valid skills, each of our own free of style_check hits", () => {
+		// One set since 2026-11-08 (the user: "There is no need for two language versions"; "combine to one gongwen,
+		// one academic, one deep research"); skill-creator serves /skill-new.
+		expect(readdirSync(getWriterSkillsDir()).sort()).toEqual([
 			"academic-writing",
-			"business-email",
-			"general-article",
+			"deep-research",
 			"lieflat-gongwen",
-			"marketing-copy",
-			"narrative-fiction",
-			"news-feature",
-			"report-analysis",
 			"skill-creator",
 		]);
-		expect(names("en")).toEqual(names("zh"));
-		for (const lang of ["zh", "en"]) {
-			// Loader accepts all of them.
-			const r = loadSkillsFromDir({ dir: join(getWriterSkillsDir(), lang), source: "path" });
-			expect([r.skills.length, r.diagnostics]).toEqual([9, []]);
-			// No AI-style hits and no negation over the threshold (lieflat-gongwen is third-party text, kept as written).
-			for (const s of r.skills.filter((x) => x.name !== "lieflat-gongwen")) {
-				const body = readFileSync(s.filePath, "utf-8").replace(/^---[\s\S]*?---\n/, "");
-				const rep = styleCheck(body, { packs: [lang === "zh" ? "core-zh" : "core-en"] });
-				expect([s.name, rep.hits.length, rep.negation.over]).toEqual([s.name, 0, false]);
-			}
+		// Loader accepts all of them.
+		const r = loadSkillsFromDir({ dir: getWriterSkillsDir(), source: "path" });
+		expect([r.skills.length, r.diagnostics]).toEqual([4, []]);
+		// No AI-style hits and no negation over the threshold (lieflat-gongwen quotes a failing example on purpose).
+		for (const s of r.skills.filter((x) => x.name !== "lieflat-gongwen")) {
+			const body = readFileSync(s.filePath, "utf-8").replace(/^---[\s\S]*?---\n/, "");
+			const rep = styleCheck(body, { packs: ["core-zh", "core-en"] });
+			expect([s.name, rep.hits.length, rep.negation.over]).toEqual([s.name, 0, false]);
 		}
 	});
 });
 
 describe("skills load only when needed", () => {
-	/** The built-in skills of a language. */
-	const shipped = (lang: string) =>
-		loadSkillsFromDir({ dir: join(getWriterSkillsDir(), lang), source: "path" }).skills;
+	/** The built-in skills. */
+	const shipped = () => loadSkillsFromDir({ dir: getWriterSkillsDir(), source: "path" }).skills;
 
-	it("keeps every description to one short sentence, and skill bodies out of the prompt", () => {
-		for (const lang of ["zh", "en"]) {
-			const skills = shipped(lang);
-			for (const s of skills) expect(s.description.length).toBeLessThanOrEqual(lang === "zh" ? 40 : 110);
-			const prompt = buildSystemPrompt({
-				cwd: "/work",
-				selectedTools: ["read"],
-				toolSnippets: { read: "x" },
-				skills,
-			});
-			// The index names the skill; its body stays in its file.
-			expect(prompt).toContain("lieflat-gongwen");
-			expect(prompt).not.toContain(readFileSync(skills[0].filePath, "utf-8").split("\n---\n")[1].slice(0, 200));
-			expect(prompt).not.toContain("公文写作 DNA");
-		}
+	it("keeps every description to what and when, and skill bodies out of the prompt", () => {
+		const skills = shipped();
+		for (const s of skills) expect(s.description.length).toBeLessThanOrEqual(200);
+		const prompt = buildSystemPrompt({
+			cwd: "/work",
+			selectedTools: ["read"],
+			toolSnippets: { read: "x" },
+			skills,
+		});
+		// The index names the skill; its body stays in its file.
+		expect(prompt).toContain("lieflat-gongwen");
+		expect(prompt).not.toContain(readFileSync(skills[0].filePath, "utf-8").split("\n---\n")[1].slice(0, 200));
+		expect(prompt).not.toContain("公文写作 DNA");
 	});
 
 	it("leaves skill-creator out of the index, for /skill-new to call by name", () => {
-		const creator = shipped("zh").find((s) => s.name === "skill-creator");
+		const creator = shipped().find((s) => s.name === "skill-creator");
 		expect(creator?.disableModelInvocation).toBe(true);
-		expect(formatSkillsForPrompt(shipped("zh"))).not.toContain("skill-creator");
+		expect(formatSkillsForPrompt(shipped())).not.toContain("skill-creator");
 	});
 
 	it("makes the gongwen skill the default genre while it is on", () => {
 		const rule = "read the lieflat-gongwen skill first";
 		const build = (skills: ReturnType<typeof shipped>) =>
 			buildSystemPrompt({ cwd: "/work", selectedTools: ["read"], toolSnippets: { read: "x" }, skills });
-		expect(build(shipped("zh"))).toContain(rule);
+		expect(build(shipped())).toContain(rule);
 		// Turned off in /skills: it is no longer among the skills, and the rule goes with it.
-		expect(build(shipped("zh").filter((s) => s.name !== "lieflat-gongwen"))).not.toContain(rule);
+		expect(build(shipped().filter((s) => s.name !== "lieflat-gongwen"))).not.toContain(rule);
 	});
 });
 
 describe("resources_discover", () => {
-	it("offers the built-ins of JW_LANG that are turned on", () => {
-		// All nine in Chinese.
+	it("offers the built-ins that are turned on, the same set in every language", () => {
+		// All four.
 		const { handlers } = load();
-		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(9);
-		expect(handlers.get("resources_discover")?.().skillPaths[0]).toBe(
-			join(getWriterSkillsDir(), "zh", "academic-writing"),
-		);
-		// English folder with JW_LANG=en.
+		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(4);
+		expect(handlers.get("resources_discover")?.().skillPaths[0]).toBe(join(getWriterSkillsDir(), "academic-writing"));
+		// The same folder with JW_LANG=en.
 		vi.stubEnv("JW_LANG", "en");
-		expect(handlers.get("resources_discover")?.().skillPaths[0]).toBe(
-			join(getWriterSkillsDir(), "en", "academic-writing"),
-		);
+		expect(handlers.get("resources_discover")?.().skillPaths[0]).toBe(join(getWriterSkillsDir(), "academic-writing"));
 	});
 });
 
@@ -180,21 +165,21 @@ describe("/skills", () => {
 	it("turns one and all off and on, edits a built-in as the user's copy, and deletes after a backup", async () => {
 		const { commands, handlers } = load();
 		// Off for one built-in, then leave.
-		let s = scriptedUi([pick("报告分析"), pick("停用"), undefined]);
+		let s = scriptedUi([pick("深度研究"), pick("停用"), undefined]);
 		await commands.get("skills")?.("", ctx(s.ui));
-		expect(s.shown[0]).toBe("写作 skill（9 个）：方向键选择，回车确认，Esc 返回");
-		expect(s.notes).toEqual(["report-analysis 已停用。运行 /reload 生效。"]);
-		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(8);
+		expect(s.shown[0]).toBe("写作 skill（4 个）：方向键选择，回车确认，Esc 返回");
+		expect(s.notes).toEqual(["deep-research 已停用。运行 /reload 生效。"]);
+		expect(handlers.get("resources_discover")?.().skillPaths).toHaveLength(3);
 		// All off, all on.
 		s = scriptedUi(["全部停用", "全部启用", undefined]);
 		await commands.get("skills")?.("", ctx(s.ui));
-		expect(s.notes).toEqual(["8 个 skill 已停用。运行 /reload 生效。", "9 个 skill 已启用。运行 /reload 生效。"]);
+		expect(s.notes).toEqual(["3 个 skill 已停用。运行 /reload 生效。", "4 个 skill 已启用。运行 /reload 生效。"]);
 		// Edit a built-in: unchanged first, then a change.
 		s = scriptedUi([
-			pick("新闻特稿"),
+			pick("深度研究"),
 			pick("编辑"),
 			"=",
-			pick("新闻特稿"),
+			pick("深度研究"),
 			pick("编辑"),
 			"{prefill}\n- 新增一条。",
 			undefined,
@@ -202,17 +187,17 @@ describe("/skills", () => {
 		await commands.get("skills")?.("", ctx(s.ui));
 		expect(s.notes[0]).toBe("内容没有变化，未保存。");
 		expect(s.notes[1]).toBe(
-			`已保存：${join(agent, "skills", "news-feature", "SKILL.md")}（原文件已备份到 ${join(agent, "skills-backup")}${s.notes[1].split("skills-backup")[1].split("）")[0]}）。运行 /reload 生效。`,
+			`已保存：${join(agent, "skills", "deep-research", "SKILL.md")}（原文件已备份到 ${join(agent, "skills-backup")}${s.notes[1].split("skills-backup")[1].split("）")[0]}）。运行 /reload 生效。`,
 		);
-		expect(readFileSync(join(agent, "skills", "news-feature", "SKILL.md"), "utf-8").endsWith("- 新增一条。")).toBe(
+		expect(readFileSync(join(agent, "skills", "deep-research", "SKILL.md"), "utf-8").endsWith("- 新增一条。")).toBe(
 			true,
 		);
 		// Delete the user's copy, which now replaces the built-in and shows as mine (confirmed), then a built-in (turned off instead).
-		s = scriptedUi([pick("news-feature，我的"), pick("删除"), true, pick("营销文案"), pick("删除"), undefined]);
+		s = scriptedUi([pick("deep-research，我的"), pick("删除"), true, pick("学术写作"), pick("删除"), undefined]);
 		await commands.get("skills")?.("", ctx(s.ui));
-		expect(s.notes[0].startsWith("已删除 news-feature，备份在 ")).toBe(true);
-		expect(s.notes[1]).toBe("内置 skill 保留在程序中，已改为停用：marketing-copy。");
-		expect(existsSync(join(agent, "skills", "news-feature"))).toBe(false);
+		expect(s.notes[0].startsWith("已删除 deep-research，备份在 ")).toBe(true);
+		expect(s.notes[1]).toBe("内置 skill 保留在程序中，已改为停用：academic-writing。");
+		expect(existsSync(join(agent, "skills", "deep-research"))).toBe(false);
 	});
 	it("updates a user skill from this session after showing the diff", async () => {
 		const { commands } = load();

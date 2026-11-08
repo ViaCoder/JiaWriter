@@ -22,6 +22,7 @@ import writerToolsExtension, {
 	gongwenGenre,
 	hasMaterials,
 	MAX_ROUNDS,
+	materialsNameSources,
 	modelAsker,
 	referenceTitles,
 	requestedLength,
@@ -327,6 +328,27 @@ describe("hasMaterials", () => {
 	});
 });
 
+describe("materialsNameSources", () => {
+	it("counts published files, searches and notes that name a source; a bare fact list names none", () => {
+		const topic = join(cwd, "20261108-来源");
+		mkdirSync(join(topic, "稿件"), { recursive: true });
+		const draft = join(topic, "稿件", "报告.md");
+		const parsed = join(cwd, "参考资料", ".parsed");
+		mkdirSync(parsed, { recursive: true });
+		// The user's facts with no outlet or title.
+		writeFileSync(join(parsed, "材料.md.md"), "1. Seedance 2.0 生成每秒视频成本约1元。");
+		expect([hasMaterials(draft, cwd), materialsNameSources(draft, cwd)]).toEqual([true, false]);
+		// Notes that name their source.
+		writeFileSync(join(parsed, "材料.md.md"), "1. 2026年4月15日《南方日报》报道：……");
+		expect(materialsNameSources(draft, cwd)).toBe(true);
+		// A published document.
+		writeFileSync(join(parsed, "材料.md.md"), "1. 事实");
+		writeFileSync(join(parsed, "白皮书.pdf.md"), "正文");
+		expect(materialsNameSources(draft, cwd)).toBe(true);
+		rmSync(join(cwd, "参考资料"), { recursive: true });
+	});
+});
+
 describe("the automatic check of each draft", () => {
 	/** The extension with its handlers and the messages it sends; `complete` answers the semantic review. */
 	function started(complete?: Complete) {
@@ -406,7 +428,7 @@ describe("the automatic check of each draft", () => {
 	it("asks for sources and the requested length when a report lacks them", async () => {
 		const { handlers, sent, wrote } = started();
 		mkdirSync(join(cwd, "参考资料", ".parsed"), { recursive: true });
-		writeFileSync(join(cwd, "参考资料", ".parsed", "东坡村调查.txt.md"), "资料");
+		writeFileSync(join(cwd, "参考资料", ".parsed", "东坡村调查.pdf.md"), "资料");
 		handlers.input({ text: "写一篇约3000字的调研报告" }, { cwd });
 		wrote("稿.md", FACT_REPORT);
 		await handlers.agent_end({}, { cwd });

@@ -70,8 +70,12 @@ export async function deepseekPost(
 
 /** The query as the API reads it: after: with a bare year means from the next year on (measured 2026-11-08: after:2026
  * found nothing), while a writer means that year, so it becomes the year's first day. */
-export function deepseekQuery(query: string): string {
-	return query.replace(/\bafter:(\d{4})(?![-\d])/g, "after:$1-01-01");
+export function deepseekQuery(query: string, range: { after?: string; before?: string } = {}): string {
+	// The date parameters become the API's own operators (api-docs.deepseek.com/zh-cn/guides/search, 2026-11-08).
+	const ops = [range.after ? `after:${range.after}` : "", range.before ? `before:${range.before}` : ""].filter(
+		Boolean,
+	);
+	return [query.replace(/\bafter:(\d{4})(?![-\d])/g, "after:$1-01-01"), ...ops].join(" ");
 }
 
 /** Search; the query carries any operators, question is the user's own question for the ranking. */
@@ -81,12 +85,14 @@ export async function deepseekSearch(
 	question: string | undefined,
 	signal?: AbortSignal,
 	fetchFn: FetchFn = fetch,
+	range: { after?: string; before?: string } = {},
 ): Promise<SearchResult[]> {
-	// The API refuses longer queries: the model shortens it.
-	if (query.length > DEEPSEEK_QUERY_MAX)
-		throw new Error(t("deepseek.long", { length: query.length, max: DEEPSEEK_QUERY_MAX }));
+	// The query as sent, operators included: the API refuses longer ones, and the model shortens it.
+	const full = deepseekQuery(query, range);
+	if (full.length > DEEPSEEK_QUERY_MAX)
+		throw new Error(t("deepseek.long", { length: full.length, max: DEEPSEEK_QUERY_MAX }));
 	// Request body; the question only when there is one, within the same limit.
-	const body: Record<string, unknown> = { query: deepseekQuery(query), count: DEEPSEEK_COUNT };
+	const body: Record<string, unknown> = { query: full, count: DEEPSEEK_COUNT };
 	if (question?.trim()) body.ori_question = question.trim().slice(0, DEEPSEEK_QUERY_MAX);
 	const data = await deepseekPost(cfg, "/v1/tools/search", body, signal, fetchFn);
 	// Result list.
