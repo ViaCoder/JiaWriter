@@ -60,9 +60,17 @@ describe("uiText", () => {
 		);
 		expect(uiText("Quit {app}", { app: "jiawriter" })).toBe("退出 jiawriter");
 		expect(uiText("A new upstream hint")).toBe("A new upstream hint");
+		// The answers of a confirmation, such as a permission question.
+		expect([uiText("Yes"), uiText("No")]).toEqual(["是", "否"]);
+		expect([uiText("Thinking..."), uiText("Operation aborted"), uiText("↓ Jump to latest message")]).toEqual([
+			"思考过程已折叠",
+			"已中断",
+			"↓ 回到最新消息",
+		]);
 		// English.
 		vi.stubEnv("JW_LANG", "en");
 		expect(uiText("to expand")).toBe("to expand");
+		expect([uiText("Yes"), uiText("No")]).toEqual(["Yes", "No"]);
 		expect(uiText("Quit {app}", { app: "jiawriter" })).toBe("Quit jiawriter");
 	});
 	it("uses full-width punctuation in every Chinese entry", () => {

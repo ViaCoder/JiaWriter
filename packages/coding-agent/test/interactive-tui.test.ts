@@ -1,6 +1,15 @@
 import type { Component, Terminal, TUI, WheelScrollLines } from "@earendil-works/pi-tui";
 import { Container, getKeybindings, isViewportTUI, ScrollView, setKeybindings, Text } from "@earendil-works/pi-tui";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// JiaWriter shows Chinese by default; these tests check the upstream interface in English.
+beforeEach(() => {
+	vi.stubEnv("JW_LANG", "en");
+});
+afterEach(() => {
+	vi.unstubAllEnvs();
+});
+
 import { VirtualTerminal } from "../../tui/test/virtual-terminal.ts";
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import type { FullscreenExitOutput, TuiMode } from "../src/core/settings-manager.ts";

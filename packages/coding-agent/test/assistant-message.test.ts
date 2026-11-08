@@ -1,6 +1,15 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { TuiMouseEvent } from "@earendil-works/pi-tui";
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+
+// JiaWriter shows Chinese by default; these tests check the upstream component in English.
+beforeEach(() => {
+	vi.stubEnv("JW_LANG", "en");
+});
+afterEach(() => {
+	vi.unstubAllEnvs();
+});
+
 import { AssistantMessageComponent } from "../src/modes/interactive/components/assistant-message.ts";
 import { UserMessageComponent } from "../src/modes/interactive/components/user-message.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";

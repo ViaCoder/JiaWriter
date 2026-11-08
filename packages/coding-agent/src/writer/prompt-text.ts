@@ -13,9 +13,10 @@ export const WRITER_PREAMBLE =
 /** Rule for the language of replies to the user (JW_LANG, Chinese by default). */
 export function writerLanguageRule(lang: string | undefined): string {
 	// English when the interface language is English (same rule as the tool output).
-	if (resolveLang(lang) === "en") return "Reply to the user in English";
+	// Everything on screen: GLM wrote its notes between tool calls in English once the rules were (2026-11-08).
+	if (resolveLang(lang) === "en") return "Write all text the user sees in English, notes between tool calls included";
 	// Chinese otherwise (the default).
-	return "Reply to the user in Simplified Chinese";
+	return "Write all text the user sees in Simplified Chinese, notes between tool calls included";
 }
 
 /** Replaces upstream's "Be concise in your responses": chat stays short, documents keep their length. */

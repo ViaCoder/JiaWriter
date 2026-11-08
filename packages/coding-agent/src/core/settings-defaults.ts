@@ -24,7 +24,8 @@ export const SETTINGS_DEFAULTS = {
 			maxRetryDelayMs: 60000,
 		},
 	},
-	hideThinkingBlock: false,
+	// JiaWriter: the model's reasoning stays folded, as in Claude Code (ctrl+t shows it); GLM reasons in English.
+	hideThinkingBlock: true,
 	showCacheMissNotices: false,
 	quietStartup: false,
 	defaultProjectTrust: "ask",

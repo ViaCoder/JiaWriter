@@ -1,5 +1,6 @@
 // The semantic review (src/writer/style/review.ts): what is kept of a reviewer's answer, and how it is shown.
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { t } from "../../src/writer/i18n/index.ts";
 import {
 	formatReview,
 	keepAnswerable,
@@ -84,5 +85,14 @@ describe("REVIEW_PROMPT", () => {
 		for (const category of REVIEW_CATEGORIES) expect(REVIEW_PROMPT).toContain(`- ${category}:`);
 		expect(REVIEW_PROMPT).toContain("Never ask for more content");
 		expect(REVIEW_PROMPT).toContain("character for character");
+	});
+});
+
+describe("the reviewer and our own knowledge", () => {
+	it("judges no fact by what it knows, and a finding is no reason to search", () => {
+		// A 2026-11-08 review called a dated 2026 event "really 2025" and the writer searched the web to check.
+		expect(REVIEW_PROMPT).toContain("Judge no fact by what you know");
+		expect(REVIEW_PROMPT).toContain("may be later than anything you know");
+		expect(t("style.materials", {}, "zh")).toContain("检查意见不是检索的理由");
 	});
 });

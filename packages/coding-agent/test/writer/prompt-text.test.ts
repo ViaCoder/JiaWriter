@@ -26,11 +26,14 @@ describe("writerLanguageRule", () => {
 	it("replies in Chinese by default and for zh, in English for en", () => {
 		// Default and zh.
 		expect([writerLanguageRule(undefined), writerLanguageRule("zh")]).toEqual([
-			"Reply to the user in Simplified Chinese",
-			"Reply to the user in Simplified Chinese",
+			"Write all text the user sees in Simplified Chinese, notes between tool calls included",
+			"Write all text the user sees in Simplified Chinese, notes between tool calls included",
 		]);
 		// English, also with a region (same rule as the tool output).
-		for (const v of [" en ", "en-US"]) expect(writerLanguageRule(v)).toBe("Reply to the user in English");
+		for (const v of [" en ", "en-US"])
+			expect(writerLanguageRule(v)).toBe(
+				"Write all text the user sees in English, notes between tool calls included",
+			);
 	});
 });
 
@@ -56,7 +59,9 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 		// Preamble first.
 		expect(prompt.startsWith(`<system_prompt>\n${WRITER_PREAMBLE}\n</system_prompt>\n\n# Rules`)).toBe(true);
 		// The language comes first, and the rules of every request follow.
-		expect(prompt).toContain("# Rules\n - Reply to the user in Simplified Chinese");
+		expect(prompt).toContain(
+			"# Rules\n - Write all text the user sees in Simplified Chinese, notes between tool calls included",
+		);
 		for (const rule of CORE_RULES) expect(prompt).toContain(`- ${rule}`);
 	});
 
@@ -71,7 +76,7 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 		const prompt = defaultPrompt();
 		// Language rule and chat rule present; upstream rule gone.
 		expect([
-			prompt.includes("- Reply to the user in English"),
+			prompt.includes("- Write all text the user sees in English, notes between tool calls included"),
 			prompt.includes(`- ${WRITER_CHAT_RULE}`),
 			prompt.includes("Be concise in your responses"),
 		]).toEqual([true, true, false]);

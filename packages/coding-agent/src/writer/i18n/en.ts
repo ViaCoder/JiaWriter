@@ -78,7 +78,7 @@ export const en: Record<MessageKey, string> = {
 	"style.reviewFound": "The semantic review found {count}:",
 	// Where facts come from in a revision.
 	"style.materials":
-		"Facts and cases in a revision come only from the materials at hand: the topic's 素材.md, 参考资料/.parsed/, and the results saved in 检索/ and 网页/, cited; nothing the materials lack is invented, and no placeholder is left.",
+		"Facts and cases in a revision come only from the materials at hand: the topic's 素材.md, 参考资料/.parsed/, and the results saved in 检索/ and 网页/, cited; nothing the materials lack is invented, and no placeholder is left. A check's finding is no reason to search: search only when the user asked, and where the materials and a finding disagree, the materials stand.",
 	// An automatic round of revision.
 	"style.round":
 		"Automatic check: the draft still has problems; revise it by the report below (round {round} of {max}).",

@@ -62,7 +62,7 @@ Categories, by id:
 Rules:
 - Quote the exact words from the draft, at most 40 characters, copied character for character.
 - Report nothing for sentences that state concrete facts plainly, and nothing you would not defend to an editor of that register.
-- A statement given with its source (据……, ……报道, according to) is the source's: you do not see the writer's materials, so judge only the writer's own reasoning, never ask more support for a sourced statement.
+- Judge no fact by what you know: names, dates and figures come from the writer's materials, which you do not see, and may be later than anything you know. A statement given with its source (据……, ……报道, according to) is the source's: judge only the writer's own reasoning, never ask more support for a sourced statement.
 - For each issue give a fix direction. Never invent facts; where facts are missing, the fix is to take them from the writer's materials, or else to state the point plainly or cut it. Never ask for more content.
 - A clean draft gets an empty list.
 

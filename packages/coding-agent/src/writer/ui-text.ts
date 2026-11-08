@@ -12,6 +12,13 @@ import { currentLang } from "./i18n/index.ts";
 
 /** English interface text → Chinese. {name} marks a value filled in by uiText(). */
 export const UI_ZH: Readonly<Record<string, string>> = {
+	// The two answers of a confirmation.
+	Yes: "是",
+	No: "否",
+	// The folded reasoning, an interrupted reply, and the way back to the end of the history.
+	"Thinking...": "思考过程已折叠",
+	"Operation aborted": "已中断",
+	"↓ Jump to latest message": "↓ 回到最新消息",
 	// Startup help, full form.
 	"to interrupt": "中断",
 	"to clear": "清空输入",

@@ -23,7 +23,16 @@ term.write(readFileSync(file), () => {
 	// The buffer shown now: the alternate screen in fullscreen mode, else the normal one.
 	const buffer = term.buffer.active;
 	const lines = [];
-	for (let i = 0; i < term.rows; i++) lines.push(buffer.getLine(buffer.viewportY + i)?.translateToString(true) ?? "");
+	// With JW_SCREEN_BG set, also the rows whose cells mostly carry a background colour (a message band, a selection).
+	const banded = [];
+	for (let i = 0; i < term.rows; i++) {
+		const line = buffer.getLine(buffer.viewportY + i);
+		lines.push(line?.translateToString(true) ?? "");
+		if (!process.env.JW_SCREEN_BG || !line) continue;
+		let coloured = 0;
+		for (let x = 0; x < term.cols; x++) if (!line.getCell(x)?.isBgDefault()) coloured++;
+		if (coloured > term.cols / 2) banded.push(i);
+	}
 	// Which buffer it is, then the lines.
-	process.stdout.write(`${JSON.stringify({ buffer: buffer.type, lines })}\n`);
+	process.stdout.write(`${JSON.stringify({ buffer: buffer.type, lines, ...(process.env.JW_SCREEN_BG ? { banded } : {}) })}\n`);
 });

@@ -2789,11 +2789,13 @@ export class InteractiveMode {
 		message: string,
 		opts?: ExtensionUIDialogOptions,
 	): Promise<boolean> {
-		const result = await this.showExtensionSelector(`${title}\n${message}`, ["Yes", "No"], opts, {
+		// JiaWriter: the two answers in the interface language.
+		const yes = uiText("Yes");
+		const result = await this.showExtensionSelector(`${title}\n${message}`, [yes, uiText("No")], opts, {
 			kind: "permission",
 			message: title,
 		});
-		return result === "Yes";
+		return result === yes;
 	}
 
 	private async promptForMissingSessionCwd(error: MissingSessionCwdError): Promise<string | undefined> {
