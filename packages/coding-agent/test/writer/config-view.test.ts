@@ -86,6 +86,10 @@ describe("otherRows / setupCommands", () => {
 			{ name: "JW_SEARCH_PAGES", value: "3", source: "默认值" },
 			{ name: "JW_SEARCH_URL", value: "https://api.anysearch.com", source: "默认值" },
 			{ name: "ANYSEARCH_KEY", value: "未设置（匿名调用）", source: "默认值" },
+			{ name: "JW_DEEPSEEK_URL", value: "https://api.deepseek.com", source: "默认值" },
+			{ name: "DEEPSEEK_KEY", value: "未设置", source: "默认值" },
+			{ name: "JW_FIRECRAWL_URL", value: "https://api.firecrawl.dev", source: "默认值" },
+			{ name: "FIRECRAWL_KEY", value: "未设置", source: "默认值" },
 			{ name: "JW_SF", value: "未设置（在约定位置查找）", source: "默认值" },
 			{ name: "PROMPT_ADD", value: "未设置", source: "默认值" },
 		]);

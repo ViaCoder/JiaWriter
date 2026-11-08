@@ -10,7 +10,9 @@ import { ALL_ENGINES } from "../browser/engines.ts";
 /** The parameters each search_web method takes, besides query and method. */
 const SEARCH_PARAMS: Readonly<Record<string, readonly string[]>> = {
 	browser: ["engines", "pages", "fresh"],
-	anysearch: ["zone", "language"],
+	anysearch: ["zone", "language", "tag"],
+	deepseek: [],
+	firecrawl: ["fresh", "news"],
 	claude: [],
 	codex: ["fresh"],
 };
@@ -19,11 +21,13 @@ const SEARCH_PARAMS: Readonly<Record<string, readonly string[]>> = {
 const WINDOWS = ["day", "week", "month", "year"];
 /** Regions of the anysearch method. */
 const ZONES = ["cn", "intl"];
+/** AnySearch capability tags offered (academic.paper: papers with abstracts, measured 2026-11-08). */
+const TAGS = ["academic.paper"];
 /** Other names of the engines. */
 const ENGINE_NAMES: Readonly<Record<string, string>> = { 必应: "bing", 谷歌: "google", 百度: "baidu", 搜狗: "sogou" };
 
 /** Every option of search_web. */
-const OPTION_NAMES = ["engines", "pages", "fresh", "zone", "language"];
+const OPTION_NAMES = ["engines", "pages", "fresh", "zone", "language", "tag", "news"];
 
 /** True when a field really holds a value. */
 function filled(value: unknown): boolean {
@@ -93,6 +97,9 @@ export function cleanSearchArgs(raw: unknown): Record<string, unknown> {
 	if (allowed.includes("zone") && ZONES.includes(word(args.zone))) out.zone = word(args.zone);
 	if (allowed.includes("language") && typeof args.language === "string" && args.language.trim())
 		out.language = args.language.trim();
+	if (allowed.includes("tag") && TAGS.includes(word(args.tag))) out.tag = word(args.tag);
+	// News results only when really asked for: true, or "true" as some models write it.
+	if (allowed.includes("news") && (args.news === true || word(args.news) === "true")) out.news = true;
 	// What the model asked for and this method does not use, so the result can say so.
 	const ignored = OPTION_NAMES.filter((name) => filled(args[name]) && !allowed.includes(name));
 	if (SEARCH_PARAMS[method] && ignored.length > 0) out.ignored = ignored;

@@ -46,6 +46,14 @@ export interface SearchConfig {
 	anysearchUrl: string;
 	// AnySearch key ("" = anonymous).
 	anysearchKey: string;
+	// DeepSeek-style search API root.
+	deepseekUrl: string;
+	// Its key ("" = the method is not available).
+	deepseekKey: string;
+	// Firecrawl API root.
+	firecrawlUrl: string;
+	// Its key ("" = the method is not available).
+	firecrawlKey: string;
 	// Explicit sf path ("" = look in the standard places).
 	sfPath: string;
 	// Timeout of one backend call (ms).
@@ -62,6 +70,10 @@ export interface SearchConfig {
 
 /** Default AnySearch API root. */
 export const DEFAULT_ANYSEARCH_URL = "https://api.anysearch.com";
+/** Default DeepSeek-style search API root. */
+export const DEFAULT_DEEPSEEK_URL = "https://api.deepseek.com";
+/** Default Firecrawl API root. */
+export const DEFAULT_FIRECRAWL_URL = "https://api.firecrawl.dev";
 /** Default timeout of one call (s): a browser-driven sf search can take minutes. */
 export const DEFAULT_TIMEOUT_S = 300;
 /** Longest page text handed to the model (characters). */
@@ -77,6 +89,10 @@ export function readSearchEnv(env: NodeJS.ProcessEnv): SearchConfig {
 	return {
 		anysearchUrl: (env.JW_SEARCH_URL ?? "").trim().replace(/\/+$/, "") || DEFAULT_ANYSEARCH_URL,
 		anysearchKey: (env.ANYSEARCH_KEY ?? "").trim(),
+		deepseekUrl: (env.JW_DEEPSEEK_URL ?? "").trim().replace(/\/+$/, "") || DEFAULT_DEEPSEEK_URL,
+		deepseekKey: (env.DEEPSEEK_KEY ?? "").trim(),
+		firecrawlUrl: (env.JW_FIRECRAWL_URL ?? "").trim().replace(/\/+$/, "") || DEFAULT_FIRECRAWL_URL,
+		firecrawlKey: (env.FIRECRAWL_KEY ?? "").trim(),
 		sfPath: (env.JW_SF ?? "").trim(),
 		timeoutMs: (Number.isFinite(seconds) && seconds > 0 ? seconds : DEFAULT_TIMEOUT_S) * 1000,
 		blocklist: (env.JW_SEARCH_BLOCK ?? "")

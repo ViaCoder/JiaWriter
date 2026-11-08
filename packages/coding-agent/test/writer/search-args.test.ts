@@ -39,6 +39,39 @@ describe("cleanSearchArgs", () => {
 			fresh: "week",
 			ignored: ["zone", "language"],
 		});
+		expect(cleanSearchArgs({ ...full, method: "deepseek" })).toEqual({
+			query: "q",
+			method: "deepseek",
+			ignored: all,
+		});
+	});
+
+	it("gives firecrawl its time window and news switch, and nothing else", () => {
+		expect(cleanSearchArgs({ query: "q", method: "firecrawl", fresh: "Week", news: "true", zone: "intl" })).toEqual({
+			query: "q",
+			method: "firecrawl",
+			fresh: "week",
+			news: true,
+			ignored: ["zone"],
+		});
+		expect(cleanSearchArgs({ query: "q", method: "firecrawl", news: false })).toEqual({
+			query: "q",
+			method: "firecrawl",
+		});
+		expect(cleanSearchArgs({ query: "q", method: "anysearch", news: true }).ignored).toEqual(["news"]);
+	});
+
+	it("keeps an AnySearch tag it offers, only for anysearch", () => {
+		expect(cleanSearchArgs({ query: "q", method: "anysearch", tag: "Academic.Paper" })).toEqual({
+			query: "q",
+			method: "anysearch",
+			tag: "academic.paper",
+		});
+		expect(cleanSearchArgs({ query: "q", method: "anysearch", tag: "finance.quote" })).toEqual({
+			query: "q",
+			method: "anysearch",
+		});
+		expect(cleanSearchArgs({ query: "q", method: "deepseek", tag: "academic.paper" }).ignored).toEqual(["tag"]);
 	});
 
 	it("shows a call as it took effect", () => {

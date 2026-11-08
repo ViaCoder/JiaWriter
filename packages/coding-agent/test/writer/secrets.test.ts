@@ -35,9 +35,9 @@ describe("takeSecrets", () => {
 		expect(secret("JW_KEY")).toBeUndefined();
 	});
 
-	test("covers exactly the two key variables", () => {
+	test("covers exactly the four key variables", () => {
 		// The list the module guards.
-		expect([...SECRET_VARS]).toEqual(["JW_KEY", "ANYSEARCH_KEY"]);
+		expect([...SECRET_VARS]).toEqual(["JW_KEY", "ANYSEARCH_KEY", "DEEPSEEK_KEY", "FIRECRAWL_KEY"]);
 	});
 });
 

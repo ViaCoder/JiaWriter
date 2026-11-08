@@ -15,7 +15,7 @@ import { parsePermissionMode, permissionMode, savedPermissionMode } from "./perm
 // The persona addition, shown by path and size.
 import { promptAddPath, promptAddText } from "./prompt-add.ts";
 // Search defaults.
-import { DEFAULT_ANYSEARCH_URL } from "./websearch/core.ts";
+import { DEFAULT_ANYSEARCH_URL, DEFAULT_DEEPSEEK_URL, DEFAULT_FIRECRAWL_URL } from "./websearch/core.ts";
 // Main-model state after startup.
 import type { WriterModelState } from "./writer-model.ts";
 
@@ -112,6 +112,26 @@ export function otherRows(env: NodeJS.ProcessEnv, lang?: WriterLang): ConfigRow[
 			name: "ANYSEARCH_KEY",
 			value: t(readEnv(env, "ANYSEARCH_KEY") ? "jw.set" : "jw.anonymous", {}, lang),
 			source: src("ANYSEARCH_KEY"),
+		},
+		{
+			name: "JW_DEEPSEEK_URL",
+			value: redactUrl(readEnv(env, "JW_DEEPSEEK_URL") ?? DEFAULT_DEEPSEEK_URL),
+			source: src("JW_DEEPSEEK_URL"),
+		},
+		{
+			name: "DEEPSEEK_KEY",
+			value: t(readEnv(env, "DEEPSEEK_KEY") ? "jw.set" : "jw.unset", {}, lang),
+			source: src("DEEPSEEK_KEY"),
+		},
+		{
+			name: "JW_FIRECRAWL_URL",
+			value: redactUrl(readEnv(env, "JW_FIRECRAWL_URL") ?? DEFAULT_FIRECRAWL_URL),
+			source: src("JW_FIRECRAWL_URL"),
+		},
+		{
+			name: "FIRECRAWL_KEY",
+			value: t(readEnv(env, "FIRECRAWL_KEY") ? "jw.set" : "jw.unset", {}, lang),
+			source: src("FIRECRAWL_KEY"),
 		},
 		{ name: "JW_SF", value: readEnv(env, "JW_SF") ?? t("jw.sfAuto", {}, lang), source: src("JW_SF") },
 		{

@@ -19,6 +19,15 @@ export const SEARCH_METHODS: Readonly<Record<string, readonly string[]>> = {
 	anysearch: [
 		"zone: intl with an English query for international cases, cn for Chinese sources",
 		"At most 10 results, with no paging, time filter, site: or dates: search other words for more, and fetch a page for its date",
+		"tag academic.paper finds papers with abstracts",
+	],
+	deepseek: [
+		"Query: a topic, not just news, at most 128 characters",
+		"Operators: site:a.com site:b.com, after:2026-01-01, lang:en",
+	],
+	firecrawl: [
+		"news: true for news hours old from major outlets; fresh then has no effect",
+		"site:domain in the query limits the outlets",
 	],
 	claude: [
 		"query is the only parameter: ask one full question and put any time range in it. The upstream researches it in up to 8 searches and reports",
@@ -41,6 +50,8 @@ export const FETCH_METHODS: Readonly<Record<string, readonly string[]>> = {
 		"If the result says the text may not be the page asked for, tell the user",
 	],
 	anysearch: ["Fast for ordinary articles; sites that block crawlers and JavaScript pages give little"],
+	deepseek: ["Clean text of ordinary articles; paywalled pages give only a summary"],
+	firecrawl: ["Main text of news pages, Reuters included"],
 	sf: [
 		"For PDF, Word and Excel links and video pages; ordinary articles are faster elsewhere",
 		"It reads text layers only: tell the user when a document is a scan",

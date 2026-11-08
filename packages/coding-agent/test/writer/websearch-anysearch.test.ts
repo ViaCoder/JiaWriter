@@ -139,6 +139,11 @@ describe("anysearchSearch and anysearchExtract", () => {
 			{ title: "", url: "https://b.example/", snippet: "3 hours ago long text", date: "3 hours ago" },
 		]);
 	});
+	it("sends a capability tag when one is given", async () => {
+		const f = fakeFetch(json(200, { code: 0, data: { results: [] } }));
+		await anysearchSearch(anon, "fishing ban", { tag: "academic.paper" }, undefined, f.fn, noSleep);
+		expect(JSON.parse(String(f.calls[0].init.body)).tag).toBe("academic.paper");
+	});
 	it("takes the fuller of snippet and content", async () => {
 		const f = fakeFetch(
 			new Response(

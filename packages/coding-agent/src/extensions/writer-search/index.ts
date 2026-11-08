@@ -84,6 +84,10 @@ import {
 	readSearchEnv,
 	type SearchResult,
 } from "../../writer/websearch/core.ts";
+// DeepSeek-style search backend.
+import { deepseekFetch, deepseekSearch } from "../../writer/websearch/deepseek.ts";
+// Firecrawl backend.
+import { firecrawlFetch, firecrawlSearch } from "../../writer/websearch/firecrawl.ts";
 // The search log.
 import { appendSearchLog } from "../../writer/websearch/log.ts";
 // The upstream's own tools in the main conversation.
@@ -135,7 +139,7 @@ function engineName(engine: string): string {
 }
 
 /** A method the model may name. */
-type Method = "browser" | "anysearch" | "sf" | ServerWay;
+type Method = "browser" | "anysearch" | "deepseek" | "firecrawl" | "sf" | ServerWay;
 
 /** Upstream failures by kind; the two that carry a detail name it. */
 const SERVER_ERRORS = {
@@ -521,6 +525,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 			...secrets,
 			...hostsOf(ctx.model?.baseUrl),
 			...secretsOf(config.anysearchKey),
+			...secretsOf(config.deepseekKey),
+			...secretsOf(config.firecrawlKey),
 		]);
 	}
 
@@ -645,21 +651,25 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		label: "Web search",
 		// Full description sent to the model.
 		description:
-			"Searches the web.\n\nUsage:\n - browser = the user's Chrome\n - anysearch = API\n" +
+			"Searches the web.\n\nUsage:\n - browser = the user's Chrome\n - anysearch, deepseek, firecrawl = APIs\n" +
 			` - ${UPSTREAM_METHODS.trim()}`,
 		// Argument schema.
 		parameters: Type.Object({
 			query: Type.String(),
-			method: StringEnum(["browser", "anysearch", "claude", "codex"] as const),
+			method: StringEnum(["browser", "anysearch", "deepseek", "firecrawl", "claude", "codex"] as const),
 			engines: Type.Optional(
 				Type.Array(StringEnum(ALL_ENGINES), { description: "browser only, in order; default bing, google" }),
 			),
 			pages: Type.Optional(Type.Number({ description: "browser only: results pages per engine, 3–5" })),
 			fresh: Type.Optional(
-				StringEnum(["day", "week", "month", "year"] as const, { description: "browser and codex only" }),
+				StringEnum(["day", "week", "month", "year"] as const, { description: "browser, codex and firecrawl only" }),
 			),
 			zone: Type.Optional(StringEnum(["cn", "intl"] as const, { description: "anysearch only" })),
 			language: Type.Optional(Type.String({ description: "anysearch only, such as zh-CN" })),
+			tag: Type.Optional(StringEnum(["academic.paper"] as const, { description: "anysearch only: papers" })),
+			news: Type.Optional(
+				Type.Boolean({ description: "firecrawl only: dated news articles, for recent reporting" }),
+			),
 		}),
 		// Models fill in fields of other methods: each call keeps only what its method uses.
 		prepareArguments: (args) => cleanSearchArgs(args) as never,
@@ -743,10 +753,15 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				raw = out.sources;
 				answer = out.text;
 				notes.push(prove(ctx, backend, "search"));
+			} else if (backend === "deepseek") {
+				raw = await deepseekSearch(config, params.query, undefined, signal);
+			} else if (backend === "firecrawl") {
+				raw = await firecrawlSearch(config, params.query, { news: params.news, fresh: params.fresh }, signal);
 			} else {
 				// AnySearch.
 				await anysearchTurn();
-				raw = await anysearchSearch(config, params.query, { zone: params.zone, language: params.language }, signal);
+				const opts = { zone: params.zone, language: params.language, tag: params.tag };
+				raw = await anysearchSearch(config, params.query, opts, signal);
 			}
 			// Every result goes in: the model chooses among them.
 			const results = normalizeResults(raw, config.blocklist);
@@ -771,13 +786,13 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		label: "Web fetch",
 		// Full description sent to the model.
 		description:
-			"Fetches a page's main text.\n\nUsage:\n - browser = the user's Chrome, for news and JavaScript pages\n - anysearch = API\n" +
+			"Fetches a page's main text.\n\nUsage:\n - browser = the user's Chrome, for news and JavaScript pages\n - anysearch, deepseek, firecrawl = APIs\n" +
 			" - sf = PDF, Word and Excel links, video pages\n" +
 			" - claude, codex = the upstream model does it itself",
 		// Argument schema.
 		parameters: Type.Object({
 			url: Type.String(),
-			method: StringEnum(["browser", "anysearch", "sf", "claude", "codex"] as const),
+			method: StringEnum(["browser", "anysearch", "deepseek", "firecrawl", "sf", "claude", "codex"] as const),
 			lineno: Type.Optional(Type.Number({ description: "codex only: the line to read from" })),
 			find: Type.Optional(Type.String({ description: "codex only: words to find in the page" })),
 		}),
@@ -812,6 +827,10 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				});
 				page = { url: out.url || params.url, title: out.title, content: out.content, date: "" };
 				joined = prove(ctx, backend, "fetch");
+			} else if (backend === "deepseek") {
+				page = await deepseekFetch(config, params.url, signal);
+			} else if (backend === "firecrawl") {
+				page = await firecrawlFetch(config, params.url, signal);
 			} else {
 				// AnySearch extract.
 				await anysearchTurn();

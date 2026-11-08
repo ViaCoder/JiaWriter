@@ -99,7 +99,7 @@ export async function anysearchPost(
 export async function anysearchSearch(
 	cfg: SearchConfig,
 	query: string,
-	opts: { zone?: string; language?: string },
+	opts: { zone?: string; language?: string; tag?: string },
 	signal?: AbortSignal,
 	fetchFn: FetchFn = fetch,
 	sleep: SleepFn = realSleep,
@@ -108,6 +108,8 @@ export async function anysearchSearch(
 	const body: Record<string, unknown> = { query, max_results: ANYSEARCH_MAX, format: "json" };
 	if (opts.zone) body.zone = opts.zone;
 	if (opts.language) body.language = opts.language;
+	// A capability tag searches a vertical source (academic.paper: papers).
+	if (opts.tag) body.tag = opts.tag;
 	// The call.
 	const data = await anysearchPost(cfg, "/v1/search", body, signal, fetchFn, sleep);
 	// Result list.
