@@ -46,6 +46,13 @@ jobs:
           PYTHON: ${{ runner.os == 'Windows' && 'python' || 'python3' }}
         run: bash search_fetch/build_binary.sh --out sf-dist
 
+      # Reading words from a picture with Apple's Vision: it can only be compiled on a Mac.
+      - name: Build the macOS text recognizer
+        if: runner.os == 'macOS'
+        run: swiftc -O scripts/ocr/jw-ocr.swift -o "sf-dist/macos/${MATRIX_NAME#macos-}/jw-ocr"
+        env:
+          MATRIX_NAME: ${{ matrix.name }}
+
       - name: Upload sf
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -263,6 +270,20 @@ jobs:
         if: runner.os != 'Windows'
         timeout-minutes: 5
         run: python3 -I scripts/writer-main-search-check.py "${{ steps.pkg.outputs.binary }}"
+
+      # Words read on this machine, with the system's own recognizer, from a fixture picture.
+      - name: System OCR check
+        if: runner.os != 'Linux'
+        timeout-minutes: 3
+        shell: bash
+        run: |
+          dir="$(dirname "${{ steps.pkg.outputs.binary }}")/ocr"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            powershell -NoProfile -ExecutionPolicy Bypass -File "$dir/ocr.ps1" "$(cygpath -w scripts/ocr/fixture.png)" | tee ocr.out
+          else
+            "$dir/jw-ocr" scripts/ocr/fixture.png | tee ocr.out
+          fi
+          grep -qi jiawriter ocr.out
 
       # Which text reaches the model at each stage, and compaction, against a local mock model.
       - name: Prompt stage check

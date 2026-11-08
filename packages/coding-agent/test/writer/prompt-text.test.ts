@@ -54,14 +54,14 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 		// Build the prompt.
 		const prompt = defaultPrompt();
 		// Preamble first.
-		expect(prompt.startsWith(`<system_prompt>\n${WRITER_PREAMBLE}\n</system_prompt>\n\n<rules>`)).toBe(true);
+		expect(prompt.startsWith(`<system_prompt>\n${WRITER_PREAMBLE}\n</system_prompt>\n\n# Rules`)).toBe(true);
 		// The language comes first, and the rules of every request follow.
-		expect(prompt).toContain("<rules>\n- Reply to the user in Simplified Chinese");
+		expect(prompt).toContain("# Rules\n - Reply to the user in Simplified Chinese");
 		for (const rule of CORE_RULES) expect(prompt).toContain(`- ${rule}`);
 	});
 
 	it("leaves the tool list to the tool descriptions", () => {
-		expect(defaultPrompt()).not.toContain("<tools>");
+		expect(defaultPrompt()).not.toContain("# Tools");
 	});
 
 	it("follows JW_LANG and replaces the upstream concise rule", () => {

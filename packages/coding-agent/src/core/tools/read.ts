@@ -12,9 +12,9 @@ import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult, truncateHead } from "./truncate.ts";
 
 const readSchema = Type.Object({
-	path: Type.String({ description: "File path" }),
-	offset: Type.Optional(Type.Number({ description: "First line, from 1" })),
-	limit: Type.Optional(Type.Number({ description: "Most lines" })),
+	path: Type.String({ description: "The path to the file" }),
+	offset: Type.Optional(Type.Number({ description: "The line number to start reading from" })),
+	limit: Type.Optional(Type.Number({ description: "The number of lines to read" })),
 });
 
 export const readToolSystemPromptContribution = {
@@ -93,7 +93,7 @@ export function createReadToolDefinition(
 	return {
 		name: "read",
 		label: "read",
-		description: "Read a text file or image; a long file comes in parts, continued with offset",
+		description: "Reads a text file or image. A long file comes in parts; continue with offset",
 		promptSnippet: readToolSystemPromptContribution.snippet,
 		promptGuidelines: [...readToolSystemPromptContribution.guidelines],
 		parameters: readSchema,

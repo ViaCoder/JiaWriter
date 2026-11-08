@@ -8,7 +8,9 @@ import { WRITER_PREAMBLE } from "../../src/writer/prompt-text.ts";
 import { SUMMARY_PROMPT, SUMMARY_TURN_PROMPT, SUMMARY_UPDATE_PROMPT } from "../../src/writer/prompts/compact.ts";
 import { CORE_RULES, DEFAULT_SKILL, defaultSkillRule } from "../../src/writer/prompts/core.ts";
 import {
+	BROWSER_MANUAL,
 	CHECK_MANUALS,
+	COMPUTER_MANUAL,
 	EXPORT_MANUAL,
 	MATERIAL_MANUAL,
 	RESEARCH_MANUAL,
@@ -59,6 +61,8 @@ describe("budgets", () => {
 		expect(size(CORE_RULES)).toBeLessThanOrEqual(1000);
 		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(1500);
 		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(800);
+		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
+		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);
 		for (const rules of [MATERIAL_MANUAL, EXPORT_MANUAL, RESTORE_MANUAL, ...Object.values(CHECK_MANUALS)])
 			expect(size(rules)).toBeLessThanOrEqual(300);
 		for (const rules of [...Object.values(SEARCH_METHODS), ...Object.values(FETCH_METHODS)])
@@ -206,9 +210,9 @@ describe("nothing assumes a writing task", () => {
 	});
 });
 
-describe("a general-purpose assistant", () => {
+describe("a general-purpose agent", () => {
 	it("says so, and limits the document rules to documents", () => {
-		expect(WRITER_PREAMBLE).toContain("general-purpose assistant");
+		expect(WRITER_PREAMBLE).toContain("general-purpose agent");
 		expect(WRITER_PREAMBLE).not.toMatch(/writing|research/i);
 		expect(CORE_RULES.join("\n")).toContain("In a document, take every case");
 		expect(CORE_RULES.join("\n")).toContain("When writing a document, keep it");

@@ -8,7 +8,9 @@
 import { basename } from "node:path";
 // The text of each stage.
 import {
+	BROWSER_MANUAL,
 	CHECK_MANUALS,
+	COMPUTER_MANUAL,
 	EXPORT_MANUAL,
 	MATERIAL_MANUAL,
 	RESEARCH_MANUAL,
@@ -64,6 +66,8 @@ export const PROMPT_STAGES: readonly PromptStage[] = [
 	})),
 	{ id: "export", title: "Export rules", rules: EXPORT_MANUAL, tools: ["export_document"] },
 	{ id: "restore", title: "Restoring", rules: RESTORE_MANUAL, tools: ["draft_restore"] },
+	{ id: "browser", title: "Using the browser", rules: BROWSER_MANUAL, tools: ["browser"] },
+	{ id: "computer", title: "Using the computer", rules: COMPUTER_MANUAL, tools: ["computer"] },
 ];
 
 /** A stage as the model reads it. */

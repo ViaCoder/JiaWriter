@@ -1,12 +1,29 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import { describe, expect, it } from "vitest";
 import {
 	citedAddresses,
+	fixedFor,
+	fixedFromEntries,
+	fixTools,
+	isOpening,
 	mainTools,
 	mainWay,
+	provenId,
 	readMainSearch,
+	readProven,
 	replyText,
+	searchReasoning,
+	serverItems,
+	sourceOf,
+	steered,
+	textOf,
 	withMainSearch,
+	withoutProven,
+	withProven,
+	writeProven,
 } from "../../src/writer/websearch/main-search.ts";
 
 /** A reply with these records and words. */
@@ -63,7 +80,7 @@ describe("withMainSearch", () => {
 		const mine = { ...own, description: "Search." };
 		const out = withMainSearch({ tools: [mine, other] }, "codex", new Set(["search"]));
 		const [first, second] = out?.tools as { description: string }[];
-		expect(first.description).toMatch(/^Search\. For upstream search call the web_search tool/);
+		expect(first.description).toMatch(/^Search\.\n - For upstream search use the web_search tool/);
 		expect(second).toEqual(other);
 	});
 
@@ -157,5 +174,124 @@ describe("replyText and citedAddresses", () => {
 		expect(replyText(message)).toContain("又见");
 		expect(citedAddresses(message)).toEqual(["https://a.example/1", "https://a.example/2"]);
 		expect(citedAddresses(reply([], "没有地址"))).toEqual([]);
+	});
+});
+
+describe("the record of shown tools", () => {
+	it("provenId keeps no address", () => {
+		const id = provenId("https://relay.example.com/v1", "model");
+		expect(id).toMatch(/^[0-9a-f]{32}$/);
+		expect(id).not.toBe(provenId("https://relay.example.com/v1", "other"));
+	});
+
+	it("readProven and writeProven round-trip, and drop unknown tools", () => {
+		const dir = mkdtempSync(join(tmpdir(), "jw-proven-"));
+		const file = join(dir, "deep", "proven.json");
+		expect(readProven(file)).toEqual({});
+		writeProven(file, { a: ["search", "fetch"] });
+		expect(readProven(file)).toEqual({ a: ["search", "fetch"] });
+		writeFileSync(file, JSON.stringify({ a: ["search", "other"], b: "no" }));
+		expect(readProven(file)).toEqual({ a: ["search"] });
+		writeFileSync(file, "not json");
+		expect(readProven(file)).toEqual({});
+		rmSync(dir, { recursive: true });
+	});
+});
+
+describe("isOpening", () => {
+	it("is true only before the model has said anything", () => {
+		expect(isOpening({ messages: [{ role: "user" }] })).toBe(true);
+		expect(isOpening({ messages: [{ role: "user" }, { role: "assistant" }] })).toBe(false);
+		expect(isOpening({})).toBe(false);
+	});
+});
+
+describe("fixedFor", () => {
+	it("gives a conversation's tools on its own upstream only", () => {
+		const fixed = { id: "a", tools: ["search" as const] };
+		expect([...fixedFor(fixed, "a")]).toEqual(["search"]);
+		expect([...fixedFor(fixed, "b")]).toEqual([]);
+		expect([...fixedFor(undefined, "a")]).toEqual([]);
+	});
+});
+
+describe("withProven and withoutProven", () => {
+	it("adds a tool once, keeps other upstreams, and forgets one upstream", () => {
+		const one = withProven({ other: ["fetch"] }, "a", "search");
+		expect(withProven(one, "a", "search")).toEqual({ other: ["fetch"], a: ["search"] });
+		expect(withProven(one, "a", "fetch").a).toEqual(["search", "fetch"]);
+		expect(withoutProven(one, "a")).toEqual({ other: ["fetch"] });
+		expect(withoutProven(one, "missing")).toEqual(one);
+	});
+});
+
+describe("fixTools", () => {
+	const record = { a: ["search" as const] };
+	it("takes the record only on a first request", () => {
+		expect(fixTools(undefined, "a", { messages: [{ role: "user" }] }, record).tools).toEqual(["search"]);
+		expect(fixTools(undefined, "a", { messages: [{ role: "assistant" }] }, record).tools).toEqual([]);
+		expect(fixTools(undefined, "b", { messages: [{ role: "user" }] }, record).tools).toEqual([]);
+	});
+	it("never changes what is fixed", () => {
+		const fixed = { id: "a", tools: [] };
+		expect(fixTools(fixed, "a", { messages: [{ role: "user" }] }, record)).toBe(fixed);
+	});
+});
+
+describe("fixedFromEntries", () => {
+	it("gives the last set of the right kind", () => {
+		const entries = [
+			{ type: "custom", customType: "t", data: { id: "a", tools: [] } },
+			{ type: "message" },
+			{ type: "custom", customType: "other", data: { id: "x", tools: [] } },
+			{ type: "custom", customType: "t", data: { id: "b", tools: ["search"] } },
+		];
+		expect(fixedFromEntries(entries, "t")?.id).toBe("b");
+		expect(fixedFromEntries([], "t")).toBeUndefined();
+	});
+});
+
+describe("searchReasoning", () => {
+	it("drops none, raises minimal and leaves the rest", () => {
+		expect(searchReasoning({ effort: "none" })).toEqual({});
+		expect(searchReasoning({ effort: "minimal", summary: "auto" })).toEqual({
+			reasoning: { effort: "low", summary: "auto" },
+		});
+		expect(searchReasoning({ effort: "high" })).toEqual({ reasoning: { effort: "high" } });
+		expect(searchReasoning(undefined)).toEqual({});
+	});
+});
+
+describe("steered", () => {
+	it("adds the note to our search tool only", () => {
+		expect(
+			(steered({ name: "search_web", description: "Search." }) as { description: string }).description,
+		).toContain("web_search tool");
+		const other = { name: "read", description: "Read." };
+		expect(steered(other)).toBe(other);
+	});
+});
+
+describe("serverItems, textOf and sourceOf", () => {
+	it("takes the records of a reply only", () => {
+		expect(serverItems(reply([{ type: "web_search_call" }])).map((i) => i.type)).toEqual(["web_search_call"]);
+	});
+	it("takes text and leaves anything else out", () => {
+		expect(textOf("a")).toBe("a");
+		expect(textOf(1)).toBe("");
+		expect(sourceOf("u", "t", 3)).toEqual({ url: "u", title: "t", snippet: "", date: "" });
+	});
+});
+
+describe("how long the record takes", () => {
+	it("reads a reply of 2000 records in under 50 ms", () => {
+		const items = Array.from({ length: 2000 }, (_, i) => ({
+			type: "web_search_call",
+			action: { type: "search", query: `q${i}`, sources: [{ url: `https://a.example.com/${i}` }] },
+		}));
+		const message = reply(items);
+		const started = performance.now();
+		expect(readMainSearch(message).sources.length).toBe(2000);
+		expect(performance.now() - started).toBeLessThan(50);
 	});
 });

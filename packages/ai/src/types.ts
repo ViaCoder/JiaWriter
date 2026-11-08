@@ -443,6 +443,7 @@ export interface ImageContent {
 	type: "image";
 	data: string; // base64 encoded image data
 	mimeType: string; // e.g., "image/jpeg", "image/png"
+	detail?: "low" | "auto"; // Only the Responses API reads this.
 }
 
 export interface ToolCall {

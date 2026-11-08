@@ -2,9 +2,9 @@
 // The local host (the jiawriter program, or `sf bridge-host`, started by Chrome through native
 // messaging) sends commands {id, op, ...}; this worker opens pages in a dedicated window of THIS
 // Chrome, runs the fixed scripts in ops/ on them, and answers {id, ok, result} or {id, ok:false, error}.
-// No code strings are ever evaluated: every page script is a static file shipped here.
+// Search and fetch run only static page scripts shipped here; the one exception is page_eval in agent.js.
 // Clicks, typing and scrolling go through chrome.debugger's Input domain, so pages receive the same
-// trusted events a person's mouse and keyboard produce; nothing else of the protocol is used.
+// trusted events a person's mouse and keyboard produce.
 
 // Native messaging host name (must match the host manifest the jiawriter program writes).
 const HOST = "com.jiawriter.browser";
@@ -1039,6 +1039,9 @@ const OPS = {
     return true;
   },
 };
+
+// The operations of the agent's browser tool, kept apart from search and fetch.
+importScripts("agent.js");
 
 // Keep the bridge reconnecting: browser start, extension install/update and a periodic alarm.
 chrome.runtime.onStartup.addListener(connect);

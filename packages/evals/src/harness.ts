@@ -259,11 +259,11 @@ export function verifySystemPrompt(
 	options: Pick<PiCodingAgentHarnessOptions, "name" | "expectedPiDocumentation">,
 ): string {
 	if (options.expectedPiDocumentation === undefined) return systemPrompt;
-	if (!systemPrompt.includes("\n<rules>\n")) {
+	if (!systemPrompt.includes("\n# Rules\n")) {
 		throw new Error(`Pi system prompt lost its rules in the ${options.name} eval variant.`);
 	}
-	// JiaWriter: the docs section text changed; its tag still marks it.
-	const hasDocumentation = systemPrompt.includes("\n<docs>\n");
+	// JiaWriter: the docs section text changed; its heading still marks it.
+	const hasDocumentation = systemPrompt.includes("\n# Docs\n");
 	if (hasDocumentation !== options.expectedPiDocumentation) {
 		throw new Error(`Pi system prompt does not match the ${options.name} eval variant.`);
 	}
@@ -493,17 +493,15 @@ export function resolveDocumentationVariant(
 }
 
 export function excludePiDocumentation(defaultPrompt: string): string {
-	const documentationStartMarker = "\n<docs>\n";
-	const documentationEndMarker = "\n</docs>";
+	const documentationStartMarker = "\n# Docs\n";
+	const nextSectionMarker = "\n\n# ";
 	const documentationStart = defaultPrompt.indexOf(documentationStartMarker);
 	if (documentationStart === -1) throw new Error("Default Pi system prompt has no Pi documentation section.");
-	const documentationEnd = defaultPrompt.indexOf(documentationEndMarker, documentationStart);
+	const documentationEnd = defaultPrompt.indexOf(nextSectionMarker, documentationStart);
 	if (documentationEnd === -1) throw new Error("Default Pi system prompt has no complete Pi documentation section.");
-	const cwdStart = defaultPrompt.lastIndexOf("\n<cwd>\n");
+	const cwdStart = defaultPrompt.lastIndexOf("\n# Environment\n");
 	if (cwdStart < documentationEnd) throw new Error("Default Pi system prompt has no working-directory section.");
-	return (
-		defaultPrompt.slice(0, documentationStart) + defaultPrompt.slice(documentationEnd + documentationEndMarker.length)
-	);
+	return defaultPrompt.slice(0, documentationStart) + defaultPrompt.slice(documentationEnd + 1);
 }
 
 type DocumentationHarnessOptions = Omit<

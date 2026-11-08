@@ -19,13 +19,13 @@ import {
 } from "./truncate.ts";
 
 const grepSchema = Type.Object({
-	pattern: Type.String({ description: "Regex or literal text" }),
-	path: Type.Optional(Type.String({ description: "File or folder, default the current one" })),
+	pattern: Type.String({ description: "The regex or literal string" }),
+	path: Type.Optional(Type.String({ description: "The file or directory, default the current one" })),
 	glob: Type.Optional(Type.String({ description: "Only files matching this glob" })),
 	ignoreCase: Type.Optional(Type.Boolean({ description: "Ignore case" })),
-	literal: Type.Optional(Type.Boolean({ description: "Pattern is literal text" })),
+	literal: Type.Optional(Type.Boolean({ description: "Treat pattern as a literal string" })),
 	context: Type.Optional(Type.Number({ description: "Lines shown around each match" })),
-	limit: Type.Optional(Type.Number({ description: "Most matches, default 100" })),
+	limit: Type.Optional(Type.Number({ description: "Maximum matches, default 100" })),
 });
 
 export const grepToolSystemPromptContribution = {
@@ -71,7 +71,7 @@ export function createGrepToolDefinition(
 	return {
 		name: "grep",
 		label: "grep",
-		description: "Search inside files; gives matching lines with paths and line numbers",
+		description: "Searches inside files and returns matching lines with paths and line numbers",
 		promptSnippet: grepToolSystemPromptContribution.snippet,
 		parameters: grepSchema,
 		async execute(

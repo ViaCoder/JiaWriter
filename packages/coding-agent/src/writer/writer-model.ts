@@ -55,7 +55,7 @@ export interface WriterProviderConfig {
 		reasoning: boolean;
 		thinkingLevelMap?: WriterThinkingLevelMap;
 		compat?: { forceAdaptiveThinking?: boolean };
-		input: "text"[];
+		input: ("text" | "image")[];
 		cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
 		contextWindow: number;
 		maxTokens: number;
@@ -114,6 +114,23 @@ const NO_REASONING: ReasoningSupport = { mode: "none", levels: [] };
 /** State shared with the extension and sdk.ts. */
 let current: WriterModelState = { kind: "none" };
 
+/** The JW provider once its upstream is known to take images, shared with the rest of the program. */
+export function buildImagesProvider(): WriterProviderConfig | undefined {
+	const now = getWriterModel();
+	if (now.kind !== "ready") return undefined;
+	const provider = buildProviderConfig(
+		now.root,
+		now.api,
+		now.model,
+		now.contextWindow,
+		now.maxTokens,
+		now.reasoning,
+		true,
+	);
+	setWriterModel({ ...now, provider });
+	return provider;
+}
+
 /** Read the last startup result. */
 export function getWriterModel(): WriterModelState {
 	// Return the stored state.
@@ -167,6 +184,7 @@ export function buildProviderConfig(
 	contextWindow: number,
 	maxTokens: number,
 	reasoning: ReasoningSupport = NO_REASONING,
+	images = false,
 ): WriterProviderConfig {
 	// True when any reasoning level works.
 	const hasReasoning = reasoning.mode !== "none" && reasoning.levels.length > 0;
@@ -197,8 +215,8 @@ export function buildProviderConfig(
 				...(api === "anthropic-messages" && reasoning.mode === "effort"
 					? { compat: { forceAdaptiveThinking: true } }
 					: {}),
-				// Text input only; image support is unknown.
-				input: ["text"],
+				// Images only once the upstream is known to take them: one it refuses fails the whole conversation.
+				input: images ? ["text", "image"] : ["text"],
 				// Cost tracking is not configured.
 				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 				// From JW_CTX.

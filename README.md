@@ -29,6 +29,12 @@ The model is configured with environment variables. OpenAI Responses, OpenAI Cha
 | `JW_OUT` | Maximum output (tokens; 128k and 1m also work) | 128000 |
 | `JW_EFFORT` | Thinking intensity: `off`, `low`, `medium`, `high`, `xhigh`, `max`; the nearest level is used when the model lacks one | `medium` |
 | `JW_LANG` | Interface and tool-output language: `zh`, `en` | `zh` |
+| `JW_PERMISSION` | How much the browser and computer tools ask: `manual`, `auto` (default) or `bypass`. `/jw permission` saves a choice. | `auto` |
+| `JW_BROWSER` | The `browser` tool: `on`, `off`, or unset to offer it when the Chrome extension is connected at session start. | follows the extension |
+| `JW_IMAGE` | Whether the upstream takes images: `on`, `off`, or unset to find out when one is first needed. | found out once |
+| `JW_IMAGE_MAX` | Images per message and per session, such as `1,10`. | `1,10` |
+| `JW_IMAGE_EDGE` | Longest edge of a picture in pixels. | `1024` |
+| `JW_COMPUTER` | `off` hides the `computer` tool. It appears at session start once `/jw computer` has installed the desktop driver. | follows the install |
 | `JW_ENGINES` | Engines the browser method uses, in order, when the model names none: `bing`, `google`, `baidu`, `sogou` | `bing,google` |
 | `JW_VERIFY_WAIT` | Longest wait for you to clear a human check (seconds, 0–300; 0: no wait) | `180` |
 | `JW_SEARCH_PAGES` | Results pages per engine for the browser backend (3–5) | `3` |

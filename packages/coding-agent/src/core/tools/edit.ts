@@ -21,19 +21,19 @@ import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 const replaceEditSchema = Type.Object(
 	{
 		oldText: Type.String({
-			description: "Exact text, unique in the file, as short as it can be",
+			description: "The exact string, unique in the file, as short as it can be",
 		}),
-		newText: Type.String({ description: "Replacement text" }),
+		newText: Type.String({ description: "The replacement string" }),
 	},
 	{},
 );
 
 const editSchema = Type.Object(
 	{
-		path: Type.String({ description: "File path" }),
+		path: Type.String({ description: "The path to the file" }),
 		edits: Type.Array(replaceEditSchema, {
 			description:
-				"One or more targeted replacements. Each edit is matched against the original file, not incrementally. Do not include overlapping or nested edits. If two changes touch the same block or nearby lines, merge them into one edit instead.",
+				"One or more replacements, each matched against the original file. Merge overlapping or nearby changes into one",
 		}),
 	},
 	{},
@@ -148,7 +148,7 @@ export function createEditToolDefinition(
 		name: "edit",
 		label: "edit",
 		description:
-			"Change a file by exact text replacement, however large the change: to add a section, replace a short passage with itself plus the new text. One call per file, one edits[] entry per change, matched against the original file",
+			"Performs exact string replacements in a file, however large the change.\n\nUsage:\n - To add a section, replace a short passage with itself plus the new text\n - One call per file, one edits[] entry per change",
 		promptSnippet: editToolSystemPromptContribution.snippet,
 		promptGuidelines: [...editToolSystemPromptContribution.guidelines],
 		parameters: editSchema,

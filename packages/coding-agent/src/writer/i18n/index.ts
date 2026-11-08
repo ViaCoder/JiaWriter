@@ -64,7 +64,14 @@ export function setUiLang(lang: WriterLang): void {
 	// Folder, temp file, rename.
 	const path = uiSettingsPath();
 	mkdirSync(join(path, ".."), { recursive: true });
-	writeFileSync(`${path}.tmp`, `${JSON.stringify({ lang }, null, 2)}\n`);
+	// Other settings in the file stay.
+	let settings: Record<string, unknown> = {};
+	try {
+		settings = JSON.parse(readFileSync(path, "utf-8")) as Record<string, unknown>;
+	} catch {
+		// First setting.
+	}
+	writeFileSync(`${path}.tmp`, `${JSON.stringify({ ...settings, lang }, null, 2)}\n`);
 	renameSync(`${path}.tmp`, path);
 	cached = { path, lang };
 }

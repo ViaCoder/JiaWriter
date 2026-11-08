@@ -186,6 +186,20 @@ for platform in "${PLATFORMS[@]}"; do
     # screenshots for this system, and an empty reference folder.
     cp -R ../../search_fetch/src/search_fetch/extension "$OUTPUT_DIR/$platform/chrome-extension"
     node ../../scripts/writer-guide.mjs "$platform" "$OUTPUT_DIR/$platform/使用说明.html"
+    # JiaWriter: reading words from a picture on this machine, where the system offers it.
+    # The macOS helper is compiled on a Mac by the build-sf job and arrives beside sf.
+    if [[ "$platform" == darwin-* && -n "$SF_DIR" ]]; then
+        ocr_arch="${platform#*-}"; ocr_arch="${ocr_arch/x64/amd64}"
+        if [[ -f "$SF_DIR/macos/$ocr_arch/jw-ocr" ]]; then
+            mkdir -p "$OUTPUT_DIR/$platform/ocr"
+            cp "$SF_DIR/macos/$ocr_arch/jw-ocr" "$OUTPUT_DIR/$platform/ocr/"
+            chmod 755 "$OUTPUT_DIR/$platform/ocr/jw-ocr"
+        fi
+    fi
+    if [[ "$platform" == windows-* ]]; then
+        mkdir -p "$OUTPUT_DIR/$platform/ocr"
+        cp ../../scripts/ocr/ocr.ps1 "$OUTPUT_DIR/$platform/ocr/"
+    fi
     # JiaWriter: the license files that came along with the copied folders stay in the repository only.
     rm -f "$OUTPUT_DIR/$platform/writer-skills/zh/lieflat-gongwen/LICENSE" "$OUTPUT_DIR/$platform/chrome-extension/vendor/Readability-LICENSE.md"
     mkdir -p "$OUTPUT_DIR/$platform/参考资料"

@@ -104,7 +104,7 @@ export default function writerRewindExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "Restore draft",
 		// Full description sent to the model.
-		description: "List a file's saved versions, or restore one; each user message keeps one",
+		description: "Lists a file's saved versions, or restores one; each user message keeps one",
 		// Argument schema.
 		parameters: Type.Object({
 			path: Type.String({ description: "The file" }),

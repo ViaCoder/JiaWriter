@@ -83,7 +83,7 @@ describe("system prompt updates", () => {
 		const previous = buildSystemPromptSections({ cwd: "/tmp", sections: { plan_mode: "Plan only." } });
 		const current = buildSystemPromptSections({ cwd: "/tmp", sections: { plan_mode: "Implementation allowed." } });
 		expect(diffSystemPromptSections(previous, current)).toEqual({
-			plan_mode: "<plan_mode>\nImplementation allowed.\n</plan_mode>",
+			plan_mode: "# Plan mode\nImplementation allowed.",
 		});
 		expect(diffSystemPromptSections(previous, previous)).toBeUndefined();
 		expect(diffSystemPromptSections(previous, buildSystemPromptSections({ cwd: "/tmp" }))).toEqual({
@@ -91,7 +91,7 @@ describe("system prompt updates", () => {
 		});
 	});
 
-	// JiaWriter: the persona stands in <system_prompt> (the user, 2026-11-05).
+	// JiaWriter: the persona stands in <system_prompt> (the user, 2026-11-05, kept 2026-11-08).
 	test("keeps the preamble in its tag and replaces it like any section", () => {
 		const previous = buildSystemPromptSections({ customPrompt: "You are A.", cwd: "/tmp" });
 		const current = buildSystemPromptSections({ customPrompt: "You are B.", cwd: "/tmp" });
@@ -161,7 +161,7 @@ describe("system prompt updates", () => {
 			);
 			expect(recorded).toEqual([
 				systemMessages[0]?.[0]?.sections,
-				{ plan_mode: "<plan_mode>\nPlan only.\n</plan_mode>" },
+				{ plan_mode: "# Plan mode\nPlan only." },
 				{ plan_mode: null },
 			]);
 			expect(getCurrentSystemPrompt(harness.session.messages)).toBe(harness.session.systemPrompt);

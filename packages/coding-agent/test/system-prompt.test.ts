@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { Skill } from "../src/core/skills.ts";
 import { createSyntheticSourceInfo } from "../src/core/source-info.ts";
-import { buildSystemPrompt } from "../src/core/system-prompt.ts";
+import { buildSystemPrompt, sectionTitle } from "../src/core/system-prompt.ts";
 
 const testSkill: Skill = {
 	name: "test-skill",
@@ -22,7 +22,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			expect(prompt).toContain("<tools>\n(none)\n");
+			expect(prompt).toContain("# Tools\n(none)\n");
 		});
 
 		test("shows file paths guideline even with no tools", () => {
@@ -33,7 +33,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			expect(prompt).toContain("<tools>\n(none)");
+			expect(prompt).toContain("# Tools\n(none)");
 		});
 	});
 
@@ -49,11 +49,11 @@ describe("buildSystemPrompt", () => {
 			});
 
 			// JiaWriter: writing assistant preamble.
-			// JiaWriter: the persona stands in <system_prompt> (the user, 2026-11-05).
-			expect(defaultPrompt.startsWith("<system_prompt>\nYou are JiaWriter, a general-purpose assistant.")).toBe(
+			// JiaWriter: the persona stands in <system_prompt> (the user, 2026-11-05, kept 2026-11-08).
+			expect(defaultPrompt.startsWith("<system_prompt>\nYou are JiaWriter, a general-purpose agent.")).toBe(true);
+			expect(customPrompt.startsWith("<system_prompt>\nYou are Exact.\n</system_prompt>\n\n# Environment")).toBe(
 				true,
 			);
-			expect(customPrompt.startsWith("<system_prompt>\nYou are Exact.\n</system_prompt>\n\n<cwd>")).toBe(true);
 		});
 
 		test("preserves an exact forced prompt without sections", () => {
@@ -70,11 +70,11 @@ describe("buildSystemPrompt", () => {
 				cwd: "/tmp",
 			});
 
-			expect(prompt).toContain("<addendum>\nAdditional instructions.\n</addendum>");
+			expect(prompt).toContain("# Addendum\nAdditional instructions.");
 			expect(prompt).toContain(
-				'<project_context>\nProject-specific instructions and guidelines:\n\n<project_instructions path="/tmp/AGENTS.md">',
+				'# Project context\nProject-specific instructions and guidelines:\n\n<project_instructions path="/tmp/AGENTS.md">',
 			);
-			expect(prompt).toContain("<cwd>\n/tmp\n</cwd>");
+			expect(prompt).toContain("# Environment\n - Primary working directory: /tmp");
 		});
 	});
 
@@ -97,7 +97,7 @@ describe("buildSystemPrompt", () => {
 			});
 
 			// JiaWriter: the default tools are in their descriptions, so no list repeats them.
-			expect(prompt).not.toContain("<tools>");
+			expect(prompt).not.toContain("# Tools");
 		});
 
 		test.each([
@@ -122,9 +122,7 @@ describe("buildSystemPrompt", () => {
 			});
 
 			// JiaWriter: documentation pointers for JiaWriter, still resolved under absolute base paths.
-			expect(prompt).toMatch(
-				/<docs>\nWhen the user asks about JiaWriter itself, read \S+ and the files in \S+\n<\/docs>/,
-			);
+			expect(prompt).toMatch(/# Docs\nWhen the user asks about JiaWriter itself, read \S+ and the files in \S+/);
 		});
 	});
 
@@ -194,7 +192,7 @@ describe("buildSystemPrompt", () => {
 				cwd: process.cwd(),
 			});
 
-			expect(prompt).toContain("<skills>");
+			expect(prompt).toContain("# Skills");
 			expect(prompt).toContain("<available_skills>");
 			expect(prompt).toContain("<name>test-skill</name>");
 			expect(prompt).toContain("Use bash to load a skill's file");
@@ -228,7 +226,7 @@ describe("buildSystemPrompt", () => {
 		test("leaves hidden tools out of the tool list and rules", () => {
 			const prompt = build(["read", "bash"]);
 
-			expect(prompt).toContain("<tools>\n- run: Run a task\n");
+			expect(prompt).toContain("# Tools\n - run: Run a task\n");
 			expect(prompt).not.toContain("- read: ");
 			expect(prompt).not.toContain("Use read for files.");
 			expect(prompt).not.toContain("Use bash for file operations");
@@ -240,5 +238,15 @@ describe("buildSystemPrompt", () => {
 			expect(build(["read"])).toContain("Use bash to load a skill's file");
 			expect(build([])).toContain("Use the read tool to load a skill's file");
 		});
+	});
+});
+
+describe("sectionTitle", () => {
+	test("turns a section's name into its heading", () => {
+		expect(sectionTitle("rules")).toBe("Rules");
+		expect(sectionTitle("project_context")).toBe("Project context");
+		expect(sectionTitle("plan-mode")).toBe("Plan mode");
+		expect(sectionTitle("cwd")).toBe("Environment");
+		expect(sectionTitle("mcp_servers")).toBe("MCP servers");
 	});
 });

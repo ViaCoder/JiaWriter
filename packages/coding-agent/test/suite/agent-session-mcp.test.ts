@@ -618,7 +618,7 @@ return { docs, sameForAliases: aliases.every((alias) => JSON.stringify(alias) ==
 		await harness.session.prompt("go");
 
 		const section = serversSection(harness);
-		expect(section).toContain("- mcp__docs (tool_search): Docs search.\n");
+		expect(section).toContain("- mcp__docs (tool_search): Docs search.");
 		expect(section).not.toContain("Long guidance");
 	});
 
@@ -800,7 +800,7 @@ return { docs, sameForAliases: aliases.every((alias) => JSON.stringify(alias) ==
 		);
 		// The first request lists the server by name; its summary follows as an appended patch.
 		expect(systemMessages).toHaveLength(2);
-		expect(systemMessages[0].sections?.[MCP_SERVERS_SECTION]).toContain("- mcp__slow (codemode)\n");
+		expect(systemMessages[0].sections?.[MCP_SERVERS_SECTION]).toMatch(/- mcp__slow \(codemode\)$/m);
 		expect(systemMessages[1].sections).toEqual({
 			[MCP_SERVERS_SECTION]: expect.stringContaining("- mcp__slow (codemode): Slow docs."),
 		});

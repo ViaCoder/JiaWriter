@@ -9,7 +9,7 @@ import { writeRenderers } from "./renderers/write.ts";
 import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 
 const writeSchema = Type.Object({
-	path: Type.String({ description: "File path" }),
+	path: Type.String({ description: "The path to the file" }),
 	content: Type.String({ description: "Full content" }),
 });
 
@@ -50,7 +50,7 @@ export function createWriteToolDefinition(
 		name: "write",
 		label: "write",
 		description:
-			"Create a new file and its folders. A file that already exists is changed with edit; write replaces one only when the user asked to rewrite all of it",
+			"Writes a new file and its parent directories.\n\nUsage:\n - A file that already exists is changed with the edit tool\n - Overwrites a file only when the user asked to rewrite all of it",
 		promptSnippet: writeToolSystemPromptContribution.snippet,
 		promptGuidelines: [...writeToolSystemPromptContribution.guidelines],
 		parameters: writeSchema,

@@ -101,7 +101,7 @@ function convertToolResultOutput<TApi extends Api>(
 	for (const image of images) {
 		output.push({
 			type: "input_image",
-			detail: "auto",
+			detail: image.detail ?? "auto",
 			image_url: `data:${image.mimeType};base64,${image.data}`,
 		});
 	}

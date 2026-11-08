@@ -4,6 +4,9 @@ import llamaExtension from "./llama/index.ts";
 import mcpExtension from "./mcp/index.ts";
 import toolSearchExtension from "./tool-search/index.ts";
 // JiaWriter: import_document, export_document and /import, /export.
+import writerBrowserExtension from "./writer-browser/index.ts";
+// JiaWriter: acting on desktop applications.
+import writerComputerExtension from "./writer-computer/index.ts";
 import writerDocsExtension from "./writer-docs/index.ts";
 // JiaWriter: the "jw" provider from JW_* environment variables.
 import writerEnvExtension from "./writer-env/index.ts";
@@ -22,6 +25,8 @@ import writerToolsExtension from "./writer-tools/index.ts";
 import writerTopicExtension from "./writer-topic/index.ts";
 // JiaWriter: /lang and the /jw configuration page.
 import writerUiExtension from "./writer-ui/index.ts";
+// JiaWriter: images as a last resort, with shared limits.
+import writerVisionExtension from "./writer-vision/index.ts";
 
 export const builtInExtensions: InlineExtension[] = [
 	// JiaWriter: registers the JW_* model and clamps its output limit.
@@ -33,6 +38,10 @@ export const builtInExtensions: InlineExtension[] = [
 	// JiaWriter: web search.
 	{ name: "writer-prompts", factory: writerPromptsExtension, builtin: true },
 	{ name: "writer-search", factory: writerSearchExtension, builtin: true },
+	// JiaWriter: acting on pages in the dedicated Chrome window.
+	{ name: "writer-vision", factory: writerVisionExtension, builtin: true },
+	{ name: "writer-browser", factory: writerBrowserExtension, builtin: true },
+	{ name: "writer-computer", factory: writerComputerExtension, builtin: true },
 	// JiaWriter: reference import and draft export.
 	{ name: "writer-topic", factory: writerTopicExtension, builtin: true },
 	{ name: "writer-docs", factory: writerDocsExtension, builtin: true },

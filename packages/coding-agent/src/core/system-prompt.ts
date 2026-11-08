@@ -55,8 +55,8 @@ export type NormalizedBuildSystemPromptOptions = BuildSystemPromptOptions & {
 };
 
 /**
- * Ordered system prompt sections, keyed by name. `preamble` is untagged text; every other
- * section is wrapped in a tag of the same name so the model can match later updates to it.
+ * Ordered system prompt sections, keyed by name. `preamble` is plain text; every other
+ * section starts with a Markdown heading so the model can match later updates to it.
  * These become `SystemMessage.sections` in the transcript.
  */
 export type SystemPromptSections = Record<string, string>;
@@ -132,7 +132,15 @@ function buildRules(
 		for (const rule of toolGuidelines[name] ?? []) addRule(rule);
 	}
 	for (const rule of promptGuidelines) addRule(rule);
-	return rules.map((rule) => `- ${rule}`).join("\n");
+	return rules.map((rule) => ` - ${rule}`).join("\n");
+}
+
+/** The heading of a section: its name in words, and the working directory under the environment heading. */
+export function sectionTitle(name: string): string {
+	if (name === "cwd") return "Environment";
+	if (name === "mcp_servers") return "MCP servers";
+	const words = name.replace(/[_-]/g, " ");
+	return `${words[0].toUpperCase()}${words.slice(1)}`;
 }
 
 /** Build the ordered, independently replaceable sections of the structured system prompt. */
@@ -163,11 +171,12 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 	if (customPrompt) {
 		promptSections.preamble = customPrompt;
 	} else {
-		// JiaWriter: writing assistant instead of coding assistant.
+		// JiaWriter: its own identity instead of the coding agent's.
 		promptSections.preamble = WRITER_PREAMBLE;
 		// JiaWriter: JiaWriter's own tools carry their use in their descriptions; other tools stay listed.
 		const listed = declaredTools.filter((name) => toolSnippets[name] && !WRITER_REPLACED_TOOLS.has(name));
-		if (listed.length > 0) promptSections.tools = listed.map((name) => `- ${name}: ${toolSnippets[name]}`).join("\n");
+		if (listed.length > 0)
+			promptSections.tools = listed.map((name) => ` - ${name}: ${toolSnippets[name]}`).join("\n");
 		else if (declaredTools.length === 0) promptSections.tools = "(none)";
 		// JiaWriter: the default genre's rule follows the skill's on/off state.
 		promptSections.rules = buildRules(declaredTools, toolGuidelines, [
@@ -189,15 +198,15 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 		const skillsPrompt = formatSkillsForPrompt(skills, skillFileReadTool).trim();
 		if (skillsPrompt) promptSections.skills = skillsPrompt;
 	}
-	promptSections.cwd = cwd.replace(/\\/g, "/");
+	promptSections.cwd = ` - Primary working directory: ${cwd.replace(/\\/g, "/")}`;
 	for (const [name, content] of Object.entries(customSections)) {
 		if (content) promptSections[name] = content;
 	}
 
-	// JiaWriter: the persona in one tag, with PROMPT_ADD's text inside it.
+	// JiaWriter: the persona and PROMPT_ADD's text in one <system_prompt> tag (the user, 2026-11-08: "keep label").
 	const sections: SystemPromptSections = { preamble: personaBlock(promptSections.preamble, promptAddText()) };
 	for (const [name, content] of Object.entries(promptSections)) {
-		if (name !== "preamble") sections[name] = `<${name}>\n${content}\n</${name}>`;
+		if (name !== "preamble") sections[name] = `# ${sectionTitle(name)}\n${content}`;
 	}
 	return sections;
 }

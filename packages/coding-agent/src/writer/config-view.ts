@@ -10,6 +10,8 @@ import { redactUrl } from "../core/bug-report.ts";
 import { DEFAULT_CONTEXT_WINDOW, DEFAULT_MAX_OUTPUT, DEFAULT_REASONING } from "./env-config.ts";
 // Messages and the language source.
 import { currentLang, savedLang, t, type WriterLang } from "./i18n/index.ts";
+// The permission mode.
+import { parsePermissionMode, permissionMode, savedPermissionMode } from "./permission.ts";
 // The persona addition, shown by path and size.
 import { promptAddPath, promptAddText } from "./prompt-add.ts";
 // Search defaults.
@@ -85,6 +87,20 @@ export function otherRows(env: NodeJS.ProcessEnv, lang?: WriterLang): ConfigRow[
 	const src = (name: string) => t(readEnv(env, name) ? "jw.src.env" : "jw.src.default", {}, lang);
 	return [
 		{ name: "JW_LANG", value: currentLang(), source: t(langSource, {}, lang) },
+		// How much new tools ask: environment, /jw permission, or the default.
+		{
+			name: "JW_PERMISSION",
+			value: permissionMode(env),
+			source: t(
+				parsePermissionMode(env.JW_PERMISSION)
+					? "jw.src.env"
+					: savedPermissionMode()
+						? "jw.src.permission"
+						: "jw.src.default",
+				{},
+				lang,
+			),
+		},
 		{ name: "JW_ENGINES", value: readEnv(env, "JW_ENGINES") ?? "bing,google", source: src("JW_ENGINES") },
 		{ name: "JW_SEARCH_PAGES", value: readEnv(env, "JW_SEARCH_PAGES") ?? "3", source: src("JW_SEARCH_PAGES") },
 		{

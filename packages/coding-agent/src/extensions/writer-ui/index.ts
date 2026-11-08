@@ -8,12 +8,14 @@
 // Width-safe line truncation of the terminal UI.
 import { truncateToWidth } from "@earendil-works/pi-tui";
 // Extension API types.
-import type { ExtensionAPI } from "../../core/extensions/types.ts";
+import type { ExtensionAPI, ExtensionCommandContext } from "../../core/extensions/types.ts";
 import { formatWaConfig } from "../../writer/config-view.ts";
 // The levels /effort offers.
 import { WRITER_REASONING_CHOICES, type WriterReasoning } from "../../writer/env-config.ts";
 // Messages and the language setting.
 import { setUiLang, t, type WriterLang } from "../../writer/i18n/index.ts";
+// The permission mode.
+import { PERMISSION_MODES, parsePermissionMode, permissionMode, savePermissionMode } from "../../writer/permission.ts";
 // The configuration page.
 import { stageLines } from "../../writer/prompts/stages.ts";
 // The keys held in memory (shown only as set or unset).
@@ -22,6 +24,8 @@ import { withSecrets } from "../../writer/secrets.ts";
 import { fileSize, searchLogPath } from "../../writer/websearch/log.ts";
 // Main-model state after startup.
 import { getWriterModel } from "../../writer/writer-model.ts";
+// Desktop control and the overall check.
+import { computerSetup, doctorLines } from "../writer-computer/index.ts";
 
 /** Language from a /lang argument, or undefined when it is not one of zh and en. */
 export function parseLangArg(arg: string): WriterLang | undefined {
@@ -66,6 +70,24 @@ export function logLines(): string[] {
 	// The file, whether or not it exists yet.
 	const path = searchLogPath();
 	return [t("jw.logPath", { path, bytes: fileSize(path) }), t("jw.logNote")];
+}
+
+/** /jw permission: the argument, or a choice with the current mode named. */
+export async function setPermission(arg: string, ctx: ExtensionCommandContext): Promise<void> {
+	let choice = arg.trim();
+	if (!choice && ctx.hasUI) {
+		choice = (await ctx.ui.select(t("perm.choose", { mode: permissionMode() }), [...PERMISSION_MODES])) ?? "";
+		if (!choice) return;
+	}
+	const mode = parsePermissionMode(choice);
+	if (!mode) {
+		ctx.ui.notify(t("perm.bad", { modes: PERMISSION_MODES.join(" / ") }), "error");
+		return;
+	}
+	// Saved for every session; an environment value goes on winning, and the user hears so.
+	savePermissionMode(mode);
+	const env = process.env.JW_PERMISSION?.trim();
+	ctx.ui.notify(env ? t("perm.envWins", { value: env }) : t("perm.saved", { mode }), env ? "warning" : "info");
 }
 
 /** Extension factory. */
@@ -123,22 +145,35 @@ export default function writerUiExtension(pi: ExtensionAPI): void {
 
 	// /jw.
 	pi.registerCommand("jw", {
-		description: "Show the JiaWriter configuration; /jw prompts shows the rules sent, /jw log the search log",
+		description:
+			"Show the JiaWriter configuration; /jw prompts shows the rules sent, /jw log the search log, /jw permission sets the mode, /jw computer sets up desktop control, /jw doctor checks everything",
 		getArgumentCompletions: (prefix) => {
 			// The sub-pages that fit.
-			const fit = ["prompts", "log"].filter((name) => name.startsWith(prefix));
+			const fit = ["prompts", "log", "permission", "computer", "doctor"].filter((name) => name.startsWith(prefix));
 			return fit.length > 0 ? fit.map((name) => ({ value: name, label: name })) : null;
 		},
 		handler: async (args, ctx) => {
 			// The word after /jw.
 			const page = args.trim();
+			// Setting up the desktop tool is the program's job, step by step, with no model involved.
+			if (page === "computer" || page === "computer install") {
+				await computerSetup(ctx, page !== "computer");
+				return;
+			}
+			// The permission mode has its own step, and needs no page.
+			if (page === "permission" || page.startsWith("permission ")) {
+				await setPermission(page.slice("permission".length), ctx);
+				return;
+			}
 			// The stage table, the search log, or the page from the environment and the startup state.
 			const lines =
 				page === "prompts"
 					? stageLines()
 					: page === "log"
 						? logLines()
-						: formatWaConfig(withSecrets(process.env), getWriterModel(), process.platform);
+						: page === "doctor"
+							? await doctorLines()
+							: formatWaConfig(withSecrets(process.env), getWriterModel(), process.platform);
 			// Full screen in the terminal; a note elsewhere.
 			if (ctx.mode === "tui")
 				await ctx.ui.custom<void>((_tui, _theme, _kb, done) => new ReadOnlyPage(lines, () => done(undefined)));

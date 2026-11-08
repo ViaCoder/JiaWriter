@@ -28,12 +28,12 @@ const findSchema = Type.Object({
 		// JiaWriter: examples from writing projects.
 		description: "Glob pattern",
 	}),
-	path: Type.Optional(Type.String({ description: "Folder, default the current one" })),
-	limit: Type.Optional(Type.Number({ description: "Most results, default 1000" })),
+	path: Type.Optional(Type.String({ description: "The directory, default the current one" })),
+	limit: Type.Optional(Type.Number({ description: "Maximum results, default 1000" })),
 });
 
 export const findToolSystemPromptContribution = {
-	snippet: "Find files by glob pattern (respects .gitignore)",
+	snippet: "Finds files by glob pattern (respects .gitignore)",
 	guidelines: [],
 } as const;
 
@@ -76,7 +76,7 @@ export function createFindToolDefinition(
 	return {
 		name: "find",
 		label: "find",
-		description: "Find files by glob pattern, such as 参考资料/**/*.pdf",
+		description: "Finds files by glob pattern, such as 参考资料/**/*.pdf",
 		promptSnippet: findToolSystemPromptContribution.snippet,
 		parameters: findSchema,
 		async execute(

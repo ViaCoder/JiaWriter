@@ -308,6 +308,12 @@ export const en: Record<MessageKey, string> = {
 	"jw.src.detect": "detected",
 	"jw.src.cache": "detected (cache)",
 	"jw.src.manual": "set by JW_API",
+	"perm.choose":
+		"Permission mode (now {mode}): manual asks each time, auto asks each time only for high risk, bypass never asks",
+	"perm.bad": "The permission mode must be {modes}",
+	"perm.saved": "Permission mode set to {mode}",
+	"perm.envWins": "Saved, but the environment variable JW_PERMISSION={value} wins",
+	"jw.src.permission": "/jw permission",
 	"jw.src.lang": "/lang",
 	"jw.set": "set",
 	"jw.unset": "not set",
@@ -326,6 +332,49 @@ export const en: Record<MessageKey, string> = {
 	// /sf.
 	"sf.cmdUsage": "Usage: /sf status or /sf install, the same as /browser.",
 	// Browser backend.
+	"browserTool.ask": "Allow {action} on {site}?",
+	"browserTool.setup": "The Chrome extension is not connected. Run /browser for the steps.",
+	"browserTool.reload": "The Chrome extension is out of date. Open chrome://extensions and press reload on JiaWriter.",
+	"browserTool.verify":
+		"The page needs a person to verify. Stopped. Handle it in the dedicated Chrome window, then send a message to go on.",
+	"browserTool.askLook": "Send a picture of {site} to the upstream model? This uses your upstream quota.",
+	"browserTool.askFile": "Send this picture to the upstream model? This uses your upstream quota.",
+	"browserTool.fileRefused": "The picture {path} was not sent: not allowed, or the image limit is reached.",
+	"computerTool.ask": 'Allow {action} in "{site}"?',
+	"computerTool.setup": "Desktop control is not installed. Run /jw computer and the program will walk you through it.",
+	"setup.none": "No desktop control component exists for this machine.",
+	"setup.download": "Downloading the desktop control component {version} (about {mb} MB)...",
+	"setup.badSum": "The download failed its checksum. Stopped; nothing was installed.",
+	"setup.installed": "Component installed and verified.",
+	"setup.macStart":
+		"The system will now ask for Accessibility and Screen Recording. Allow them for CuaDriver, not JiaWriter.",
+	"setup.macOpen":
+		"Permission was not completed. System Settings is open: turn CuaDriver on, then run /jw computer again.",
+	"setup.macApp":
+		"CuaDriver.app must go in the Applications folder, which your account must be able to write. Run /jw computer again afterwards.",
+	"setup.a11yAsk":
+		"Turn on GNOME's accessibility support? Reading applications needs it. It takes effect at the next login.",
+	"setup.waylandAsk":
+		"GNOME on Wayland needs a small window helper extension to find windows. Install it now? You will need to log in again.",
+	"setup.relogin": "Log in to the desktop again, then run /jw computer to check.",
+	"setup.ok": "Desktop control is ready from the next new session.",
+	"setup.limited": "Desktop control works, with limits: {problems}",
+	"setup.confirmTitle": "Desktop control",
+	"doctor.title": "JiaWriter check",
+	"doctor.upstreamOk": "Upstream: {model}",
+	"doctor.upstreamNo": "Upstream: not set. Set JW_URL, JW_KEY and JW_MODEL.",
+	"doctor.imageYes": "Images: the upstream takes them",
+	"doctor.imageNo": "Images: the upstream does not take them",
+	"doctor.imageUnknown": "Images: not known yet; found out when first needed",
+	"doctor.extOk": "Chrome extension: connected, version {version}",
+	"doctor.extOld":
+		"Chrome extension: version {version} is out of date. Open chrome://extensions and press reload on JiaWriter.",
+	"doctor.extNo": "Chrome extension: not connected. Run /browser for the steps.",
+	"doctor.ocrYes": "Text recognition on this machine: available",
+	"doctor.ocrNo": "Text recognition on this machine: not available; looking will ask to send a picture",
+	"doctor.computerOk": "Desktop control: component {version} installed",
+	"doctor.computerNo": "Desktop control: not installed. Run /jw computer.",
+	"doctor.mode": "Permission mode: {mode}",
 	"browser.label": "browser ({detail})",
 	"browser.engineLine": "{engine} {pages} pages",
 	"browser.stopped": "{engine} stopped after page {pages}: {reason}",

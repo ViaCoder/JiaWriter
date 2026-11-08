@@ -117,7 +117,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		label: "Import document",
 		// Full description sent to the model.
 		description:
-			"Import a reference file (pdf, docx, txt, md, html) to Markdown with page markers under 参考资料/.parsed/; without path, every new file in 参考资料/",
+			"Imports a reference file (pdf, docx, txt, md, html) to Markdown with page markers under 参考资料/.parsed/; without path, every new file in 参考资料/",
 		// Argument schema.
 		parameters: Type.Object({
 			path: Type.Optional(Type.String({ description: "File" })),
@@ -139,7 +139,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "Export document",
 		// Full description sent to the model.
-		description: "Export a Markdown draft to .docx (default) or Markdown, with Chinese punctuation",
+		description: "Exports a Markdown draft to .docx (default) or Markdown, with Chinese punctuation",
 		// Argument schema.
 		parameters: Type.Object({
 			path: Type.String({ description: "Draft" }),

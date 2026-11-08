@@ -25,7 +25,7 @@ const write = (path: string, content: string) =>
 
 describe("guidance before writing", () => {
 	it("tells the model in the tool descriptions that an existing file is changed with edit", () => {
-		expect(createWriteToolDefinition("/tmp").description).toMatch(/already exists is changed with edit/);
+		expect(createWriteToolDefinition("/tmp").description).toMatch(/already exists is changed with the edit tool/);
 		expect(createWriteToolDefinition("/tmp").description).not.toMatch(/overwrites/);
 		expect(createEditToolDefinition("/tmp").description).toMatch(/however large the change/);
 	});

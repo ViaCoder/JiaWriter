@@ -23,6 +23,8 @@ import type { Readable, Writable } from "node:stream";
 
 /** Native messaging host name (the extension's background.js connects to it). */
 export const HOST_NAME = "com.jiawriter.browser";
+/** The extension this program goes with: anything older lacks operations it uses. */
+export const EXTENSION_VERSION = "2.5.0";
 /** Chrome's id of the JiaWriter extension (fixed by the key in its manifest.json). */
 export const EXTENSION_ID = "mnoicnfoocibanokjfbpmbgpamlmdgje";
 /** Largest message the host may send to Chrome (Chrome's limit is 1 MB). */
@@ -282,6 +284,11 @@ export async function hostMain(args: readonly string[], agentDir: string): Promi
 		log: (line) => process.stderr.write(`${line}\n`),
 	});
 	return 0;
+}
+
+/** True when a host is listening at all: no file means nothing to connect to, and no connection is tried. */
+export function bridgePresent(address: BridgeAddress): boolean {
+	return existsSync(address.kind === "unix" ? address.path : address.file);
 }
 
 /** Send one request to the extension through the host and return its result. */

@@ -105,7 +105,7 @@ describe("context handlers and system messages", () => {
 
 		const systemMessages = getRequest().messages.filter((message) => message.role === "system");
 		expect(systemMessages).toHaveLength(2);
-		expect(systemMessages[1]?.sections).toEqual({ plan_mode: "<plan_mode>\nPlan only.\n</plan_mode>" });
+		expect(systemMessages[1]?.sections).toEqual({ plan_mode: "# Plan mode\nPlan only." });
 	});
 
 	it("applies in-place edits to event.messages without a return value", async () => {

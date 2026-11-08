@@ -48,7 +48,7 @@ export function promptAddText(env: NodeJS.ProcessEnv = process.env): string {
 	return loaded.text;
 }
 
-/** The persona block: the persona text, then the added text, in one tag (the user, 2026-11-05). */
+/** The persona block: the persona text, then the added text, in one tag (the user, 2026-11-05, kept 2026-11-08). */
 export function personaBlock(persona: string, added: string): string {
 	// One line break: the two read as one text.
 	return `<system_prompt>\n${added ? `${persona}\n${added}` : persona}\n</system_prompt>`;

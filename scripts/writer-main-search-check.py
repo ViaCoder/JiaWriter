@@ -2,7 +2,8 @@
 """Hands-on check of the upstream's own search tools in the main conversation, in the real program: a local mock
 plays the model and the upstream (nothing leaves 127.0.0.1, the key is a dummy). One run on the Responses API and
 one on the Messages API: a first search through a request of its own shows the tool works, then the tool is in the
-main request, what it read goes back on the next request, and the archive holds the pages' own text.
+main request (on Messages from the next conversation, as thinking blocks are bound to the set of tools), what it read
+goes back on the next request, and the archive holds the pages' own text.
 Prints one line per check and exits 1 when any fails.
 Usage: python3 -I scripts/writer-main-search-check.py [program]
 """
@@ -188,15 +189,18 @@ def program():
     return ["node", "--import", "file://" + os.path.join(coding, "src", "experimental", "source-resolver.ts"), os.path.join(coding, "src", "cli.ts")]
 
 
-def run(api, port):
-    """One run; gives the output, the text of the archive by folder, and the log."""
-    main_calls.clear()
-    inner_calls.clear()
-    endpoint_calls.clear()
+def run(api, port, rounds=(("-p", "开始"),)):
+    """Runs of the program in one home; gives the last output, the archive by folder, the log, and each run's requests."""
     tmp = tempfile.mkdtemp(prefix="jw-main-")
+    each_run = []
     env = {k: v for k, v in os.environ.items() if not k.startswith(("JW_", "PI_", "SF_", "PROMPT_ADD", "ANYSEARCH_"))}
     env.update(HOME=tmp, JW_DIR=os.path.join(tmp, "agent"), JW_LANG="zh", JW_URL=f"http://127.0.0.1:{port}", JW_KEY=KEY, JW_MODEL="mock-model", JW_API=api, JW_EFFORT="off")
-    out = subprocess.run(program() + ["-p", "开始"], cwd=tmp, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
+    for args in rounds:
+        main_calls.clear()
+        inner_calls.clear()
+        endpoint_calls.clear()
+        out = subprocess.run(program() + list(args), cwd=tmp, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
+        each_run.append(list(main_calls))
     found = {"检索": "", "网页": ""}
     for folder, _dirs, files in os.walk(tmp):
         name = os.path.basename(folder)
@@ -207,7 +211,7 @@ def run(api, port):
     log_path = os.path.join(env["JW_DIR"], "logs", "search.log")
     log_text = open(log_path, encoding="utf-8").read() if os.path.exists(log_path) else ""
     shutil.rmtree(tmp, ignore_errors=True)
-    return out, found, log_text
+    return out, found, log_text, each_run
 
 
 def tool_types(body):
@@ -222,7 +226,7 @@ def main():
     port = server.server_address[1]
     checks = []
 
-    out, found, log_text = run("openai-responses", port)
+    out, found, log_text, _runs = run("openai-responses", port)
     first, second, third = (main_calls + [{}, {}, {}])[:3]
     checks += [
         ("codex：程序正常结束", out.returncode == 0 and "完成了" in out.stdout),
@@ -243,7 +247,7 @@ def main():
 
     # The test site has no endpoint: pages are kept as the server reports them, and nothing moves to another channel.
     endpoint_on[0] = False
-    out, found, log_text = run("openai-responses", port)
+    out, found, log_text, _runs = run("openai-responses", port)
     checks += [
         ("无接口：程序正常结束", out.returncode == 0 and "完成了" in out.stdout),
         ("无接口：只试一次接口", len(endpoint_calls) == 1),
@@ -254,15 +258,20 @@ def main():
     ]
     endpoint_on[0] = True
 
-    out, found, log_text = run("anthropic-messages", port)
-    calls = main_calls + [{}, {}, {}, {}]
+    out, found, log_text, runs = run("anthropic-messages", port, (("-p", "开始"), ("-p", "第二个对话"), ("-c", "-p", "继续")))
+    opening, second_chat, resumed = runs
+    calls = second_chat + [{}, {}, {}, {}]
     last = json.dumps(calls[3].get("messages"), ensure_ascii=False)
+    both = ["web_search_20250305", "web_fetch_20250910"]
     checks += [
         ("claude：程序正常结束", out.returncode == 0 and "完成了" in out.stdout),
-        ("claude：第一次主请求没有内置工具", tool_types(calls[0]) == []),
-        ("claude：搜索证明后只加 web_search", tool_types(calls[1]) == ["web_search_20250305"]),
-        ("claude：抓取证明后两个都加", tool_types(calls[2]) == ["web_search_20250305", "web_fetch_20250910"]),
-        ("claude：pause_turn 后自动继续", len(main_calls) == 4 and "Continue." in last),
+        ("claude：证明成功的对话里 tools 一字不变", len(opening) == 4 and len({json.dumps(c.get("tools"), sort_keys=True) for c in opening}) == 1),
+        ("claude：证明成功的对话里没有内置工具", tool_types(opening[0]) == []),
+        ("claude：工具描述没有中途改写", "web_search tool instead" not in json.dumps(opening[-1].get("tools"))),
+        ("claude：新对话第一条请求就带两个工具", tool_types(calls[0]) == both),
+        ("claude：新对话里 tools 一字不变", len({json.dumps(c.get("tools"), sort_keys=True) for c in second_chat}) == 1),
+        ("claude：恢复对话后 tools 仍相同", [c.get("tools") for c in resumed[:1]] == [second_chat[0].get("tools")]),
+        ("claude：pause_turn 后自动继续", len(second_chat) == 4 and "Continue." in last),
         ("claude：搜索内容在下一轮发回", ENCRYPTED in last and "web_search_tool_result" in last),
         ("claude：没有结果的调用不发回", "停在半路" not in last),
         ("claude：抓到的网页文字进了 网页/", "主对话读到的原文" in found["网页"]),

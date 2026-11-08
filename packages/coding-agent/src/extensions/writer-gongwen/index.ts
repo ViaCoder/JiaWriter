@@ -28,7 +28,7 @@ export default function writerGongwenExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "公文参数自检",
 		// Full description sent to the model.
-		description: "Check a 公文 draft against the corpus figures of its genre",
+		description: "Checks a 公文 draft against the corpus figures of its genre",
 		// Argument schema.
 		parameters: Type.Object({
 			// File input.

@@ -171,9 +171,9 @@ describe("AgentSession codemode tool", () => {
 		expect(requestTools[1]).not.toContain("echo");
 		expect(requestTools[1]).not.toContain("read");
 		// The prompt's tool list matches the declarations: hidden tools are not listed (#10192).
-		expect(requestPrompts[1]).not.toContain("\n- read: ");
-		expect(requestPrompts[1]).toContain("\n- codemode: ");
-		expect(harness.session.systemPrompt).not.toContain("\n- read: ");
+		expect(requestPrompts[1]).not.toContain("\n - read: ");
+		expect(requestPrompts[1]).toContain("\n - codemode: ");
+		expect(harness.session.systemPrompt).not.toContain("\n - read: ");
 		// Hidden tools' guidelines move from the rules to their codemode sections (#10343).
 		expect(requestPrompts[1]).not.toContain("Use read to examine files");
 		expect(description("codemode")).toContain("- Use read to examine files instead of cat or sed.");

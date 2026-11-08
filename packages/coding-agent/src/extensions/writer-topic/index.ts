@@ -42,7 +42,7 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "Open topic",
 		// Full description sent to the model.
-		description: "Open or continue a topic folder: 稿件/, 参考资料/, 检索/, 网页/ and 素材.md",
+		description: "Opens or continues a topic directory: 稿件/, 参考资料/, 检索/, 网页/ and 素材.md",
 		// Argument schema.
 		parameters: Type.Object({
 			name: Type.String({
@@ -74,7 +74,7 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		label: "Add material",
 		// Full description sent to the model.
 		description:
-			"Record cases and data in 素材.md. A case needs time, reporter, subject, action; data needs time, region, industry, indicator, value; each needs url, or file and page",
+			"Records cases and data in 素材.md.\n\nUsage:\n - A case needs time, reporter, subject, action\n - Data needs time, region, industry, indicator, value\n - Each needs url, or file and page",
 		// Argument schema.
 		parameters: Type.Object({
 			items: Type.Array(

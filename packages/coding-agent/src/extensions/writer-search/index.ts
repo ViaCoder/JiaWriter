@@ -89,12 +89,21 @@ import { appendSearchLog } from "../../writer/websearch/log.ts";
 // The upstream's own tools in the main conversation.
 import {
 	citedAddresses,
+	type FixedTools,
+	fixedFor,
+	fixedFromEntries,
+	fixTools,
 	type MainTool,
 	type MainWay,
 	mainWay,
+	provenId,
 	readMainSearch,
+	readProven,
 	replyText,
 	withMainSearch,
+	withoutProven,
+	withProven,
+	writeProven,
 } from "../../writer/websearch/main-search.ts";
 // sf backend.
 import { locateSf, parseSfFetch, runSf, sfChildEnv, sfError } from "../../writer/websearch/sf.ts";
@@ -109,6 +118,8 @@ const ANYSEARCH_GAP_MS = 1000;
 const MAX_ORIGINS = 8;
 /** Most resumes of a paused reply in a row: a guard against one that never ends. */
 const MAX_RESUMES = 3;
+/** Session entry holding a Claude conversation's upstream tools. */
+const FIXED_TOOLS_ENTRY = "jiawriter-fixed-tools";
 
 /** Engine names as shown to the user. */
 function engineName(engine: string): string {
@@ -208,6 +219,10 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	const refused = new Set<string>();
 	// Upstream tools shown to work, by address and model: only those go into the main conversation.
 	const proven = new Map<string, Set<MainTool>>();
+	// Where tools shown on Claude wait for the next conversation.
+	const provenFile = join(getAgentDir(), "proven.json");
+	// A Claude conversation's tools: thinking blocks are bound to the tool set, so it never changes on the way.
+	let fixedTools: FixedTools | undefined;
 	// Pages being fetched for the archive, one after the other, beside the conversation.
 	let originQueue: Promise<void> = Promise.resolve();
 	// How many of them could not be fetched in this run.
@@ -365,6 +380,12 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	function prove(ctx: ExtensionContext, way: ServerWay, tool: MainTool): string {
 		// A conversation on another API cannot carry it.
 		if (mainWay(ctx.model?.api) !== way) return "";
+		// Claude: kept for the next conversation; this one's tools stay as they are.
+		if (way === "claude") {
+			const id = provenId(ctx.model?.baseUrl, ctx.model?.id);
+			writeProven(provenFile, withProven(readProven(provenFile), id, tool));
+			return "";
+		}
 		const key = provenKey(ctx);
 		const shown = proven.get(key) ?? new Set<MainTool>();
 		proven.set(key, shown);
@@ -372,7 +393,26 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		shown.add(tool);
 		// Codex's one tool does both.
 		if (way === "codex" && shown.size > 1) return "";
-		return t("server.mainOn", { tool: way === "claude" && tool === "fetch" ? "web_fetch" : "web_search" });
+		return t("server.mainOn", { tool: "web_search" });
+	}
+
+	/** Forget what an upstream refused: on Claude too, or every next request of the conversation would fail. */
+	function forgetProven(ctx: ExtensionContext): void {
+		proven.delete(provenKey(ctx));
+		const id = provenId(ctx.model?.baseUrl, ctx.model?.id);
+		writeProven(provenFile, withoutProven(readProven(provenFile), id));
+		if (fixedTools?.id === id) fixedTools = { id, tools: [] };
+	}
+
+	/** The tools a Claude conversation carries, fixed by its first request and kept in the session. */
+	function claudeTools(ctx: ExtensionContext, payload: unknown): Set<MainTool> {
+		const id = provenId(ctx.model?.baseUrl, ctx.model?.id);
+		if (!fixedTools) {
+			// Only a request nothing depends on may take them; a conversation under way stays without.
+			fixedTools = fixTools(fixedTools, id, payload, readProven(provenFile));
+			pi.appendEntry(FIXED_TOOLS_ENTRY, fixedTools);
+		}
+		return fixedFor(fixedTools, id);
 	}
 
 	/** A page through sf. */
@@ -527,7 +567,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		if (way) recordMainSearch(ctx, message, way);
 		// A tool the upstream refused in the conversation must not fail the next request too.
 		if (message.stopReason === "error" && /\b400\b|tool|web_search|web_fetch/i.test(message.errorMessage ?? ""))
-			proven.delete(provenKey(ctx));
+			forgetProven(ctx);
 		// The upstream's own loop stopped halfway: the reply goes on.
 		if (message.rawStopReason !== "pause_turn") resumes = 0;
 		else if (resumes < MAX_RESUMES) {
@@ -542,7 +582,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	// The upstream's own tools go into the main conversation once they are shown to work.
 	pi.on("before_provider_request", (event, ctx) => {
 		const way = mainWay(ctx.model?.api);
-		const shown = proven.get(provenKey(ctx));
+		const shown = way === "claude" ? claudeTools(ctx, event.payload) : proven.get(provenKey(ctx));
 		return way && shown ? withMainSearch(event.payload, way, shown) : undefined;
 	});
 
@@ -563,6 +603,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	// Which program and setup the lines below come from.
 	pi.on("session_start", async (_event, ctx) => {
 		toldIgnored.clear();
+		// A resumed conversation goes on with the tools it started with.
+		fixedTools = fixedFromEntries(ctx.sessionManager.getEntries(), FIXED_TOOLS_ENTRY);
 		(await searchLog(ctx))({
 			kind: "session",
 			version: VERSION,
@@ -603,9 +645,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		label: "Web search",
 		// Full description sent to the model.
 		description:
-			"Search the web. browser = the user's Chrome; takes engines, pages, fresh. anysearch = API; takes zone, language. " +
-			`${UPSTREAM_METHODS}` +
-			"Each method uses only its own parameters.",
+			"Searches the web.\n\nUsage:\n - browser = the user's Chrome\n - anysearch = API\n" +
+			` - ${UPSTREAM_METHODS.trim()}`,
 		// Argument schema.
 		parameters: Type.Object({
 			query: Type.String(),
@@ -730,9 +771,9 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		label: "Web fetch",
 		// Full description sent to the model.
 		description:
-			"Fetch a page's main text. browser = the user's Chrome, for news and JavaScript pages. anysearch = API. " +
-			"sf = PDF, Word and Excel links, video pages. " +
-			UPSTREAM_METHODS.trim(),
+			"Fetches a page's main text.\n\nUsage:\n - browser = the user's Chrome, for news and JavaScript pages\n - anysearch = API\n" +
+			" - sf = PDF, Word and Excel links, video pages\n" +
+			" - claude, codex = the upstream model does it itself",
 		// Argument schema.
 		parameters: Type.Object({
 			url: Type.String(),

@@ -1,9 +1,16 @@
 /**
  * The upstream's own search tools in the main conversation, as Claude Code and Codex use them: the conversation's
  * model reads the pages itself, with no second model retelling them. A tool the upstream refuses would fail the
- * whole conversation, so a tool is only added once a request of its own has shown this upstream takes it.
+ * whole conversation, so a tool is only added once a request of its own has shown this upstream takes it. Claude's
+ * thinking blocks are bound to the set of tools, so there a shown tool waits for the next conversation.
  */
 
+// The name of an upstream in the record.
+import { createHash } from "node:crypto";
+// The record between sessions.
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+// Its folder.
+import { dirname } from "node:path";
 // The conversation's messages.
 import type { AssistantMessage, ThinkingContent } from "@earendil-works/pi-ai";
 // One search result.
@@ -14,6 +21,17 @@ export type MainWay = "claude" | "codex";
 
 /** What a tool does. */
 export type MainTool = "search" | "fetch";
+
+/** Upstream tools shown to work, by upstream, kept between sessions. */
+export type ProvenRecord = Record<string, MainTool[]>;
+
+/** A Claude conversation's upstream tools: fixed by its first request, for as long as it lasts. */
+export interface FixedTools {
+	// The upstream and model they were fixed for.
+	id: string;
+	// The tools.
+	tools: MainTool[];
+}
 
 /** A page whose text came back with the tool. */
 export interface MainPage {
@@ -42,7 +60,7 @@ const CLAUDE_SEARCHES = 5;
 /** Pages read in one reply. */
 const CLAUDE_FETCHES = 4;
 /** Added to our own search tool while the upstream's is there: a model with both took ours (seen on 2026-11-06). */
-const OWN_TOOL_NOTE = " For upstream search call the web_search tool instead, unless the user names another method.";
+const OWN_TOOL_NOTE = "\n - For upstream search use the web_search tool instead, unless the user names another method";
 /** Sources are only listed when asked for. */
 const CODEX_SOURCES = "web_search_call.action.sources";
 
@@ -63,7 +81,7 @@ export function mainTools(way: MainWay, proven: ReadonlySet<MainTool>): Record<s
 }
 
 /** The reasoning a request with Codex's tool can have: the tool refuses none and minimal, as in a search of its own. */
-function searchReasoning(reasoning: unknown): Record<string, unknown> {
+export function searchReasoning(reasoning: unknown): Record<string, unknown> {
 	// The effort asked for.
 	const effort = (reasoning as { effort?: unknown } | undefined)?.effort;
 	if (effort === "none") return {};
@@ -72,7 +90,7 @@ function searchReasoning(reasoning: unknown): Record<string, unknown> {
 }
 
 /** One of the conversation's tools, told when to leave the search to the upstream's. */
-function steered(tool: unknown): unknown {
+export function steered(tool: unknown): unknown {
 	const own = tool as { name?: string; description?: string };
 	return own.name === "search_web" ? { ...own, description: `${own.description ?? ""}${OWN_TOOL_NOTE}` } : tool;
 }
@@ -118,8 +136,84 @@ interface ClaudeFetched {
 	content?: { title?: unknown; source?: { type?: unknown; data?: unknown } };
 }
 
+/** An upstream's name in the record: a hash, so no address is kept on disk. */
+export function provenId(baseUrl: string | undefined, modelId: string | undefined): string {
+	return createHash("sha256").update(`${baseUrl}\n${modelId}`).digest("hex").slice(0, 32);
+}
+
+/** The record; a missing or broken file counts as nothing shown. */
+export function readProven(file: string): ProvenRecord {
+	try {
+		// Only arrays of known tools count.
+		const raw = JSON.parse(readFileSync(file, "utf-8")) as Record<string, unknown>;
+		const out: ProvenRecord = {};
+		for (const [id, tools] of Object.entries(raw)) {
+			if (Array.isArray(tools)) out[id] = tools.filter((t): t is MainTool => t === "search" || t === "fetch");
+		}
+		return out;
+	} catch {
+		// Not there yet, or not readable.
+		return {};
+	}
+}
+
+/** Save the record whole, so a crash leaves the old one; a failure only means proving again. */
+export function writeProven(file: string, record: ProvenRecord): void {
+	try {
+		mkdirSync(dirname(file), { recursive: true });
+		// Beside the file, so the rename stays on one filesystem.
+		const staged = `${file}.${process.pid}.tmp`;
+		writeFileSync(staged, JSON.stringify(record), { mode: 0o600 });
+		renameSync(staged, file);
+	} catch {
+		// The record only saves a request.
+	}
+}
+
+/** The record with a tool added for an upstream, each tool once. */
+export function withProven(record: ProvenRecord, id: string, tool: MainTool): ProvenRecord {
+	return { ...record, [id]: [...new Set([...(record[id] ?? []), tool])] };
+}
+
+/** The record without an upstream. */
+export function withoutProven(record: ProvenRecord, id: string): ProvenRecord {
+	const { [id]: _gone, ...rest } = record;
+	return rest;
+}
+
+/** A conversation's tools: those already fixed for it, else what is on record if nothing depends on the set yet. */
+export function fixTools(
+	fixed: FixedTools | undefined,
+	id: string,
+	payload: unknown,
+	record: ProvenRecord,
+): FixedTools {
+	return fixed ?? { id, tools: isOpening(payload) ? (record[id] ?? []) : [] };
+}
+
+/** The last fixed set in a session's entries. */
+export function fixedFromEntries(entries: readonly unknown[], customType: string): FixedTools | undefined {
+	return entries
+		.flatMap((e) => {
+			const entry = e as { type?: string; customType?: string; data?: FixedTools };
+			return entry.type === "custom" && entry.customType === customType && entry.data ? [entry.data] : [];
+		})
+		.at(-1);
+}
+
+/** True for a conversation's first request: nothing the model said is in it, so no reasoning depends on its tools. */
+export function isOpening(payload: unknown): boolean {
+	const messages = (payload as { messages?: { role?: string }[] }).messages;
+	return Array.isArray(messages) && !messages.some((m) => m.role === "assistant");
+}
+
+/** The tools a Claude request carries: those fixed for this conversation, or none on another upstream. */
+export function fixedFor(fixed: FixedTools | undefined, id: string): Set<MainTool> {
+	return new Set(fixed?.id === id ? fixed.tools : []);
+}
+
 /** The records of a reply. */
-function serverItems(message: AssistantMessage): ServerItem[] {
+export function serverItems(message: AssistantMessage): ServerItem[] {
 	return message.content.flatMap((block) =>
 		block.type === "thinking" && (block as ThinkingContent).serverItem
 			? [JSON.parse(block.thinkingSignature ?? "{}") as ServerItem]
@@ -128,13 +222,13 @@ function serverItems(message: AssistantMessage): ServerItem[] {
 }
 
 /** A value when it is text. */
-function text(value: unknown): string {
+export function textOf(value: unknown): string {
 	return typeof value === "string" ? value : "";
 }
 
 /** A source with the fields it has. */
-function source(url: unknown, title?: unknown, date?: unknown): SearchResult {
-	return { url: text(url), title: text(title), snippet: "", date: text(date) };
+export function sourceOf(url: unknown, title?: unknown, date?: unknown): SearchResult {
+	return { url: textOf(url), title: textOf(title), snippet: "", date: textOf(date) };
 }
 
 /** What the upstream's tools did in one reply. */
@@ -145,22 +239,29 @@ export function readMainSearch(message: AssistantMessage): MainSearch {
 			// Codex: what it did, with no page text.
 			const action = item.action;
 			if (action?.type === "search") {
-				out.queries.push(text(action.query), ...(Array.isArray(action.queries) ? action.queries.map(text) : []));
-				out.sources.push(...(action.sources ?? []).map((s) => source(s.url)));
-			} else out.opened.push(text(action?.url));
+				out.queries.push(
+					textOf(action.query),
+					...(Array.isArray(action.queries) ? action.queries.map(textOf) : []),
+				);
+				out.sources.push(...(action.sources ?? []).map((s) => sourceOf(s.url)));
+			} else out.opened.push(textOf(action?.url));
 		} else if (item.type === "server_tool_use") {
 			// Claude: the call.
-			if (item.name === "web_search") out.queries.push(text(item.input?.query));
-			else if (item.name === "web_fetch") out.opened.push(text(item.input?.url));
+			if (item.name === "web_search") out.queries.push(textOf(item.input?.query));
+			else if (item.name === "web_fetch") out.opened.push(textOf(item.input?.url));
 		} else if (item.type === "web_search_tool_result" && Array.isArray(item.content)) {
 			// Claude: the results; an error is no list.
-			out.sources.push(...(item.content as ClaudeResult[]).map((r) => source(r.url, r.title, r.page_age)));
+			out.sources.push(...(item.content as ClaudeResult[]).map((r) => sourceOf(r.url, r.title, r.page_age)));
 		} else if (item.type === "web_fetch_tool_result") {
 			// Claude: the page, in plain text unless it is a document such as a PDF.
 			const fetched = item.content as ClaudeFetched | undefined;
 			const body = fetched?.content?.source;
-			if (body?.type === "text" && text(body.data)) {
-				const page = { url: text(fetched?.url), title: text(fetched?.content?.title), content: text(body.data) };
+			if (body?.type === "text" && textOf(body.data)) {
+				const page = {
+					url: textOf(fetched?.url),
+					title: textOf(fetched?.content?.title),
+					content: textOf(body.data),
+				};
 				out.pages.push(page);
 			}
 		}

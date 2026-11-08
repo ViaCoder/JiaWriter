@@ -7,7 +7,8 @@
 import { resolveLang } from "./i18n/index.ts";
 
 /** Opening sentence (the untagged preamble). */
-export const WRITER_PREAMBLE = "You are JiaWriter, a general-purpose assistant.";
+export const WRITER_PREAMBLE =
+	"You are JiaWriter, a general-purpose agent. Use the instructions below and the tools available to you to assist the user.";
 
 /** Rule for the language of replies to the user (JW_LANG, Chinese by default). */
 export function writerLanguageRule(lang: string | undefined): string {

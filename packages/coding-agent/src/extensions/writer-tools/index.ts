@@ -40,7 +40,7 @@ export default function writerToolsExtension(pi: ExtensionAPI): void {
 		label: "Style check",
 		// Full description sent to the model.
 		description:
-			"Find AI-style writing in a draft, with line and column: contrast frames, stock phrases, negative assertions, list and bold overuse",
+			"Finds AI-style writing in a draft, with line and column: contrast frames, stock phrases, negative assertions, list and bold overuse",
 		// Argument schema.
 		parameters: Type.Object({
 			// path or text.
@@ -79,7 +79,7 @@ export default function writerToolsExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "Word count",
 		// Full description sent to the model.
-		description: "Count a draft as writers do, whole or per section, against a target",
+		description: "Counts a draft as writers do, whole or per section, against a target",
 		// Argument schema.
 		parameters: Type.Object({
 			// path or text.
@@ -118,7 +118,7 @@ export default function writerToolsExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "Readability check",
 		// Full description sent to the model.
-		description: "Find rare Chinese characters and long sentences, and rate English readability",
+		description: "Finds rare Chinese characters and long sentences, and rates English readability",
 		// Argument schema.
 		parameters: Type.Object({
 			// path or text.

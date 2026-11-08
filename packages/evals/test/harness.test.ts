@@ -75,14 +75,14 @@ describe("documentation variant", () => {
 			selectedTools: [...DOCUMENTATION_EVAL_TOOLS],
 		});
 		// JiaWriter: the docs section points at JiaWriter's documentation.
-		expect(prompt).toContain("\n<docs>\nWhen the user asks about JiaWriter");
-		expect(prompt).toContain("\n<rules>\n");
-		expect(prompt).toContain("\n<cwd>\n/workspace\n</cwd>");
+		expect(prompt).toContain("\n# Docs\nWhen the user asks about JiaWriter");
+		expect(prompt).toContain("\n# Rules\n");
+		expect(prompt).toContain("\n# Environment\n - Primary working directory: /workspace");
 
 		const stripped = excludePiDocumentation(prompt);
-		expect(stripped).toContain("\n<rules>\n");
-		expect(stripped).toContain("\n<cwd>\n/workspace\n</cwd>");
-		expect(stripped).not.toContain("<docs>");
+		expect(stripped).toContain("\n# Rules\n");
+		expect(stripped).toContain("\n# Environment\n - Primary working directory: /workspace");
+		expect(stripped).not.toContain("# Docs");
 		expect(stripped).not.toContain("When the user asks about JiaWriter");
 		expect(stripped).not.toContain(getReadmePath());
 		expect(stripped).not.toContain(getDocsPath());
@@ -104,7 +104,7 @@ describe("documentation variant", () => {
 
 	it("fails closed when prompt markers are missing", () => {
 		expect(() => excludePiDocumentation("Instructions")).toThrow("no Pi documentation section");
-		expect(() => excludePiDocumentation("\n<docs>\nPi documentation\n</docs>")).toThrow(
+		expect(() => excludePiDocumentation("\n# Docs\nPi documentation\n\n# Skills\nx")).toThrow(
 			"no working-directory section",
 		);
 	});

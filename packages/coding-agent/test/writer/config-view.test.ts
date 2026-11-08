@@ -81,6 +81,7 @@ describe("otherRows / setupCommands", () => {
 		// Defaults, then the /lang choice, then JW_LANG.
 		expect(otherRows({}, "zh")).toEqual([
 			{ name: "JW_LANG", value: "zh", source: "默认值" },
+			{ name: "JW_PERMISSION", value: "auto", source: "默认值" },
 			{ name: "JW_ENGINES", value: "bing,google", source: "默认值" },
 			{ name: "JW_SEARCH_PAGES", value: "3", source: "默认值" },
 			{ name: "JW_SEARCH_URL", value: "https://api.anysearch.com", source: "默认值" },

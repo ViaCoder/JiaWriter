@@ -257,7 +257,7 @@ export async function smoke(command, args) {
 		const names = (body.tools ?? []).map((t) => t.function?.name ?? t.name);
 		rows.push(["writing tools", TOOLS.every((t) => names.includes(t)), names.join(",")]);
 		const system = JSON.stringify(body.messages?.[0] ?? "");
-		rows.push(["writing prompt", system.includes("general-purpose assistant"), ""]);
+		rows.push(["writing prompt", system.includes("general-purpose agent"), ""]);
 		rows.push(["built-in skills", system.includes("report-analysis") && system.includes("lieflat-gongwen"), ""]);
 		rows.push(["key hidden", !p.stdout.includes(SECRET) && !p.stderr.includes(SECRET) && !anyFileContains(home, SECRET), ""]);
 		// Import a PDF and export a .docx through tool calls (pdf.js, docx and fflate inside the build).

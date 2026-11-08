@@ -29,6 +29,12 @@ JiaWriter 是一个通用写作 agent，在终端里运行。它读取参考资�
 | `JW_OUT` | 最大输出（token，也可以写 128k、1m） | 128000 |
 | `JW_EFFORT` | 思考强度：`off`、`low`、`medium`、`high`、`xhigh`、`max`，模型不支持时自动用最接近的档位 | `medium` |
 | `JW_LANG` | 界面和工具输出的语言：`zh`、`en` | `zh` |
+| `JW_PERMISSION` | 浏览器和计算机操作工具的询问程度：`manual`、`auto`（默认）或 `bypass`。`/jw permission` 可保存选择。 | `auto` |
+| `JW_BROWSER` | `browser` 工具：`on`、`off`，不设时会话开始时连着 Chrome 扩展才提供。 | 跟随扩展 |
+| `JW_IMAGE` | 上游是否收图：`on`、`off`，不设时第一次需要时判断。 | 判断一次 |
+| `JW_IMAGE_MAX` | 每条消息和每会话的图片上限，例如 `1,10`。 | `1,10` |
+| `JW_IMAGE_EDGE` | 图片最长边的像素数。 | `1024` |
+| `JW_COMPUTER` | `off` 隐藏 `computer` 工具。用 `/jw computer` 安装组件后，新会话开始时提供。 | 跟随安装 |
 | `JW_ENGINES` | 模型没有指定引擎时，浏览器检索依次使用的引擎，可选 `bing`、`google`、`baidu`、`sogou` | `bing,google` |
 | `JW_VERIFY_WAIT` | 遇到人机验证时等你处理的最长时间（秒，0–300，0 表示不等） | `180` |
 | `JW_SEARCH_PAGES` | 浏览器检索每个引擎看几页结果（3–5） | `3` |

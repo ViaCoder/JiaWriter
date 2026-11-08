@@ -9,8 +9,8 @@ import { wrapToolDefinition } from "./tool-definition-wrapper.ts";
 import { DEFAULT_MAX_BYTES, formatSize, type TruncationResult, truncateHead } from "./truncate.ts";
 
 const lsSchema = Type.Object({
-	path: Type.Optional(Type.String({ description: "Folder, default the current one" })),
-	limit: Type.Optional(Type.Number({ description: "Most entries, default 500" })),
+	path: Type.Optional(Type.String({ description: "The directory, default the current one" })),
+	limit: Type.Optional(Type.Number({ description: "Maximum entries, default 500" })),
 });
 
 export const lsToolSystemPromptContribution = {
@@ -59,7 +59,7 @@ export function createLsToolDefinition(
 	return {
 		name: "ls",
 		label: "ls",
-		description: "List a folder",
+		description: "Lists a directory",
 		promptSnippet: lsToolSystemPromptContribution.snippet,
 		parameters: lsSchema,
 		async execute(
