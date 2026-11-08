@@ -162,6 +162,9 @@ export const en: Record<MessageKey, string> = {
 	"firecrawl.credits": "firecrawl credits are used up (HTTP 402).",
 	"firecrawl.newsDates":
 		"Note: firecrawl news is not filtered by date; after and before apply to web results only. To bound the dates, search again without news.",
+	"search.methodDown":
+		"Method {method} is down for this session ({reason}) and was not tried. Use another; methods that worked in this session: {worked}.",
+	"search.noneWorked": "none yet",
 	"firecrawl.rate": "firecrawl rate limit (HTTP 429); try again later.",
 	"firecrawl.page": "firecrawl could not read the page (HTTP {status}): {url}",
 	"firecrawl.http": "firecrawl request failed (HTTP {status}).",

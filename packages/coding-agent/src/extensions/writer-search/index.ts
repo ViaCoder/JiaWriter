@@ -109,6 +109,8 @@ import {
 	withProven,
 	writeProven,
 } from "../../writer/websearch/main-search.ts";
+// Methods that failed for a lasting reason in this session.
+import { newMethodHealth, recordMethod } from "../../writer/websearch/method-health.ts";
 // sf backend.
 import { locateSf, parseSfFetch, runSf, sfChildEnv, sfError } from "../../writer/websearch/sf.ts";
 // The configured model's name.
@@ -641,6 +643,27 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	pi.on("session_shutdown", async () => {
 		if (!usedBrowser) return;
 		await bridgeCall(address, "close_run", { run }, 5000).catch(() => undefined);
+	});
+
+	// Which methods work in this session: one that failed for a lasting reason is not tried again.
+	const health = newMethodHealth();
+	pi.on("tool_call", (event) => {
+		if (event.toolName !== "search_web" && event.toolName !== "fetch_web") return undefined;
+		const method = String((event.input as { method?: unknown }).method ?? "");
+		const reason = health.down.get(method);
+		if (!reason) return undefined;
+		const worked = [...health.worked].join(", ") || t("search.noneWorked");
+		return { block: true, reason: t("search.methodDown", { method, reason, worked }) };
+	});
+	pi.on("tool_result", (event) => {
+		if (event.toolName !== "search_web" && event.toolName !== "fetch_web") return undefined;
+		const text = event.content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
+		recordMethod(health, String((event.input as { method?: unknown }).method ?? ""), event.isError, text);
+		return undefined;
+	});
+	pi.on("session_start", () => {
+		health.worked.clear();
+		health.down.clear();
 	});
 
 	// search_web.

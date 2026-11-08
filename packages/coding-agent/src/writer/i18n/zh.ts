@@ -144,6 +144,9 @@ export const zh = {
 	"firecrawl.credits": "firecrawl 积分不足（HTTP 402）。",
 	"firecrawl.newsDates":
 		"注意：firecrawl 的新闻结果不按日期筛选，after/before 只对网页结果生效；要限定日期，去掉 news 再搜。",
+	"search.methodDown":
+		"{method} 方式在本次会话里已不可用（{reason}），没有再试。改用别的方式；本次会话里用成功过的：{worked}。",
+	"search.noneWorked": "还没有",
 	"firecrawl.rate": "firecrawl 请求过于频繁（HTTP 429），请稍后再试。",
 	"firecrawl.page": "firecrawl 无法读取该网页（HTTP {status}）：{url}",
 	"firecrawl.http": "firecrawl 请求失败（HTTP {status}）。",

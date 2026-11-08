@@ -205,3 +205,47 @@ describe("dateArg", () => {
 		});
 	});
 });
+
+describe("writer-search: methods down for the session", () => {
+	it("refuses a second try of a method that failed for a lasting reason, naming what worked", () => {
+		const handlers: Record<string, ((event: unknown, ctx: unknown) => unknown)[]> = {};
+		writerSearchExtension({
+			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
+				(handlers[name] ??= []).push(fn);
+			},
+			registerTool: () => {},
+			registerCommand: () => {},
+			registerFlag: () => {},
+			getFlag: () => undefined,
+		} as unknown as ExtensionAPI);
+		const ctx = { cwd: "/tmp", hasUI: false, model: undefined, ui: { notify: () => {} } };
+		const fire = (name: string, event: unknown) =>
+			handlers[name]?.map((h) => h(event, ctx)).find((r) => r !== undefined && !(r instanceof Promise));
+		const failed = (method: string, text: string) =>
+			fire("tool_result", {
+				toolName: "search_web",
+				input: { method },
+				isError: true,
+				content: [{ type: "text", text }],
+			});
+		fire("tool_result", {
+			toolName: "search_web",
+			input: { method: "anysearch" },
+			isError: false,
+			content: [{ type: "text", text: "结果" }],
+		});
+		failed("firecrawl", "firecrawl 请求失败（HTTP 400）。");
+		const refused = fire("tool_call", {
+			toolName: "fetch_web",
+			input: { method: "firecrawl", url: "https://a.example/" },
+		}) as {
+			block: boolean;
+			reason: string;
+		};
+		expect(refused.block).toBe(true);
+		expect(refused.reason).toContain("HTTP 400");
+		expect(refused.reason).toContain("anysearch");
+		// Other methods go on.
+		expect(fire("tool_call", { toolName: "search_web", input: { method: "deepseek", query: "q" } })).toBeUndefined();
+	});
+});
