@@ -9,6 +9,8 @@ metadata:
 
 # Narrative fiction
 
+Writes short stories, tales and narrative essays: characters act in concrete scenes.
+
 ## Preparation
 
 - Confirm the length, point of view, readers' age and genre.
@@ -26,7 +28,4 @@ metadata:
 - Give each character a voice that fits who they are; each line of dialogue moves something forward.
 - Use concrete sensory detail and comparisons drawn from the character's own experience.
 - Keep the timeline and the names of characters consistent.
-
-## Final checks
-
-- Run style_check with a negation threshold of 5; keep negations in dialogue where they fit the character.
+- Keep negations in dialogue where they fit the character.

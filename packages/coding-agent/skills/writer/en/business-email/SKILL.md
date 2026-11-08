@@ -9,6 +9,8 @@ metadata:
 
 # Business email and memos
 
+Writes business emails, memos and meeting minutes: one matter per message, so the reader knows what to do.
+
 ## Structure
 
 - The subject line names the matter and the action needed, for example "Please confirm: sample delivery on 5 November".
@@ -26,7 +28,4 @@ metadata:
 
 - Record time, place, attendees and agenda.
 - For each item record the decision, the owner and the due date.
-
-## Final checks
-
-- Run style_check and check that names, dates and figures agree throughout.
+- Before sending, check that names, dates and figures agree throughout.

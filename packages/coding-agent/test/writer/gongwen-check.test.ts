@@ -34,6 +34,10 @@ import { listSkills, readSkillInfo } from "../../src/writer/skills/manage.ts";
 
 /** The bundled Chinese skill. */
 const SKILL = join(getWriterSkillsDir(), "zh", "lieflat-gongwen");
+/** The synthetic samples the skill once shipped, kept only for these measurements (they use 一是 and placeholders). */
+const SAMPLES = join(__dirname, "fixtures", "gongwen-samples");
+/** Where a measured file is: the samples here, the official documents in the skill. */
+const samplePath = (rel: string) => join(rel.startsWith("示例/") ? SAMPLES : SKILL, rel);
 
 /** One row of the Python parity data. */
 type PyRow = Omit<Metrics, "plain"> & { match: [string, number][]; fails?: number; genre?: string };
@@ -122,7 +126,7 @@ describe("analyze", () => {
 		// Every sample measured by Python.
 		expect(Object.keys(PY)).toHaveLength(29);
 		for (const [rel, py] of Object.entries(PY)) {
-			const a = metrics(readFileSync(join(SKILL, rel), "utf-8"));
+			const a = metrics(readFileSync(samplePath(rel), "utf-8"));
 			const { match, fails, genre, ...pyMetrics } = py;
 			// Same measurements (plain is not in the Python data; toEqual skips undefined fields).
 			expect({ ...a, plain: undefined }, rel).toEqual(pyMetrics);
@@ -211,7 +215,7 @@ describe("formatReport", () => {
 
 	it("passes a sample of the declared genre", () => {
 		// A bundled sample speech.
-		const a = metrics(readFileSync(join(SKILL, "示例", "领导讲话_全市安全生产工作会议上的讲话.md"), "utf-8"));
+		const a = metrics(readFileSync(samplePath("示例/领导讲话_全市安全生产工作会议上的讲话.md"), "utf-8"));
 		const { text, fails } = formatReport(a, "领导讲话");
 		expect(fails).toBe(0);
 		expect(text).toContain("✓ 通过（2 项）");
@@ -279,9 +283,9 @@ describe("bundled lieflat-gongwen skill", () => {
 		expect(readSkillInfo(SKILL).name).toBe("lieflat-gongwen");
 		expect(readFileSync(join(SKILL, "LICENSE"), "utf-8")).toContain("PolyForm Noncommercial License 1.0.0");
 		const md = readFileSync(join(SKILL, "SKILL.md"), "utf-8");
-		// The adaptation section, the tool instead of Python, no placeholder rule.
-		expect(md).toContain("## 在 JiaWriter 里使用");
-		expect(md).toContain("调用 `gongwen_check` 工具");
+		// The rewritten skill (2026-11-08): the paragraph method, the tool instead of Python, no placeholder rule.
+		expect(md).toContain("## 分析段落");
+		expect(md).toContain("自动做公文参数检查");
 		expect(md).not.toContain("python3 scripts/check_params.py");
 		expect(md).not.toContain("宁可占位");
 		// Every file the reference table names exists.
@@ -290,7 +294,8 @@ describe("bundled lieflat-gongwen skill", () => {
 			"标题技法库.md",
 			"句子对照库.md",
 			"公文语料/文章结构模板.md",
-			"党建语料/党建DNA.md",
+			"公文语料/写作视角与认知框架.md",
+			"公文语料/语言DNA.md",
 		]) {
 			expect(existsSync(join(SKILL, f)), f).toBe(true);
 		}

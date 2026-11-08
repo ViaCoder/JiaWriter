@@ -10,6 +10,8 @@ metadata:
 
 # 编写写作 skill
 
+新建或修改写作 skill：规则具体、可以检查、尽量简短。
+
 ## 文件格式
 
 - 每个 skill 是一个文件夹，内含 SKILL.md。文件开头是 frontmatter：

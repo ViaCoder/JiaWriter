@@ -9,6 +9,8 @@ metadata:
 
 # Marketing copy
 
+Writes product descriptions, campaign copy and social posts: concrete selling points, claims that can be proven.
+
 ## Preparation
 
 - Confirm the product, audience, channel (website, social media, poster, shop page) and length limit.
@@ -26,7 +28,4 @@ metadata:
 - Use words the readers use and describe concrete situations of use.
 - Keep figures, prices and campaign rules as the official information gives them, with validity dates.
 - Use claims that can be substantiated, and name the source of any comparison.
-
-## Final checks
-
-- Run style_check, then check the channel's length limit with word_count.
+- Check the channel's length limit with word_count.

@@ -189,14 +189,7 @@ const SOFT: Record<string, Rule[]> = {
 			basis: "语料平均 13.2 个，但存在把重点任务拆成多个平行一级标题的扁平变体",
 		},
 	],
-	调研报告: [
-		{
-			key: "yishi",
-			min: 3,
-			msg: "调研报告通常用“一是二是”做段内分层",
-			basis: "语料中位 9 次，但四分之一的作品完全不用",
-		},
-	],
+	// 调研报告 has no expectation here: the user forbids 一是/二是 (2026-11-08), whatever the corpus does.
 };
 
 /** Share of the heaviest section: p25, p75, median and what is typical (full-corpus counts). */

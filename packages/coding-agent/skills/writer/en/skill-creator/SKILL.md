@@ -10,6 +10,8 @@ metadata:
 
 # Writing skill creator
 
+Creates or changes a writing skill: concrete, checkable rules, as short as possible.
+
 ## File format
 
 - A skill is a folder with SKILL.md. The file starts with frontmatter:

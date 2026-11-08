@@ -9,6 +9,8 @@ metadata:
 
 # Academic writing
 
+Writes papers, literature reviews, proposals and abstracts: a clear question, traceable evidence, conclusions within their limits.
+
 ## Preparation
 
 - Confirm the discipline, the journal or school format, the citation style (such as APA or GB/T 7714) and the length.
@@ -31,7 +33,4 @@ metadata:
 
 - Use precise terms and define each at first use.
 - Match the strength of each claim to its evidence and state the scope of each conclusion.
-
-## Final checks
-
-- Run style_check and readability_check; choose an academic export profile when exporting.
+- Choose an academic export profile when exporting.
