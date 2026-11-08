@@ -1,5 +1,5 @@
 // Reading words on this machine (src/writer/ocr.ts): which recognizer, and what comes of it.
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -36,13 +36,13 @@ describe("ocrHelperDir", () => {
 });
 
 describe("ocrText", () => {
-	/** A recognizer made of a small script. */
+	/** A recognizer made of a small Node script, so it runs on every system, Windows too. */
 	function script(body: string) {
 		const dir = mkdtempSync(join(tmpdir(), "jw-ocrt-"));
-		const command = join(dir, "r.sh");
-		writeFileSync(command, `#!/bin/sh\n${body}\n`);
-		chmodSync(command, 0o755);
-		return { dir, ocr: { command, args: (file: string) => [file] } };
+		const file = join(dir, "r.mjs");
+		// argv[2] is the picture's file, as a real recognizer gets it.
+		writeFileSync(file, `import { readFileSync, writeFileSync } from "node:fs";\n${body}\n`);
+		return { dir, ocr: { command: process.execPath, args: (picture: string) => [file, picture] } };
 	}
 
 	it("gives nothing without a recognizer", async () => {
@@ -50,14 +50,18 @@ describe("ocrText", () => {
 	});
 
 	it("hands the picture over as a file and returns the words", async () => {
-		const { dir, ocr } = script('cat "$1"; echo " 词"');
+		const { dir, ocr } = script('process.stdout.write(readFileSync(process.argv[2], "utf8") + " 词\\n");');
 		expect(await ocrText(Buffer.from("图").toString("base64"), ocr)).toBe("图 词");
 		rmSync(dir, { recursive: true });
 	});
 
 	it("takes a failure as nothing, and leaves no file behind", async () => {
-		const { dir, ocr } = script('echo "$1" > "$(dirname "$0")/seen"; exit 3');
+		const { dir, ocr } = script('writeFileSync(new URL("seen", import.meta.url), process.argv[2]); process.exit(3);');
 		expect(await ocrText("eA==", ocr)).toBe("");
+		// The picture's file was handed over, and is gone afterwards.
+		const seen = readFileSync(join(dir, "seen"), "utf8");
+		expect(seen.length).toBeGreaterThan(0);
+		expect(existsSync(seen)).toBe(false);
 		rmSync(dir, { recursive: true });
 	});
 

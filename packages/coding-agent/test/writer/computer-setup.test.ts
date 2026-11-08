@@ -1,5 +1,6 @@
 // Setting up desktop control (src/writer/computer/setup.ts): every step, with the machine replaced, and no model.
 import { createHash } from "node:crypto";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { driverAsset, driverPath, MAC_APP } from "../../src/writer/computer/driver.ts";
 import {
@@ -136,7 +137,7 @@ describe("linuxSteps", () => {
 			{ "get org.gnome": { code: 0, stdout: "true\n" } },
 		);
 		await linuxSteps(deps);
-		expect(ran.some((r) => r.includes("wayland-helper/install.sh"))).toBe(true);
+		expect(ran.some((r) => r.includes(join("wayland-helper", "install.sh")))).toBe(true);
 	});
 });
 

@@ -72,7 +72,8 @@ export function driverDir(agentDir: string): string {
 /** The driver program; JW_COMPUTER_DRIVER names another copy. */
 export function driverPath(agentDir: string, platform: NodeJS.Platform, env: NodeJS.ProcessEnv = process.env): string {
 	if (env.JW_COMPUTER_DRIVER) return env.JW_COMPUTER_DRIVER;
-	if (platform === "darwin") return join(MAC_APP, "Contents", "MacOS", "cua-driver");
+	// A macOS path, written with / whatever system builds it (tests run on Windows too).
+	if (platform === "darwin") return `${MAC_APP}/Contents/MacOS/cua-driver`;
 	return join(driverDir(agentDir), platform === "win32" ? "cua-driver.exe" : "cua-driver");
 }
 

@@ -62,8 +62,10 @@ describe("computerSetup", () => {
 			hasUI: false,
 			ui: { notify: (text: string) => void notes.push(text) },
 		} as unknown as ExtensionCommandContext;
-		expect(["ready", "limited"]).toContain(await computerSetup(ctx));
-		expect(notes.length).toBe(1);
+		// Only the install part: the system's own steps would open System Settings on a Mac, so they are
+		// tested with the machine replaced (computer-setup.test.ts). The driver named is found, so nothing is fetched.
+		expect(await computerSetup(ctx, true)).toBe("limited");
+		expect(notes).toEqual([]);
 	}, 30000);
 });
 
