@@ -17,10 +17,11 @@ export const NO_USER_NOTE =
 
 /**
  * With a user who answers between turns (2026-11-09: the rule reached a run only with its first write, after it had
- * written the whole report in the turn meant for the outline).
+ * written the whole report in the turn meant for the outline). Short documents are written at once (2026-11-09: a
+ * notice of a few hundred characters came as its opening only, and the user's later changes went to the outline).
  */
 export const USER_TURNS_NOTE =
-	"The user answers between turns. Write a long document over turns, unless they ask for it at once: show the outline and stop for their word; then one section per turn, ending with one line on what it covered and what comes next, and stop: their reply decides whether to revise it or go on";
+	"The user answers between turns. Write a long document (a report of some thousands of characters) over turns, unless they ask for it at once: show the outline and stop for their word; then one section per turn, ending with one line on what it covered and what comes next, and stop: their reply decides whether to revise it or go on. A short one (a notice, a letter, a brief) is written whole in one turn";
 
 /** The key of a tool result's details that names the stages it brought. */
 export const STAGES_KEY = "jwStages";

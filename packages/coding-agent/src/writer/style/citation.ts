@@ -79,6 +79,13 @@ export function citationIssues(text: string): CitationIssue[] {
 	for (const m of text.matchAll(/[（(]\s*来源[:：]\s*([^（）()\n]{1,40}?)\s*[）)]/g))
 		if (!/\d{1,2}月\d{1,2}日/.test(m[1]))
 			issues.push({ quote: m[0], form: `YYYY年MM月DD日《${m[1].split(/援引|转引|，|,/)[0]}》报道` });
+	// Book-title marks with no date at all: 据《中国经济时报》报道 (2026-11-09, a research report: three times; the 17
+	// such phrases in 1,575 published texts all name an outlet).
+	for (const m of body.matchAll(/(?<![日\d])据?《([^》\n]{1,14})》(报道|刊文|援引|发文|撰文)/g)) {
+		const at = m.index ?? 0;
+		if (/\d{1,2}月\d{1,2}日[，,、\s]{0,2}$/.test(body.slice(Math.max(0, at - 14), at))) continue;
+		issues.push({ quote: m[0], form: `YYYY年MM月DD日《${m[1]}》${m[2]}` });
+	}
 	// A year and month with no day before book-title marks: 2025年5月《中国民航报》 (2026-11-09, a research report).
 	for (const m of text.matchAll(/(\d{4}年\d{1,2}月)(?!\d)《([^》\n]{1,40})》/g))
 		issues.push({ quote: m[0], form: `${m[1]}DD日《${m[2]}》` });

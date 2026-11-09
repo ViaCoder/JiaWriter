@@ -117,3 +117,14 @@ describe("citationIssues: a month with no day, and 刊文", () => {
 		expect(citationIssues("2026年11月6日《路透社》报道，油价下跌。")).toEqual([]);
 	});
 });
+
+// 2026-11-09, a research report: 据《中国经济时报》报道 three times, with no date.
+describe("citationIssues: book-title marks with no date", () => {
+	it("asks for the date, and leaves dated ones and documents alone", () => {
+		expect(citationIssues("据《中国经济时报》报道，核心零部件仍有瓶颈。")).toEqual([
+			{ quote: "据《中国经济时报》报道", form: "YYYY年MM月DD日《中国经济时报》报道" },
+		]);
+		expect(citationIssues("2026年8月21日《中国经济时报》报道，核心零部件仍有瓶颈。")).toEqual([]);
+		expect(citationIssues("按照《关于加快场景培育的实施意见》的要求推进。")).toEqual([]);
+	});
+});
