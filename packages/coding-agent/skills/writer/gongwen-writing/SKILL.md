@@ -17,6 +17,14 @@ Write each genre as an experienced drafter would: judgment first, specific evide
 2. When asked for one paragraph or section, write only that part; no outline.
 3. For a whole document, first read the genre's section of `公文语料/文章结构模板.md` to lay out the structure; the outline and the writing section by section follow the writing rules. A report ends naturally, with no closing formula.
 
+## Causes
+
+Purpose: the reader needs to know why the problems arise, so that each measure can reach its cause.
+
+- One cause per heading and paragraph, stated as a judgment about a mechanism: an incentive, a gap in rules, capacity or coordination, a cost, a lag between change and response. A cause is not the problem said again.
+- Prove it with evidence that shows the mechanism at work; a fact already used for a problem is referred to in a clause, not told again.
+- Every problem has a cause, and every cause leads to a measure; keep the parts about equal in weight.
+
 ## Countermeasures
 
 Purpose: each measure answers one problem named earlier, at its cause, in a form someone can carry out.

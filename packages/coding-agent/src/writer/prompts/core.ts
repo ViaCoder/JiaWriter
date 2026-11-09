@@ -14,7 +14,8 @@ export const CORE_RULES: readonly string[] = [
 	"Search only when the user asks",
 	"Run one search_web or fetch_web at a time and name its method: none is the default. If it fails, let the user choose the next",
 	"Use methods claude and codex only when the user's prompt says the upstream supports them: claude for Claude models, codex for Codex and GPT models",
-	"In a document, take every case and figure from the reference materials or search results",
+	// What was done counts as a fact too (2026-11-09: two reports opened with surveys and checks nobody made).
+	"In a document, take every case, figure and account of work done (surveys, visits) from the reference materials or search results",
 ];
 
 /**

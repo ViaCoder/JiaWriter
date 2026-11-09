@@ -410,3 +410,14 @@ describe("structureStats: references", () => {
 		expect(structureStats(`${body}\n\n${refs.slice(1).join("\n")}`).listOver).toBe(true);
 	});
 });
+
+describe("gw-casual: the spoken words of reports", () => {
+	it("catches the words real reports almost never use, and spares those they do", () => {
+		// 2026-11-09: report drafts wrote 卡在, 大头, 收不上来 and 等不来; the corpus check keeps 兜底 and 抓手 out.
+		const hits = (text: string) =>
+			styleCheck(text, { register: "official", packs: ["gongwen-zh"] }).hits.filter((h) => h.id === "gw-casual")
+				.length;
+		expect(hits("加装电梯主要卡在低层住户不同意，物业费收不上来，任务大头已经落地。")).toBe(3);
+		expect(hits("要发挥社会保障兜底作用，以项目为抓手推动落实。")).toBe(0);
+	});
+});

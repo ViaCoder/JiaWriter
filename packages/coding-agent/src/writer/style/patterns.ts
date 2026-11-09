@@ -190,7 +190,14 @@ const CORE_EN: readonly StylePattern[] = [
 const GONGWEN_ZH: readonly StylePattern[] = [
 	// Spoken words where the written term exists: 0 times in 217,000 characters of human official documents, 4 times in
 	// JiaWriter's eval drafts (随手可承受, 2026-11-09). Each one is looked at, not counted by density.
-	zhp("gw-casual", "公文 口语词", "official style spoken word", "随手|顺手|压根|没啥|一下子|搞定"),
+	// Spoken words that real reports almost never use: at most 2 hits in 1,575 published texts each (2026-11-09); 一刀切,
+	// 走过场, 接地气, 硬骨头, 兜底 and 抓手 stay out, at 3 to 38 hits.
+	zhp(
+		"gw-casual",
+		"公文 口语词",
+		"official style spoken word",
+		"随手|顺手|压根|没啥|一下子|搞定|卡在|大头|收不上来|等不来|缩水|扎堆|一窝蜂|拍脑袋|最难啃|掉链子",
+	),
 	// Contrast connector.
 	zhp("gw-raner", "公文 然而", "official style 然而", "然而"),
 	// 首先，其次， skeleton; mid-sentence uses are spared by the comma.

@@ -62,7 +62,8 @@ afterEach(() => {
 
 describe("budgets", () => {
 	it("keeps every text short", () => {
-		expect(size(CORE_RULES)).toBeLessThanOrEqual(1000);
+		// 1100 since 2026-11-09: work done (surveys, visits) counts as a fact from the materials.
+		expect(size(CORE_RULES)).toBeLessThanOrEqual(1100);
 		expect(size(WORKING_RULES)).toBeLessThanOrEqual(700);
 		// Raised from 1500 for the evidence rule (2026-11-08); the user: no "arbitrary or nonsensical limitations" of my own making.
 		// The analysis method moved here from the gongwen skill on 2026-11-08, so it is in one place for every document;
@@ -121,7 +122,10 @@ describe("the user's requirements", () => {
 		["the reference list", "参考文献"],
 		["a list entry", "[page title, publisher, date](full URL)"],
 		// No search unless the user asks (the user, 2026-11-08).
-		["cases from the materials", "take every case and figure from the reference materials"],
+		[
+			"cases from the materials",
+			"take every case, figure and account of work done (surveys, visits) from the reference materials",
+		],
 		// Long documents section by section (the user, 2026-11-09).
 		["section by section", "Write one section at a time from its own items"],
 		["over turns with the user", "show the outline and stop; then one section per turn"],
