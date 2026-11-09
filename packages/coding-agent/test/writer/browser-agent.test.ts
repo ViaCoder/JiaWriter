@@ -579,3 +579,35 @@ describe("rolesOf / refCandidates and an action without a reference", () => {
 		});
 	});
 });
+
+// 2026-11-09, the same run's next try: an empty type sent the form off blank, the page reloaded, and every later
+// action met "Node with given id does not belong to the document" without knowing what it meant.
+describe("references after the page moved", () => {
+	const FORM = { ...READ, lines: '[e1] combobox = "2023"\n[e2] textbox "指标名称"\n[e3] button "查询"' };
+
+	it("does not guess a field for a type with nothing to type, nor a list for a select with no option", async () => {
+		const { deps } = await opened({ page_read: FORM });
+		expect((await runBrowser({ action: "type", enter: true }, deps)).reason).toBe("no-ref");
+		expect((await runBrowser({ action: "select" }, deps)).reason).toBe("no-ref");
+	});
+
+	it("forgets the old page's references when an action moved to another address", async () => {
+		const { deps } = await opened({
+			page_read: FORM,
+			page_type: { url: "https://a.example.com/query?year=2023", changed: true, holds: true },
+		});
+		await runBrowser({ action: "type", ref: "e2", text: "新增城镇就业", enter: true }, deps);
+		expect(deps.state.roles?.size ?? 0).toBe(0);
+		expect((await runBrowser({ action: "select", option: "2024" }, deps)).reason).toBe("no-ref");
+	});
+
+	it("says stale-ref, with what to do, when the element is no longer in the page", async () => {
+		const gone = new Error('{"code":-32000,"message":"Node with given id does not belong to the document"}');
+		const { deps } = await opened({ page_read: FORM, page_select: gone });
+		expect(await runBrowser({ action: "select", ref: "e1", option: "2024" }, deps)).toMatchObject({
+			effect: "failed",
+			reason: "stale-ref",
+			data: { need: "read the page again for new references" },
+		});
+	});
+});

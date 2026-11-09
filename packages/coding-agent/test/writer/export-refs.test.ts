@@ -6,13 +6,13 @@ import { describe, expect, it } from "vitest";
 import {
 	checkEntry,
 	checkReferences,
+	entryNames,
 	normalizeUrl,
 	openedUrls,
 	referenceEntries,
 	splitEntry,
-	unopenedUrls,
-	entryNames,
 	uncitedReferences,
+	unopenedUrls,
 } from "../../src/writer/export/refs.ts";
 
 describe("normalizeUrl", () => {
@@ -120,17 +120,20 @@ describe("entryNames / uncitedReferences", () => {
 	].join("\n");
 
 	it("entryNames: the outlets and the longer titles, without dates or addresses", () => {
-		expect(entryNames("[向天空要生产力！低空经济万翼齐扬，上海证券报，2025-12-30](https://m.cnstock.com/611057)")).toEqual([
-			"向天空要生产力！低空经济万翼齐扬",
-			"上海证券报",
-		]);
-		expect(entryNames("2. [国家先后设立两个“低空司”，中国网《北京周报》，2026-05-25](http://x.cn/a)")).toContain("北京周报");
+		expect(
+			entryNames("[向天空要生产力！低空经济万翼齐扬，上海证券报，2025-12-30](https://m.cnstock.com/611057)"),
+		).toEqual(["向天空要生产力！低空经济万翼齐扬", "上海证券报"]);
+		expect(entryNames("2. [国家先后设立两个“低空司”，中国网《北京周报》，2026-05-25](http://x.cn/a)")).toContain(
+			"北京周报",
+		);
 		expect(entryNames("5. https://example.com/12345")).toEqual([]);
 	});
 
 	it("uncitedReferences: entries named nowhere in the text and with no [n] marker", () => {
 		const body = REPORT.split("## 参考文献")[0];
 		// 3 is cited by its outlet, 6 by its marker, 5 names nothing to look for.
-		expect(uncitedReferences(REPORT, body)).toEqual([1, 2, 4]);
+		expect(uncitedReferences(REPORT, body).map((u) => u.n)).toEqual([1, 2, 4]);
+		// With the words looked for, so the model knows what to name.
+		expect(uncitedReferences(REPORT, body)[0].names).toContain("新华社");
 	});
 });

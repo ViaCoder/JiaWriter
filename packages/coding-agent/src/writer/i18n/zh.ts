@@ -53,7 +53,8 @@ export const zh = {
 	"style.passShort": "AI 腔检查通过。",
 	"style.longSentences": "{count} 句超过 {limit} 字，拆开：{heads}。",
 	"style.uncitedRefs":
-		"参考文献第 {entries} 条在正文里没有引用：在用到它的事实处写明“××年××月××日《媒体》报道”，或删去这一条。",
+		"参考文献有条目在正文里没有引用（正文里要出现它的媒体名或标题）：{entries}。在用到它的事实处写明“××年××月××日《媒体》报道”，或删去这一条。",
+	"style.uncitedEntry": "第 {n} 条（找的是：{names}）",
 	"style.rareChars": "生僻字 {chars}：换成常用字，人名、地名和引文除外。",
 	"style.unsupported": "提示：问题或风险部分有 {count} 段只有判断，没有案例或数据。材料里有的补上，没有的不必补：",
 	"style.repeated":

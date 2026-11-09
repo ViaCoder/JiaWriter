@@ -491,7 +491,9 @@ export async function runBrowser(given: BrowserInput, deps: BrowserDeps): Promis
 		// elements it may be, not as a page that changed (a run sent x and y instead 38 times).
 		if (REF_ACTIONS.has(action) && !input.ref) {
 			const candidates = refCandidates(action, state.roles);
-			if (candidates.length === 1) input.ref = candidates[0];
+			// Only with what to put there: an empty type once sent a search form off blank (2026-11-09).
+			const content = action === "select" ? input.option?.trim() : action === "type" ? input.text?.trim() : "";
+			if (candidates.length === 1 && content) input.ref = candidates[0];
 			else
 				return outcome("failed", action, "model", "no-ref", { need: "ref: an [eN] of the last read", candidates });
 		}
@@ -544,6 +546,11 @@ export async function runBrowser(given: BrowserInput, deps: BrowserDeps): Promis
 			CALL_MS,
 		)) as PageReply;
 		if (reply.newTab) state.tab = reply.newTab;
+		// Another address: the references read on the old page are no longer the page's.
+		if (reply.newTab || (reply.url && reply.url !== state.url)) {
+			state.labels.clear();
+			state.roles?.clear();
+		}
 		if (reply.url) state.url = reply.url;
 		state.dialog = !!reply.dialog;
 		return pageOutcome(input, reply, key, breaker);
@@ -553,6 +560,15 @@ export async function runBrowser(given: BrowserInput, deps: BrowserDeps): Promis
 		if (error instanceof BridgeUnavailable) return outcome("failed", action, "user", "not-connected");
 		// An older extension does not know this: reloading it is the user's step.
 		if (/unknown op/.test(message)) return outcome("failed", action, "user", "extension-old");
+		// The element of a reference is no longer in the page (it reloaded or moved): read it again.
+		if (
+			/does not belong to the document|No node with given id|Either objectId or executionContextId|Could not find node/.test(
+				message,
+			)
+		)
+			return outcome("failed", action, breaker.failed(key) ? "user" : "model", "stale-ref", {
+				need: "read the page again for new references",
+			});
 		// The tab was closed under the session.
 		if (/not a JiaWriter tab|No tab with id/.test(message)) {
 			state.tab = undefined;

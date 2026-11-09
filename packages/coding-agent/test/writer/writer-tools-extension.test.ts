@@ -611,7 +611,7 @@ describe("finishedChecks and the references", () => {
 	it("names the reference entries the text never cites", () => {
 		const draft =
 			"# 报告\n\n2025年12月30日《上海证券报》报道，航线增加。\n\n## 参考文献\n\n1. [向天空要生产力，上海证券报，2025-12-30](https://a.example/1)\n2. [大事记，现代物流报，2025-12-31](https://a.example/2)\n";
-		expect(finishedChecks(draft).join("\n")).toContain("参考文献第 2 条在正文里没有引用");
+		expect(finishedChecks(draft).join("\n")).toContain("第 2 条（找的是：现代物流报）");
 		expect(
 			finishedChecks(
 				draft.replace("航线增加。", "航线增加。2025年12月31日《现代物流报》报道，订单超300亿元。"),

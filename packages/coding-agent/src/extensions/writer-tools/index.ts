@@ -299,7 +299,14 @@ export function finishedChecks(text: string): string[] {
 	if (rare.length > 0) out.push(t("style.rareChars", { chars: rare.map((c) => c.char).join("、") }));
 	// Each reference entry cited where its fact is used, so the reader can tell which source holds which fact.
 	const uncited = uncitedReferences(text, bodyBeforeReferences(text));
-	if (uncited.length > 0) out.push(t("style.uncitedRefs", { entries: uncited.join("、") }));
+	// Each with the words looked for, so the model knows what the text has to name (2026-11-09: a run that could not
+	// tell went to read the program's source).
+	if (uncited.length > 0)
+		out.push(
+			t("style.uncitedRefs", {
+				entries: uncited.map((u) => t("style.uncitedEntry", { n: u.n, names: u.names.join("、") })).join("；"),
+			}),
+		);
 	return out;
 }
 

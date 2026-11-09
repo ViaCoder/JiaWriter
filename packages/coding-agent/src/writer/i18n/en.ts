@@ -60,7 +60,8 @@ export const en: Record<MessageKey, string> = {
 	"style.passShort": "AI-style check passed.",
 	"style.longSentences": "{count} sentences over {limit} characters; split them: {heads}.",
 	"style.uncitedRefs":
-		"Reference entries {entries} are not cited in the text: cite each where its fact is used, in the form YYYY年MM月DD日《outlet》报道, or remove it.",
+		"Reference entries not cited in the text (the text must name the outlet or the title): {entries}. Cite each where its fact is used, in the form YYYY年MM月DD日《outlet》报道, or remove it.",
+	"style.uncitedEntry": "entry {n} (looked for: {names})",
 	"style.rareChars": "Rare characters {chars}: use common ones, except in names and quotations.",
 	"style.unsupported":
 		"Note: {count} paragraphs on problems or risks state a judgment with no case or figure. Add them where the materials have them:",
