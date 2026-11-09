@@ -15,6 +15,13 @@ import { dueStages, givenStages, PROMPT_STAGES, stageText, WRITING_STAGE } from 
 export const NO_USER_NOTE =
 	"Nobody can answer in this session: do not ask; settle open points from the materials and the document's usual form, finish, and state your assumptions at the end";
 
+/**
+ * With a user who answers between turns (2026-11-09: the rule reached a run only with its first write, after it had
+ * written the whole report in the turn meant for the outline).
+ */
+export const USER_TURNS_NOTE =
+	"The user answers between turns. Write a long document over turns, unless they ask for it at once: show the outline and stop for their word; then one section per turn, ending with one line on what it covered and what comes next, and stop: their reply decides whether to revise it or go on";
+
 /** The key of a tool result's details that names the stages it brought. */
 export const STAGES_KEY = "jwStages";
 
@@ -43,14 +50,20 @@ export default function writerPromptsExtension(pi: ExtensionAPI): void {
 		writing = given.has(WRITING_STAGE);
 		given.clear();
 	};
-	pi.on("session_compact", forget);
+	pi.on("session_compact", () => {
+		forget();
+		// The summary may have dropped the note: it comes again with the next request.
+		toldTurns = false;
+	});
 	pi.on("session_tree", forget);
-	// Whether this session was told that nobody answers.
+	// Whether this session was told that nobody answers, or that the user answers between turns.
 	let toldNoUser = false;
+	let toldTurns = false;
 	// A new session has written nothing yet.
 	pi.on("session_start", () => {
 		writing = false;
 		toldNoUser = false;
+		toldTurns = false;
 		givenStages().clear();
 	});
 
@@ -83,16 +96,25 @@ export default function writerPromptsExtension(pi: ExtensionAPI): void {
 	// Without an interface there is nobody to answer a question: said once, before the first run. After compaction a
 	// document under way needs its rules back; a topic alone asks for nothing.
 	pi.on("before_agent_start", (_event, ctx) => {
+		// One message holds whatever is due, so a note never pushes the writing rules out (after a compaction both are).
+		const parts: { type: string; text: string }[] = [];
 		if (!ctx.hasUI && !toldNoUser) {
 			toldNoUser = true;
-			return { message: { customType: "jiawriter-no-user", content: NO_USER_NOTE, display: false } };
+			parts.push({ type: "jiawriter-no-user", text: NO_USER_NOTE });
+		}
+		if (ctx.hasUI && !toldTurns) {
+			toldTurns = true;
+			parts.push({ type: "jiawriter-user-turns", text: USER_TURNS_NOTE });
 		}
 		const given = givenStages();
-		if (!writing || given.has(WRITING_STAGE)) return;
 		const stage = PROMPT_STAGES.find((s) => s.id === WRITING_STAGE);
-		if (!stage) return;
-		given.add(stage.id);
+		if (writing && stage && !given.has(WRITING_STAGE)) {
+			given.add(stage.id);
+			parts.push({ type: "jiawriter-rules", text: stageText(stage) });
+		}
+		if (parts.length === 0) return;
 		// The model reads it; the conversation on screen stays as it was.
-		return { message: { customType: "jiawriter-rules", content: stageText(stage), display: false } };
+		const content = parts.map((p) => p.text).join("\n\n");
+		return { message: { customType: parts[0].type, content, display: false } };
 	});
 }

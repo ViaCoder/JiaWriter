@@ -9,6 +9,7 @@ import {
 	lookAt,
 	matchLines,
 	newBrowserState,
+	normalizeBrowserInput,
 	pageOp,
 	pageOutcome,
 	pointAt,
@@ -506,5 +507,28 @@ describe("sendOrRead", () => {
 		expect(part.data?.picture).toMatchObject({ detail: "auto" });
 		const whole = await sendOrRead(fake().deps, shot, false);
 		expect(whole.data?.picture).toMatchObject({ detail: "low" });
+	});
+});
+
+describe("normalizeBrowserInput and a missing reference", () => {
+	it("takes a bracketed reference as the reference and a click with text as typing", () => {
+		// 2026-11-09: real runs copied [0] with its brackets and clicked a field with the text to enter.
+		expect(normalizeBrowserInput({ action: "click", ref: "[e2]" })).toMatchObject({ action: "click", ref: "e2" });
+		expect(normalizeBrowserInput({ action: "click", ref: "e3", text: "老旧小区" })).toMatchObject({
+			action: "type",
+			ref: "e3",
+		});
+		expect(normalizeBrowserInput({ action: "click", ref: " " }).ref).toBeUndefined();
+	});
+	it("says no-ref when an action on a control has none, without asking the page", async () => {
+		// A real run sent x and y instead of a reference 38 times and read stale-ref each time.
+		const { deps, calls } = await opened();
+		const before = calls.length;
+		expect(await runBrowser({ action: "select", option: "2024" }, deps)).toMatchObject({
+			effect: "failed",
+			reason: "no-ref",
+			next: "model",
+		});
+		expect(calls.length).toBe(before);
 	});
 });

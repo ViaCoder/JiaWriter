@@ -7,6 +7,7 @@ import {
 	listWindows,
 	needsValueRoute,
 	newComputerState,
+	normalizeComputerInput,
 	readWindow,
 	replyOutcome,
 	runComputer,
@@ -343,6 +344,17 @@ describe("runComputer", () => {
 		expect(await runComputer({ action: "look", reason: "看" }, deps)).toMatchObject({
 			next: "user",
 			reason: "surface_identity_unproven",
+		});
+	});
+});
+
+describe("normalizeComputerInput", () => {
+	it("takes a bracketed reference as the reference and a click with text as typing", () => {
+		// 2026-11-09: a real run sent ref "[0]" and a click carrying the text to fill in.
+		expect(normalizeComputerInput({ action: "click", ref: "[0]" })).toMatchObject({ action: "click", ref: "0" });
+		expect(normalizeComputerInput({ action: "click", ref: "0", text: "11月21日" })).toMatchObject({
+			action: "type",
+			ref: "0",
 		});
 	});
 });

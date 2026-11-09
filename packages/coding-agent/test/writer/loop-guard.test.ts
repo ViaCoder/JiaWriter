@@ -25,6 +25,18 @@ describe("callKey", () => {
 	});
 });
 
+describe("callKey and the reason of a call", () => {
+	it("takes calls that differ only in their reason for the same call", () => {
+		// 2026-11-09: a browser run gave each repeated select a new reason, 30 times.
+		expect(callKey("browser", { action: "select", option: "2024", reason: "选择年份" })).toBe(
+			callKey("browser", { action: "select", option: "2024", reason: "在下拉框中选2024" }),
+		);
+		expect(callKey("browser", { action: "select", option: "2024" })).not.toBe(
+			callKey("browser", { action: "select", option: "2025" }),
+		);
+	});
+});
+
 describe("checkCall and recordResult", () => {
 	it("blocks a call after MAX_SAME_FAILURES failures in a row, and a success starts them again", () => {
 		const guard = newGuard();

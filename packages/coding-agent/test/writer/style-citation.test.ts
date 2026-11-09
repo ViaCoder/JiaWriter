@@ -104,3 +104,16 @@ describe("citationIssues: an outlet with no date", () => {
 		).toEqual([]);
 	});
 });
+
+describe("citationIssues: a month with no day, and 刊文", () => {
+	it("asks for the day and for book-title marks", () => {
+		// 2026-11-09, a research report.
+		expect(citationIssues("机队规模增长（2025年5月《中国民航报》）。")).toEqual([
+			{ quote: "2025年5月《中国民航报》", form: "2025年5月DD日《中国民航报》" },
+		]);
+		expect(citationIssues("据统计（2025年11月11日求是网刊文）。").map((i) => i.form)).toEqual([
+			"2025年11月11日《求是网》报道",
+		]);
+		expect(citationIssues("2026年11月6日《路透社》报道，油价下跌。")).toEqual([]);
+	});
+});

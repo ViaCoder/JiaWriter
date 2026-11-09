@@ -3,7 +3,11 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
-import writerPromptsExtension, { NO_USER_NOTE, withStageTexts } from "../../src/extensions/writer-prompts/index.ts";
+import writerPromptsExtension, {
+	NO_USER_NOTE,
+	USER_TURNS_NOTE,
+	withStageTexts,
+} from "../../src/extensions/writer-prompts/index.ts";
 import { t } from "../../src/writer/i18n/index.ts";
 import { WRITER_PREAMBLE } from "../../src/writer/prompt-text.ts";
 import { SUMMARY_PROMPT, SUMMARY_TURN_PROMPT, SUMMARY_UPDATE_PROMPT } from "../../src/writer/prompts/compact.ts";
@@ -128,8 +132,8 @@ describe("the user's requirements", () => {
 		],
 		// Long documents section by section (the user, 2026-11-09).
 		["section by section", "Write one section at a time from its own items"],
-		["over turns with the user", "show the outline and stop; then one section per turn"],
-		["in one run with nobody to answer", "With nobody to answer: every section in one run"],
+		// The user's later words change the plan (2026-11-09).
+		["later requests first", "A later request of the user changes the outline before the text"],
 		["running the checks", "program checks each write and, at the end, length, readability and 公文 parameters"],
 		// Old material keeps its date (a 2026 report called 2021 "the first year", 2026-11-08).
 		["dated material", "Give old material its own date"],
@@ -341,22 +345,29 @@ describe("the extension", () => {
 		const map = handlers();
 		setCurrentTopic("/tmp/主题");
 		map.get("tool_result")?.(result("search_web", "codex"));
+		// The interactive note, then nothing; after compaction the note again, and no writing rules.
+		expect(map.get("before_agent_start")?.({}, UI)).toBeDefined();
 		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
 		map.get("session_compact")?.();
-		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
+		const again = map.get("before_agent_start")?.({}, UI) as { message: { content: string } };
+		expect(again.message.content).toBe(USER_TURNS_NOTE);
 	});
 
-	it("tells a session without an interface once that nobody answers, and an interactive one never", () => {
+	it("tells a session without an interface once that nobody answers, and an interactive one that the user answers", () => {
 		const map = handlers();
 		const out = map.get("before_agent_start")?.({}, { hasUI: false }) as {
 			message: { content: string; customType: string };
 		};
 		expect(out.message).toMatchObject({ customType: "jiawriter-no-user", content: NO_USER_NOTE });
 		expect(map.get("before_agent_start")?.({}, { hasUI: false })).toBeUndefined();
-		// A new session is told again; an interactive one is not.
+		// A new session is told again; an interactive one hears of the turns instead (2026-11-09).
 		map.get("session_start")?.();
 		expect(map.get("before_agent_start")?.({}, { hasUI: false })).toBeDefined();
-		expect(handlers().get("before_agent_start")?.({}, UI)).toBeUndefined();
+		const ui = handlers();
+		expect(ui.get("before_agent_start")?.({}, UI)).toMatchObject({
+			message: { customType: "jiawriter-user-turns", content: USER_TURNS_NOTE },
+		});
+		expect(ui.get("before_agent_start")?.({}, UI)).toBeUndefined();
 	});
 
 	it("gives the writing rules back after compaction when a document is under way, once", () => {
@@ -364,7 +375,8 @@ describe("the extension", () => {
 		map.get("tool_result")?.(result("write"));
 		map.get("session_compact")?.();
 		const out = map.get("before_agent_start")?.({}, UI) as { message: { content: string; display: boolean } };
-		expect(out.message.content).toBe(stageText(PROMPT_STAGES[0]));
+		// Both are due: the turns note and the writing rules, in one message.
+		expect(out.message.content).toBe(`${USER_TURNS_NOTE}\n\n${stageText(PROMPT_STAGES[0])}`);
 		expect(out.message.display).toBe(false);
 		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
 	});
@@ -396,5 +408,14 @@ describe("working rules", () => {
 			expect(prompt.split(rule).length - 1).toBe(1);
 			expect(prompt.indexOf(rule)).toBeGreaterThan(core);
 		}
+	});
+});
+
+describe("USER_TURNS_NOTE", () => {
+	it("asks for a long document over turns: the outline, then one section per turn, the user deciding", () => {
+		// The user, 2026-11-09: a dialogue in which the model advances the document segment by segment.
+		expect(USER_TURNS_NOTE).toContain("show the outline and stop");
+		expect(USER_TURNS_NOTE).toContain("one section per turn");
+		expect(USER_TURNS_NOTE).toContain("unless they ask for it at once");
 	});
 });

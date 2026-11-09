@@ -29,7 +29,7 @@ export function citationIssues(text: string): CitationIssue[] {
 	const issues: CitationIssue[] = [];
 	// An outlet right after a date, without book-title marks: 11月7日，路透社 / 2026年11月7日新华网报道.
 	const bare = new RegExp(
-		`((?:\\d{4}年)?\\d{1,2}月\\d{1,2}日)[，,、\\s]{0,2}据?(${OUTLET})(?=报道|消息|称|发布|援引|[，,。；\\s]|$)`,
+		`((?:\\d{4}年)?\\d{1,2}月\\d{1,2}日)[，,、\\s]{0,2}据?(${OUTLET})(?=报道|消息|称|发布|援引|刊文|刊发|文章|[，,。；）)\\s]|$)`,
 		"g",
 	);
 	for (const m of text.matchAll(bare)) {
@@ -79,6 +79,9 @@ export function citationIssues(text: string): CitationIssue[] {
 	for (const m of text.matchAll(/[（(]\s*来源[:：]\s*([^（）()\n]{1,40}?)\s*[）)]/g))
 		if (!/\d{1,2}月\d{1,2}日/.test(m[1]))
 			issues.push({ quote: m[0], form: `YYYY年MM月DD日《${m[1].split(/援引|转引|，|,/)[0]}》报道` });
+	// A year and month with no day before book-title marks: 2025年5月《中国民航报》 (2026-11-09, a research report).
+	for (const m of text.matchAll(/(\d{4}年\d{1,2}月)(?!\d)《([^》\n]{1,40})》/g))
+		issues.push({ quote: m[0], form: `${m[1]}DD日《${m[2]}》` });
 	// Book-title marks with a date that has no year: 11月7日《路透社》报道.
 	for (const m of text.matchAll(/(?<!\d{4}年)(?<![\d年])(\d{1,2}月\d{1,2}日)《([^》\n]{1,40})》/g))
 		issues.push({ quote: m[0], form: `YYYY年${m[1]}《${m[2]}》` });

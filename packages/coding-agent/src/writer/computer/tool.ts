@@ -203,7 +203,18 @@ export function tierRefusal(input: ComputerInput, tier: AppTier): string {
 }
 
 /** One action, whatever comes of it. */
-export async function runComputer(input: ComputerInput, deps: ComputerDeps): Promise<Outcome> {
+/**
+ * The input as the model meant it (2026-11-09: a real run sent ref "[0]" and a click carrying the text to fill in): a
+ * reference copied with its brackets is the reference, and a click that carries text is typing.
+ */
+export function normalizeComputerInput(input: ComputerInput): ComputerInput {
+	const ref = input.ref?.trim().replace(/^\[(.+)\]$/, "$1") || undefined;
+	const action = input.action === "click" && input.text?.trim() ? "type" : input.action;
+	return { ...input, action, ref };
+}
+
+export async function runComputer(given: ComputerInput, deps: ComputerDeps): Promise<Outcome> {
+	const input = normalizeComputerInput(given);
 	const { state, breaker } = deps;
 	const { action } = input;
 	const key = `${action}\n${state.pid}\n${input.ref ?? input.name ?? ""}`;

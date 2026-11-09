@@ -56,9 +56,16 @@ function ordered(value: unknown): unknown {
 	return Object.fromEntries(entries.map(([k, v]) => [k, ordered(v)]));
 }
 
-/** The key of a call: its tool and its arguments. */
+/** Free-text fields that say why, not what: they do not make a call another call. */
+const WHY_FIELDS: ReadonlySet<string> = new Set(["reason"]);
+
+/** The key of a call: its tool and its arguments, less the reason given for it. */
 export function callKey(tool: string, input: unknown): string {
-	return `${tool}\n${JSON.stringify(ordered(input) ?? null)}`;
+	const what =
+		input && typeof input === "object" && !Array.isArray(input)
+			? Object.fromEntries(Object.entries(input as Record<string, unknown>).filter(([k]) => !WHY_FIELDS.has(k)))
+			: input;
+	return `${tool}\n${JSON.stringify(ordered(what) ?? null)}`;
 }
 
 /** Whether a call may run: "ok", or why not ("failed": it keeps failing; "repeated": it was made enough times). */

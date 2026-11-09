@@ -23,6 +23,7 @@ Purpose: the reader needs to know why the problems arise, so that each measure c
 
 - One cause per heading and paragraph, stated as a judgment about a mechanism: an incentive, a gap in rules, capacity or coordination, a cost, a lag between change and response. A cause is not the problem said again.
 - Prove it with evidence that shows the mechanism at work; a fact already used for a problem is referred to in a clause, not told again.
+- Reason a cause from the facts given; it adds no fact of its own, such as a rule that is missing or a body that does not act, unless the materials show it.
 - Every problem has a cause, and every cause leads to a measure; keep the parts about equal in weight.
 
 ## Countermeasures

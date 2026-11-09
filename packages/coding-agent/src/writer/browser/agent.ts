@@ -434,7 +434,21 @@ export async function pointAt(input: BrowserInput, deps: BrowserDeps): Promise<O
 }
 
 /** One action, whatever comes of it. */
-export async function runBrowser(input: BrowserInput, deps: BrowserDeps): Promise<Outcome> {
+/** Actions that act on one control and need its reference. */
+const REF_ACTIONS: ReadonlySet<string> = new Set(["click", "hover", "type", "select", "drag", "upload"]);
+
+/**
+ * The input as the model meant it (2026-11-09, a form a real run never filled): a reference copied with its brackets
+ * ([e1]) is the reference, and a click that carries text to enter is typing.
+ */
+export function normalizeBrowserInput(input: BrowserInput): BrowserInput {
+	const ref = input.ref?.trim().replace(/^\[(.+)\]$/, "$1") || undefined;
+	const action = input.action === "click" && input.text?.trim() ? "type" : input.action;
+	return { ...input, action, ref };
+}
+
+export async function runBrowser(given: BrowserInput, deps: BrowserDeps): Promise<Outcome> {
+	const input = normalizeBrowserInput(given);
 	const { state, breaker } = deps;
 	const { action } = input;
 	const key = `${action}\n${state.url}\n${input.ref ?? input.url ?? ""}`;
@@ -449,6 +463,8 @@ export async function runBrowser(input: BrowserInput, deps: BrowserDeps): Promis
 		if (state.held.has(scope)) return outcome("refused", action, "user", "held-for-user", { site: scope });
 		if (action !== "open" && state.tab === undefined) return outcome("refused", action, "model", "no-page");
 		if (state.dialog && action !== "dialog") return outcome("refused", action, "model", "dialog-open");
+		// No reference to act on: said as such, not as a page that changed (a run sent x and y instead 38 times).
+		if (REF_ACTIONS.has(action) && !input.ref) return outcome("failed", action, "model", "no-ref");
 		// Each of these goes through its own steps.
 		if (action === "look") return await lookAt(input, deps);
 		if (action === "point") return await pointAt(input, deps);
