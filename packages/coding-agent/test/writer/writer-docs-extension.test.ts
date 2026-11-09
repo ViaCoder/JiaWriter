@@ -12,7 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Extension API types.
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../src/core/extensions/types.ts";
 // Extension under test.
-import writerDocsExtension, { parseExportArgs } from "../../src/extensions/writer-docs/index.ts";
+import writerDocsExtension, { parseExportArgs, sessionWrote } from "../../src/extensions/writer-docs/index.ts";
 // Automatic export helpers.
 import { autoExportEnabled, editedDrafts, isDraftPath } from "../../src/writer/docs/auto.ts";
 // Fixtures.
@@ -286,5 +286,28 @@ describe("editedDrafts / isDraftPath / autoExportEnabled", () => {
 	it("is on unless switched off", () => {
 		expect(autoExportEnabled({})).toBe(true);
 		for (const v of ["off", "0", "FALSE", "no"]) expect(autoExportEnabled({ JW_AUTO_EXPORT: v })).toBe(false);
+	});
+});
+
+// 2026-11-09: asked to export the user's own report, a run removed its reference entry because the address would not
+// open. Only drafts this session wrote have their references checked against the pages opened.
+describe("sessionWrote", () => {
+	const call = (id: string, name: string, path: string) => ({
+		role: "assistant",
+		content: [{ type: "toolCall", id, name, arguments: { path } }],
+	});
+	it("is true for a file written or edited, false for one only read or a failed write", () => {
+		const messages = [
+			call("a", "write", "稿件/报告.md"),
+			call("b", "read", "参考资料/材料.md"),
+			call("c", "edit", "/work/稿件/通知.md"),
+			call("d", "write", "稿件/失败.md"),
+			{ role: "toolResult", toolCallId: "d", isError: true, content: [] },
+		];
+		expect(sessionWrote(messages, "/work/稿件/报告.md", "/work")).toBe(true);
+		expect(sessionWrote(messages, "稿件/通知.md", "/work")).toBe(true);
+		expect(sessionWrote(messages, "参考资料/材料.md", "/work")).toBe(false);
+		expect(sessionWrote(messages, "稿件/失败.md", "/work")).toBe(false);
+		expect(sessionWrote(messages, "稿件.md", "/work")).toBe(false);
 	});
 });

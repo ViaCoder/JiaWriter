@@ -52,6 +52,39 @@ function sessionOpened(ctx: ExtensionContext, extra: readonly unknown[] = []): s
 	return [...openedUrls([...branch, ...extra]), ...(topic ? archivedUrls(topic) : [])];
 }
 
+/**
+ * Whether this session wrote or edited the file (write or edit that did not fail, on the active branch). Only such
+ * drafts have their reference URLs checked against the pages opened (2026-11-09: asked to export the user's own
+ * report, a run removed its reference entry because the address would not open).
+ */
+export function sessionWrote(messages: readonly unknown[], file: string, cwd: string): boolean {
+	const all = messages as { role?: string; isError?: boolean; toolCallId?: string; content?: unknown }[];
+	const failed = new Set(all.filter((m) => m.role === "toolResult" && m.isError).map((m) => m.toolCallId));
+	const target = resolve(cwd, file);
+	return all.some(
+		(m) =>
+			m.role === "assistant" &&
+			Array.isArray(m.content) &&
+			(m.content as { type?: string; id?: string; name?: string; arguments?: { path?: unknown } }[]).some(
+				(b) =>
+					b.type === "toolCall" &&
+					(b.name === "write" || b.name === "edit") &&
+					!failed.has(b.id) &&
+					typeof b.arguments?.path === "string" &&
+					resolve(cwd, b.arguments.path) === target,
+			),
+	);
+}
+
+/** The opened URLs to check a draft's references against, or undefined when the session did not write it. */
+function openedFor(ctx: ExtensionContext, draft: string): string[] | undefined {
+	const branch = ctx.sessionManager
+		.getBranch()
+		.filter((e) => e.type === "message")
+		.map((e) => (e as { message: unknown }).message);
+	return sessionWrote(branch, draft, ctx.cwd) ? sessionOpened(ctx) : undefined;
+}
+
 /** Where a file is copied in a folder: its own name, or a numbered one when another file holds that name. */
 export function freeName(folder: string, file: string): string {
 	// The same content under the same name is the same file.
@@ -155,7 +188,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 			if (!params.path?.trim()) throw new Error(t("export.noInput"));
 			// Export and report.
 			const draft = await resolveReadPathAsync(params.path, ctx.cwd);
-			const result = await exportDraft(draft, ctx.cwd, getAgentDir(), { ...params, opened: sessionOpened(ctx) });
+			const result = await exportDraft(draft, ctx.cwd, getAgentDir(), { ...params, opened: openedFor(ctx, draft) });
 			return { content: [{ type: "text", text: formatExport(result) }], details: result };
 		},
 	});
@@ -181,10 +214,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 			try {
 				const a = parseExportArgs(args);
 				if (!a.path) throw new Error(t("export.noInput"));
-				const result = await exportDraft(await resolveReadPathAsync(a.path, ctx.cwd), ctx.cwd, getAgentDir(), {
-					...a,
-					opened: sessionOpened(ctx),
-				});
+				const draft = await resolveReadPathAsync(a.path, ctx.cwd);
+				const result = await exportDraft(draft, ctx.cwd, getAgentDir(), { ...a, opened: openedFor(ctx, draft) });
 				ctx.ui.notify(formatExport(result), "info");
 			} catch (e) {
 				ctx.ui.notify(e instanceof Error ? e.message : String(e), "error");

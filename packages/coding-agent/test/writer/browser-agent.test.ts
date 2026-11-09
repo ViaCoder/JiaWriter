@@ -14,7 +14,9 @@ import {
 	pageOutcome,
 	pointAt,
 	readTab,
+	refCandidates,
 	riskOf,
+	rolesOf,
 	runBrowser,
 	sendOrRead,
 	siteOf,
@@ -530,5 +532,50 @@ describe("normalizeBrowserInput and a missing reference", () => {
 			next: "model",
 		});
 		expect(calls.length).toBe(before);
+	});
+});
+
+// 2026-11-09: a run sent select with the option and no reference five times, naming e1 only in its reason.
+describe("rolesOf / refCandidates and an action without a reference", () => {
+	it("rolesOf: the role of each reference", () => {
+		expect(rolesOf(LINES)).toEqual(
+			new Map([
+				["e1", "button"],
+				["e2", "link"],
+				["e3", "textbox"],
+			]),
+		);
+	});
+
+	it("refCandidates: lists for select, fields for type, nothing for other actions", () => {
+		const roles = rolesOf(
+			'[e1] combobox = "2023"\n[e2] textbox "指标名称"\n[e3] combobox = "全部"\n[e4] button "查询"',
+		);
+		expect(refCandidates("select", roles)).toEqual(["e1", "e3"]);
+		expect(refCandidates("type", roles)).toEqual(["e2"]);
+		expect(refCandidates("click", roles)).toEqual([]);
+		expect(refCandidates("select", undefined)).toEqual([]);
+	});
+
+	it("types into the page's only field when no reference is given", async () => {
+		const { deps, calls } = await opened();
+		const before = calls.length;
+		const result = await runBrowser({ action: "type", text: "老旧小区" }, deps);
+		expect(result.reason).not.toBe("no-ref");
+		expect(JSON.stringify(calls.slice(before))).toContain('"ref":"e3"');
+	});
+
+	it("chooses in the page's only list, and names the candidates when there are two", async () => {
+		const one = { ...READ, lines: '[e1] combobox = "2023"\n[e2] textbox "指标名称"\n[e3] button "查询"' };
+		const single = await opened({ page_read: one });
+		const before = single.calls.length;
+		expect((await runBrowser({ action: "select", option: "2024" }, single.deps)).reason).not.toBe("no-ref");
+		expect(JSON.stringify(single.calls.slice(before))).toContain('"ref":"e1"');
+		const two = { ...READ, lines: '[e1] combobox = "2023"\n[e2] combobox = "全部"' };
+		const both = await opened({ page_read: two });
+		expect(await runBrowser({ action: "select", option: "2024" }, both.deps)).toMatchObject({
+			reason: "no-ref",
+			data: { candidates: ["e1", "e2"] },
+		});
 	});
 });

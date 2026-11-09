@@ -80,6 +80,8 @@ export interface BrowserState {
 	url: string;
 	// Reference → label, from the last read.
 	labels: Map<string, string>;
+	// Reference → role (combobox, textbox, button) from the same read.
+	roles?: Map<string, string>;
 	// Sites waiting for the user, such as a verification page.
 	held: Set<string>;
 	// A page dialog is open: nothing else in the tab can happen until it is answered.
@@ -143,6 +145,27 @@ export function siteOf(url: string): string {
 /** Reference → label from the lines of a read, such as `[e3] button "提交"`. */
 export function labelsOf(lines: string): Map<string, string> {
 	return new Map([...lines.matchAll(/^\[(e\d+)\] \S+(?: "([^"]*)")?/gm)].map((m) => [m[1], m[2] ?? ""]));
+}
+
+/** Reference → role from the lines of a read, such as `[e1] combobox = "2023"`. */
+export function rolesOf(lines: string): Map<string, string> {
+	return new Map([...lines.matchAll(/^\[(e\d+)\] (\S+)/gm)].map((m) => [m[1], m[2]]));
+}
+
+/** The roles an action without a reference may mean: a choice is made in a list, text goes in a field. */
+const REF_ROLES: Readonly<Record<string, readonly string[]>> = {
+	select: ["combobox", "listbox"],
+	type: ["textbox", "searchbox", "textarea"],
+};
+
+/**
+ * The elements an action without a reference may mean, by role (2026-11-09: a run sent select with the option and no
+ * reference five times, naming e1 only in its reason). One of them is the element; none or several leave it open.
+ */
+export function refCandidates(action: string, roles: ReadonlyMap<string, string> | undefined): string[] {
+	const wanted = REF_ROLES[action];
+	if (!wanted || !roles) return [];
+	return [...roles].filter(([, role]) => wanted.includes(role)).map(([ref]) => ref);
 }
 
 /** The lines that hold the words looked for; empty words give none. */
@@ -243,6 +266,7 @@ export async function readTab(deps: BrowserDeps, input: BrowserInput): Promise<O
 	state.url = page.url;
 	state.readUrl = page.url;
 	state.labels = labelsOf(page.lines);
+	state.roles = rolesOf(page.lines);
 	const found = input.action === "find" ? matchLines(page.lines, input.query ?? "") : [];
 	const lines = input.action === "find" ? found.join("\n") : page.lines;
 	const data = {
@@ -463,8 +487,14 @@ export async function runBrowser(given: BrowserInput, deps: BrowserDeps): Promis
 		if (state.held.has(scope)) return outcome("refused", action, "user", "held-for-user", { site: scope });
 		if (action !== "open" && state.tab === undefined) return outcome("refused", action, "model", "no-page");
 		if (state.dialog && action !== "dialog") return outcome("refused", action, "model", "dialog-open");
-		// No reference to act on: said as such, not as a page that changed (a run sent x and y instead 38 times).
-		if (REF_ACTIONS.has(action) && !input.ref) return outcome("failed", action, "model", "no-ref");
+		// No reference to act on: the only list or field of the page when there is one; else said as such, with the
+		// elements it may be, not as a page that changed (a run sent x and y instead 38 times).
+		if (REF_ACTIONS.has(action) && !input.ref) {
+			const candidates = refCandidates(action, state.roles);
+			if (candidates.length === 1) input.ref = candidates[0];
+			else
+				return outcome("failed", action, "model", "no-ref", { need: "ref: an [eN] of the last read", candidates });
+		}
 		// Each of these goes through its own steps.
 		if (action === "look") return await lookAt(input, deps);
 		if (action === "point") return await pointAt(input, deps);
@@ -496,6 +526,7 @@ export async function runBrowser(given: BrowserInput, deps: BrowserDeps): Promis
 			state.tab = opened.tab;
 			state.url = opened.url ?? input.url ?? "";
 			state.labels.clear();
+			state.roles?.clear();
 			return readTab(deps, { ...input, action: "read" });
 		}
 		if (action === "back") {
