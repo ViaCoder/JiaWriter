@@ -215,8 +215,10 @@ export function unusedMaterials(text: string, file: string, cwd: string): string
 }
 
 /** Words that report research the writer did: a survey, a visit, a meeting, a questionnaire. */
+// The phrases real reports use for their research (1,575 published texts, 2026-11-09): 座谈, 走访, 开展专题调研,
+// 进行实地调研, 赴……调研, 调研组.
 const METHOD_WORDS =
-	/调研组|开展调研|专题调研|实地走访|入户走访|走访了|座谈|问卷|抽样调查|调研了解到|调研发现|实地察看/g;
+	/调研组|(?:进行|开展|组织)了?(?:专题|深入|实地)?调研|赴[^，。\n]{1,10}调研|实地走访|入户走访|走访了|座谈|问卷|抽样调查|调研了解到|调研发现|实地察看/g;
 
 /** Every text of the materials beside a draft: 素材.md, imported references, saved searches and pages. */
 export function materialText(file: string, cwd: string): string {

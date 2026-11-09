@@ -383,6 +383,11 @@ describe("inventedMethods", () => {
 		mkdirSync(join(cwd, "参考资料", ".parsed"), { recursive: true });
 		writeFileSync(join(cwd, "参考资料", ".parsed", "材料.md.md"), "1. 全市老旧小区共412个。");
 		expect(inventedMethods(report, draft, cwd)).toEqual(["调研组", "座谈"]);
+		// The other ways reports say it (2026-11-09: "市住建局……进行了调研").
+		expect(inventedMethods("# 报告\n\n市住建局对全市情况进行了调研，并赴东湖街道调研。", draft, cwd)).toEqual([
+			"进行了调研",
+			"赴东湖街道调研",
+		]);
 		writeFileSync(join(cwd, "参考资料", ".parsed", "材料.md.md"), "1. 市住建局组织座谈，了解到全市老旧小区共412个。");
 		expect(inventedMethods(report, draft, cwd)).toEqual([]);
 		rmSync(join(cwd, "参考资料"), { recursive: true });
