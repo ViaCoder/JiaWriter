@@ -11,6 +11,8 @@ import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // One form for a stopped call.
 import { blockedText } from "../../writer/blocked.ts";
 import { t } from "../../writer/i18n/index.ts";
+// Plan mode is shared with Shift+Tab, which cycles it with the permission modes.
+import { isPlanning, setPlanning } from "../../writer/permission.ts";
 // Which shell commands only read.
 import { bashRisk } from "../../writer/tool-risk.ts";
 
@@ -26,7 +28,7 @@ export const PLAN_REFUSED = new Set([
 
 /** The note each request carries while plan mode is on. */
 export const PLAN_NOTE =
-	"Plan mode is on: look, read and search as needed, then give a numbered plan of the changes and stop. Change no file until the user turns plan mode off with /plan";
+	"Plan mode is on: look, read and search as needed, then give a numbered plan of the changes and stop. Change no file until the user turns plan mode off (/plan or Shift+Tab)";
 
 /** True when plan mode refuses this call. */
 export function refusedInPlan(toolName: string, input: Record<string, unknown>): boolean {
@@ -37,23 +39,23 @@ export function refusedInPlan(toolName: string, input: Record<string, unknown>):
 
 /** Register /plan, the refusals and the note. */
 export default function writerPlanExtension(pi: ExtensionAPI): void {
-	// On or off for this session.
-	let planning = false;
+	// On or off for this session; the status line shows it with the work mode.
 	pi.registerCommand("plan", {
 		description: t("plan.description"),
 		handler: async (_args, ctx) => {
-			planning = !planning;
-			ctx.ui.notify(t(planning ? "plan.on" : "plan.off"), "info");
-			if (ctx.hasUI) ctx.ui.setStatus("writer-plan", planning ? t("plan.status") : undefined);
+			setPlanning(!isPlanning());
+			ctx.ui.notify(t(isPlanning() ? "plan.on" : "plan.off"), "info");
 		},
 	});
+	// A new session starts outside plan mode.
+	pi.on("session_start", () => setPlanning(false));
 	pi.on("tool_call", (event) => {
-		if (!planning || !refusedInPlan(event.toolName, event.input as Record<string, unknown>)) return undefined;
+		if (!isPlanning() || !refusedInPlan(event.toolName, event.input as Record<string, unknown>)) return undefined;
 		const why = t("plan.refused", { tool: event.toolName });
 		return { block: true, reason: blockedText({ why, next: "user", still: t("plan.refusedStill") }) };
 	});
 	pi.on("before_agent_start", () => {
-		if (!planning) return undefined;
+		if (!isPlanning()) return undefined;
 		return { message: { customType: "jiawriter-plan", content: PLAN_NOTE, display: false } };
 	});
 }

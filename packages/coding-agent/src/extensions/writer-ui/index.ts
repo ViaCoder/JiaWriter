@@ -15,7 +15,13 @@ import { WRITER_REASONING_CHOICES, type WriterReasoning } from "../../writer/env
 // Messages and the language setting.
 import { setUiLang, t, type WriterLang } from "../../writer/i18n/index.ts";
 // The permission mode.
-import { PERMISSION_MODES, parsePermissionMode, permissionMode, savePermissionMode } from "../../writer/permission.ts";
+import {
+	PERMISSION_MODES,
+	parsePermissionMode,
+	permissionMode,
+	savePermissionMode,
+	setSessionPermissionMode,
+} from "../../writer/permission.ts";
 // The configuration page.
 import { stageLines } from "../../writer/prompts/stages.ts";
 // The keys held in memory (shown only as set or unset).
@@ -84,8 +90,10 @@ export async function setPermission(arg: string, ctx: ExtensionCommandContext): 
 		ctx.ui.notify(t("perm.bad", { modes: PERMISSION_MODES.join(" / ") }), "error");
 		return;
 	}
-	// Saved for every session; an environment value goes on winning, and the user hears so.
+	// Saved for every session, and in effect now: a mode chosen with Shift+Tab gives way. An environment value goes
+	// on winning, and the user hears so.
 	savePermissionMode(mode);
+	setSessionPermissionMode(undefined);
 	const env = process.env.JW_PERMISSION?.trim();
 	ctx.ui.notify(env ? t("perm.envWins", { value: env }) : t("perm.saved", { mode }), env ? "warning" : "info");
 }

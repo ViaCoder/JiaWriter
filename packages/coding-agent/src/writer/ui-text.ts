@@ -10,6 +10,10 @@ import { brandText } from "./brand.ts";
 // Current interface language.
 import { currentLang } from "./i18n/index.ts";
 
+/** The Mac note under the shortcut list (English; UI_ZH holds the Chinese). */
+export const MAC_OPTION_NOTE =
+	'On a Mac, Option shortcuts need the terminal\'s "Use Option as Meta Key": Terminal: Settings → Profiles → Keyboard; iTerm2: Settings → Profiles → Keys → General, both Option keys set to Esc+. Without it, Ctrl+J or \\ then Enter gives a new line, and /model switches the model.';
+
 /** English interface text → Chinese. {name} marks a value filled in by uiText(). */
 export const UI_ZH: Readonly<Record<string, string>> = {
 	// The two answers of a confirmation.
@@ -97,7 +101,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Set thinking level": "设置推理档位",
 	"Set the thinking intensity: /effort off, low, medium, high, xhigh or max":
 		"设置思考强度：/effort off、low、medium、high、xhigh 或 max",
-	"Enable/disable models for Ctrl+P cycling": "设置 Ctrl+P 轮换的模型",
+	"Enable/disable models for Ctrl+P cycling": "设置可轮换的模型",
 	"Export session (HTML default, or specify path: .html/.jsonl)": "导出会话（默认 HTML，也可指定 .html/.jsonl 路径）",
 	"Import and resume a session from a JSONL file": "从 JSONL 文件导入并继续会话",
 	"Copy last agent message to clipboard": "复制最后一条回复到剪贴板",
@@ -129,7 +133,121 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Show the JiaWriter model and search configuration (read-only)": "查看 JiaWriter 的模型和检索配置（只读）",
 	"search_fetch Chrome bridge: /sf status, or /sf install to set up the extension":
 		"search_fetch 的 Chrome 桥接：/sf status 查看状态，/sf install 安装扩展",
+	// The shortcut list (? or /hotkeys), grouped as Claude Code's.
+	"Keyboard Shortcuts": "快捷键",
+	Key: "按键",
+	Action: "作用",
+	General: "常用",
+	Editing: "输入与编辑",
+	History: "查看历史",
+	"Send message": "发送",
+	"New line": "换行",
+	"Stop the reply, or close a dialog": "停止回复，或关闭对话框",
+	"Clear the input, or rewind when it is empty": "清空输入；输入为空时回退到之前的消息",
+	"Interrupt, or clear the input; twice to exit": "中断，或清空输入；连按两次退出",
+	"Exit (input empty)": "退出（输入为空时）",
+	"Cycle work mode: manual, auto, plan": "切换工作模式：手动确认、自动、规划",
+	"Detailed view: tool output, thinking, time and model": "详细模式：完整的工具输出、思考过程、时间和模型",
+	"Show or hide the task list": "显示或隐藏任务清单",
+	"Switch model": "切换模型",
+	"Cycle thinking level": "切换思考强度",
+	"Search the input history": "搜索输入历史",
+	"Redraw the screen": "重绘屏幕",
+	"Edit the input in an external editor": "用外部编辑器编辑输入",
+	"Send queued messages now": "立即发送排队的消息",
+	"Restore queued messages": "取回排队的消息",
+	"Queue a message until the reply ends": "排队到回复结束后再发",
+	"Paste images, files or text": "粘贴图片、文件或文本",
+	"Copy selection or the last reply": "复制选中内容或最后一条回复",
+	"Suspend to background": "挂起到后台",
+	"Next model": "下一个模型",
+	"Previous model": "上一个模型",
+	"Show or hide thinking": "显示或隐藏思考过程",
+	"This list (input empty)": "显示本列表（输入为空时）",
+	Commands: "命令",
+	"Run a shell command": "运行 shell 命令",
+	"Run a shell command (not sent to the model)": "运行 shell 命令（结果不发给模型）",
+	"Move the cursor, or browse the history": "移动光标，或翻看输入历史",
+	"Move the cursor": "移动光标",
+	"Move by word": "按词移动",
+	"Start of line": "到行首",
+	"End of line": "到行尾",
+	"Jump forward to character": "向后跳到某个字符",
+	"Jump backward to character": "向前跳到某个字符",
+	"Delete word backwards": "向前删除一个词",
+	"Delete word forwards": "向后删除一个词",
+	"Delete to start of line": "删除到行首",
+	"Delete to end of line": "删除到行尾",
+	"Paste the most-recently-deleted text": "粘贴刚删除的文字",
+	"Cycle through the deleted text after pasting": "粘贴后轮换更早删除的文字",
+	Undo: "撤销",
+	"Complete a path or accept a suggestion": "补全路径或接受建议",
+	"Scroll the conversation": "翻动对话",
+	"Jump to your previous or next message": "跳到自己的上一条或下一条消息",
+	"Search the conversation": "搜索对话",
+	[MAC_OPTION_NOTE]:
+		"Mac：Option 组合键要先在终端里打开“将 Option 键用作 Meta 键”。终端：设置 → 描述文件 → 键盘；iTerm2：Settings → Profiles → Keys → General，左右 Option 键都设为 Esc+。不做设置也可以用 Ctrl+J 或 \\ 加回车换行，用 /model 切换模型。",
+	// The status lines of the detailed view and the work mode.
+	"Detailed view: on": "详细模式：开（{key} 关闭）",
+	"Detailed view: off": "详细模式：关",
+	"Task list: shown": "任务清单：显示",
+	"Task list: hidden": "任务清单：隐藏",
+	"Context {percent}%": "上下文 {percent}%",
+	"Work mode: {mode}": "工作模式：{mode}",
+	"{mode} ({key} to switch)": "{mode}（{key} 切换）",
+	manual: "手动确认",
+	auto: "自动",
+	bypass: "全部放行",
+	plan: "规划模式",
+	"No earlier input to search": "还没有可搜索的输入历史",
+	"Search the input history (type to filter)": "搜索输入历史（输入文字筛选）",
+	"{seconds}s": "{seconds} 秒",
+	"{minutes}m {seconds}s": "{minutes} 分 {seconds} 秒",
+	// Startup hints for the keys added on 2026-11-09.
+	"to cycle work mode": "切换工作模式（手动确认、自动、规划）",
+	"for the detailed view": "详细模式（完整的工具输出和思考过程）",
+	"to show or hide the task list": "显示或隐藏任务清单",
+	"to search the input history": "搜索输入历史",
+	"for all shortcuts": "查看全部快捷键（输入为空时）",
+	mode: "切换模式",
+	shortcuts: "快捷键",
+	// Resource sections at startup.
+	Skills: "技能",
+	Context: "上下文文件",
+	Prompts: "提示模板",
+	Extensions: "扩展",
 };
+
+/** Tool names users read: what each tool does, in Chinese; other languages keep the name. */
+export const TOOL_LABELS_ZH: Readonly<Record<string, string>> = {
+	read: "读取",
+	write: "写入",
+	edit: "修改",
+	bash: "命令",
+	powershell: "命令",
+	grep: "查找内容",
+	find: "查找文件",
+	ls: "列出文件",
+	search_web: "网络检索",
+	fetch_web: "打开网页",
+	material_add: "记录素材",
+	word_count: "统计字数",
+	readability_check: "可读性检查",
+	style_check: "文风检查",
+	export_document: "导出文档",
+	import_document: "导入资料",
+	topic_open: "打开专题",
+	draft_restore: "恢复稿件",
+	todo_write: "任务清单",
+	ask_user: "提问",
+	browser: "浏览器",
+	computer: "桌面操作",
+};
+
+/** The name a tool is shown with. */
+export function toolLabel(name: string): string {
+	return currentLang() === "zh" ? (TOOL_LABELS_ZH[name] ?? name) : name;
+}
 
 /** text in the interface language: the Chinese entry of UI_ZH when the language is Chinese, else text; {name} filled from vars. */
 export function uiText(text: string, vars: Readonly<Record<string, string>> = {}): string {

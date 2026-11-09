@@ -9,6 +9,8 @@
 import { Box, Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { renderDiff } from "../../../modes/interactive/components/diff.ts";
 import type { Theme } from "../../../modes/interactive/theme/theme.ts";
+// JiaWriter: tool names users read.
+import { toolLabel } from "../../../writer/ui-text.ts";
 import type { ToolDefinition } from "../../extensions/types.ts";
 import type { EditToolDetails } from "../edit.ts";
 import { computeEditsDiff, type Edit, type EditDiffError, type EditDiffResult } from "../edit-diff.ts";
@@ -97,7 +99,7 @@ function formatLiveEdit(args: RenderableEditArgs | undefined, theme: Theme): str
 }
 function formatEditCall(args: RenderableEditArgs | undefined, theme: Theme, cwd: string): string {
 	const pathDisplay = renderToolPath(str(args?.file_path ?? args?.path), theme, cwd);
-	return `${theme.fg("toolTitle", theme.bold("edit"))} ${pathDisplay}`;
+	return `${theme.fg("toolTitle", theme.bold(toolLabel("edit")))} ${pathDisplay}`;
 }
 function formatEditResult(
 	args: RenderableEditArgs | undefined,

@@ -40,6 +40,9 @@ export function cleanTodos(raw: unknown): TodoItem[] {
 		.slice(0, MAX_TODOS);
 }
 
+/** The widget key of the list; Ctrl+T shows or hides it. */
+export const TASK_LIST_WIDGET = "writer-todo";
+
 /** The lines shown above the editor; none once every task is done. */
 export function todoLines(todos: readonly TodoItem[]): string[] {
 	const done = todos.filter((x) => x.status === "completed").length;
@@ -55,7 +58,7 @@ export default function writerTodoExtension(pi: ExtensionAPI): void {
 	const show = (ctx: ExtensionContext) => {
 		if (!ctx.hasUI) return;
 		const lines = todoLines(todos);
-		ctx.ui.setWidget("writer-todo", lines.length > 0 ? lines : undefined);
+		ctx.ui.setWidget(TASK_LIST_WIDGET, lines.length > 0 ? lines : undefined);
 	};
 	/** The list from the latest todo_write result on the branch. */
 	const restore = (ctx: ExtensionContext) => {

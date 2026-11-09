@@ -241,7 +241,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 			message: {
 				customType: "jiawriter-references",
 				content: `${t("refs.available")}\n${lines.join("\n")}`,
-				display: true,
+				// For the model: the screen already listed the import (2026-11-09: the tag and full paths showed).
+				display: false,
 			},
 		};
 	});

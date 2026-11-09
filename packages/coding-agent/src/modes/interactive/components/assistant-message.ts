@@ -5,6 +5,23 @@ import { uiText } from "../../../writer/ui-text.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
 import { createMarkdownTransform } from "./markdown-transform.ts";
 
+/**
+ * JiaWriter: the detailed view (Ctrl+O), shared by every reply on screen: the thinking is shown, and each reply
+ * starts with its time and model, as in Claude Code's transcript view.
+ */
+let detailedView = false;
+
+/** Turn the detailed view on or off; the replies on screen redraw with their next update. */
+export function setDetailedView(on: boolean): void {
+	detailedView = on;
+}
+
+/** The time and model of a reply, as the detailed view shows them. */
+export function replyHeader(message: Pick<AssistantMessage, "timestamp" | "model" | "responseModel">): string {
+	const time = new Date(message.timestamp).toLocaleTimeString("zh-CN", { hour12: false });
+	return `${time} · ${message.responseModel ?? message.model}`;
+}
+
 const OSC133_ZONE_START = "\x1b]133;A\x07";
 const OSC133_ZONE_END = "\x1b]133;B\x07";
 const OSC133_ZONE_FINAL = "\x1b]133;C\x07";
@@ -102,6 +119,8 @@ export class AssistantMessageComponent extends Container {
 
 		if (hasVisibleContent) {
 			this.contentContainer.addChild(new Spacer(1));
+			if (detailedView)
+				this.contentContainer.addChild(new Text(theme.fg("dim", replyHeader(message)), this.outputPad, 0));
 		}
 
 		// Render content in order
@@ -141,7 +160,7 @@ export class AssistantMessageComponent extends Container {
 					.some((c) => (c.type === "text" && c.text.trim()) || (c.type === "thinking" && c.thinking.trim()));
 
 				const runIndex = thinkingRunIndex++;
-				const hidden = this.thinkingVisibilityOverrides.get(runIndex) ?? this.hideThinkingBlock;
+				const hidden = this.thinkingVisibilityOverrides.get(runIndex) ?? (this.hideThinkingBlock && !detailedView);
 				const thinkingComponent = hidden
 					? new Text(theme.italic(theme.fg("thinkingText", this.hiddenThinkingLabel)), this.outputPad, 0)
 					: new Markdown(

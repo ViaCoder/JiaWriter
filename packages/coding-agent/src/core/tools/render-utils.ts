@@ -1,4 +1,5 @@
 import * as os from "node:os";
+import { isAbsolute, relative } from "node:path";
 import { pathToFileURL } from "node:url";
 import type { ImageContent, TextContent } from "@earendil-works/pi-ai";
 import { getCapabilities, getImageDimensions, hyperlink, imageFallback } from "@earendil-works/pi-tui";
@@ -6,10 +7,16 @@ import type { Theme } from "../../modes/interactive/theme/theme.ts";
 import { stripAnsi } from "../../utils/ansi.ts";
 import { resolvePath } from "../../utils/paths.ts";
 import { sanitizeBinaryOutput } from "../../utils/shell.ts";
+import { toolLabel } from "../../writer/ui-text.ts";
 import type { ToolRenderContext } from "../extensions/types.ts";
 
-export function shortenPath(path: unknown): string {
+export function shortenPath(path: unknown, cwd?: string): string {
 	if (typeof path !== "string") return "";
+	// JiaWriter: a path in the working folder is shown from there (参考资料/材料.md), as Claude Code shows it.
+	if (cwd) {
+		const inside = relative(cwd, resolvePath(path, cwd));
+		if (inside && !inside.startsWith("..") && !isAbsolute(inside)) return inside;
+	}
 	const home = os.homedir();
 	if (path.startsWith(home)) {
 		return `~${path.slice(home.length)}`;
@@ -95,7 +102,8 @@ const COLLAPSED_ARGS_CHARS = 100;
  * line below the title, with strings shown raw and continuation lines indented.
  */
 export function formatToolCallWithArgs(title: string, args: unknown, theme: Theme, expanded: boolean): string {
-	const header = theme.fg("toolTitle", theme.bold(title));
+	// JiaWriter: the tool's name as users read it.
+	const header = theme.fg("toolTitle", theme.bold(toolLabel(title)));
 	if (args == null) return header;
 	const entries =
 		typeof args === "object" && !Array.isArray(args)
@@ -181,5 +189,5 @@ export function renderToolPath(
 	if (rawPath === null) return invalidArgText(theme);
 	const value = rawPath || options?.emptyFallback;
 	if (!value) return theme.fg("toolOutput", "...");
-	return linkPath(theme.fg("accent", shortenPath(value)), value, cwd);
+	return linkPath(theme.fg("accent", shortenPath(value, cwd)), value, cwd);
 }

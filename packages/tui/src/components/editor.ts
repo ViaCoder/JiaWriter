@@ -421,6 +421,11 @@ export class Editor implements Component, Focusable {
 		this.setAutocompleteTriggerCharacters(provider.triggerCharacters ?? []);
 	}
 
+	/** The prompt history, the newest first (JiaWriter: for the Ctrl+R search). */
+	getHistory(): readonly string[] {
+		return this.history;
+	}
+
 	/**
 	 * Add a prompt to history for up/down arrow navigation.
 	 * Called after successful submission.

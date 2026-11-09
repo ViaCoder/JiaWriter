@@ -8,6 +8,8 @@
 
 import { Container, Text } from "@earendil-works/pi-tui";
 import { getLanguageFromPath, highlightCode, type Theme } from "../../../modes/interactive/theme/theme.ts";
+// JiaWriter: tool names users read.
+import { toolLabel } from "../../../writer/ui-text.ts";
 import type { ToolDefinition } from "../../extensions/types.ts";
 import { normalizeDisplayText, renderToolPath, replaceTabs, str } from "../render-utils.ts";
 
@@ -101,7 +103,7 @@ function formatWriteCall(
 	const rawPath = str(args?.file_path ?? args?.path);
 	const fileContent = str(args?.content);
 	const pathDisplay = renderToolPath(rawPath, theme, cwd);
-	let text = `${theme.fg("toolTitle", theme.bold("write"))} ${pathDisplay}`;
+	let text = `${theme.fg("toolTitle", theme.bold(toolLabel("write")))} ${pathDisplay}`;
 
 	if (fileContent === null) {
 		text += `\n\n${theme.fg("error", "[invalid content arg - expected string]")}`;

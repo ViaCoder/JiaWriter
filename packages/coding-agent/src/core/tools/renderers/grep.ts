@@ -9,6 +9,8 @@
 import { Text } from "@earendil-works/pi-tui";
 import { keyHint } from "../../../modes/interactive/components/keybinding-hints.ts";
 import type { Theme } from "../../../modes/interactive/theme/theme.ts";
+// JiaWriter: tool names users read.
+import { toolLabel } from "../../../writer/ui-text.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
 import type { GrepToolDetails } from "../grep.ts";
 import { getTextOutput, invalidArgText, shortenPath, str } from "../render-utils.ts";
@@ -25,7 +27,7 @@ function formatGrepCall(
 	const limit = args?.limit;
 	const invalidArg = invalidArgText(theme);
 	let text =
-		theme.fg("toolTitle", theme.bold("grep")) +
+		theme.fg("toolTitle", theme.bold(toolLabel("grep"))) +
 		" " +
 		(pattern === null ? invalidArg : theme.fg("accent", `/${pattern || ""}/`)) +
 		theme.fg("toolOutput", ` in ${path === null ? invalidArg : path}`);

@@ -193,7 +193,7 @@ describe("ExtensionRunner", () => {
 		it("allows a shortcut when the reserved set no longer contains the default key", async () => {
 			const extCode = `
 				export default function(pi) {
-					pi.registerShortcut("ctrl+p", {
+					pi.registerShortcut("ctrl+l", {
 						description: "Uses freed default",
 						handler: async () => {},
 					});
@@ -205,10 +205,11 @@ describe("ExtensionRunner", () => {
 
 			const result = await discoverAndLoadExtensions([], tempDir, tempDir);
 			const runner = new ExtensionRunner(result.extensions, result.runtime, tempDir, sessionManager, modelRegistry);
-			const keybindings = { ...defaultKeybindings, "app.model.cycleForward": "ctrl+n" as KeyId };
+			// JiaWriter: Ctrl+P browses the history now; Ctrl+L (redraw) moved away is the freed default.
+			const keybindings = { ...defaultKeybindings, "app.screen.redraw": "ctrl+shift+l" as KeyId };
 			const shortcuts = runner.getShortcuts(keybindings);
 
-			expect(shortcuts.has("ctrl+p")).toBe(true);
+			expect(shortcuts.has("ctrl+l")).toBe(true);
 			expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining("conflicts with built-in"));
 
 			warnSpy.mockRestore();

@@ -122,6 +122,8 @@ import type { TruncationResult } from "../../core/tools/truncate.ts";
 import { hasTrustRequiringProjectResources, ProjectTrustStore } from "../../core/trust-manager.ts";
 import { getUsageCostBreakdown } from "../../core/usage-totals.ts";
 import { addMcpServerConfig, loadMcpConfig } from "../../extensions/mcp/config.ts";
+// The task list widget Ctrl+T shows or hides.
+import { TASK_LIST_WIDGET } from "../../extensions/writer-todo/index.ts";
 import { getChangelogPath, getNewEntries, normalizeChangelogLinks, parseChangelog } from "../../utils/changelog.ts";
 import { copyToClipboard, readClipboardFilePaths, readClipboardText } from "../../utils/clipboard.ts";
 import { extensionForImageMimeType, readClipboardImage } from "../../utils/clipboard-image.ts";
@@ -137,10 +139,12 @@ import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-
 import { brandText } from "../../writer/brand.ts";
 // JiaWriter: the "Jia" logo for release packages.
 import { jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
-import { abortedText, compactionErrorText, uiText } from "../../writer/ui-text.ts";
+// The work mode Shift+Tab cycles.
+import { applyWorkMode, nextWorkMode, workMode } from "../../writer/permission.ts";
+import { abortedText, compactionErrorText, MAC_OPTION_NOTE, uiText } from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
-import { AssistantMessageComponent } from "./components/assistant-message.ts";
+import { AssistantMessageComponent, setDetailedView } from "./components/assistant-message.ts";
 import { BashExecutionComponent } from "./components/bash-execution.ts";
 import { BranchSummaryMessageComponent } from "./components/branch-summary-message.ts";
 import { CompactionSummaryMessageComponent } from "./components/compaction-summary-message.ts";
@@ -154,6 +158,7 @@ import { ExtensionEditorComponent } from "./components/extension-editor.ts";
 import { ExtensionInputComponent } from "./components/extension-input.ts";
 import { ExtensionSelectorComponent } from "./components/extension-selector.ts";
 import { FooterComponent, formatTokens } from "./components/footer.ts";
+import { HistorySearchComponent } from "./components/history-search.ts";
 import { formatKeyText, keyDisplayText, keyHint, keyText, rawKeyHint } from "./components/keybinding-hints.ts";
 import { LoginDialogComponent } from "./components/login-dialog.ts";
 import { createMermaidMarkdownTransformer } from "./components/mermaid.ts";
@@ -519,6 +524,8 @@ export class InteractiveMode {
 
 	// Tool output expansion state
 	private toolOutputExpanded = false;
+	// Widgets hidden with a key (the task list with Ctrl+T).
+	private hiddenWidgets = new Set<string>();
 
 	// Thinking block visibility state
 	private hideThinkingBlock = false;
@@ -1035,7 +1042,9 @@ export class InteractiveMode {
 			};
 
 			// Build startup instructions using keybinding hint helpers
-			const hint = (keybinding: AppKeybinding, description: string) => keyHint(keybinding, description);
+			// JiaWriter: an action with no key bound leaves its line out.
+			const hint = (keybinding: AppKeybinding, description: string) =>
+				keyText(keybinding) ? keyHint(keybinding, description) : "";
 
 			const expandedInstructions = () =>
 				[
@@ -1045,13 +1054,13 @@ export class InteractiveMode {
 					hint("app.exit", "to exit (empty)"),
 					hint("app.suspend", "to suspend"),
 					keyHint("tui.editor.deleteToLineEnd", "to delete to end"),
+					hint("app.mode.cycle", "to cycle work mode"),
 					hint("app.thinking.cycle", "to cycle thinking level"),
-					rawKeyHint(
-						`${keyText("app.model.cycleForward")}/${keyText("app.model.cycleBackward")}`,
-						"to cycle models",
-					),
+					hint("app.model.cycleForward", "to cycle models"),
 					hint("app.model.select", "to select model"),
-					hint("app.tools.expand", "to expand tools"),
+					hint("app.tools.expand", "for the detailed view"),
+					hint("app.todo.toggle", "to show or hide the task list"),
+					hint("app.history.search", "to search the input history"),
 					hint("app.thinking.toggle", "to expand thinking"),
 					hint("app.editor.external", "for external editor"),
 					rawKeyHint("/", "for commands"),
@@ -1062,13 +1071,18 @@ export class InteractiveMode {
 					rawKeyHint(this.sendNowKeys(), "to send queued messages now"),
 					hint("app.clipboard.pasteImage", "to paste files on macOS, images, or text"),
 					rawKeyHint("drop files", "to attach"),
-				].join("\n");
+					rawKeyHint("?", "for all shortcuts"),
+				]
+					.filter(Boolean)
+					.join("\n");
 			const compactInstructions = () =>
 				[
 					hint("app.interrupt", "interrupt"),
 					rawKeyHint(`${keyText("app.clear")}/${keyText("app.exit")}`, "clear/exit"),
 					rawKeyHint("/", "commands"),
 					rawKeyHint("!", "bash"),
+					hint("app.mode.cycle", "mode"),
+					rawKeyHint("?", "shortcuts"),
 					hint("app.tools.expand", "more"),
 				].join(theme.fg("muted", " · "));
 			// JiaWriter: onboarding lines in the interface language.
@@ -1812,7 +1826,8 @@ export class InteractiveMode {
 			return;
 		}
 
-		const sectionHeader = (name: string, color: ThemeColor = "mdHeading") => theme.fg(color, `[${name}]`);
+		// JiaWriter: section names in the interface language.
+		const sectionHeader = (name: string, color: ThemeColor = "mdHeading") => theme.fg(color, `[${uiText(name)}]`);
 		const formatCompactList = (items: string[], options?: { sort?: boolean }): string => {
 			const labels = items.map((item) => item.trim()).filter((item) => item.length > 0);
 			if (options?.sort !== false) {
@@ -2546,8 +2561,9 @@ export class InteractiveMode {
 		if (leadingSpacer) {
 			container.addChild(new Spacer(1));
 		}
-		for (const component of widgets.values()) {
-			container.addChild(component);
+		for (const [key, component] of widgets) {
+			// Ctrl+T hides the task list.
+			if (!this.hiddenWidgets.has(key)) container.addChild(component);
 		}
 	}
 
@@ -3075,6 +3091,16 @@ export class InteractiveMode {
 				this.editor.setText("");
 				this.isBashMode = false;
 				this.updateEditorBorderColor();
+			} else if (this.editor.getText().trim()) {
+				// JiaWriter, as Claude Code: Esc twice clears the input and keeps it in the history for Up.
+				const now = Date.now();
+				if (now - this.lastEscapeTime < 500) {
+					this.editor.addToHistory?.(this.editor.getText());
+					this.editor.setText("");
+					this.lastEscapeTime = 0;
+				} else {
+					this.lastEscapeTime = now;
+				}
 			} else if (!this.editor.getText().trim()) {
 				// Double-escape with empty editor triggers /tree, /fork, or nothing based on setting
 				const action = this.settingsManager.getDoubleEscapeAction();
@@ -3107,6 +3133,11 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("app.model.select", () => this.showModelSelector());
 		this.defaultEditor.onAction("app.tools.expand", () => this.toggleToolOutputExpansion());
 		this.defaultEditor.onAction("app.thinking.toggle", () => this.toggleThinkingBlockVisibility());
+		// JiaWriter: the keys Claude Code has (2026-11-09).
+		this.defaultEditor.onAction("app.mode.cycle", () => this.cycleWorkMode());
+		this.defaultEditor.onAction("app.todo.toggle", () => this.toggleTaskList());
+		this.defaultEditor.onAction("app.screen.redraw", () => this.ui.requestRender(true));
+		this.defaultEditor.onAction("app.history.search", () => this.showHistorySearch());
 		this.defaultEditor.onAction("app.editor.external", () => void this.handleOpenExternalEditor());
 		this.defaultEditor.onAction(
 			"app.message.copy",
@@ -3124,6 +3155,12 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("app.session.resume", () => this.showSessionSelector());
 
 		this.defaultEditor.onChange = (text: string) => {
+			// JiaWriter, as Claude Code: ? typed into an empty input shows the shortcut list.
+			if (text === "?") {
+				this.editor.setText("");
+				this.handleHotkeysCommand();
+				return;
+			}
 			const wasBashMode = this.isBashMode;
 			this.isBashMode = text.trimStart().startsWith("!");
 			if (wasBashMode !== this.isBashMode) {
@@ -4637,7 +4674,56 @@ export class InteractiveMode {
 				}
 			}
 		}
-		this.showStatus(`Tool output: ${expanded ? "expanded" : "collapsed"}`);
+		// JiaWriter: Ctrl+O is the detailed view, as Claude Code's transcript view: tool output, the thinking, the
+		// time and model of each reply, and the token counts in the status line.
+		setDetailedView(expanded);
+		this.footer.setDetailed(expanded);
+		for (const child of this.chatContainer.children) {
+			if (child instanceof AssistantMessageComponent) child.invalidate();
+		}
+		this.showStatus(
+			expanded ? uiText("Detailed view: on", { key: keyText("app.tools.expand") }) : uiText("Detailed view: off"),
+		);
+	}
+
+	/** Shift+Tab: the next work mode (manual, auto, plan), for this session only. */
+	private cycleWorkMode(): void {
+		const next = nextWorkMode(workMode());
+		applyWorkMode(next);
+		this.showStatus(uiText("Work mode: {mode}", { mode: uiText(next) }));
+		this.ui.requestRender();
+	}
+
+	/** Ctrl+T: show or hide the task list above the input. */
+	private toggleTaskList(): void {
+		if (this.hiddenWidgets.has(TASK_LIST_WIDGET)) this.hiddenWidgets.delete(TASK_LIST_WIDGET);
+		else this.hiddenWidgets.add(TASK_LIST_WIDGET);
+		this.renderWidgets();
+		this.showStatus(uiText(this.hiddenWidgets.has(TASK_LIST_WIDGET) ? "Task list: hidden" : "Task list: shown"));
+	}
+
+	/** Ctrl+R: search the earlier inputs; the chosen one goes in the input box. */
+	private showHistorySearch(): void {
+		const entries = this.defaultEditor.getHistory();
+		if (entries.length === 0) {
+			this.showStatus(uiText("No earlier input to search"));
+			return;
+		}
+		this.showSelector((done) => {
+			const search = new HistorySearchComponent(
+				entries,
+				(entry) => {
+					done();
+					this.editor.setText(entry);
+					this.ui.requestRender();
+				},
+				() => {
+					done();
+					this.ui.requestRender();
+				},
+			);
+			return { component: search, focus: search };
+		});
 	}
 
 	/** Update rendered assistant messages without rebuilding live tool components. */
@@ -6905,53 +6991,82 @@ export class InteractiveMode {
 		const dequeue = this.getAppKeyDisplay("app.message.dequeue");
 		const pasteImage = this.getAppKeyDisplay("app.clipboard.pasteImage");
 
-		let hotkeys = `
-**Navigation**
-| Key | Action |
-|-----|--------|
-| \`${cursorUp}\` / \`${cursorDown}\` / \`${cursorLeft}\` / \`${cursorRight}\` | Move cursor / browse history |
-| \`${cursorWordLeft}\` / \`${cursorWordRight}\` | Move by word |
-| \`${cursorLineStart}\` | Start of line |
-| \`${cursorLineEnd}\` | End of line |
-| \`${jumpForward}\` | Jump forward to character |
-| \`${jumpBackward}\` | Jump backward to character |
-| \`${pageUp}\` / \`${pageDown}\` | Scroll by page |
-
-**Editing**
-| Key | Action |
-|-----|--------|
-| \`${submit}\` | Send message |
-| \`${newLine}\` | New line${process.platform === "win32" ? " (Ctrl+Enter on Windows Terminal)" : ""} |
-| \`${deleteWordBackward}\` | Delete word backwards |
-| \`${deleteWordForward}\` | Delete word forwards |
-| \`${deleteToLineStart}\` | Delete to start of line |
-| \`${deleteToLineEnd}\` | Delete to end of line |
-| \`${yank}\` | Paste the most-recently-deleted text |
-| \`${yankPop}\` | Cycle through the deleted text after pasting |
-| \`${undo}\` | Undo |
-
-**Other**
-| Key | Action |
-|-----|--------|
-| \`${tab}\` | Path completion / accept autocomplete |
-| \`${interrupt}\` | Cancel autocomplete / abort streaming |
-| \`${clear}\` | Clear editor (first) / exit (second) |
-| \`${exit}\` | Exit (when editor is empty) |
-| \`${suspend}\` | Suspend to background |
-| \`${cycleThinkingLevel}\` | Cycle thinking level |
-| \`${cycleModelForward}\` / \`${cycleModelBackward}\` | Cycle models |
-| \`${selectModel}\` | Open model selector |
-| \`${expandTools}\` | Toggle tool output expansion |
-| \`${toggleThinking}\` | Toggle thinking block visibility |
-| \`${externalEditor}\` | Edit message in external editor |
-| \`${copyMessage}\` | Copy selection or last assistant message |
-| \`${followUp}\` | Queue follow-up message |
-| \`${dequeue}\` | Restore queued messages |
-| \`${pasteImage}\` | Paste files on macOS, images, or text from clipboard |
-| \`/\` | Slash commands |
-| \`!\` | Run bash command |
-| \`!!\` | Run bash command (excluded from context) |
-`;
+		// JiaWriter: grouped as Claude Code's shortcut list, rows in the interface language; a key that is not bound
+		// leaves its row out (2026-11-09: "The operation should be consistent with Claude Code").
+		const app = (action: AppKeybinding) => this.getAppKeyDisplay(action);
+		const editorKey = (action: Keybinding) => this.getEditorKeyDisplay(action);
+		const row = (keys: string, label: string) => (keys ? `| \`${keys}\` | ${uiText(label)} |\n` : "");
+		const table = (title: string, rows: string) =>
+			`\n**${uiText(title)}**\n| ${uiText("Key")} | ${uiText("Action")} |\n|-----|--------|\n${rows}`;
+		let hotkeys =
+			table(
+				"General",
+				row(submit, "Send message") +
+					row(`${newLine} / \\ + Enter`, "New line") +
+					row(interrupt, "Stop the reply, or close a dialog") +
+					row(`${interrupt} ${interrupt}`, "Clear the input, or rewind when it is empty") +
+					row(clear, "Interrupt, or clear the input; twice to exit") +
+					row(exit, "Exit (input empty)") +
+					row(app("app.mode.cycle"), "Cycle work mode: manual, auto, plan") +
+					row(expandTools, "Detailed view: tool output, thinking, time and model") +
+					row(app("app.todo.toggle"), "Show or hide the task list") +
+					row(selectModel, "Switch model") +
+					row(cycleThinkingLevel, "Cycle thinking level") +
+					row(app("app.history.search"), "Search the input history") +
+					row(app("app.screen.redraw"), "Redraw the screen") +
+					row(externalEditor, "Edit the input in an external editor") +
+					row(this.sendNowKeys(), "Send queued messages now") +
+					row(dequeue, "Restore queued messages") +
+					row(followUp, "Queue a message until the reply ends") +
+					row(pasteImage, "Paste images, files or text") +
+					row(copyMessage, "Copy selection or the last reply") +
+					row(suspend, "Suspend to background") +
+					row(cycleModelForward, "Next model") +
+					row(cycleModelBackward, "Previous model") +
+					row(toggleThinking, "Show or hide thinking") +
+					row("?", "This list (input empty)") +
+					row("/", "Commands") +
+					row("!", "Run a shell command") +
+					row("!!", "Run a shell command (not sent to the model)"),
+			) +
+			table(
+				"Editing",
+				row(
+					[
+						`${cursorUp}/${cursorDown}`,
+						`${editorKey("tui.editor.historyPrevious")}/${editorKey("tui.editor.historyNext")}`,
+					]
+						.filter((k) => k !== "/")
+						.join(" · "),
+					"Move the cursor, or browse the history",
+				) +
+					row(`${cursorLeft}/${cursorRight}`, "Move the cursor") +
+					row(`${cursorWordLeft} / ${cursorWordRight}`, "Move by word") +
+					row(cursorLineStart, "Start of line") +
+					row(cursorLineEnd, "End of line") +
+					row(jumpForward, "Jump forward to character") +
+					row(jumpBackward, "Jump backward to character") +
+					row(deleteWordBackward, "Delete word backwards") +
+					row(deleteWordForward, "Delete word forwards") +
+					row(deleteToLineStart, "Delete to start of line") +
+					row(deleteToLineEnd, "Delete to end of line") +
+					row(yank, "Paste the most-recently-deleted text") +
+					row(yankPop, "Cycle through the deleted text after pasting") +
+					row(undo, "Undo") +
+					row(tab, "Complete a path or accept a suggestion"),
+			) +
+			table(
+				"History",
+				row(`${pageUp} / ${pageDown}`, "Scroll the conversation") +
+					row(
+						`${editorKey("tui.altScreen.previousPrompt")} / ${editorKey("tui.altScreen.nextPrompt")}`,
+						"Jump to your previous or next message",
+					) +
+					row(editorKey("tui.altScreen.search"), "Search the conversation"),
+			);
+		// On a Mac the Option keys work only with the terminal's "Use Option as Meta Key" (Claude Code's terminal
+		// setup page, checked 2026-11-09); Ctrl+J and \ + Enter need no setup.
+		if (process.platform === "darwin") hotkeys += `\n${uiText(MAC_OPTION_NOTE)}\n`;
 
 		// Add extension-registered shortcuts
 		const extensionRunner = this.session.extensionRunner;
@@ -6971,7 +7086,9 @@ export class InteractiveMode {
 
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new DynamicBorder());
-		this.chatContainer.addChild(new ThemedText(() => theme.bold(theme.fg("accent", "Keyboard Shortcuts")), 1, 0));
+		this.chatContainer.addChild(
+			new ThemedText(() => theme.bold(theme.fg("accent", uiText("Keyboard Shortcuts"))), 1, 0),
+		);
 		this.chatContainer.addChild(new Spacer(1));
 		this.chatContainer.addChild(new Markdown(hotkeys.trim(), 1, 1, this.getMarkdownThemeWithSettings()));
 		this.chatContainer.addChild(new DynamicBorder());

@@ -6,8 +6,10 @@ describe("KeybindingsManager", () => {
 	it("binds Ctrl+J as a default newline alias", () => {
 		const keybindings = new KeybindingsManager(TUI_KEYBINDINGS);
 
-		assert.deepStrictEqual(keybindings.getKeys("tui.input.newLine"), ["shift+enter", "ctrl+j"]);
+		// JiaWriter: Option+Enter too, as in Claude Code (2026-11-09).
+		assert.deepStrictEqual(keybindings.getKeys("tui.input.newLine"), ["shift+enter", "alt+enter", "ctrl+j"]);
 		assert.strictEqual(keybindings.matches("\n", "tui.input.newLine"), true);
+		assert.strictEqual(keybindings.matches("\x1b\r", "tui.input.newLine"), true);
 		assert.strictEqual(keybindings.matches("\x1b[106;5u", "tui.input.newLine"), true);
 	});
 
@@ -20,11 +22,11 @@ describe("KeybindingsManager", () => {
 		assert.deepStrictEqual(keybindings.getKeys("tui.editor.pageDown"), ["pageDown", "ctrl+pageDown"]);
 	});
 
-	it("leaves dedicated prompt history navigation unbound by default", () => {
+	it("binds Ctrl+P and Ctrl+N to prompt history, as Claude Code", () => {
 		const keybindings = new KeybindingsManager(TUI_KEYBINDINGS);
 
-		assert.deepStrictEqual(keybindings.getKeys("tui.editor.historyPrevious"), []);
-		assert.deepStrictEqual(keybindings.getKeys("tui.editor.historyNext"), []);
+		assert.deepStrictEqual(keybindings.getKeys("tui.editor.historyPrevious"), ["ctrl+p"]);
+		assert.deepStrictEqual(keybindings.getKeys("tui.editor.historyNext"), ["ctrl+n"]);
 	});
 
 	it("binds unmodified terminal viewport shortcuts to alternate-screen navigation", () => {

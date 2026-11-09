@@ -5,7 +5,11 @@ import { areExperimentalFeaturesEnabled } from "../../../core/experimental.ts";
 import type { ContextUsage } from "../../../core/extensions/types.ts";
 import type { ReadonlyFooterDataProvider } from "../../../core/footer-data-provider.ts";
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../../../core/usage-totals.ts";
+// The work mode the status line names.
+import { workMode } from "../../../writer/permission.ts";
+import { uiText } from "../../../writer/ui-text.ts";
 import { theme } from "../theme/theme.ts";
+import { keyText } from "./keybinding-hints.ts";
 
 /**
  * Sanitize text for display in a single-line status.
@@ -61,6 +65,8 @@ interface SessionStats {
  */
 export class FooterComponent implements Component {
 	private autoCompactEnabled = true;
+	// JiaWriter: the detailed view (Ctrl+O) adds the token counts and the git branch.
+	private detailed = false;
 	private session: AgentSession;
 	private footerData: ReadonlyFooterDataProvider;
 	private sessionStats?: SessionStats;
@@ -72,6 +78,10 @@ export class FooterComponent implements Component {
 
 	setSession(session: AgentSession): void {
 		this.session = session;
+	}
+
+	setDetailed(detailed: boolean): void {
+		this.detailed = detailed;
 	}
 
 	setAutoCompactEnabled(enabled: boolean): void {
@@ -165,7 +175,7 @@ export class FooterComponent implements Component {
 		let pwd = formatCwdForFooter(this.session.sessionManager.getCwd(), process.env.HOME || process.env.USERPROFILE);
 
 		// Add git branch if available
-		const branch = this.footerData.getGitBranch();
+		const branch = this.detailed ? this.footerData.getGitBranch() : undefined;
 		if (branch) {
 			pwd = `${pwd} (${branch})`;
 		}
@@ -176,13 +186,25 @@ export class FooterComponent implements Component {
 			pwd = `${pwd} • ${sessionName}`;
 		}
 
-		// Build stats line
+		// Build stats line. JiaWriter: the work mode first, as Claude Code shows it under the input; the token
+		// counts only in the detailed view, since most users of a writing tool do not read them.
 		const statsParts = [];
-		if (usageTotals.input) statsParts.push(`↑${formatTokens(usageTotals.input)}`);
-		if (usageTotals.output) statsParts.push(`↓${formatTokens(usageTotals.output)}`);
-		if (usageTotals.cacheRead) statsParts.push(`R${formatTokens(usageTotals.cacheRead)}`);
-		if (usageTotals.cacheWrite) statsParts.push(`W${formatTokens(usageTotals.cacheWrite)}`);
-		if ((usageTotals.cacheRead > 0 || usageTotals.cacheWrite > 0) && latestCacheHitRate !== undefined) {
+		const current = workMode();
+		const mode = uiText(current);
+		const modeKey = keyText("app.mode.cycle");
+		const modeText = modeKey ? uiText("{mode} ({key} to switch)", { mode, key: modeKey }) : mode;
+		// Manual stays plain; the others stand out, as Claude Code colours its mode line.
+		const modeColor = ({ auto: "success", bypass: "error", plan: "accent" } as const)[current as "auto"];
+		statsParts.push(modeColor ? theme.fg(modeColor, modeText) : modeText);
+		if (this.detailed && usageTotals.input) statsParts.push(`↑${formatTokens(usageTotals.input)}`);
+		if (this.detailed && usageTotals.output) statsParts.push(`↓${formatTokens(usageTotals.output)}`);
+		if (this.detailed && usageTotals.cacheRead) statsParts.push(`R${formatTokens(usageTotals.cacheRead)}`);
+		if (this.detailed && usageTotals.cacheWrite) statsParts.push(`W${formatTokens(usageTotals.cacheWrite)}`);
+		if (
+			this.detailed &&
+			(usageTotals.cacheRead > 0 || usageTotals.cacheWrite > 0) &&
+			latestCacheHitRate !== undefined
+		) {
 			statsParts.push(`CH${latestCacheHitRate.toFixed(1)}%`);
 		}
 
@@ -198,8 +220,11 @@ export class FooterComponent implements Component {
 		// Colorize context percentage based on usage
 		let contextPercentStr: string;
 		const autoIndicator = this.autoCompactEnabled ? " (auto)" : "";
-		const contextPercentDisplay =
-			contextPercent === "?"
+		const contextPercentDisplay = !this.detailed
+			? uiText("Context {percent}%", {
+					percent: contextPercent === "?" ? "?" : String(Math.round(contextPercentValue)),
+				})
+			: contextPercent === "?"
 				? `?/${formatTokens(contextWindow)}${autoIndicator}`
 				: `${contextPercent}%/${formatTokens(contextWindow)}${autoIndicator}`;
 		if (contextPercentValue > 90) {

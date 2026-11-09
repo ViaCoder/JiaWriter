@@ -57,7 +57,9 @@ describe("status indicators", () => {
 		editor.setWorkingStatusIndicator(indicator);
 
 		const topBorder = editor.render(20)[0]!;
-		expect(stripAnsi(topBorder)).toBe("── ⠋ Working ───────");
+		// JiaWriter: the time since the work began follows the message (2026-11-09).
+		expect(stripAnsi(topBorder)).toMatch(/^── ⠋ Working · 0/);
+		expect(visibleWidth(stripAnsi(topBorder))).toBe(20);
 		expect(visibleWidth(topBorder)).toBe(20);
 		expect(topBorder.split(theme.getFgAnsi("thinkingHigh"))).toHaveLength(5);
 		indicator.dispose();

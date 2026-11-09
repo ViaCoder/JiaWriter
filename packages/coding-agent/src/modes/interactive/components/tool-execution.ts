@@ -11,6 +11,8 @@ import {
 	type TuiMouseEvent,
 } from "@earendil-works/pi-tui";
 import type { ToolDefinition, ToolRenderContext, ToolRenderers } from "../../../core/extensions/types.ts";
+// JiaWriter: tool names users read.
+import { toolLabel } from "../../../writer/ui-text.ts";
 
 /** What this component needs from a tool: how to draw it, without executing it. */
 export type { ToolRenderers };
@@ -394,7 +396,7 @@ export class ToolExecutionComponent extends Container {
 	}
 
 	private formatToolExecution(): string {
-		let text = theme.fg("toolTitle", theme.bold(this.toolName));
+		let text = theme.fg("toolTitle", theme.bold(toolLabel(this.toolName)));
 		const content = JSON.stringify(this.args, null, 2);
 		if (content) {
 			text += `\n\n${content}`;

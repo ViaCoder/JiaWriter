@@ -9,6 +9,8 @@
 import { Text } from "@earendil-works/pi-tui";
 import { keyHint } from "../../../modes/interactive/components/keybinding-hints.ts";
 import type { Theme } from "../../../modes/interactive/theme/theme.ts";
+// JiaWriter: tool names users read.
+import { toolLabel } from "../../../writer/ui-text.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
 import type { LsToolDetails } from "../ls.ts";
 import { getTextOutput, renderToolPath, str } from "../render-utils.ts";
@@ -17,7 +19,7 @@ import { DEFAULT_MAX_BYTES, formatSize } from "../truncate.ts";
 function formatLsCall(args: { path?: string; limit?: number } | undefined, theme: Theme, cwd: string): string {
 	const limit = args?.limit;
 	const pathDisplay = renderToolPath(str(args?.path), theme, cwd, { emptyFallback: "." });
-	let text = `${theme.fg("toolTitle", theme.bold("ls"))} ${pathDisplay}`;
+	let text = `${theme.fg("toolTitle", theme.bold(toolLabel("ls")))} ${pathDisplay}`;
 	if (limit !== undefined) {
 		text += theme.fg("toolOutput", ` (limit ${limit})`);
 	}

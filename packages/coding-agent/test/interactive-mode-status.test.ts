@@ -8,9 +8,11 @@ import { VirtualTerminal } from "../../tui/test/virtual-terminal.ts";
 import type { AutocompleteProviderFactory } from "../src/core/extensions/types.ts";
 import type { QuietStartup } from "../src/core/settings-manager.ts";
 import type { SourceInfo } from "../src/core/source-info.ts";
+import { keyText } from "../src/modes/interactive/components/keybinding-hints.ts";
 import type { AuthSelectorProvider } from "../src/modes/interactive/components/oauth-selector.ts";
 import { InteractiveMode } from "../src/modes/interactive/interactive-mode.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
+import { uiText } from "../src/writer/ui-text.ts";
 
 function renderLastLine(container: Container, width = 120): string {
 	const last = container.children[container.children.length - 1];
@@ -156,6 +158,7 @@ describe("InteractiveMode.setToolsExpanded", () => {
 			chatContainer: { children: [chatChild] },
 			ui: { requestRender: vi.fn() },
 			showStatus: vi.fn(),
+			footer: { setDetailed: vi.fn() },
 		};
 
 		(InteractiveMode as any).prototype.setToolsExpanded.call(fakeThis, true);
@@ -164,7 +167,11 @@ describe("InteractiveMode.setToolsExpanded", () => {
 		expect(header.setExpanded).toHaveBeenCalledWith(true);
 		expect(loadedResourcesChild.setExpanded).toHaveBeenCalledWith(true);
 		expect(chatChild.setExpanded).toHaveBeenCalledWith(true);
-		expect(fakeThis.showStatus).toHaveBeenCalledWith("Tool output: expanded");
+		// JiaWriter: Ctrl+O is the detailed view, and the status line shows the counts with it.
+		expect(fakeThis.footer.setDetailed).toHaveBeenCalledWith(true);
+		expect(fakeThis.showStatus).toHaveBeenCalledWith(
+			uiText("Detailed view: on", { key: keyText("app.tools.expand") }),
+		);
 	});
 });
 
@@ -809,7 +816,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.loadedResourcesContainer);
-		expect(output).toContain("[Skills]");
+		expect(output).toContain("[技能]");
 		expect(output).toContain("commit");
 		expect(output).not.toContain("resource-list");
 	});
@@ -826,7 +833,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.loadedResourcesContainer);
-		expect(output).toContain("[Skills]");
+		expect(output).toContain("[技能]");
 		expect(output).toContain("resource-list");
 		expect(output).not.toContain("commit");
 	});
@@ -844,7 +851,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.loadedResourcesContainer);
-		expect(output).toContain("[Skills]");
+		expect(output).toContain("[技能]");
 		expect(output).toContain("resource-list");
 		expect(output).not.toContain("commit");
 	});
@@ -860,7 +867,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.loadedResourcesContainer);
-		expect(output).toContain("[Extensions]");
+		expect(output).toContain("[扩展]");
 		expect(output).toContain("answer.ts, btw.ts");
 		expect(output).not.toContain("extensions/answer.ts");
 	});
@@ -877,7 +884,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   @scope/pi-scoped, answer.ts, cli-extension.ts, HazAT/pi-interactive-subagents, HazAT/pi-interactive-subagents:subagents, local-index, pi-markdown-preview, user-index"`);
 	});
 
@@ -923,7 +930,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   alpha/one, beta/one, gamma/one"`);
 	});
 
@@ -951,7 +958,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   plan-mode"`);
 	});
 
@@ -979,7 +986,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   plan-mode"`);
 	});
 
@@ -1016,7 +1023,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   plan-mode, webfetch.ts"`);
 	});
 
@@ -1053,7 +1060,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   bar, foo"`);
 	});
 
@@ -1090,7 +1097,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   alpha/tools, beta/tools"`);
 	});
 
@@ -1118,7 +1125,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   main.ts"`);
 	});
 
@@ -1146,7 +1153,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   pi-markdown-preview"`);
 	});
 
@@ -1183,7 +1190,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   primary-package, primary-package:../sibling-package"`);
 	});
 
@@ -1223,7 +1230,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   primary-package, primary-package:../sibling-package"`);
 	});
 
@@ -1240,7 +1247,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`
-"[Extensions]
+"[扩展]
   project
     /tmp/project/.pi/extensions/answer.ts
     /tmp/project/.pi/extensions/local-index
@@ -1271,7 +1278,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.loadedResourcesContainer).replace(/\\/g, "/");
-		expect(output).toContain("[Context]");
+		expect(output).toContain("[上下文文件]");
 		expect(output).toContain("~/.pi/agent/AGENTS.md, AGENTS.md");
 		expect(output).not.toContain(`${cwd.replace(/\\/g, "/")}/AGENTS.md`);
 	});
@@ -1291,7 +1298,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.loadedResourcesContainer).replace(/\\/g, "/");
-		expect(output).toContain("[Context]");
+		expect(output).toContain("[上下文文件]");
 		expect(output).toContain(".pi/SYSTEM.md, .pi/APPEND_SYSTEM.md, AGENTS.md");
 	});
 
@@ -1310,7 +1317,7 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.loadedResourcesContainer).replace(/\\/g, "/");
-		expect(output).toContain("[Context]");
+		expect(output).toContain("[上下文文件]");
 		expect(output).toContain("~/.pi/agent/AGENTS.md");
 		expect(output).toContain("~/Development/pi-mono/AGENTS.md");
 		expect(output).not.toContain("~/.pi/agent/AGENTS.md, AGENTS.md");
@@ -1367,6 +1374,6 @@ describe("InteractiveMode.showLoadedResources", () => {
 
 		const output = renderAll(fakeThis.loadedResourcesContainer);
 		expect(output).toContain("[Skill conflicts]");
-		expect(output).not.toContain("[Skills]");
+		expect(output).not.toContain("[技能]");
 	});
 });

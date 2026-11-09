@@ -1,8 +1,19 @@
 import { type Component, Loader, type TUI, truncateToWidth } from "@earendil-works/pi-tui";
 import type { WorkingIndicatorOptions } from "../../../core/extensions/index.ts";
+import { uiText } from "../../../writer/ui-text.ts";
 import { theme } from "../theme/theme.ts";
 import { CountdownTimer } from "./countdown-timer.ts";
 import { keyText } from "./keybinding-hints.ts";
+
+/** Time since a start, as the working line shows it: 12 秒, 1 分 05 秒 (Kimi Code shows it too, 2026-11-09). */
+export function elapsedText(ms: number): string {
+	const total = Math.max(0, Math.floor(ms / 1000));
+	if (total < 60) return uiText("{seconds}s", { seconds: String(total) });
+	return uiText("{minutes}m {seconds}s", {
+		minutes: String(Math.floor(total / 60)),
+		seconds: String(total % 60).padStart(2, "0"),
+	});
+}
 
 export type StatusIndicatorKind = "working" | "retry" | "compaction" | "branchSummary";
 
@@ -37,11 +48,14 @@ export class StatusIndicator extends Loader {
 
 export class WorkingStatusIndicator extends StatusIndicator {
 	constructor(ui: TUI, message: string, indicator?: WorkingIndicatorOptions, colorFn?: (text: string) => string) {
+		// JiaWriter: the message is followed by the time since the work began, redrawn with each spinner frame.
+		const started = Date.now();
+		const messageColor = colorFn ?? ((text: string) => theme.fg("muted", text));
 		super(
 			"working",
 			ui,
 			colorFn ?? ((text) => theme.fg("accent", text)),
-			colorFn ?? ((text) => theme.fg("muted", text)),
+			(text) => `${messageColor(text)}${theme.fg("dim", ` · ${elapsedText(Date.now() - started)}`)}`,
 			message,
 			indicator,
 		);

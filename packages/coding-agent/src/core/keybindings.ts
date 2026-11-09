@@ -30,28 +30,39 @@ const APP_KEYBINDINGS = {
 		defaultKeys: process.platform === "win32" ? [] : "ctrl+z",
 		description: "Suspend to background",
 	},
-	"app.thinking.cycle": {
+	// JiaWriter: the keys follow Claude Code's (2026-11-09: "The operation should be consistent with Claude Code").
+	// Shift+Tab cycles the work mode; thinking moves to Option+T, the model picker to Option+P.
+	"app.mode.cycle": {
 		defaultKeys: "shift+tab",
+		description: "Cycle work mode (manual, auto, plan)",
+	},
+	"app.thinking.cycle": {
+		defaultKeys: "alt+t",
 		description: "Cycle thinking level",
 	},
 	"app.thinking.save": {
 		defaultKeys: "ctrl+s",
 		description: "Save thinking level",
 	},
+	// Ctrl+P and Ctrl+N browse the input history, as in Claude Code; cycling models has no default key.
 	"app.model.cycleForward": {
-		defaultKeys: "ctrl+p",
+		defaultKeys: [],
 		description: "Cycle to next model",
 	},
 	"app.model.cycleBackward": {
-		defaultKeys: windowsKeybindings ? "alt+p" : "shift+ctrl+p",
+		defaultKeys: [],
 		description: "Cycle to previous model",
 	},
-	"app.model.select": { defaultKeys: "ctrl+l", description: "Open model selector" },
-	"app.tools.expand": { defaultKeys: "ctrl+o", description: "Toggle tool output" },
+	"app.model.select": { defaultKeys: "alt+p", description: "Open model selector" },
+	"app.tools.expand": { defaultKeys: "ctrl+o", description: "Toggle detailed view" },
+	// Thinking shows in the detailed view (Ctrl+O); Ctrl+T shows or hides the task list.
 	"app.thinking.toggle": {
-		defaultKeys: "ctrl+t",
+		defaultKeys: [],
 		description: "Toggle thinking blocks",
 	},
+	"app.todo.toggle": { defaultKeys: "ctrl+t", description: "Show or hide the task list" },
+	"app.screen.redraw": { defaultKeys: "ctrl+l", description: "Redraw the screen" },
+	"app.history.search": { defaultKeys: "ctrl+r", description: "Search the input history" },
 	"app.session.toggleNamedFilter": {
 		defaultKeys: "ctrl+n",
 		description: "Toggle named session filter",
@@ -65,7 +76,8 @@ const APP_KEYBINDINGS = {
 		description: "Copy selection or last assistant message",
 	},
 	"app.message.followUp": {
-		defaultKeys: windowsKeybindings ? "ctrl+q" : "alt+enter",
+		// Option+Enter is a new line, as in Claude Code; Enter while a reply runs queues the message.
+		defaultKeys: windowsKeybindings ? "ctrl+q" : [],
 		description: "Queue follow-up message",
 	},
 	"app.message.dequeue": {

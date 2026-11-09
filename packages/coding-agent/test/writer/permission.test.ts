@@ -7,9 +7,12 @@ import type { ExtensionCommandContext } from "../../src/core/extensions/types.ts
 import { setPermission } from "../../src/extensions/writer-ui/index.ts";
 import { setUiLang, uiSettingsPath } from "../../src/writer/i18n/index.ts";
 import {
+	applyWorkMode,
 	createPermissionGate,
+	isPlanning,
 	isSecretField,
 	needsAsking,
+	nextWorkMode,
 	type PermissionMode,
 	parsePermissionMode,
 	permissionMode,
@@ -17,6 +20,9 @@ import {
 	riskOfLabel,
 	savedPermissionMode,
 	savePermissionMode,
+	setPlanning,
+	setSessionPermissionMode,
+	workMode,
 } from "../../src/writer/permission.ts";
 
 let dir: string;
@@ -205,5 +211,75 @@ describe("setPermission", () => {
 		await setPermission("manual", ctx);
 		delete process.env.JW_PERMISSION;
 		expect(notes[0][1]).toBe("warning");
+	});
+});
+
+// Shift+Tab, as in Claude Code (2026-11-09): a mode for this session only, and plan mode in the same cycle.
+describe("work mode", () => {
+	afterEach(() => {
+		setSessionPermissionMode(undefined);
+		setPlanning(false);
+	});
+
+	it("setSessionPermissionMode: the session's mode wins over the environment and the saved one, unsaved", () => {
+		savePermissionMode("manual");
+		setSessionPermissionMode("bypass");
+		expect(permissionMode({ JW_PERMISSION: "auto" })).toBe("bypass");
+		expect(savedPermissionMode()).toBe("manual");
+		setSessionPermissionMode(undefined);
+		expect(permissionMode({})).toBe("manual");
+	});
+
+	it("isPlanning / setPlanning: plan mode is off until turned on", () => {
+		expect(isPlanning()).toBe(false);
+		setPlanning(true);
+		expect(isPlanning()).toBe(true);
+	});
+
+	it("workMode: plan while planning, else the permission mode", () => {
+		expect(workMode({ JW_PERMISSION: "manual" })).toBe("manual");
+		setPlanning(true);
+		expect(workMode({ JW_PERMISSION: "manual" })).toBe("plan");
+	});
+
+	it("nextWorkMode: manual, auto, plan and round; bypass only when set outside the session", () => {
+		const env = {};
+		expect(["manual", "auto", "plan"].map((m) => nextWorkMode(m as "manual", env))).toEqual([
+			"auto",
+			"plan",
+			"manual",
+		]);
+		const bypass = { JW_PERMISSION: "bypass" };
+		expect(["manual", "auto", "bypass", "plan"].map((m) => nextWorkMode(m as "manual", bypass))).toEqual([
+			"auto",
+			"bypass",
+			"plan",
+			"manual",
+		]);
+	});
+
+	it("applyWorkMode: plan turns planning on and keeps the permission mode; another mode turns it off", () => {
+		savePermissionMode("auto");
+		applyWorkMode("plan");
+		expect(isPlanning()).toBe(true);
+		expect(permissionMode({})).toBe("auto");
+		applyWorkMode("manual");
+		expect(isPlanning()).toBe(false);
+		expect(permissionMode({})).toBe("manual");
+		expect(savedPermissionMode()).toBe("auto");
+	});
+
+	it("/jw permission puts its choice in effect over a Shift+Tab choice", async () => {
+		setSessionPermissionMode("bypass");
+		const notes: string[] = [];
+		const ctx = { hasUI: false, ui: { notify: (m: string) => notes.push(m) } } as unknown as ExtensionCommandContext;
+		const env = process.env.JW_PERMISSION;
+		delete process.env.JW_PERMISSION;
+		try {
+			await setPermission("manual", ctx);
+			expect(permissionMode({})).toBe("manual");
+		} finally {
+			if (env !== undefined) process.env.JW_PERMISSION = env;
+		}
 	});
 });

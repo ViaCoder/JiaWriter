@@ -109,6 +109,13 @@ const RESERVED_KEYBINDINGS_FOR_EXTENSION_CONFLICTS = [
 	"app.editor.external",
 	"app.message.copy",
 	"app.message.followUp",
+	// JiaWriter: the keys added to follow Claude Code (2026-11-09).
+	"app.mode.cycle",
+	"app.todo.toggle",
+	"app.screen.redraw",
+	"app.history.search",
+	"tui.editor.historyPrevious",
+	"tui.editor.historyNext",
 	"tui.input.submit",
 	"tui.select.confirm",
 	"tui.select.cancel",

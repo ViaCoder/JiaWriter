@@ -67,7 +67,7 @@ export class ExtensionSelectorComponent extends Container {
 		this.addChild(new Spacer(1));
 		this.addChild(
 			new Text(
-				rawKeyHint("↑↓", "navigate") +
+				rawKeyHint(this.options.length > 1 ? `↑↓ / 1-${Math.min(9, this.options.length)}` : "↑↓", "navigate") +
 					"  " +
 					keyHint("tui.select.confirm", "select") +
 					"  " +
@@ -86,9 +86,11 @@ export class ExtensionSelectorComponent extends Container {
 		this.listContainer.clear();
 		for (let i = 0; i < this.options.length; i++) {
 			const isSelected = i === this.selectedIndex;
+			// JiaWriter: numbered, so a number key picks the option (as Claude Code's and Kimi Code's prompts).
+			const label = i < 9 ? `${i + 1}. ${this.options[i]}` : this.options[i];
 			const text = isSelected
-				? theme.fg("accent", "→ ") + theme.fg("accent", this.options[i])
-				: `  ${theme.fg("text", this.options[i])}`;
+				? theme.fg("accent", "→ ") + theme.fg("accent", label)
+				: `  ${theme.fg("text", label)}`;
 			this.listContainer.addChild(new Text(text, 1, 0));
 		}
 	}
@@ -108,6 +110,9 @@ export class ExtensionSelectorComponent extends Container {
 			if (selected) this.onSelectCallback(selected);
 		} else if (kb.matches(keyData, "tui.select.cancel")) {
 			this.onCancelCallback();
+		} else if (/^[1-9]$/.test(keyData) && Number(keyData) <= this.options.length) {
+			// A number picks its option at once.
+			this.onSelectCallback(this.options[Number(keyData) - 1]);
 		}
 	}
 

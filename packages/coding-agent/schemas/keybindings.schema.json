@@ -211,6 +211,10 @@
       "$ref": "#/$defs/KeybindingValue",
       "description": "Suspend to background"
     },
+    "app.mode.cycle": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Cycle work mode (manual, auto, plan)"
+    },
     "app.thinking.cycle": {
       "$ref": "#/$defs/KeybindingValue",
       "description": "Cycle thinking level"
@@ -233,11 +237,23 @@
     },
     "app.tools.expand": {
       "$ref": "#/$defs/KeybindingValue",
-      "description": "Toggle tool output"
+      "description": "Toggle detailed view"
     },
     "app.thinking.toggle": {
       "$ref": "#/$defs/KeybindingValue",
       "description": "Toggle thinking blocks"
+    },
+    "app.todo.toggle": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Show or hide the task list"
+    },
+    "app.screen.redraw": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Redraw the screen"
+    },
+    "app.history.search": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Search the input history"
     },
     "app.session.toggleNamedFilter": {
       "$ref": "#/$defs/KeybindingValue",

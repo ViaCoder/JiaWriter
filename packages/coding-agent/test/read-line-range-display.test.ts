@@ -17,6 +17,7 @@ import { formatReadLineRange } from "../src/core/tools/render-utils.ts";
 import { ToolExecutionComponent } from "../src/modes/interactive/components/tool-execution.ts";
 import { TreeSelectorComponent } from "../src/modes/interactive/components/tree-selector.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
+import { toolLabel } from "../src/writer/ui-text.ts";
 
 interface HtmlViewer {
 	formatReadLineRange: typeof formatReadLineRange;
@@ -132,7 +133,7 @@ describe("read line range display", () => {
 			{ requestRender() {} } as TUI,
 			tempDir,
 		);
-		expect(stripVTControlCharacters(tool.render(120).join("\n"))).toContain("read notes.txt:25-37");
+		expect(stripVTControlCharacters(tool.render(120).join("\n"))).toContain(`${toolLabel("read")} notes.txt:25-37`);
 
 		const tree = new TreeSelectorComponent(
 			SessionManager.open(sessionPath).getTree(),

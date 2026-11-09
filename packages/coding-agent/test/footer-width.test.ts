@@ -1,7 +1,8 @@
-import { visibleWidth } from "@earendil-works/pi-tui";
+import { setKeybindings, visibleWidth } from "@earendil-works/pi-tui";
 import { beforeAll, describe, expect, it } from "vitest";
 import type { AgentSession } from "../src/core/agent-session.ts";
 import type { ReadonlyFooterDataProvider } from "../src/core/footer-data-provider.ts";
+import { KeybindingsManager } from "../src/core/keybindings.ts";
 import { FooterComponent, formatCwdForFooter } from "../src/modes/interactive/components/footer.ts";
 import { initTheme } from "../src/modes/interactive/theme/theme.ts";
 import { stripAnsi } from "../src/utils/ansi.ts";
@@ -232,6 +233,8 @@ describe("FooterComponent width handling", () => {
 			},
 		});
 		const footer = new FooterComponent(session, createFooterData(1));
+		// The counts are part of the detailed view (Ctrl+O) since 2026-11-09.
+		footer.setDetailed(true);
 
 		const statsLine = stripAnsi(footer.render(120)[1]);
 		expect(statsLine).toContain("CH25.0%");
@@ -278,5 +281,28 @@ describe("FooterComponent width handling", () => {
 
 		expect(stats).toContain("$1.234");
 		expect(stats).not.toContain("(sub)");
+	});
+});
+
+// JiaWriter (2026-11-09): the status line names the work mode and the context in words; the token counts and the
+// git branch come with the detailed view (Ctrl+O).
+describe("FooterComponent detailed view", () => {
+	beforeAll(() => {
+		initTheme(undefined, false);
+		// The app's keys, so the work mode names Shift+Tab.
+		setKeybindings(new KeybindingsManager());
+	});
+
+	it("shows the work mode and the context, and the counts and branch only in the detailed view", () => {
+		const usage = { input: 2000, output: 72, cacheRead: 6500, cacheWrite: 0, cost: { total: 0 } };
+		const footer = new FooterComponent(createSession({ sessionName: "", usage }), createFooterData(1));
+		const plain = footer.render(120).join("\n");
+		expect(plain).toMatch(/Shift\+Tab/);
+		expect(plain).not.toContain("↑2.0k");
+		expect(plain).not.toContain("(main)");
+		footer.setDetailed(true);
+		const detailed = footer.render(120).join("\n");
+		expect(detailed).toContain("↑2.0k");
+		expect(detailed).toContain("(main)");
 	});
 });

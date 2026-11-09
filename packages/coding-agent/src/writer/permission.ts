@@ -66,9 +66,55 @@ export function savedPermissionMode(): PermissionMode | undefined {
 	}
 }
 
-/** The mode in effect: JW_PERMISSION, then the saved choice, then the default. */
+/** The mode chosen with Shift+Tab for this session only, as in Claude Code; never saved. */
+let sessionMode: PermissionMode | undefined;
+/** Plan mode (/plan or Shift+Tab): look and plan, change nothing. */
+let planning = false;
+
+/** The mode in effect: this session's choice, then JW_PERMISSION, then the saved choice, then the default. */
 export function permissionMode(env: NodeJS.ProcessEnv = process.env): PermissionMode {
-	return parsePermissionMode(env.JW_PERMISSION) ?? savedPermissionMode() ?? DEFAULT_PERMISSION_MODE;
+	return sessionMode ?? parsePermissionMode(env.JW_PERMISSION) ?? savedPermissionMode() ?? DEFAULT_PERMISSION_MODE;
+}
+
+/** Set this session's mode (undefined: back to the saved one). */
+export function setSessionPermissionMode(mode: PermissionMode | undefined): void {
+	sessionMode = mode;
+}
+
+/** Whether plan mode is on. */
+export function isPlanning(): boolean {
+	return planning;
+}
+
+/** Turn plan mode on or off. */
+export function setPlanning(on: boolean): void {
+	planning = on;
+}
+
+/** What the status line names: a permission mode, or plan. */
+export type WorkMode = PermissionMode | "plan";
+
+/** The work mode in effect. */
+export function workMode(env: NodeJS.ProcessEnv = process.env): WorkMode {
+	return planning ? "plan" : permissionMode(env);
+}
+
+/**
+ * The mode after this one for Shift+Tab: manual → auto → plan → manual, as Claude Code cycles default, accept
+ * edits and plan. bypass joins the cycle only when it is the mode set outside the session (as Claude Code shows its
+ * bypass mode only when started with it).
+ */
+export function nextWorkMode(current: WorkMode, env: NodeJS.ProcessEnv = process.env): WorkMode {
+	const outside = parsePermissionMode(env.JW_PERMISSION) ?? savedPermissionMode();
+	const cycle: WorkMode[] = outside === "bypass" ? ["manual", "auto", "bypass", "plan"] : ["manual", "auto", "plan"];
+	const at = cycle.indexOf(current);
+	return cycle[(at + 1) % cycle.length];
+}
+
+/** Put a work mode in effect for this session. */
+export function applyWorkMode(mode: WorkMode): void {
+	planning = mode === "plan";
+	if (mode !== "plan") sessionMode = mode;
 }
 
 /** Save the choice beside the other settings (atomic write). */
