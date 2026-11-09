@@ -17,7 +17,7 @@ Write each genre as an experienced drafter would: judgment first, specific evide
 
 1. Pick the genre. Surveying a situation and proposing measures: research report (调研报告). Deploying work at a meeting: leader's speech (领导讲话). Setting rules for lower units: work opinion (工作意见). Reporting practices: experience material (经验材料). Setting goals and dividing tasks: work plan (工作方案). Statutory documents (通知, 请示, 批复, 函) follow the layouts in `参考/法定公文样例/`.
 2. When asked for one paragraph or section, write only that part; no outline.
-3. For a whole document, first read the genre's section of `公文语料/文章结构模板.md` to lay out the structure, then assign the cases and data in the materials to the judgments, recording with material_add which judgment uses which item.
+3. For a whole document, first read the genre's section of `公文语料/文章结构模板.md` to lay out the structure; the outline and the writing section by section follow the writing rules.
 4. After you write, the program infers the genre from the title and runs the official-document parameter check, reporting only hard conflicts; fix what it reports. You need not call `gongwen_check` yourself.
 
 ## Countermeasures

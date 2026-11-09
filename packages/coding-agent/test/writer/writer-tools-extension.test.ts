@@ -26,6 +26,7 @@ import writerToolsExtension, {
 	MAX_ROUNDS,
 	materialsNameSources,
 	modelAsker,
+	outlineOpen,
 	referenceTitles,
 	requestedLength,
 	unusedMaterials,
@@ -370,6 +371,17 @@ describe("lacksReferences", () => {
 	});
 });
 
+describe("outlineOpen", () => {
+	it("is true while the outline beside a draft has a section to write", () => {
+		const draft = join(cwd, "稿.md");
+		expect(outlineOpen(draft)).toBe(false);
+		writeFileSync(join(cwd, "大纲.md"), "- [x] 一、基本情况\n- [ ] 二、问题\n");
+		expect([outlineOpen(draft), outlineOpen(join(cwd, "大纲.md"))]).toEqual([true, false]);
+		writeFileSync(join(cwd, "大纲.md"), "- [x] 一、基本情况\n- [x] 二、问题\n");
+		expect(outlineOpen(draft)).toBe(false);
+	});
+});
+
 describe("materialsNameSources", () => {
 	it("counts published files, searches and notes that name a source; a bare fact list names none", () => {
 		const topic = join(cwd, "20261108-来源");
@@ -497,6 +509,22 @@ describe("the automatic check of each draft", () => {
 		wrote("稿.md", `${FACT_REPORT}\n\n资料来源：《东坡村调查》。`);
 		await handlers.agent_end({}, { cwd });
 		expect(sent.length).toBe(1);
+	});
+
+	it("judges length and unused materials only once the outline has no section left, keeping the length asked", async () => {
+		// A long document written one section per turn with the user (2026-11-09).
+		const { handlers, sent, wrote } = started();
+		writeFileSync(join(cwd, "大纲.md"), "# 大纲\n\n- [x] 一、基本情况\n- [ ] 二、存在的问题\n");
+		handlers.input({ text: "写一篇约3000字的调研报告" }, { cwd });
+		wrote("稿.md", FACT_REPORT);
+		await handlers.agent_end({}, { cwd });
+		expect(sent.map((s) => s.message.content).join("")).not.toContain("要求约 3000 字");
+		// The last section done: the length asked in the first turn is the target.
+		writeFileSync(join(cwd, "大纲.md"), "# 大纲\n\n- [x] 一、基本情况\n- [x] 二、存在的问题\n");
+		handlers.input({ text: "继续" }, { cwd });
+		wrote("稿.md", FACT_REPORT);
+		await handlers.agent_end({}, { cwd });
+		expect(sent.at(-1)?.message.content).toContain("要求约 3000 字");
 	});
 
 	it("goes on without the review when the model cannot be asked", async () => {

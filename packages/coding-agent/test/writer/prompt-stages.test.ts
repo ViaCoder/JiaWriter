@@ -68,7 +68,9 @@ describe("budgets", () => {
 		// The analysis method moved here from the gongwen skill on 2026-11-08, so it is in one place for every document;
 		// the rest of the growth is the user's citation rule with its exception, the measured placement rule, and the name
 		// of a requested outline (a 提纲 written to 大纲.md skipped the checks and the export).
-		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(2350);
+		// 2800 since 2026-11-09: long documents are outlined as a checklist with their items and written one section per
+		// turn with the user (the user's request), or in one run with nobody to answer.
+		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(2800);
 		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);
@@ -107,7 +109,8 @@ describe("one place for each rule", () => {
 });
 
 describe("the user's requirements", () => {
-	const writing = WRITING_MANUAL.join("\n");
+	// Each requirement lives in one place: the rules of every request or the writing manual.
+	const writing = [...CORE_RULES, ...WRITING_MANUAL].join("\n");
 
 	it.each([
 		// Citations only where the type expects them, by kind of source (the user, 2026-11-08).
@@ -118,12 +121,16 @@ describe("the user's requirements", () => {
 		["the reference list", "参考文献"],
 		["a list entry", "[page title, publisher, date](full URL)"],
 		// No search unless the user asks (the user, 2026-11-08).
-		["cases from the materials", "take cases and data from the materials"],
-		["running the checks", "the program checks each write and, at the end, length, readability and 公文 parameters"],
+		["cases from the materials", "take every case and figure from the reference materials"],
+		// Long documents section by section (the user, 2026-11-09).
+		["section by section", "Write one section at a time from its own items"],
+		["over turns with the user", "show the outline and stop; then one section per turn"],
+		["in one run with nobody to answer", "With nobody to answer: every section in one run"],
+		["running the checks", "program checks each write and, at the end, length, readability and 公文 parameters"],
 		// Old material keeps its date (a 2026 report called 2021 "the first year", 2026-11-08).
 		["dated material", "Give old material its own date"],
 		// The AI-style check runs by itself after each write (the user, 2026-11-08).
-		["recording materials", "for long documents recording them with material_add"],
+		["recording materials", "its material items, each item once, recorded with material_add"],
 		// Analysis: general sentences, then the evidence (the user, 2026-11-08).
 		[
 			"the paragraph form",

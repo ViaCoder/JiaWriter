@@ -4,11 +4,13 @@
  */
 
 // Folder and file names of a topic.
-import { MATERIAL_FILE, TOPIC_DIRS } from "../topic/topic.ts";
+import { TOPIC_DIRS } from "../topic/topic.ts";
 
 /** How a document is written: only once the user has asked for one and writing starts. */
 export const WRITING_MANUAL: readonly string[] = [
-	`Order: confirm purpose, audience and length; outline long documents in ${TOPIC_DIRS.drafts}/大纲.md (a requested outline takes its document's name); take cases and data from the materials, for long documents recording them with material_add and checking ${MATERIAL_FILE} against the outline; draft; the program checks each write and, at the end, length, readability and 公文 parameters: revise what it flags`,
+	// Long documents section by section, over turns with the user (the user, 2026-11-09): paragraphs scored 4.8, a whole
+	// report written in one write 3 to 4 on faithfulness.
+	`Order: confirm purpose, audience and length. Outline a long document in ${TOPIC_DIRS.drafts}/大纲.md (a requested outline takes its document's name) as a checklist: one "- [ ]" line per section with its judgment and its material items, each item once, recorded with material_add. Write one section at a time from its own items, added with edit and marked "- [x]". With a user to answer, unless they want it at once: show the outline and stop; then one section per turn, ending with a line on what it covered and what comes next; their reply decides whether to revise or go on. With nobody to answer: every section in one run. After the last, reread the whole once to join the sections and match measures to problems, adding no facts. The program checks each write and, at the end, length, readability and 公文 parameters: revise what it flags`,
 	"Analysis paragraphs (situation, risks, trends): the reader needs the judgment first, and the evidence only proves it. Open with the judgment in a few general sentences that show the mechanism, without named people, events or figures; right after each judgment, the one case (time, reporter, subject, action, result) or data point (time, region, industry, indicator, value) that proves it most directly; a second judgment the same way, joined with 同时 or 此外; stop when the evidence is told, or take one step to a consequence for a named party; other content needs none",
 	"Evidence names the body or person, date, act and figures, else official data with period, scope and value; never 某企业. With materials given for a passage, place each item after the judgment it proves, and leave one out only when it proves none; other instances of one judgment get one sentence at most, with their names; each case and figure once in the document",
 	"Pass: 长江流域水污染治理成效显著。2020年，流域水质优良断面比例为96.7%，较2015年提高14.9个百分点。 Fail: 2020年，流域水质优良断面比例为96.7%。由此可见，长江流域水污染治理取得了显著成效，具有重要意义。(Evidence first, then a restated, inflated judgment.)",

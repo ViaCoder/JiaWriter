@@ -62,6 +62,9 @@ const INPUT_FIELDS = {
 /** Hints shared by the three tools: they only read. */
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 
+/** The outline of a long document, beside its drafts. */
+const OUTLINE_FILE = "大纲.md";
+
 /** Automatic rounds of revision after one message of the user, so a draft that cannot be cleaned does not loop. */
 export const MAX_ROUNDS = 2;
 
@@ -84,6 +87,16 @@ export function draftCheck(text: string): { clean: boolean; mustFix: boolean; te
 		mustFix: styleMustFix(report) || found.fail.length > 0,
 		text: `${styleText}${lines}`,
 	};
+}
+
+/**
+ * True while a draft's outline (大纲.md beside it) still has a section to write ("- [ ]"): a long document written one
+ * section per turn is not yet whole, so its length and unused materials are not judged (2026-11-09).
+ */
+export function outlineOpen(file: string): boolean {
+	if (basename(file) === OUTLINE_FILE) return false;
+	const outline = join(dirname(file), OUTLINE_FILE);
+	return existsSync(outline) && /^\s*[-*]\s*\[ \]/m.test(readFileSync(outline, "utf-8"));
 }
 
 /** The folders from a draft's own up to the writing folder, where its materials may be. */
@@ -296,10 +309,12 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	// A new message from the user starts again.
 	// The length the user's message asked for, if it named one.
 	let target: number | undefined;
+	// A document written one section per turn is still open: the length asked at its start stays the target.
+	let documentOpen = false;
 	pi.on("input", (event) => {
 		written.clear();
 		rounds = 0;
-		target = requestedLength(event.text ?? "");
+		target = requestedLength(event.text ?? "") ?? (documentOpen ? target : undefined);
 	});
 	// After each write or edit of a draft, the program checks it: the model never has to remember to.
 	pi.on("tool_result", (event, ctx) => {
@@ -318,6 +333,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	// When a reply ends, each draft it wrote gets the rules and one separate semantic review; while either finds
 	// something, the program asks for another round, at most MAX_ROUNDS.
 	pi.on("agent_end", async (_event, ctx) => {
+		documentOpen = [...written].some((file) => existsSync(file) && outlineOpen(file));
 		if (rounds >= MAX_ROUNDS || written.size === 0) return;
 		const ask = modelAsker(ctx, complete);
 		const open: string[] = [];
@@ -336,12 +352,15 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			if (inferRegister(text) === "report" && /\d/.test(text) && !cites && materialsNameSources(file, ctx.cwd))
 				own.push(t("style.noCitation"));
 			if (lacksReferences(text, file, ctx.cwd)) own.push(t("style.noReferences"));
-			const unused = unusedMaterials(text, file, ctx.cwd);
-			if (unused.length > 0)
-				own.push(t("style.unusedMaterials", { items: unused.map((i) => `“${i.slice(0, 40)}”`).join("；") }));
-			const chars = countText(bodyBeforeReferences(text)).total;
-			if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)
-				own.push(t("style.length", { chars, target }));
+			// The whole document's measures wait until its outline has no section left (written one per turn).
+			if (!outlineOpen(file)) {
+				const unused = unusedMaterials(text, file, ctx.cwd);
+				if (unused.length > 0)
+					own.push(t("style.unusedMaterials", { items: unused.map((i) => `“${i.slice(0, 40)}”`).join("；") }));
+				const chars = countText(bodyBeforeReferences(text)).total;
+				if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)
+					own.push(t("style.length", { chars, target }));
+			}
 			own.push(...finishedChecks(text));
 			if (!check.mustFix && !issues?.length && own.length === 0) continue;
 			const review = issues?.length
