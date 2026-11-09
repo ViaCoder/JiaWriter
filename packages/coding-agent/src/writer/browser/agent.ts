@@ -489,6 +489,12 @@ export async function runBrowser(given: BrowserInput, deps: BrowserDeps): Promis
 		if (state.dialog && action !== "dialog") return outcome("refused", action, "model", "dialog-open");
 		// No reference to act on: the only list or field of the page when there is one; else said as such, with the
 		// elements it may be, not as a page that changed (a run sent x and y instead 38 times).
+		// Nothing to put there: said as such, before any reference (2026-11-09: a run sent type with the words only in
+		// its reason seven times, and heard only that the reference was missing).
+		if (action === "type" && !input.text?.trim())
+			return outcome("failed", action, "model", "no-text", { need: "text: the words to type" });
+		if (action === "select" && !input.option?.trim())
+			return outcome("failed", action, "model", "no-option", { need: "option: the option to choose" });
 		if (REF_ACTIONS.has(action) && !input.ref) {
 			const candidates = refCandidates(action, state.roles);
 			// Only with what to put there: an empty type once sent a search form off blank (2026-11-09).

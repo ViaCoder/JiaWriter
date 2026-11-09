@@ -16,6 +16,10 @@ export const CORE_RULES: readonly string[] = [
 	"Use methods claude and codex only when the user's prompt says the upstream supports them: claude for Claude models, codex for Codex and GPT models",
 	// What was done counts as a fact too (2026-11-09: two reports opened with surveys and checks nobody made).
 	"In a document, take every case, figure and account of work done (surveys, visits) from the reference materials or search results",
+	// The user, 2026-11-09: "add prompt request model not repeatedly attempt to bypass verification mechanisms"; three of
+	// three runs at a slider wall dragged, clicked, ran page scripts and probed the site with curl. fetch_web is named
+	// as usable, since its sf method passes some checks itself (the user's compatibility handling, 59f66f31b).
+	"A verification check (captcha, slider, robot test) is the user's to pass: do not try to solve or get around it (dragging, clicking, page scripts, shell requests to the site); say once what the user must do and stop. fetch_web's methods stay usable as they are",
 ];
 
 /**

@@ -587,8 +587,12 @@ describe("references after the page moved", () => {
 
 	it("does not guess a field for a type with nothing to type, nor a list for a select with no option", async () => {
 		const { deps } = await opened({ page_read: FORM });
-		expect((await runBrowser({ action: "type", enter: true }, deps)).reason).toBe("no-ref");
-		expect((await runBrowser({ action: "select" }, deps)).reason).toBe("no-ref");
+		// What is missing is said as such: the words, the option (2026-11-09: the words only in the reason, seven times).
+		expect(await runBrowser({ action: "type", enter: true, reason: "输入“老旧小区”" }, deps)).toMatchObject({
+			reason: "no-text",
+			data: { need: "text: the words to type" },
+		});
+		expect((await runBrowser({ action: "select" }, deps)).reason).toBe("no-option");
 	});
 
 	it("forgets the old page's references when an action moved to another address", async () => {
