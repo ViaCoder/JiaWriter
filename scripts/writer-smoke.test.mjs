@@ -58,7 +58,7 @@ else if (a[1] === "导入并导出") {
   fs.writeFileSync("参考资料/.parsed/a.pdf.md", "Smoke reference text");
   fs.writeFileSync("d.docx", "PK fake");
   fs.writeFileSync("稿件.docx", "PK auto");
-  await fetch(process.env.JW_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.JW_KEY }, body: JSON.stringify({ max_tokens: 100, messages: [{ role: "tool", content: "✗ 领导讲话不用三级标题" }] }) });
+  await fetch(process.env.JW_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.JW_KEY }, body: JSON.stringify({ max_tokens: 100, messages: [{ role: "tool", content: "逐处命中 1 处：- 第 3 行第 2 列〔对比框架 不是……而是〕不是简单的技术问题，而是" }] }) });
   console.log(${JSON.stringify(REPLY)});
 } else {
   const body = { max_tokens: 100, messages: [{ role: "system", content: "You are JiaWriter, a general-purpose agent. <name>deep-research</name> <name>gongwen-writing</name>" }],
@@ -111,7 +111,7 @@ test("smoke passes a well-behaved program and fails one that leaks the key", asy
 		["import pdf", true],
 		["export docx", true],
 		["auto export", true],
-		["gongwen check", true],
+		["style check", true],
 		["host listens", true],
 		["host round trip", true],
 		["host exits", true],
