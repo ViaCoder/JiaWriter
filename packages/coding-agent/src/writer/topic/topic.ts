@@ -347,10 +347,46 @@ export function renderMaterial(item: Material): string {
 	return `- ${item.section?.trim() ? `【${item.section.trim()}】` : ""}${body}｜来源：${source}`;
 }
 
+/**
+ * The outlet a fetched page names for itself: its "来源：" line, else the site at the end of its title (… - 新华网).
+ * Empty when the page was not fetched or names none.
+ */
+export function pageReporter(dir: string, url: string): string {
+	const key = materialKey(url);
+	const entry = readIndex(dir).find(
+		(e) => e.kind === "page" && [e.url, e.requested].some((u) => u && materialKey(u) === key),
+	);
+	if (!entry || !existsSync(join(dir, entry.file))) return "";
+	// The page as archived: the head, then the text.
+	const text = readFileSync(join(dir, entry.file), "utf-8").slice(0, 4000);
+	const stated = text.match(/(?:^|[\s　|｜])来源[:：]\s*([\u4e00-\u9fa5A-Za-z·]{2,20}?)(?=$|[\s　|｜，,。])/m);
+	if (stated) return stated[1];
+	// The title's last part, when it names a site: 新华网, 人民日报, 央视新闻.
+	const site =
+		entry.title
+			.split(/\s[-–—|｜]\s|_/)
+			.at(-1)
+			?.trim() ?? "";
+	return /^[\u4e00-\u9fa5A-Za-z]{2,12}(?:网|报|社|台|新闻|日报|在线)$/.test(site) ? site : "";
+}
+
+/**
+ * Cases from the web with their outlet filled from the page when the model left it out (2026-11-09: a research run
+ * gave the url of a fetched 新华网 page nine times without reporter, and ended with no draft). The outlet is the one
+ * the page names; nothing is guessed.
+ */
+export function withPageReporters(dir: string, items: readonly Material[]): Material[] {
+	return items.map((item) => {
+		if (item.kind !== "case" || item.reporter?.trim() || item.file?.trim() || !item.url?.trim()) return item;
+		const reporter = pageReporter(dir, item.url);
+		return reporter ? { ...item, reporter } : item;
+	});
+}
+
 /** Add materials to 素材.md, all or none; returns how many it holds now. */
 export function addMaterials(dir: string, given: readonly Material[]): number {
-	// Local paths in url are files.
-	const items = given.map(asFileSource);
+	// Local paths in url are files; a case's outlet comes from its fetched page when it was left out.
+	const items = withPageReporters(dir, given.map(asFileSource));
 	// Every item is checked before anything is written.
 	const archived = materialUrls(dir);
 	const problems = items.flatMap((item, i) => {

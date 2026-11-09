@@ -24,11 +24,13 @@ import {
 	materialUrls,
 	openAutoTopic,
 	openTopic,
+	pageReporter,
 	readIndex,
 	renderMaterial,
 	safeName,
 	topicPath,
 	topicWords,
+	withPageReporters,
 } from "../../src/writer/topic/topic.ts";
 
 // Working folder of each test.
@@ -317,5 +319,77 @@ describe("current topic", () => {
 		const entry = (topicDir?: string, role = "toolResult") => ({ message: { role, details: { topicDir } } });
 		expect(topicFromEntries([entry("/a"), entry(), entry("/b"), entry("/c", "user")])).toBe("/b");
 		expect(topicFromEntries([{ type: "label" }])).toBeUndefined();
+	});
+});
+
+// The outlet of a web case from the page it was fetched from (2026-11-09: a research run gave a fetched 新华网 page
+// nine times without reporter and ended with no draft).
+describe("pageReporter / withPageReporters", () => {
+	/** A page as the run on 2026-11-09 fetched it. */
+	const XINHUA = {
+		url: "https://www.news.cn/20251222/15fef6ce60024e5aac0226a0d88924a1/c.html",
+		title: "市场最前沿｜逐空而上！低空经济加速启航万亿新赛道 - 新华网 > 新闻 > 正文",
+		date: "2025-12-22",
+		content:
+			"新华网 > 新闻 > 正文\n\n2025 12/22 20:19:04\n\n来源：新华网\n\n# 市场最前沿\n\n国产首款800公斤级重载eVTOL首飞成功。",
+	};
+	const CASE_NO_REPORTER: Material = {
+		kind: "case",
+		time: "2025年12月10日",
+		subject: "国产AR-E800飞行器",
+		action: "国产首款800公斤级重载eVTOL首飞成功",
+		url: XINHUA.url,
+	};
+
+	it("pageReporter: the page's 来源 line, else the site at the end of its title, else nothing", () => {
+		const dir = openTopic(cwd, "低空经济").dir;
+		archivePage(dir, XINHUA, XINHUA.url, "deepseek", "时间");
+		expect(pageReporter(dir, XINHUA.url)).toBe("新华网");
+		archivePage(
+			dir,
+			{ url: "https://b.example/1", title: "低空经济观察 - 人民日报", date: "", content: "正文" },
+			"https://b.example/1",
+			"x",
+			"t",
+		);
+		expect(pageReporter(dir, "https://b.example/1")).toBe("人民日报");
+		archivePage(
+			dir,
+			{ url: "https://c.example/1", title: "低空经济观察", date: "", content: "正文" },
+			"https://c.example/1",
+			"x",
+			"t",
+		);
+		expect(pageReporter(dir, "https://c.example/1")).toBe("");
+		expect(pageReporter(dir, "https://never.example/")).toBe("");
+	});
+
+	it("withPageReporters: fills only web cases without an outlet", () => {
+		const dir = openTopic(cwd, "低空经济").dir;
+		archivePage(dir, XINHUA, XINHUA.url, "deepseek", "时间");
+		const [filled, kept, data] = withPageReporters(dir, [
+			CASE_NO_REPORTER,
+			{ ...CASE_NO_REPORTER, reporter: "央视新闻" },
+			DATA,
+		]);
+		expect(filled.reporter).toBe("新华网");
+		expect(kept.reporter).toBe("央视新闻");
+		expect(data).toBe(DATA);
+	});
+
+	it("addMaterials: a case from a fetched page is recorded with the page's outlet", () => {
+		const dir = openTopic(cwd, "低空经济").dir;
+		archivePage(dir, XINHUA, XINHUA.url, "deepseek", "时间");
+		addMaterials(dir, [CASE_NO_REPORTER]);
+		expect(readFileSync(join(dir, "素材.md"), "utf-8")).toContain("报道方：新华网");
+		// A page that names no outlet still asks for one.
+		archivePage(
+			dir,
+			{ url: "https://c.example/1", title: "观察", date: "", content: "正文" },
+			"https://c.example/1",
+			"x",
+			"t",
+		);
+		expect(() => addMaterials(dir, [{ ...CASE_NO_REPORTER, url: "https://c.example/1" }])).toThrow(/reporter/);
 	});
 });
