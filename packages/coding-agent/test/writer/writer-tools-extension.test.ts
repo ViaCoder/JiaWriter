@@ -471,6 +471,14 @@ describe("the automatic check of each draft", () => {
 		expect(wrote("稿2.md", VAGUE_REPORT, true)).toBeUndefined();
 	});
 
+	it("gives the length against the request and the sentence checks with each write", () => {
+		// 2026-11-09: a report run called word_count ten times and readability_check three times.
+		const { handlers, wrote } = started();
+		handlers.input({ text: "写一篇约3000字的调研报告" }, { cwd });
+		const text = wrote("稿.md", FACT_REPORT)?.content[1]?.text ?? "";
+		expect(text).toMatch(/篇幅：正文 \d+ 字，要求约 3000 字（相差 20% 以内即可）/);
+	});
+
 	it("asks for another round while a draft is flagged, at most MAX_ROUNDS, and starts again with the user", async () => {
 		const { handlers, sent, wrote } = started();
 		wrote("稿.md", VAGUE_REPORT);

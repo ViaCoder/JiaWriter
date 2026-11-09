@@ -82,6 +82,9 @@ export const en: Record<MessageKey, string> = {
 		"These materials are not used: {items}. If one proves a judgment, put it right after that judgment; leave out only what has no bearing here.",
 	"style.length":
 		"{chars} characters against about {target} asked: cut or add to fit; when the materials run short, do not repeat or add what they lack, and say so in the reply.",
+	"style.lengthNow": "Length: {chars} characters in the body.",
+	"style.lengthNowTarget":
+		"Length: {chars} characters in the body, about {target} asked (within {tolerance}% is fine).",
 	"style.reviewFound": "The semantic review found {count}:",
 	// Where facts come from in a revision.
 	"style.materials":

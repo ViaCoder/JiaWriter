@@ -70,6 +70,8 @@ export const zh = {
 		"这几条材料没有用上：{items}。它若能证明某个判断，就放在那个判断之后；确实与本段无关的才不用。",
 	"style.length":
 		"篇幅 {chars} 字，要求约 {target} 字：按要求增删；材料不够时不复述、不加材料里没有的内容来凑字数，在回复里说明。",
+	"style.lengthNow": "篇幅：正文 {chars} 字。",
+	"style.lengthNowTarget": "篇幅：正文 {chars} 字，要求约 {target} 字（相差 {tolerance}% 以内即可）。",
 	"style.reviewFound": "语义审查发现 {count} 处：",
 	// Where facts come from in a revision.
 	"style.materials":

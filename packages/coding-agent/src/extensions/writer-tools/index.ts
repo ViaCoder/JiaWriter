@@ -341,7 +341,15 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		written.add(file);
 		// The checks called without a file read this one.
 		setLastDraft(file);
-		const text = draftCheck(readFileSync(file, "utf-8")).text;
+		const draft = readFileSync(file, "utf-8");
+		// The length and the sentence checks come with each write, so the model needs no tool for them (2026-11-09: a
+		// report run called word_count ten times and readability_check three times).
+		const chars = countText(bodyBeforeReferences(draft)).total;
+		const tolerance = Math.round(LENGTH_TOLERANCE * 100);
+		const length = target
+			? t("style.lengthNowTarget", { chars, target, tolerance })
+			: t("style.lengthNow", { chars });
+		const text = [draftCheck(draft).text, length, ...finishedChecks(draft)].join("\n");
 		return { content: [...event.content, { type: "text", text: first ? `${text}\n${STYLE_REVIEW}` : text }] };
 	});
 	// When a reply ends, each draft it wrote gets the rules and one separate semantic review; while either finds
@@ -446,7 +454,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		label: "Word count",
 		// Full description sent to the model.
 		description:
-			"Counts a draft as writers do, whole or per section, against a target. The program checks the length at the end of each run; call it for section counts or when the brief's target is not in the request",
+			"Counts text as writers do, whole or per section, against a target. The program gives a draft's length after each write and checks it at the end of each run; call this only for one section or for text outside a draft",
 		// Argument schema.
 		parameters: Type.Object({
 			// path or text.
@@ -486,7 +494,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		label: "Readability check",
 		// Full description sent to the model.
 		description:
-			"Finds rare Chinese characters and long sentences, and rates English readability. The program checks both at the end of each run; call it for a file you did not write",
+			"Finds rare Chinese characters and long sentences, and rates English readability. The program reports both after each write of a draft; call this only for a file you did not write",
 		// Argument schema.
 		parameters: Type.Object({
 			// path or text.
