@@ -15,11 +15,14 @@ import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 // Extension under test.
 import writerToolsExtension, {
 	type Complete,
+	changedParagraphs,
 	citesMaterials,
 	draftCheck,
 	draftFolders,
 	finishedChecks,
+	freshLines,
 	hasMaterials,
+	inChanged,
 	inventedMethods,
 	itemMarks,
 	lacksReferences,
@@ -28,6 +31,7 @@ import writerToolsExtension, {
 	materialText,
 	modelAsker,
 	outlineOpen,
+	ownFindings,
 	referenceTitles,
 	requestedLength,
 	unusedMaterials,
@@ -526,6 +530,39 @@ describe("the automatic check of each draft", () => {
 		expect(sent[0]?.message.content).toContain("[vague-no-facts]");
 	});
 
+	// 2026-11-09: asked to change a date, a run also cut a phrase of the notice the user had kept, because the review
+	// read the whole notice again.
+	it("in a revision, asks only about what the run changed", async () => {
+		const answer = (quote: string) =>
+			JSON.stringify({ issues: [{ category: "stock-phrase", quote, why: "x", fix: "y" }] });
+		const lines = FACT_REPORT.split("\n");
+		const kept = lines.find((l) => l.includes("王大爷说")) ?? "";
+		/** The draft there before the message, then one edit of another line, as the tools see it. */
+		const revise = (handlers: Record<string, (event: unknown, ctx: unknown) => unknown>) => {
+			writeFileSync(join(cwd, "稿.md"), FACT_REPORT);
+			handlers.input({ text: "截止时间改成12月5日" }, { cwd });
+			handlers.tool_call({ toolName: "edit", input: { path: "稿.md" } }, { cwd });
+			const changed = FACT_REPORT.replace(kept, `${kept}（12月5日前报送）`);
+			writeFileSync(join(cwd, "稿.md"), changed);
+			handlers.tool_result(
+				{ toolName: "edit", input: { path: "稿.md" }, content: [{ type: "text", text: "ok" }], isError: false },
+				{ cwd },
+			);
+		};
+		// A finding on a line the user kept: no round.
+		const untouched = started(
+			fakeComplete(answer(lines.find((l) => l.trim() && l !== kept && !l.startsWith("#"))?.slice(0, 8) ?? "x")),
+		);
+		revise(untouched.handlers);
+		await untouched.handlers.agent_end({}, reviewCtx());
+		expect(untouched.sent).toEqual([]);
+		// A finding on the line the run wrote: a round.
+		const touched = started(fakeComplete(answer("12月5日前报送")));
+		revise(touched.handlers);
+		await touched.handlers.agent_end({}, reviewCtx());
+		expect(touched.sent[0]?.message.content).toContain("12月5日前报送");
+	});
+
 	it("asks for sources and the requested length when a report lacks them", async () => {
 		const { handlers, sent, wrote } = started();
 		mkdirSync(join(cwd, "参考资料", ".parsed"), { recursive: true });
@@ -572,8 +609,44 @@ describe("the automatic check of each draft", () => {
 // 2026-11-09: each reference entry cited where its fact is used.
 describe("finishedChecks and the references", () => {
 	it("names the reference entries the text never cites", () => {
-		const draft = "# 报告\n\n2025年12月30日《上海证券报》报道，航线增加。\n\n## 参考文献\n\n1. [向天空要生产力，上海证券报，2025-12-30](https://a.example/1)\n2. [大事记，现代物流报，2025-12-31](https://a.example/2)\n";
+		const draft =
+			"# 报告\n\n2025年12月30日《上海证券报》报道，航线增加。\n\n## 参考文献\n\n1. [向天空要生产力，上海证券报，2025-12-30](https://a.example/1)\n2. [大事记，现代物流报，2025-12-31](https://a.example/2)\n";
 		expect(finishedChecks(draft).join("\n")).toContain("参考文献第 2 条在正文里没有引用");
-		expect(finishedChecks(draft.replace("航线增加。", "航线增加。2025年12月31日《现代物流报》报道，订单超300亿元。")).join("\n")).not.toContain("没有引用");
+		expect(
+			finishedChecks(
+				draft.replace("航线增加。", "航线增加。2025年12月31日《现代物流报》报道，订单超300亿元。"),
+			).join("\n"),
+		).not.toContain("没有引用");
+	});
+});
+
+describe("changedParagraphs / freshLines / inChanged / ownFindings", () => {
+	it("changedParagraphs: the lines the run wrote", () => {
+		expect(changedParagraphs("# 通知\n\n甲。\n\n乙。", "# 通知\n\n甲。\n\n乙改。\n\n丙。")).toEqual([
+			"乙改。",
+			"丙。",
+		]);
+		expect(changedParagraphs("", "甲。")).toEqual(["甲。"]);
+	});
+	it("freshLines: the report lines that are new", () => {
+		expect(freshLines(["A", "B"], ["B", "C"])).toEqual(["C"]);
+	});
+	it("inChanged: the findings that quote a changed line", () => {
+		const issue = (quote: string) => ({ category: "stock-phrase", quote, why: "", fix: "" });
+		expect(
+			inChanged([issue("形成工作闭环"), issue("12月5日")], ["于2026年12月5日前报送"]).map((i) => i.quote),
+		).toEqual(["12月5日"]);
+	});
+	it("ownFindings: the program's findings; materials left out only on the first write", () => {
+		const dir = mkdtempSync(join(tmpdir(), "jw-own-"));
+		mkdirSync(join(dir, "参考资料"), { recursive: true });
+		const file = join(dir, "稿件", "通知.md");
+		mkdirSync(join(dir, "稿件"), { recursive: true });
+		writeFileSync(file, "# 通知\n\n各单位于12月5日前报送。\n");
+		expect(ownFindings("# 通知\n\n各单位于12月5日前报送。\n", file, dir, { firstWrite: true })).toEqual([]);
+		expect(ownFindings("# 通知\n\n短。\n", file, dir, { target: 3000, firstWrite: false }).join("")).toContain(
+			"3000",
+		);
+		rmSync(dir, { recursive: true, force: true });
 	});
 });

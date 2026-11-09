@@ -42,7 +42,13 @@ import { runDraftChecks } from "../../writer/style/draft-checks.ts";
 // The default threshold for the schema description.
 import { DEFAULT_NEGATION_THRESHOLD } from "../../writer/style/patterns.ts";
 // The semantic review by a separate request.
-import { formatReview, keepAnswerable, reviewDraft, reviewEnabled } from "../../writer/style/review.ts";
+import {
+	formatReview,
+	keepAnswerable,
+	type ReviewIssue,
+	reviewDraft,
+	reviewEnabled,
+} from "../../writer/style/review.ts";
 // Length as writers count it.
 import { bodyBeforeReferences, countText, REFERENCES_HEADING } from "../../writer/text-stats.ts";
 // Shared input loading.
@@ -297,6 +303,59 @@ export function finishedChecks(text: string): string[] {
 	return out;
 }
 
+/** The paragraphs of a draft that a run wrote: those of `after` that `before` does not hold as they stand. */
+export function changedParagraphs(before: string, after: string): string[] {
+	const old = new Set(before.split(/\n/).map((line) => line.trim()));
+	return after
+		.split(/\n/)
+		.map((line) => line.trim())
+		.filter((line) => line !== "" && !old.has(line));
+}
+
+/** The lines of a report on `after` that its report on `before` did not have: what this run brought in. */
+export function freshLines(before: readonly string[], after: readonly string[]): string[] {
+	const old = new Set(before);
+	return after.filter((line) => !old.has(line));
+}
+
+/** The review findings that quote what this run wrote; the rest the user saw and kept. */
+export function inChanged(issues: readonly ReviewIssue[], changed: readonly string[]): ReviewIssue[] {
+	return issues.filter((issue) => changed.some((paragraph) => paragraph.includes(issue.quote.trim())));
+}
+
+/**
+ * What the program itself sees in a finished draft: a report with materials that cites none, no references, research
+ * steps the materials do not record, materials left out (when first written), a length far from the one asked, and
+ * the sentence and reference checks.
+ */
+export function ownFindings(
+	text: string,
+	file: string,
+	cwd: string,
+	opts: { target?: number; firstWrite: boolean },
+): string[] {
+	const own: string[] = [];
+	// A report that states figures from materials naming their sources, and cites none of them.
+	const cites = citesMaterials(text, referenceTitles(file, cwd));
+	if (inferRegister(text) === "report" && /\d/.test(text) && !cites && materialsNameSources(file, cwd))
+		own.push(t("style.noCitation"));
+	if (lacksReferences(text, file, cwd)) own.push(t("style.noReferences"));
+	const methods = inventedMethods(text, file, cwd);
+	if (methods.length > 0) own.push(t("style.inventedMethods", { words: methods.join("、") }));
+	// The whole document's measures wait until its outline has no section left (written one per turn); materials
+	// left out are named when the draft is first written, not again with each revision.
+	if (!outlineOpen(file)) {
+		const unused = opts.firstWrite ? unusedMaterials(text, file, cwd) : [];
+		if (unused.length > 0)
+			own.push(t("style.unusedMaterials", { items: unused.map((i) => `“${i.slice(0, 40)}”`).join("；") }));
+		const chars = countText(bodyBeforeReferences(text)).total;
+		if (opts.target && Math.abs(chars - opts.target) > opts.target * LENGTH_TOLERANCE)
+			own.push(t("style.length", { chars, target: opts.target }));
+	}
+	own.push(...finishedChecks(text));
+	return own;
+}
+
 /** How one request reaches a model: completeSimple, or a stand-in in tests. */
 export type Complete = typeof completeSimple;
 
@@ -326,6 +385,10 @@ export function modelAsker(
 export default function writerToolsExtension(pi: ExtensionAPI, complete: Complete = completeSimple): void {
 	// Drafts written since the user's last message, and the automatic rounds they have had.
 	const written = new Set<string>();
+	// Each draft as it was before this message changed it ("" for a new one): a revision is checked for what it
+	// brought in only (2026-11-09: asked to change a date, a run also cut a phrase of the notice the user had kept,
+	// because the review read the whole notice again).
+	const before = new Map<string, string>();
 	let rounds = 0;
 	// A new message from the user starts again.
 	// The length the user's message asked for, if it named one.
@@ -334,8 +397,18 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	let documentOpen = false;
 	pi.on("input", (event) => {
 		written.clear();
+		before.clear();
 		rounds = 0;
 		target = requestedLength(event.text ?? "") ?? (documentOpen ? target : undefined);
+	});
+	// The draft before its first change in this message.
+	pi.on("tool_call", (event, ctx) => {
+		if (event.toolName !== "write" && event.toolName !== "edit") return undefined;
+		const path = (event.input as { path?: unknown }).path;
+		const file = typeof path === "string" ? resolveToCwd(path, ctx.cwd) : "";
+		if (file && isDraftPath(file, ctx.cwd) && !before.has(file))
+			before.set(file, existsSync(file) ? readFileSync(file, "utf-8") : "");
+		return undefined;
 	});
 	// After each write or edit of a draft, the program checks it: the model never has to remember to.
 	pi.on("tool_result", (event, ctx) => {
@@ -369,35 +442,31 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		for (const file of written) {
 			if (!existsSync(file)) continue;
 			const text = readFileSync(file, "utf-8");
+			// A revision of a draft that was there before this message: only what it brought in counts.
+			const old = before.get(file) ?? "";
+			const revision = old.trim() !== "";
+			const changed = revision ? changedParagraphs(old, text) : [];
 			const check = draftCheck(text);
+			const checkLines = revision ? freshLines(draftCheck(old).text.split("\n"), check.text.split("\n")) : [];
+			const mustFix = revision ? check.mustFix && checkLines.length > 0 : check.mustFix;
 			const found = ask ? await reviewDraft(text, ask) : undefined;
 			// Findings that ask for facts only where there are materials to take them from.
 			const materials = hasMaterials(file, ctx.cwd);
-			const issues = found && keepAnswerable(found, materials);
-			// What the program itself sees: a report with materials that names none, a length far from the one asked.
-			const own: string[] = [];
-			// A report that states figures from materials naming their sources, and cites none of them.
-			const cites = citesMaterials(text, referenceTitles(file, ctx.cwd));
-			if (inferRegister(text) === "report" && /\d/.test(text) && !cites && materialsNameSources(file, ctx.cwd))
-				own.push(t("style.noCitation"));
-			if (lacksReferences(text, file, ctx.cwd)) own.push(t("style.noReferences"));
-			const methods = inventedMethods(text, file, ctx.cwd);
-			if (methods.length > 0) own.push(t("style.inventedMethods", { words: methods.join("、") }));
-			// The whole document's measures wait until its outline has no section left (written one per turn).
-			if (!outlineOpen(file)) {
-				const unused = unusedMaterials(text, file, ctx.cwd);
-				if (unused.length > 0)
-					own.push(t("style.unusedMaterials", { items: unused.map((i) => `“${i.slice(0, 40)}”`).join("；") }));
-				const chars = countText(bodyBeforeReferences(text)).total;
-				if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)
-					own.push(t("style.length", { chars, target }));
-			}
-			own.push(...finishedChecks(text));
-			if (!check.mustFix && !issues?.length && own.length === 0) continue;
+			const answerable = found && keepAnswerable(found, materials);
+			const issues = answerable && revision ? inChanged(answerable, changed) : answerable;
+			// What the program itself sees; a length far from the one asked is the whole document's, so it counts in a
+			// revision too.
+			const own = ownFindings(text, file, ctx.cwd, { target, firstWrite: !revision });
+			// In a revision, what the draft already had before this message is the user's, not this run's.
+			const ownNow = revision
+				? freshLines(ownFindings(old, file, ctx.cwd, { target, firstWrite: false }), own)
+				: own;
+			if (!mustFix && !issues?.length && ownNow.length === 0) continue;
 			const review = issues?.length
 				? `\n${t("style.reviewFound", { count: issues.length })}\n${formatReview(issues)}`
 				: "";
-			open.push([`${file}\n${check.text}${review}`, ...own, STYLE_REVIEW].join("\n"));
+			const checkText = revision ? (mustFix ? checkLines.join("\n") : "") : check.text;
+			open.push([`${file}\n${checkText}${review}`, ...ownNow, STYLE_REVIEW].join("\n"));
 		}
 		if (open.length === 0) return;
 		rounds++;
