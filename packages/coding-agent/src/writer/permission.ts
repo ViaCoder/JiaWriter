@@ -8,8 +8,8 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 // Its folder.
 import { dirname } from "node:path";
-// Where the settings live.
-import { uiSettingsPath } from "./i18n/index.ts";
+// Where the settings live, and the answers of the question.
+import { t, uiSettingsPath } from "./i18n/index.ts";
 
 /** How much the program asks. */
 export type PermissionMode = "manual" | "auto" | "bypass";
@@ -39,7 +39,12 @@ export interface PermissionRequest {
 export interface PermissionUi {
 	// False when nobody can answer.
 	hasUI: boolean;
-	ui: { confirm(title: string, message: string): Promise<boolean> };
+	// select and input give the three answers of Claude Code's and Kimi Code's prompts; without them, yes or no.
+	ui: {
+		confirm(title: string, message: string): Promise<boolean>;
+		select?(title: string, options: string[]): Promise<string | undefined>;
+		input?(title: string, placeholder?: string): Promise<string | undefined>;
+	};
 }
 
 /** Why an action was stopped; empty means it may go on. */
@@ -161,6 +166,8 @@ export function isSecretField(role: string, inputType: string, name = ""): boole
 export interface PermissionGate {
 	// Ask when the table says so; gives why the action must stop, or "".
 	check(ctx: PermissionUi, request: PermissionRequest): Promise<PermissionRefusal>;
+	// What the user said to do instead, with the last refusal; empty when nothing.
+	lastNote(): string;
 	// Forget this session's answers.
 	reset(): void;
 }
@@ -169,18 +176,42 @@ export interface PermissionGate {
 export function createPermissionGate(env: NodeJS.ProcessEnv = process.env): PermissionGate {
 	// Scopes the user allowed, per risk.
 	const allowed = new Set<string>();
+	// Scopes the user said not to ask about again in this session, whatever the mode.
+	const always = new Set<string>();
+	// What the user said to do instead, with the last refusal.
+	let note = "";
 	return {
 		async check(ctx, request) {
+			note = "";
 			const key = `${request.risk}\n${request.scope}`;
-			if (!needsAsking(permissionMode(env), request.risk, allowed.has(key))) return "";
+			if (always.has(key) || !needsAsking(permissionMode(env), request.risk, allowed.has(key))) return "";
 			// Nobody to ask: a question becomes a refusal.
 			if (!ctx.hasUI) return "no-user";
-			if (!(await ctx.ui.confirm(request.title, request.detail))) return "declined";
-			allowed.add(key);
-			return "";
+			// An interface with only yes or no.
+			const { select, input } = ctx.ui;
+			if (!select) {
+				if (!(await ctx.ui.confirm(request.title, request.detail))) return "declined";
+				allowed.add(key);
+				return "";
+			}
+			// Yes; yes and not again this session; no and what to do instead (Esc is no), as Claude Code asks.
+			const options = [t("permission.yes"), t("permission.yesSession"), t("permission.noTell")];
+			const choice = await select.call(ctx.ui, `${request.title}\n${request.detail}`, options);
+			if (choice === options[0] || choice === options[1]) {
+				allowed.add(key);
+				if (choice === options[1]) always.add(key);
+				return "";
+			}
+			if (choice === options[2] && input) note = ((await input.call(ctx.ui, t("permission.tellWhat"))) ?? "").trim();
+			return "declined";
+		},
+		lastNote() {
+			return note;
 		},
 		reset() {
 			allowed.clear();
+			always.clear();
+			note = "";
 		},
 	};
 }

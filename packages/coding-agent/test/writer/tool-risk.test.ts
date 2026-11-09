@@ -140,4 +140,29 @@ describe("writer-permission", () => {
 		expect((await call("write", { path: "/etc/hosts" }))?.block).toBe(true);
 		expect(asked.length).toBe(0);
 	});
+
+	it("no, with what to do instead: the user's words go to the model with the refusal (2026-11-09)", async () => {
+		vi.stubEnv("JW_PERMISSION", "manual");
+		const handlers: Record<string, (event: unknown, ctx: unknown) => unknown> = {};
+		writerPermissionExtension({
+			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
+				handlers[name] = fn;
+			},
+		} as unknown as ExtensionAPI);
+		const ctx = {
+			cwd: "/work",
+			hasUI: true,
+			ui: {
+				confirm: async () => true,
+				select: async (_title: string, options: string[]) => options[2],
+				input: async () => "先给我看大纲",
+			},
+		};
+		const refused = (await handlers.tool_call({ toolName: "write", input: { path: "稿.md" } }, ctx)) as {
+			block: boolean;
+			reason: string;
+		};
+		expect(refused.block).toBe(true);
+		expect(refused.reason).toContain("先给我看大纲");
+	});
 });

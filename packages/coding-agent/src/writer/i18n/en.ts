@@ -434,6 +434,11 @@ export const en: Record<MessageKey, string> = {
 	"permission.askFile": "Allow writing and editing files in the working directory?",
 	"permission.askOutside": "Allow changing a file outside the working directory?",
 	"permission.declined": "the user did not agree to {what}",
+	"permission.declinedNote": "the user did not agree to {what}, and said: {note}",
+	"permission.yes": "Yes",
+	"permission.yesSession": "Yes, and do not ask again for this in this session",
+	"permission.noTell": "No, and say what to do instead",
+	"permission.tellWhat": "What should it do instead? (may be empty; Enter to confirm)",
 	"permission.noUser":
 		"nobody can confirm {what}: it needs confirming in the interactive interface, or the user can start with JW_PERMISSION=bypass (only the user can change it)",
 	"todo.title": "Tasks ({done}/{total})",

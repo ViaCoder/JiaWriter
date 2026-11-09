@@ -283,3 +283,61 @@ describe("work mode", () => {
 		}
 	});
 });
+
+// The three answers of Claude Code's and Kimi Code's prompts (2026-11-09): yes; yes and not again this session; no
+// and what to do instead.
+describe("createPermissionGate with three answers", () => {
+	/** An interface that picks the given option and types the given note. */
+	function picker(pick: number | undefined, note = "") {
+		const asked: string[] = [];
+		return {
+			asked,
+			hasUI: true,
+			ui: {
+				confirm: async () => true,
+				select: async (title: string, options: string[]) => {
+					asked.push(title);
+					return pick === undefined ? undefined : options[pick];
+				},
+				input: async () => note,
+			},
+		};
+	}
+	const request = { risk: "act" as Risk, scope: "/work", title: "允许写入？", detail: "/work/稿.md" };
+
+	it("yes allows this time: manual mode asks again next time", async () => {
+		setUiLang("zh");
+		const gate = createPermissionGate({ JW_PERMISSION: "manual" });
+		const ui = picker(0);
+		expect(await gate.check(ui, request)).toBe("");
+		expect(await gate.check(ui, request)).toBe("");
+		expect(ui.asked).toHaveLength(2);
+		expect(ui.asked[0]).toContain("/work/稿.md");
+	});
+
+	it("yes for the session: not asked again, even in manual mode, until reset", async () => {
+		const gate = createPermissionGate({ JW_PERMISSION: "manual" });
+		const ui = picker(1);
+		expect(await gate.check(ui, request)).toBe("");
+		expect(await gate.check(ui, request)).toBe("");
+		expect(ui.asked).toHaveLength(1);
+		gate.reset();
+		await gate.check(ui, request);
+		expect(ui.asked).toHaveLength(2);
+	});
+
+	it("no with what to do instead: declined, and lastNote gives the user's words", async () => {
+		const gate = createPermissionGate({ JW_PERMISSION: "manual" });
+		expect(await gate.check(picker(2, " 改成导出 Word "), request)).toBe("declined");
+		expect(gate.lastNote()).toBe("改成导出 Word");
+		// Esc is no, without words; the note of an earlier refusal is gone.
+		expect(await gate.check(picker(undefined), request)).toBe("declined");
+		expect(gate.lastNote()).toBe("");
+	});
+
+	it("an interface with only yes or no still works", async () => {
+		const gate = createPermissionGate({ JW_PERMISSION: "manual" });
+		expect(await gate.check({ hasUI: true, ui: { confirm: async () => false } }, request)).toBe("declined");
+		expect(await gate.check({ hasUI: true, ui: { confirm: async () => true } }, request)).toBe("");
+	});
+});

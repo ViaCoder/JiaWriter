@@ -194,7 +194,8 @@ def main():
         press(fd, b"\r")
         # Auto mode asks once per folder before the first write; the number key answers.
         shown = wait_screen(fd, "允许在工作目录里写入", 20)
-        check("自动模式第一次写入前询问，选项带编号", "1. 是" in shown and "2. 否" in shown)
+        check("自动模式第一次写入前询问：是、本会话不再问、否并说明，带编号",
+              "1. 是" in shown and "2. 是，本会话" in shown and "3. 否，告诉它怎么做" in shown)
         press(fd, b"1", 1)
         shown = wait_screen(fd, "完成了", 30)
         check("写稿一轮完成", "完成了" in shown and os.path.exists(os.path.join(work, "稿.md")))

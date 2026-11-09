@@ -40,11 +40,14 @@ export default function writerPermissionExtension(pi: ExtensionAPI): void {
 			return { block: true, reason: noUser(request.detail) };
 		}
 		const refusal = await gate.check(ctx, request);
-		if (refusal === "declined")
-			return {
-				block: true,
-				reason: blockedText({ why: t("permission.declined", { what: request.detail }), next: "user" }),
-			};
+		if (refusal === "declined") {
+			// The user's own words on what to do instead go with the refusal, as Claude Code passes them on.
+			const note = gate.lastNote();
+			const why = note
+				? t("permission.declinedNote", { what: request.detail, note })
+				: t("permission.declined", { what: request.detail });
+			return { block: true, reason: blockedText({ why, next: note ? "change" : "user" }) };
+		}
 		if (refusal === "no-user") return { block: true, reason: noUser(request.detail) };
 		return undefined;
 	});

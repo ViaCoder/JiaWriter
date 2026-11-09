@@ -403,6 +403,11 @@ export const zh = {
 	"permission.askFile": "允许在工作目录里写入和修改文件？",
 	"permission.askOutside": "允许修改工作目录以外的文件？",
 	"permission.declined": "用户没有同意执行 {what}",
+	"permission.declinedNote": "用户没有同意执行 {what}，并说：{note}",
+	"permission.yes": "是",
+	"permission.yesSession": "是，本会话里这类操作不再询问",
+	"permission.noTell": "否，告诉它怎么做",
+	"permission.tellWhat": "告诉它应该怎么做（可以留空，回车确认）",
 	"permission.noUser":
 		"没有人可以确认 {what}：这一步要用户在交互界面里确认，或由用户用 JW_PERMISSION=bypass 启动（这个设置只有用户能改）",
 	"todo.title": "任务清单（{done}/{total}）",
