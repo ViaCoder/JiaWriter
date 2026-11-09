@@ -150,7 +150,9 @@ def main():
     first = chat_only.requests[0]
     system = system_of(first)
     tools = len(json.dumps(first.get("tools", []), ensure_ascii=False))
-    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 5000 and tools <= 9500)
+    # 13000 since 2026-11-09: bash, todo_write and ask_user joined the default tools (about 2000 characters) and search_web
+    # took dates (about 500); still a guard against descriptions that grow.
+    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 5000 and tools <= 13000)
     check("闲聊时没有任何手册", not any(w in text_of(first) for w in ("Writing rules", "Research rules", "2026年10月31日")))
     said = json.dumps(first["messages"][1:], ensure_ascii=False)
     check("日期只有一个 [Date: …]，没有其他时间", said.count("[Date: ") == 1 and "[Sent" not in said)

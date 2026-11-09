@@ -187,6 +187,8 @@ def main():
         HOME=tmp, JW_DIR=os.path.join(tmp, "agent"), TERM="xterm-256color", COLUMNS="120", LINES="40",
         JW_URL=f"http://127.0.0.1:{server.server_address[1]}", JW_KEY="sk-dummy-rewind-check", JW_MODEL="mock",
         JW_API="openai-completions", JW_EFFORT="off",
+        # Writing without the permission question: these checks are about the screen, not about asking (2026-11-09).
+        JW_PERMISSION="bypass",
     )
     # The program.
     program = [a for a in sys.argv[1:] if a != "--debug"]

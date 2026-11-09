@@ -57,6 +57,19 @@ describe("checkCall and recordResult", () => {
 		for (let i = 0; i < MAX_SAME_CALLS; i++) recordResult(guard, write, false, "write");
 		expect(checkCall(guard, write)).toBe("repeated");
 	});
+	it("reads a page again after a browser action, and still blocks the same page read over and over", () => {
+		// The browser package check read a page a fifth time after a click and was blocked (2026-11-09).
+		const guard = newGuard();
+		const read = callKey("browser", { action: "read" });
+		for (let i = 0; i < MAX_SAME_CALLS; i++) {
+			recordResult(guard, read, false, "browser");
+			recordResult(guard, callKey("browser", { action: "click", ref: `e${i}` }), false, "browser");
+		}
+		expect(checkCall(guard, read)).toBe("ok");
+		const again = newGuard();
+		for (let i = 0; i < MAX_SAME_CALLS; i++) recordResult(again, read, false, "browser");
+		expect(checkCall(again, read)).toBe("repeated");
+	});
 	it("blocks the same call after MAX_SAME_CALLS, even when it works", () => {
 		const guard = newGuard();
 		const key = callKey("read", { path: "a" });

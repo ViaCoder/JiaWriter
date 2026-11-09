@@ -10,7 +10,11 @@ export const MAX_SAME_FAILURES = 2;
 export const MAX_SAME_CALLS = 4;
 /** At the third blocked call the run stops. */
 export const MAX_BLOCKS = 3;
-/** Tools that change files or the topic: after one of them works, an earlier call may answer differently. */
+/**
+ * Tools that change files, the topic, a page or the desktop: after one of them works, an earlier call may answer
+ * differently. browser and computer since 2026-11-09: reading a page again after a click is new information, and the
+ * package check's fifth page read was blocked.
+ */
 export const CHANGING_TOOLS: ReadonlySet<string> = new Set([
 	"write",
 	"edit",
@@ -19,6 +23,8 @@ export const CHANGING_TOOLS: ReadonlySet<string> = new Set([
 	"topic_open",
 	"import_document",
 	"export_document",
+	"browser",
+	"computer",
 ]);
 
 /** What the guard knows of one call. */
