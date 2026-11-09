@@ -6,6 +6,8 @@
 // Extension API types.
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Output messages.
+// One form for a stopped call.
+import { blockedText } from "../../writer/blocked.ts";
 import { t } from "../../writer/i18n/index.ts";
 // The guard's rules.
 import {
@@ -36,7 +38,7 @@ export default function writerGuardExtension(pi: ExtensionAPI): void {
 			verdict === "failed"
 				? t("guard.failed", { tool: event.toolName, count: MAX_SAME_FAILURES })
 				: t("guard.repeated", { tool: event.toolName, count: MAX_SAME_CALLS });
-		return { block: true, reason: stop ? `${why}${t("guard.stopped")}` : why, terminate: stop };
+		return { block: true, reason: blockedText({ why, next: stop ? "stop" : "change" }), terminate: stop };
 	});
 
 	// After a call: its outcome counts.

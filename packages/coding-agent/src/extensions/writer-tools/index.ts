@@ -35,7 +35,7 @@ import {
 	readabilityCheck,
 } from "../../writer/readability.ts";
 // AI-style check.
-import { formatStyleReport, inferRegister, styleCheck, styleClean } from "../../writer/style/check.ts";
+import { formatStyleReport, inferRegister, styleCheck, styleClean, styleMustFix } from "../../writer/style/check.ts";
 // The program's checks of a draft, as one table.
 import { runDraftChecks } from "../../writer/style/draft-checks.ts";
 // The default threshold for the schema description.
@@ -66,7 +66,7 @@ const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: 
 export const MAX_ROUNDS = 2;
 
 /** The automatic check of a draft: the rules for its register, then the semantic review only a reader can do. */
-export function draftCheck(text: string): { clean: boolean; text: string } {
+export function draftCheck(text: string): { clean: boolean; mustFix: boolean; text: string } {
 	// Reports and official documents are checked against official-document habits too.
 	const register = inferRegister(text);
 	const report = styleCheck(text, {
@@ -78,7 +78,12 @@ export function draftCheck(text: string): { clean: boolean; text: string } {
 	// A clean report is one line: the full measures each time were noise the model reread after every edit.
 	const styleText = styleClean(report) ? t("style.passShort") : formatStyleReport(report);
 	const lines = [...found.fail, ...found.note].map((line) => `\n${line}`).join("");
-	return { clean: styleClean(report) && found.fail.length === 0, text: `${styleText}${lines}` };
+	// clean: nothing to show; mustFix: something a careful human writer would not leave, which asks for another round.
+	return {
+		clean: styleClean(report) && found.fail.length === 0,
+		mustFix: styleMustFix(report) || found.fail.length > 0,
+		text: `${styleText}${lines}`,
+	};
 }
 
 /** The folders from a draft's own up to the writing folder, where its materials may be. */
@@ -338,7 +343,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			if (target && Math.abs(chars - target) > target * LENGTH_TOLERANCE)
 				own.push(t("style.length", { chars, target }));
 			own.push(...finishedChecks(text));
-			if (check.clean && !issues?.length && own.length === 0) continue;
+			if (!check.mustFix && !issues?.length && own.length === 0) continue;
 			const review = issues?.length
 				? `\n${t("style.reviewFound", { count: issues.length })}\n${formatReview(issues)}`
 				: "";

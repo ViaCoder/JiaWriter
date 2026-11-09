@@ -8,6 +8,8 @@
 // Extension API types.
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Output messages.
+// One form for a stopped call.
+import { blockedText } from "../../writer/blocked.ts";
 import { t } from "../../writer/i18n/index.ts";
 // Which shell commands only read.
 import { bashRisk } from "../../writer/tool-risk.ts";
@@ -47,7 +49,8 @@ export default function writerPlanExtension(pi: ExtensionAPI): void {
 	});
 	pi.on("tool_call", (event) => {
 		if (!planning || !refusedInPlan(event.toolName, event.input as Record<string, unknown>)) return undefined;
-		return { block: true, reason: t("plan.refused", { tool: event.toolName }) };
+		const why = t("plan.refused", { tool: event.toolName });
+		return { block: true, reason: blockedText({ why, next: "user", still: t("plan.refusedStill") }) };
 	});
 	pi.on("before_agent_start", () => {
 		if (!planning) return undefined;

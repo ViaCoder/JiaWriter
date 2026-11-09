@@ -25,6 +25,7 @@ describe("runDraftChecks", () => {
 			"citation",
 			"headings",
 			"list-markers",
+			"placeholders",
 			"ascii-quotes",
 			"repeated",
 			"evidence-first",

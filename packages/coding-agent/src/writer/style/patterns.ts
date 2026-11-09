@@ -21,6 +21,14 @@ export interface StylePattern {
 	weak?: boolean;
 }
 
+/**
+ * Patterns that careful human writers use too, so one hit is shown for the model to judge and only their density
+ * (negation over its limit) asks for another round: in 29 human official documents (test fixtures and the State
+ * Council samples, 2026-11-09) zh-denial matched 93 times, zh-bushi-ershi 8 and zh-fou-ershi 5. The semantic review's
+ * defensive-negation category judges what a single one says.
+ */
+export const DENSITY_ONLY: ReadonlySet<string> = new Set(["zh-denial", "zh-bushi-ershi", "zh-fou-ershi"]);
+
 /** Characters that end a clause frame in Chinese (a frame never spans them). */
 const ZH_END = "。！？!?\\n";
 

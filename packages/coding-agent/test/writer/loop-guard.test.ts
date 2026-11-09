@@ -108,7 +108,7 @@ describe("writer-guard", () => {
 			expect(out?.reason).toContain("gongwen_check");
 			expect(out?.terminate).toBe(block === MAX_BLOCKS);
 		}
-		expect(call(input)?.reason).toContain("本轮已停止");
+		expect(call(input)?.reason).toContain("本轮到此结束");
 	});
 
 	it("starts again with a new message of the user", () => {

@@ -13,6 +13,7 @@ import {
 	DASHES,
 	DEFAULT_NEGATION_THRESHOLD,
 	DEFAULT_PACKS,
+	DENSITY_ONLY,
 	FACTS,
 	FACTS_PER_1000,
 	NEGATION_EN,
@@ -130,8 +131,11 @@ export interface StyleOptions {
 	register?: StyleRegister;
 }
 
-/** Bold spans allowed per 1,000 characters. */
-export const BOLD_PER_1000 = 2;
+/**
+ * Bold spans allowed per 1,000 characters: the user's sample documents bold their topic sentences, 1.3 to 6.5 per
+ * 1,000 (median 3.1, 22 samples, 2026-11-09); bold scattered over words runs far above that.
+ */
+export const BOLD_PER_1000 = 8;
 /** Most hits listed in a report. */
 export const MAX_LISTED = 60;
 
@@ -296,7 +300,18 @@ export function styleCheck(text: string, options: StyleOptions = {}): StyleRepor
 	};
 }
 
-/** True when the report has nothing to fix. */
+/** True when the report holds something a careful human writer would not leave: it asks for another round. */
+export function styleMustFix(report: StyleReport): boolean {
+	// What styleClean asks, less the single hits of patterns human writers use too (DENSITY_ONLY).
+	const strong = report.hits.some((hit) => !hit.weak && !DENSITY_ONLY.has(hit.id));
+	// Those patterns count by density, at the negation limit: human documents reach 1.5 per 10 sentences (2026-11-09).
+	const frames = report.hits.filter((hit) => DENSITY_ONLY.has(hit.id)).length;
+	const sentences = Math.max(1, report.negation.sentences);
+	const framesOver = frames >= 2 && (frames * 10) / sentences > report.negation.threshold;
+	return strong || framesOver || !styleClean({ ...report, hits: [] });
+}
+
+/** True when the report has nothing to show. */
 export function styleClean(report: StyleReport): boolean {
 	// No hits, density and format inside their limits.
 	const p = report.prose;

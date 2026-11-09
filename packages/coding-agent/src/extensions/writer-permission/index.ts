@@ -9,6 +9,8 @@
 // Extension API types.
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Output messages.
+// One form for a stopped call.
+import { blockedText } from "../../writer/blocked.ts";
 import { t } from "../../writer/i18n/index.ts";
 // The modes and the session's gate.
 import { createPermissionGate, permissionMode } from "../../writer/permission.ts";
@@ -16,6 +18,11 @@ import { createPermissionGate, permissionMode } from "../../writer/permission.ts
 import { toolRequest } from "../../writer/tool-risk.ts";
 
 /** Register the gate on tool calls. */
+/** The refusal when nobody can confirm: the part that needs no confirmation still goes on (2026-11-09: a run dropped it). */
+function noUser(what: string): string {
+	return blockedText({ why: t("permission.noUser", { what }), next: "user", still: t("permission.noUserStill") });
+}
+
 export default function writerPermissionExtension(pi: ExtensionAPI): void {
 	// Answers of this session, per risk and scope.
 	const gate = createPermissionGate();
@@ -30,11 +37,15 @@ export default function writerPermissionExtension(pi: ExtensionAPI): void {
 		// Nobody to ask: the allowlist instead of a question.
 		if (!ctx.hasUI && permissionMode() !== "bypass") {
 			if (request.risk === "read" || request.inDirFile) return undefined;
-			return { block: true, reason: t("permission.noUser", { what: request.detail }) };
+			return { block: true, reason: noUser(request.detail) };
 		}
 		const refusal = await gate.check(ctx, request);
-		if (refusal === "declined") return { block: true, reason: t("permission.declined", { what: request.detail }) };
-		if (refusal === "no-user") return { block: true, reason: t("permission.noUser", { what: request.detail }) };
+		if (refusal === "declined")
+			return {
+				block: true,
+				reason: blockedText({ why: t("permission.declined", { what: request.detail }), next: "user" }),
+			};
+		if (refusal === "no-user") return { block: true, reason: noUser(request.detail) };
 		return undefined;
 	});
 	// A new session starts with no answers.

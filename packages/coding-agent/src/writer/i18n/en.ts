@@ -69,6 +69,8 @@ export const en: Record<MessageKey, string> = {
 	"style.headings": "Heading numbers off: level 1 is 一、, level 2 （一）, usually two levels only:",
 	"style.listMarkers":
 		"No in-text ordinals {markers}: use numbered headings where items are needed, else plain sentences.",
+	"style.placeholders":
+		"Leave nothing marked to check or fill in later: write what the materials hold, else cut the point ({marks}).",
 	"style.citation":
 		"{count} citations in another form; write reports as 2026年10月31日《路透社》报道 and files as 2021年6月7日《文件名》:",
 	"style.noCitation":
@@ -152,18 +154,23 @@ export const en: Record<MessageKey, string> = {
 	// URL not allowed.
 	"fetch.badUrl": "Only http(s) URLs can be fetched: {url}",
 	// AnySearch quota exhausted (402 body discarded).
-	"guard.failed":
-		"Blocked: {tool} failed {count} times in a row with these arguments. Change them, or stop and tell the user.",
-	"guard.repeated":
-		"Blocked: {tool} ran {count} times with these arguments; the result will not change. Go on with it, or stop and say why.",
-	"guard.stopped": " This run has stopped.",
+	"guard.failed": "{tool} failed {count} times in a row with the same arguments",
+	"guard.repeated": "{tool} was called {count} times with the same arguments, and the result will not change",
+	"blocked.why": "Blocked: {why}. ",
+	"blocked.change":
+		"Next: change the arguments or the method, or go on with what you have; do not make the same call again.",
+	"blocked.user": "Next: ask the user what they want; do not try the blocked step with another tool, command or path.",
+	"blocked.stop": "Next: this round ends here; tell the user what was done and what blocks you.",
+	"blocked.still": " Still allowed: {still}.",
+	"search.methodWorked": "methods that worked in this session: {worked}",
+	"permission.noUserStill": "the changes inside the working folder, which need no confirmation, on their own",
+	"plan.refusedStill": "reading and searching; give the user a numbered plan and wait for /plan to turn plan mode off",
 	"firecrawl.noKey": "The firecrawl method needs FIRECRAWL_KEY.",
 	"firecrawl.auth": "firecrawl rejected the key (HTTP {status}); check FIRECRAWL_KEY and JW_FIRECRAWL_URL.",
 	"firecrawl.credits": "firecrawl credits are used up (HTTP 402).",
 	"firecrawl.newsDates":
 		"Note: firecrawl news is not filtered by date; after and before apply to web results only. To bound the dates, search again without news.",
-	"search.methodDown":
-		"Method {method} is down for this session ({reason}) and was not tried. Use another; methods that worked in this session: {worked}.",
+	"search.methodDown": "the {method} method is down for this session ({reason})",
 	"search.noneWorked": "none yet",
 	"firecrawl.rate": "firecrawl rate limit (HTTP 429); try again later.",
 	"firecrawl.page": "firecrawl could not read the page (HTTP {status}): {url}",
@@ -236,7 +243,7 @@ export const en: Record<MessageKey, string> = {
 	// Unpaired quote.
 	"export.unpaired": "- Unpaired quote: {start}…",
 	// 待核实 marks.
-	"export.pending": 'The draft has {count} "待核实" mark(s); remove them or add the source in the finished draft.',
+	"export.pending": 'Remove the {count} "待核实" mark(s) from the finished draft, or add the source.',
 	// Spaces.
 	"export.spaces":
 		"Spaces: kept only between English words, none between Chinese and English or numbers; {count} other space(s).",
@@ -420,10 +427,9 @@ export const en: Record<MessageKey, string> = {
 	"permission.askCommand": "Run this command?",
 	"permission.askFile": "Allow writing and editing files in the working directory?",
 	"permission.askOutside": "Allow changing a file outside the working directory?",
-	"permission.declined":
-		"The user did not allow it, so it did not run: {what}. Do not retry another way; ask the user what they want.",
+	"permission.declined": "the user did not agree to {what}",
 	"permission.noUser":
-		"Nobody can confirm, so it did not run: {what}. Do the parts that need no confirmation (changes inside the working folder) on their own; do not try the refused change with another tool, command or path, and tell the user this step needs confirming in the interactive interface, or that they can start with JW_PERMISSION=bypass (only the user can change it).",
+		"nobody can confirm {what}: it needs confirming in the interactive interface, or the user can start with JW_PERMISSION=bypass (only the user can change it)",
 	"todo.title": "Tasks ({done}/{total})",
 	"todo.saved": "Task list saved: {done}/{total} done; in progress: {now}.",
 	"ask.other": "Other (type your own)",
@@ -436,8 +442,7 @@ export const en: Record<MessageKey, string> = {
 	"plan.on": "Plan mode is on: reading and searching only, then a plan. Once the plan is agreed, /plan turns it off.",
 	"plan.off": "Plan mode is off: the plan can be carried out.",
 	"plan.status": "Plan mode",
-	"plan.refused":
-		"Nothing can be changed in plan mode ({tool}). Give a numbered plan and stop until the user turns plan mode off with /plan.",
+	"plan.refused": "plan mode allows no changes ({tool})",
 	"computerTool.ask": 'Allow {action} in "{site}"?',
 	"computerTool.setup": "Desktop control is not installed. Run /jw computer and the program will walk you through it.",
 	"setup.none": "No desktop control component exists for this machine.",

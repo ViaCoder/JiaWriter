@@ -60,6 +60,7 @@ export const zh = {
 	"style.asciiQuotes": '{count} 处中文用了英文引号 "……"：改成中文引号“……”。',
 	"style.headings": "标题编号不符：一级标题用“一、”，二级用“（一）”，一般只用两级：",
 	"style.listMarkers": "不用段内序号 {markers}：需要分条时用标题编号，否则写成连贯的句子。",
+	"style.placeholders": "不要留待核实、待补的标记：材料里有的写上，没有的删去这一处（{marks}）。",
 	"style.citation":
 		"引用格式不符 {count} 处，报道写成 2026年10月31日《路透社》报道，文件写成 2021年6月7日《文件名》：",
 	"style.noCitation":
@@ -135,17 +136,23 @@ export const zh = {
 	// URL not allowed.
 	"fetch.badUrl": "只能抓取 http(s) 网址：{url}",
 	// The loop guard.
-	"guard.failed": "已拦下：{tool} 用相同参数已连续失败 {count} 次。换参数，或停下向用户说明。",
-	"guard.repeated": "已拦下：{tool} 用相同参数已调用 {count} 次，结果不会变。用已有结果继续，或停下说明。",
-	"guard.stopped": "本轮已停止。",
+	"guard.failed": "{tool} 用相同参数已连续失败 {count} 次",
+	"guard.repeated": "{tool} 用相同参数已调用 {count} 次，结果不会变",
+	"blocked.why": "已拦下：{why}。",
+	"blocked.change": "下一步：换参数、换方法或用已有结果继续；同样的调用不要再试。",
+	"blocked.user": "下一步：问用户想怎么做；被拦下的这一步不要换工具、命令或路径再试。",
+	"blocked.stop": "下一步：本轮到此结束，向用户说明做到了哪里、卡在哪里。",
+	"blocked.still": "仍可做：{still}。",
+	"search.methodWorked": "本次会话里用成功过的方式 {worked}",
+	"permission.noUserStill": "工作目录里不用确认的改动，单独去做",
+	"plan.refusedStill": "读取和检索照常；把编号的计划交给用户，等用户用 /plan 关闭规划模式",
 	// Firecrawl errors.
 	"firecrawl.noKey": "firecrawl 方式需要 FIRECRAWL_KEY。",
 	"firecrawl.auth": "firecrawl 拒绝了 key（HTTP {status}），请检查 FIRECRAWL_KEY 和 JW_FIRECRAWL_URL。",
 	"firecrawl.credits": "firecrawl 积分不足（HTTP 402）。",
 	"firecrawl.newsDates":
 		"注意：firecrawl 的新闻结果不按日期筛选，after/before 只对网页结果生效；要限定日期，去掉 news 再搜。",
-	"search.methodDown":
-		"{method} 方式在本次会话里已不可用（{reason}），没有再试。改用别的方式；本次会话里用成功过的：{worked}。",
+	"search.methodDown": "{method} 方式在本次会话里已不可用（{reason}）",
 	"search.noneWorked": "还没有",
 	"firecrawl.rate": "firecrawl 请求过于频繁（HTTP 429），请稍后再试。",
 	"firecrawl.page": "firecrawl 无法读取该网页（HTTP {status}）：{url}",
@@ -391,9 +398,9 @@ export const zh = {
 	"permission.askCommand": "允许执行这条命令？",
 	"permission.askFile": "允许在工作目录里写入和修改文件？",
 	"permission.askOutside": "允许修改工作目录以外的文件？",
-	"permission.declined": "用户没有同意，未执行：{what}。不要换一种方式重试，问用户想怎么做。",
+	"permission.declined": "用户没有同意执行 {what}",
 	"permission.noUser":
-		"没有人可以确认，未执行：{what}。其中不用确认的部分（工作目录里的改动）单独去做；被拦下的改动不要换工具、命令或路径再试，告诉用户这一步要在交互界面里确认，或由用户用 JW_PERMISSION=bypass 启动（这个设置只有用户能改）。",
+		"没有人可以确认 {what}：这一步要用户在交互界面里确认，或由用户用 JW_PERMISSION=bypass 启动（这个设置只有用户能改）",
 	"todo.title": "任务清单（{done}/{total}）",
 	"todo.saved": "任务清单已更新：完成 {done}/{total}，进行中：{now}。",
 	"ask.other": "其他（自己输入）",
@@ -405,7 +412,7 @@ export const zh = {
 	"plan.on": "规划模式已打开：只读取和检索，给出计划后停下。确认计划后再输入 /plan 关闭，开始执行。",
 	"plan.off": "规划模式已关闭，可以按计划执行。",
 	"plan.status": "规划模式",
-	"plan.refused": "规划模式下不能修改（{tool}）。先给出编号的计划并停下，等用户用 /plan 关闭规划模式。",
+	"plan.refused": "规划模式下不能修改（{tool}）",
 	"computerTool.ask": "允许在「{site}」执行 {action} 吗？",
 	"computerTool.setup": "还没有安装计算机操作组件。运行 /jw computer，程序会一步步带你装好。",
 	"setup.none": "这台机器没有可用的计算机操作组件。",

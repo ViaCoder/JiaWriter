@@ -37,6 +37,13 @@ const NONE: CheckResult = { fail: [], note: [] };
 const DOCUMENTS = (register: StyleRegister) => register !== "general";
 /** Every text. */
 const ALL = () => true;
+/**
+ * Words that leave something to check or fill in later (the user: "No content is presented as requiring
+ * verification"): 待核实, 待补, 需核实, 【待…】, 此处补充, ××. 待定 stays: a notice may say a time is still to be set.
+ */
+export const PLACEHOLDER =
+	/待核[实查]|待补(?![助偿贴发])|待确认|(?:需|有待)(?:进一步)?核实|[【[]待[^】\]\n]{0,10}[】\]]|此处(?:补充|填写|插入)|×{2,}/g;
+
 /** A list of quoted openings under a heading line. */
 const quoted = (head: string, items: readonly string[]) => `${head}\n${items.map((s) => `- “${s}”`).join("\n")}`;
 
@@ -72,6 +79,15 @@ export const DRAFT_CHECKS: readonly DraftCheck[] = [
 		run: (text) => {
 			const found = listMarkers(text);
 			return found.length === 0 ? NONE : { fail: [t("style.listMarkers", { markers: found.join("、") })], note: [] };
+		},
+	},
+	{
+		// Nothing left to check or fill in later (the user's citation rule; no check held it until 2026-11-09).
+		id: "placeholders",
+		when: ALL,
+		run: (text) => {
+			const found = [...new Set(text.match(PLACEHOLDER) ?? [])];
+			return found.length === 0 ? NONE : { fail: [t("style.placeholders", { marks: found.join("、") })], note: [] };
 		},
 	},
 	{

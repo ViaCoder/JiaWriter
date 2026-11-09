@@ -37,6 +37,9 @@ import { getAgentDir, getWriterExtensionDir, isBunBinary, VERSION } from "../../
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
 // How a tool call is shown.
 import { formatToolCallWithArgs } from "../../core/tools/render-utils.ts";
+// Output messages.
+// One form for a stopped call.
+import { blockedText } from "../../writer/blocked.ts";
 // The bridge to Chrome.
 import { bridgeAddress, bridgeCall } from "../../writer/browser/bridge.ts";
 // Host registration and starting Chrome.
@@ -60,7 +63,6 @@ import {
 import { nowText } from "../../writer/clock.ts";
 // Addresses compared as the reference check does.
 import { normalizeUrl } from "../../writer/export/refs.ts";
-// Output messages.
 import { currentLang, t } from "../../writer/i18n/index.ts";
 // Secrets are taken out of upstream errors.
 import { redactSecrets } from "../../writer/redact.ts";
@@ -653,7 +655,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 		const reason = health.down.get(method);
 		if (!reason) return undefined;
 		const worked = [...health.worked].join(", ") || t("search.noneWorked");
-		return { block: true, reason: t("search.methodDown", { method, reason, worked }) };
+		const why = t("search.methodDown", { method, reason });
+		return { block: true, reason: blockedText({ why, next: "change", still: t("search.methodWorked", { worked }) }) };
 	});
 	pi.on("tool_result", (event) => {
 		if (event.toolName !== "search_web" && event.toolName !== "fetch_web") return undefined;
