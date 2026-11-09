@@ -389,6 +389,22 @@ describe("materialsNameSources", () => {
 		expect(materialsNameSources(draft, cwd)).toBe(true);
 		rmSync(join(cwd, "参考资料"), { recursive: true });
 	});
+	it("does not count a material item whose source is the user's own file in 参考资料", () => {
+		// 2026-11-09: material_add gave the notes file as the source, and the brief was told to cite it.
+		const topic = join(cwd, "20261109-简报");
+		mkdirSync(join(topic, "稿件"), { recursive: true });
+		const draft = join(topic, "稿件", "简报.md");
+		writeFileSync(
+			join(topic, "素材.md"),
+			"# 素材\n\n- 数据｜时间：2025年｜数值：5.2万人｜来源：《参考资料/材料.md》第1条\n",
+		);
+		expect(materialsNameSources(draft, cwd)).toBe(false);
+		writeFileSync(
+			join(topic, "素材.md"),
+			"# 素材\n\n- 案例｜时间：2026年4月15日｜报道方：《南方日报》｜来源：https://a.example/x\n",
+		);
+		expect(materialsNameSources(draft, cwd)).toBe(true);
+	});
 });
 
 describe("the automatic check of each draft", () => {

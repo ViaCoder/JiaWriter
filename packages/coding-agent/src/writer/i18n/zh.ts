@@ -393,7 +393,7 @@ export const zh = {
 	"permission.askOutside": "允许修改工作目录以外的文件？",
 	"permission.declined": "用户没有同意，未执行：{what}。不要换一种方式重试，问用户想怎么做。",
 	"permission.noUser":
-		"没有人可以确认，未执行：{what}。告诉用户这一步需要在交互界面里确认，或用 JW_PERMISSION=bypass 运行。",
+		"没有人可以确认，未执行：{what}。其中不用确认的部分（工作目录里的改动）单独去做；被拦下的改动不要换工具、命令或路径再试，告诉用户这一步要在交互界面里确认，或由用户用 JW_PERMISSION=bypass 启动（这个设置只有用户能改）。",
 	"todo.title": "任务清单（{done}/{total}）",
 	"todo.saved": "任务清单已更新：完成 {done}/{total}，进行中：{now}。",
 	"ask.other": "其他（自己输入）",

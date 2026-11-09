@@ -4,6 +4,8 @@
  * In Markdown the levels are ##, ###, #### and #####.
  */
 
+import { bodyBeforeReferences } from "../text-stats.ts";
+
 /** One wrong number or list marker: the words in the draft and the form they should take. */
 export interface NumberingIssue {
 	// The words, character for character.
@@ -31,7 +33,8 @@ const ANY_NUMBER = new RegExp(
 /** Headings whose number does not fit their level. */
 export function headingIssues(text: string): NumberingIssue[] {
 	const issues: NumberingIssue[] = [];
-	for (const line of text.split("\n")) {
+	// The body only: 参考文献 is no numbered part of it (2026-11-09: the check had a brief number it 三、参考文献).
+	for (const line of bodyBeforeReferences(text).split("\n")) {
 		const m = /^(#{2,5})\s+(.*\S)\s*$/.exec(line);
 		if (!m) continue;
 		const level = LEVELS[m[1].length];

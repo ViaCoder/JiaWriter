@@ -11,6 +11,7 @@ import {
 	driverDir,
 	driverEnv,
 	driverPath,
+	forgetAccountHome,
 	MAC_APP,
 	macAccountHome,
 } from "../../src/writer/computer/driver.ts";
@@ -85,6 +86,8 @@ describe("driverEnv", () => {
 		).toBe(userInfo().homedir);
 	});
 	it("finds the account's home through the directory service, whatever HOME says", () => {
+		// On a Mac the tests above found the real home already (CI 42539031250, 2026-11-09).
+		forgetAccountHome();
 		const asked: string[] = [];
 		const read = (command: string, args: string[]) => {
 			asked.push([command, ...args].join(" "));

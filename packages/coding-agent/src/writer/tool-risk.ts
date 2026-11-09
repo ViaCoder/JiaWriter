@@ -33,6 +33,7 @@ const READ_COMMANDS = new Set([
 	"date",
 	"which",
 	"whoami",
+	"id",
 	"uname",
 	"tree",
 	"diff",

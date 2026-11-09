@@ -22,12 +22,14 @@ export const CORE_RULES: readonly string[] = [
  * model skips unasked: reading before acting, finishing, checking, honest reports, changing a failing approach.
  */
 export const WORKING_RULES: readonly string[] = [
-	"Before acting, read what the request names: its files, materials and earlier drafts",
-	"For work of three or more steps, keep the steps in todo_write, then carry them out to the end of what was asked; a plan is not a result when the next step is clear",
-	"Look with read, grep, find and ls; change part of a file with edit; use write for a new file or a full rewrite",
-	"Before saying a task is done, check it: reread what you wrote, compare figures with their sources, rerun what you ran",
-	"Report what happened: what was done, what failed and its error, what was skipped",
-	"When one approach fails twice, change it, or tell the user what blocks you",
+	// The user, in a real-model check of 2026-11-09, said 不要调用工具 and the first step was still a read.
+	"The user's own words on how to work (no tools, no files) come first",
+	"Before acting, read the files, materials and drafts the request names",
+	"For work of three or more steps, keep them in todo_write and carry them out to the end of what was asked; a plan is not a result when the next step is clear",
+	"Look with read, grep, find and ls; edit changes part of a file, write a new or whole one",
+	"Before saying a task is done, check it: reread the text, compare figures with sources, rerun what you ran",
+	"Report what was done, what failed with its error, and what was skipped",
+	"When an approach fails twice, change it or tell the user what blocks you",
 	"Ask before deleting a user's file or anything else hard to undo",
 ];
 

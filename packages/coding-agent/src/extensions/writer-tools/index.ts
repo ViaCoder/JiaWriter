@@ -7,7 +7,7 @@
 // The drafts an automatic check reads, and the materials beside them.
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 // Walking from a draft up to the writing folder.
-import { basename, dirname, join, relative } from "node:path";
+import { basename, dirname, isAbsolute, join, relative } from "node:path";
 // One request to the session's model, for the semantic review.
 import { type Api, completeSimple, type Model } from "@earendil-works/pi-ai/compat";
 // Parameter schemas.
@@ -86,8 +86,10 @@ export function draftFolders(file: string, cwd: string): string[] {
 	const dirs: string[] = [];
 	for (let dir = dirname(file); ; dir = dirname(dir)) {
 		dirs.push(dir);
-		// Stop at the writing folder, at the root, or at once for a draft outside the writing folder.
-		if (relative(cwd, dir) === "" || relative(cwd, dir).startsWith("..") || dirname(dir) === dir) return dirs;
+		// Stop at the writing folder, at the root, or at once for a draft outside the writing folder (on Windows a draft
+		// on another drive gives an absolute relative path: CI 42539031250, 2026-11-09).
+		const rel = relative(cwd, dir);
+		if (rel === "" || rel.startsWith("..") || isAbsolute(rel) || dirname(dir) === dir) return dirs;
 	}
 }
 
@@ -134,7 +136,15 @@ export function materialsNameSources(file: string, cwd: string): boolean {
 	return draftFolders(file, cwd).some((dir) => {
 		if ([join(dir, TOPIC_DIRS.search), join(dir, TOPIC_DIRS.web)].some(filled)) return true;
 		const material = join(dir, MATERIAL_FILE);
-		if (existsSync(material) && SOURCE_MARK.test(readFileSync(material, "utf-8"))) return true;
+		// An item whose source is a file in 参考资料 names no source of its own: that file is judged below by what it says
+		// (2026-11-09: a brief from the user's two figures was told to cite, and cited the notes file).
+		const named = existsSync(material)
+			? readFileSync(material, "utf-8")
+					.split("\n")
+					.filter((line) => !/来源：《参考资料[/\\]/.test(line))
+					.join("\n")
+			: "";
+		if (SOURCE_MARK.test(named)) return true;
 		return parsedFiles(dir).some((path) => {
 			// 报告.pdf.md was imported from 报告.pdf.
 			const kind = (basename(path, ".md").match(/\.([^.]+)$/)?.[1] ?? "").toLowerCase();

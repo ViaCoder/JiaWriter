@@ -18,6 +18,8 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	// The folded reasoning, an interrupted reply, and the way back to the end of the history.
 	"Thinking...": "思考过程已折叠",
 	"Operation aborted": "已中断",
+	"Aborted after {count} retry attempt": "已中断（此前重试 {count} 次）",
+	"Aborted after {count} retry attempts": "已中断（此前重试 {count} 次）",
 	"↓ Jump to latest message": "↓ 回到最新消息",
 	// Collapsed lines of a skill, a compaction summary and a branch summary.
 	"[skill]": "[技能]",
@@ -135,6 +137,13 @@ export function uiText(text: string, vars: Readonly<Record<string, string>> = {}
 	const chosen = currentLang() === "zh" ? (UI_ZH[text] ?? text) : text;
 	// Placeholders, then the product name of a release package.
 	return brandText(chosen.replace(/\{(\w+)\}/g, (whole, name: string) => vars[name] ?? whole));
+}
+
+/** The line of an interrupted reply, with the retries before it (2026-11-09: the screen showed "Operation aborted"). */
+export function abortedText(retryAttempt: number): string {
+	if (retryAttempt <= 0) return uiText("Operation aborted");
+	const key = retryAttempt > 1 ? "Aborted after {count} retry attempts" : "Aborted after {count} retry attempt";
+	return uiText(key, { count: String(retryAttempt) });
 }
 
 /** Upstream's compaction failure messages in Chinese, keeping the reason after the prefix. */

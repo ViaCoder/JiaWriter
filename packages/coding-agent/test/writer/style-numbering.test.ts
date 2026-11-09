@@ -19,6 +19,13 @@ describe("headingIssues", () => {
 	});
 });
 
+describe("headingIssues and the references", () => {
+	it("leaves the references heading unnumbered", () => {
+		// 2026-11-09: the check asked for 三、参考文献.
+		expect(headingIssues("## 一、基本情况\n\n正文。\n\n## 参考文献\n\n- 《材料》")).toEqual([]);
+	});
+});
+
 describe("listMarkers", () => {
 	it("finds ordinal markers at the start of a sentence or clause, once each", () => {
 		const text = "一是加强领导。二是完善机制；三是强化保障。主要做法，一是建台账。其一，摸清底数。一要压实责任。";

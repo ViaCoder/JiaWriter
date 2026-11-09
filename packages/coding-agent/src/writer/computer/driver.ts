@@ -86,6 +86,11 @@ export type ReadCommand = (command: string, args: string[]) => string;
 /** The account home once found, for the life of the program. */
 let knownHome: string | undefined;
 
+/** Forget the account home found so far (tests: on a real Mac an earlier call has found it already). */
+export function forgetAccountHome(): void {
+	knownHome = undefined;
+}
+
 /**
  * The home the system records for this account on macOS. Bun's os.userInfo().homedir gives $HOME instead
  * (checked with bun 1.4.4), so the directory service is asked; failing that, what the runtime says.

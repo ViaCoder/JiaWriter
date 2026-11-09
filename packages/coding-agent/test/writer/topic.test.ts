@@ -260,6 +260,9 @@ describe("materials", () => {
 		expect(renderMaterial(DATA)).toContain("《年鉴.pdf》第12页");
 		// A file without pages is cited by its name alone.
 		expect(renderMaterial({ ...DATA, file: "报告.txt", page: "" }).endsWith("来源：《报告.txt》")).toBe(true);
+		// A place that is not a page number is written as given (2026-11-09: 第第1条页).
+		expect(renderMaterial({ ...DATA, page: "第1条" }).endsWith("《年鉴.pdf》第1条")).toBe(true);
+		expect(renderMaterial({ ...DATA, page: "3-4" }).endsWith("《年鉴.pdf》第3-4页")).toBe(true);
 	});
 
 	it("takes a local path given as url for the file, and asks no page of a file that has none", () => {

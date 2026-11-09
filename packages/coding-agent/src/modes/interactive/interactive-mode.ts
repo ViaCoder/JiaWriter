@@ -137,7 +137,7 @@ import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-
 import { brandText } from "../../writer/brand.ts";
 // JiaWriter: the "Jia" logo for release packages.
 import { jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
-import { compactionErrorText, uiText } from "../../writer/ui-text.ts";
+import { abortedText, compactionErrorText, uiText } from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
 import { AssistantMessageComponent } from "./components/assistant-message.ts";
@@ -3566,11 +3566,7 @@ export class InteractiveMode {
 					this.streamingMessage = event.message;
 					let errorMessage: string | undefined;
 					if (this.streamingMessage.stopReason === "aborted") {
-						const retryAttempt = this.session.retryAttempt;
-						errorMessage =
-							retryAttempt > 0
-								? `Aborted after ${retryAttempt} retry attempt${retryAttempt > 1 ? "s" : ""}`
-								: "Operation aborted";
+						errorMessage = abortedText(this.session.retryAttempt);
 						this.streamingMessage.errorMessage = errorMessage;
 					}
 					this.streamingComponent.updateContent(this.streamingMessage, false);
@@ -4061,11 +4057,7 @@ export class InteractiveMode {
 						if (message.stopReason === "aborted" || message.stopReason === "error") {
 							let errorMessage: string;
 							if (message.stopReason === "aborted") {
-								const retryAttempt = this.session.retryAttempt;
-								errorMessage =
-									retryAttempt > 0
-										? `Aborted after ${retryAttempt} retry attempt${retryAttempt > 1 ? "s" : ""}`
-										: "Operation aborted";
+								errorMessage = abortedText(this.session.retryAttempt);
 							} else {
 								errorMessage = message.errorMessage || "Error";
 							}

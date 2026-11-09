@@ -1,4 +1,6 @@
 // The risk of shell commands and file changes, and the permission extension that asks with it.
+
+import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import writerPermissionExtension from "../../src/extensions/writer-permission/index.ts";
@@ -28,6 +30,8 @@ describe("bashRisk", () => {
 			expect([c, bashRisk(c)]).toEqual([c, "act"]);
 		// Writing only to /dev/null stays reading.
 		expect(bashRisk("grep x f 2>/dev/null")).toBe("read");
+		// id reads who the user is (a 2026-11-09 run had `ls -ld dir; id` asked for).
+		expect(bashRisk("ls -ld a b 2>&1; id")).toBe("read");
 	});
 	it("finds the dangerous part of a compound command", () => {
 		for (const c of [
@@ -63,7 +67,8 @@ describe("insideDir and toolRequest", () => {
 		expect(toolRequest("write", { path: "a.md" }, "/work", titles)).toMatchObject({
 			risk: "act",
 			title: "F",
-			detail: "/work/a.md",
+			// The full path as the platform writes it (C:\\work\\a.md on Windows).
+			detail: resolve("/work", "a.md"),
 			inDirFile: true,
 		});
 		expect(toolRequest("edit", { path: "/home/u/.bashrc" }, "/work", titles)).toMatchObject({

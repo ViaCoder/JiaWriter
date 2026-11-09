@@ -329,7 +329,9 @@ export function materialProblem(item: Material, archived: readonly string[]): st
 /** One material as a Markdown list item. */
 export function renderMaterial(item: Material): string {
 	// The source line ends every item.
-	const page = item.page?.trim() ? `第${item.page.trim()}页` : "";
+	// A number or a range is a page (第3页); anything else is written as given (第1条, not 第第1条页).
+	const at = item.page?.trim() ?? "";
+	const page = /^\d+(?:\s*[-–—~～]\s*\d+)?$/.test(at) ? `第${at}页` : at;
 	const source = item.file?.trim() ? `《${item.file}》${page}` : (item.url ?? "");
 	const body =
 		item.kind === "case"

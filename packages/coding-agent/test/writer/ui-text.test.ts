@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Functions under test.
 import { currentLang, savedLang, setUiLang, t, uiSettingsPath } from "../../src/writer/i18n/index.ts";
-import { UI_ZH, uiText } from "../../src/writer/ui-text.ts";
+import { abortedText, UI_ZH, uiText } from "../../src/writer/ui-text.ts";
 
 // Agent folder of each test.
 let agent = "";
@@ -79,5 +79,19 @@ describe("uiText", () => {
 			/[\p{Script=Han}][,.;:!?()]|[,.;:!?()][\p{Script=Han}]/u.test(v.replace(/\.[a-z]+\b/g, "")),
 		);
 		expect(bad).toEqual([]);
+	});
+});
+
+describe("abortedText", () => {
+	it("says an interrupted reply in the interface language, with the retries before it", () => {
+		// 2026-11-09: the real-model check saw "Operation aborted" on the Chinese screen.
+		vi.stubEnv("JW_LANG", "zh");
+		expect([abortedText(0), abortedText(2)]).toEqual(["已中断", "已中断（此前重试 2 次）"]);
+		vi.stubEnv("JW_LANG", "en");
+		expect([abortedText(0), abortedText(1), abortedText(3)]).toEqual([
+			"Operation aborted",
+			"Aborted after 1 retry attempt",
+			"Aborted after 3 retry attempts",
+		]);
 	});
 });

@@ -423,7 +423,7 @@ export const en: Record<MessageKey, string> = {
 	"permission.declined":
 		"The user did not allow it, so it did not run: {what}. Do not retry another way; ask the user what they want.",
 	"permission.noUser":
-		"Nobody can confirm, so it did not run: {what}. Tell the user this step needs confirming in the interactive interface, or running with JW_PERMISSION=bypass.",
+		"Nobody can confirm, so it did not run: {what}. Do the parts that need no confirmation (changes inside the working folder) on their own; do not try the refused change with another tool, command or path, and tell the user this step needs confirming in the interactive interface, or that they can start with JW_PERMISSION=bypass (only the user can change it).",
 	"todo.title": "Tasks ({done}/{total})",
 	"todo.saved": "Task list saved: {done}/{total} done; in progress: {now}.",
 	"ask.other": "Other (type your own)",
