@@ -3,7 +3,8 @@
 The keys of Claude Code in a real terminal (2026-11-09: "The operation should be consistent with Claude Code ...
 ensure that the key bindings for macOS are correctly implemented"): Shift+Tab cycles the work mode, ? shows the
 shortcut list, Ctrl+O the detailed view, Ctrl+R searches the history, Esc Esc clears the input into the history,
-Option+Enter adds a line, Ctrl+P recalls the last input, Ctrl+T hides the task list. A fake model answers on a local
+Option+Enter adds a line, Ctrl+P recalls the last input, Ctrl+T hides the task list; the whole of a long
+conversation can be scrolled back to its first message, also after the session is continued with --continue. A fake model answers on a local
 port; nothing leaves the machine.
 
 Usage: python3 -I scripts/writer-keys-check.py [--debug DIR] [program]   (default: the source tree; --debug keeps the
@@ -36,6 +37,7 @@ CTRL_P = b"\x10"
 CTRL_T = b"\x14"
 ESC = b"\x1b"
 OPTION_ENTER = b"\x1b\r"
+PAGE_UP = b"\x1b[5~"
 # Everything the terminal received: the screen is played from it.
 RAW = bytearray()
 
@@ -146,12 +148,26 @@ def main():
         coding = os.path.join(ROOT, "packages", "coding-agent")
         resolver = "file://" + os.path.join(coding, "src", "experimental", "source-resolver.ts")
         program = ["node", "--import", resolver, os.path.join(coding, "src", "cli.ts")]
-    pid, fd = pty.fork()
-    if pid == 0:
-        fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
-        os.chdir(work)
-        os.execvpe(program[0], program, env)
-    os.set_blocking(fd, False)
+    def start(extra):
+        """Start the program in the working folder; the screen is played from this start on."""
+        RAW.clear()
+        child, terminal = pty.fork()
+        if child == 0:
+            fcntl.ioctl(0, termios.TIOCSWINSZ, struct.pack("HHHH", 40, 120, 0, 0))
+            os.chdir(work)
+            os.execvpe(program[0], program + extra, env)
+        os.set_blocking(terminal, False)
+        return child, terminal
+
+    def scrolled_to(wanted, pages=40):
+        """Page up until `wanted` shows, or the pages run out."""
+        for _ in range(pages):
+            if wanted in screen():
+                return True
+            press(fd, PAGE_UP, 0.3)
+        return wanted in screen()
+
+    pid, fd = start([])
     results = []
     def check(name, ok):
         """Record a result, with the screen when debugging."""
@@ -221,6 +237,19 @@ def main():
         press(fd, CTRL_T, 1)
         shown = wait_screen(fd, "任务清单：", 4)
         check("Ctrl+T 显示或隐藏任务清单", "任务清单：隐藏" in shown)
+        # A long conversation: twenty more turns, then back to the first message.
+        for i in range(1, 21):
+            press(fd, f"第{i}条消息".encode("utf-8"), 0.3)
+            press(fd, b"\r", 1.2)
+        wait_screen(fd, "第20条消息", 10)
+        check("长对话往上翻能看到第一条消息", scrolled_to("写稿"))
+        # Continued in a new run: the whole conversation is there again.
+        os.kill(pid, 9)
+        os.waitpid(pid, 0)
+        pid, fd = start(["--continue"])
+        shown = wait_screen(fd, "第20条消息", 30)
+        check("--continue 继续会话后显示之前的对话", "第20条消息" in shown)
+        check("继续会话后往上翻能看到第一条消息", scrolled_to("写稿"))
     finally:
         try:
             os.kill(pid, 9)
