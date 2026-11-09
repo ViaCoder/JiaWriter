@@ -3,6 +3,8 @@
  * Permission, stale references and limits are decided here, by rules; what comes back says who goes on.
  */
 
+// The shape of every result.
+import { holdSite } from "../held-sites.ts";
 // Too few words to count as a reading.
 import { MIN_WORDS } from "../ocr.ts";
 // What the permission gate answers.
@@ -13,7 +15,6 @@ import {
 	type Risk,
 	riskOfLabel,
 } from "../permission.ts";
-// The shape of every result.
 import { type Breaker, type Outcome, outcome } from "../protocol.ts";
 // Images, as a last resort.
 import { type Capture, type ImageLedger, type ImageSupport, pagePoint, pictureHash } from "../vision.ts";
@@ -253,6 +254,8 @@ export async function readTab(deps: BrowserDeps, input: BrowserInput): Promise<O
 	const tab = state.tab as number;
 	if (await walled(deps, tab)) {
 		state.held.add(siteOf(state.url));
+		// No other tool reaches the site either, until the user has passed it.
+		holdSite(siteOf(state.url));
 		return outcome("refused", "read", "user", "verification", { url: state.url });
 	}
 	const page = (await deps.call("page_read", { tab, text: input.all ?? false }, CALL_MS)) as {

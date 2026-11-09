@@ -359,7 +359,8 @@ export function pageReporter(dir: string, url: string): string {
 	if (!entry || !existsSync(join(dir, entry.file))) return "";
 	// The page as archived: the head, then the text.
 	const text = readFileSync(join(dir, entry.file), "utf-8").slice(0, 4000);
-	const stated = text.match(/(?:^|[\s　|｜])来源[:：]\s*([\u4e00-\u9fa5A-Za-z·]{2,20}?)(?=$|[\s　|｜，,。])/m);
+	// Letters and digits too: 来源：C114 2026-04-20 (2026-11-09: a research run stopped at it).
+	const stated = text.match(/(?:^|[\s　|｜])来源[:：]\s*([\u4e00-\u9fa5A-Za-z0-9·]{2,20}?)(?=$|[\s　|｜，,。])/m);
 	if (stated) return stated[1];
 	// The title's last part, when it names a site: 新华网, 人民日报, 央视新闻.
 	const site =
@@ -378,9 +379,16 @@ export function pageReporter(dir: string, url: string): string {
 export function withPageReporters(dir: string, items: readonly Material[]): Material[] {
 	return items.map((item) => {
 		if (item.kind !== "case" || item.reporter?.trim() || item.file?.trim() || !item.url?.trim()) return item;
-		const reporter = pageReporter(dir, item.url);
+		// The page's own name for its outlet, else the site it is on: a run never stops for want of one (2026-11-09:
+		// twice a research run ended with no draft over this field).
+		const reporter = pageReporter(dir, item.url) || siteName(item.url);
 		return reporter ? { ...item, reporter } : item;
 	});
+}
+
+/** The site of an address, without www.: c114.net.cn. Empty when it is not one. */
+export function siteName(url: string): string {
+	return URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : "";
 }
 
 /** Add materials to 素材.md, all or none; returns how many it holds now. */

@@ -28,6 +28,7 @@ import {
 	readIndex,
 	renderMaterial,
 	safeName,
+	siteName,
 	topicPath,
 	topicWords,
 	withPageReporters,
@@ -362,6 +363,25 @@ describe("pageReporter / withPageReporters", () => {
 		);
 		expect(pageReporter(dir, "https://c.example/1")).toBe("");
 		expect(pageReporter(dir, "https://never.example/")).toBe("");
+		// 来源：C114 2026-04-20, the line a research run stopped at.
+		archivePage(
+			dir,
+			{
+				url: "https://www.c114.net.cn/industry/77324.html",
+				title: "民航局：全年无人机累计飞行小时",
+				date: "",
+				content: "民航局：全年无人机累计飞行小时  来源：C114 2026-04-20  C114讯 4月20日消息",
+			},
+			"https://www.c114.net.cn/industry/77324.html",
+			"x",
+			"t",
+		);
+		expect(pageReporter(dir, "https://www.c114.net.cn/industry/77324.html")).toBe("C114");
+	});
+
+	it("siteName: the site of an address", () => {
+		expect(siteName("https://www.c114.net.cn/industry/77324.html")).toBe("c114.net.cn");
+		expect(siteName("not an address")).toBe("");
 	});
 
 	it("withPageReporters: fills only web cases without an outlet", () => {
@@ -390,6 +410,8 @@ describe("pageReporter / withPageReporters", () => {
 			"x",
 			"t",
 		);
-		expect(() => addMaterials(dir, [{ ...CASE_NO_REPORTER, url: "https://c.example/1" }])).toThrow(/reporter/);
+		// A page that names no outlet: the site it is on (a run never stops for want of one).
+		addMaterials(dir, [{ ...CASE_NO_REPORTER, url: "https://c.example/1" }]);
+		expect(readFileSync(join(dir, "素材.md"), "utf-8")).toContain("报道方：c.example");
 	});
 });

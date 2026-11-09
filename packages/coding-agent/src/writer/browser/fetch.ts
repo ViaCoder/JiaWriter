@@ -44,6 +44,12 @@ const CHALLENGE_MARKS = [
 	"access denied",
 	"请验证",
 	"人机验证",
+	// 2026-11-09: a slider wall (请完成安全验证, 拖动滑块完成拼图) read as an ordinary short page.
+	"安全验证",
+	"验证码",
+	"拖动滑块",
+	"完成拼图",
+	"captcha",
 ];
 /** Visible text that counts as a loaded page (characters). */
 const CONTENT_MIN = 200;
