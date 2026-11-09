@@ -67,7 +67,11 @@ class Model(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
-        text = str(last.get("content"))
+        # The messages since the last reply: the user's and the notes added after it (2026-11-09).
+        since = len(body["messages"])
+        while since > 0 and body["messages"][since - 1].get("role") != "assistant":
+            since -= 1
+        text = str([m.get("content") for m in body["messages"][since:]])
         if last.get("role") == "tool":
             self.wfile.write(event({"content": "完成了。"}) + event({}, "stop") + b"data: [DONE]\n\n")
         elif "改稿" in text:

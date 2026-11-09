@@ -42,12 +42,17 @@ def tool_call(name, args):
 
 def answer(messages):
     """What the fake model says next, from the last message of the request."""
-    # The last message's text.
+    # The last message.
     last = messages[-1]
-    text = json.dumps(last.get("content", ""), ensure_ascii=False)
     # After a tool result: a short reply.
     if last.get("role") == "tool":
         return {"content": "完成了"}, "stop"
+    # The messages since the last reply: the user's, and the notes the program adds after it (2026-11-09: the note
+    # that the user answers between turns came last, and the check never saw 写稿).
+    since = len(messages)
+    while since > 0 and messages[since - 1].get("role") != "assistant":
+        since -= 1
+    text = json.dumps([m.get("content", "") for m in messages[since:]], ensure_ascii=False)
     # The two user messages of the check.
     if "写稿" in text:
         return tool_call("write", {"path": "稿.md", "content": "# 标题\n\n第一版正文。\n"})
