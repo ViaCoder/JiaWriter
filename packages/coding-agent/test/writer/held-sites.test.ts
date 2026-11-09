@@ -37,7 +37,9 @@ describe("held sites", () => {
 		setUiLang("zh");
 		const handlers: Record<string, (event: unknown) => unknown> = {};
 		writerGuardExtension({
-			on: (name: string, fn: (event: unknown) => unknown) => (handlers[name] = fn),
+			on: (name: string, fn: (event: unknown) => unknown) => {
+				handlers[name] = fn;
+			},
 		} as unknown as ExtensionAPI);
 		handlers.input({});
 		holdSite("127.0.0.1");
