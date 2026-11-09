@@ -265,13 +265,14 @@ export async function smoke(command, args) {
 		mkdirSync(join(work, "参考资料"), { recursive: true });
 		writeFileSync(join(work, "参考资料", "a.pdf"), onePagePdf("Smoke reference text for the import check, 2026."));
 		writeFileSync(join(work, "d.md"), "# 标题\n\n正文, 测试.\n");
-		// A speech with a level-3 heading: gongwen_check must report the hard conflict.
-		writeFileSync(join(work, "讲话.md"), `${"全市各部门围绕重点任务推进各项工作并取得进展。".repeat(60)}\n1．第一点\n`);
+		// A speech with a contrast frame: style_check must report it (gongwen_check went with the licensed code in P23k,
+		// 2026-11-09, and this check still called it).
+		writeFileSync(join(work, "讲话.md"), `# 在全市工作会议上的讲话\n\n${"这不是简单的技术问题，而是治理问题。".repeat(3)}\n`);
 		const tools = await startMock([
 			{ tool: "import_document", args: { path: "参考资料/a.pdf" } },
 			{ tool: "export_document", args: { path: "d.md" } },
 			{ tool: "write", args: { path: "稿件.md", content: "# 题目\n\n正文, 自动导出.\n" } },
-			{ tool: "gongwen_check", args: { path: "讲话.md", genre: "领导讲话" } },
+			{ tool: "style_check", args: { path: "讲话.md" } },
 			{ text: REPLY },
 		]);
 		try {
@@ -283,7 +284,7 @@ export async function smoke(command, args) {
 			const auto = join(work, "稿件.docx");
 			rows.push(["auto export", existsSync(auto) && readFileSync(auto).subarray(0, 2).toString("latin1") === "PK", ""]);
 			// The tool result went back to the model.
-			rows.push(["gongwen check", JSON.stringify(tools.requests).includes("领导讲话不用三级标题"), ""]);
+			rows.push(["style check", JSON.stringify(tools.requests).includes("对比框架 不是……而是"), ""]);
 		} finally {
 			tools.server.close();
 		}
