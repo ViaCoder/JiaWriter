@@ -59,6 +59,8 @@ export const en: Record<MessageKey, string> = {
 		"Note: {count} paragraphs open with specifics. In analysis, state the judgment first in a few general sentences, then the case or data that proves it; paragraphs that are not analysis need no change:",
 	"style.passShort": "AI-style check passed.",
 	"style.longSentences": "{count} sentences over {limit} characters; split them: {heads}.",
+	"style.uncitedRefs":
+		"Reference entries {entries} are not cited in the text: cite each where its fact is used, in the form YYYY年MM月DD日《outlet》报道, or remove it.",
 	"style.rareChars": "Rare characters {chars}: use common ones, except in names and quotations.",
 	"style.unsupported":
 		"Note: {count} paragraphs on problems or risks state a judgment with no case or figure. Add them where the materials have them:",

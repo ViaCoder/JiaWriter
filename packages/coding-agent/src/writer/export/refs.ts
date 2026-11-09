@@ -105,6 +105,33 @@ export function splitEntry(entry: string): { urls: string[]; text: string } {
 	return { urls, text };
 }
 
+/** A word that names an outlet: what news agencies, papers, sites and stations end in. */
+const OUTLET_WORD =
+	/^[\u4e00-\u9fa5A-Za-z]{2,12}?(?:通讯社|电视台|新闻网|新闻社|新闻|周刊|杂志|日报|晚报|时报|报|网|社|台|网站)$/;
+
+/** The outlets and longer titles an entry names, for finding it in the text. */
+export function entryNames(entry: string): string[] {
+	const words = splitEntry(entry)
+		.text.split(/[，,：:（）()《》[\]\s|｜、]+/)
+		.map((w) => w.trim())
+		.filter(Boolean);
+	return words.filter((w) => !/\d/.test(w) && (OUTLET_WORD.test(w) || w.length >= 8));
+}
+
+/**
+ * The numbers of the entries the body never cites: no [n] marker, and neither its outlet nor its title appears
+ * (2026-11-09: a third of 94 entries in ten research reports; the body named only an institution, or another outlet
+ * than the entry). An entry that names nothing to look for is left out.
+ */
+export function uncitedReferences(markdown: string, body: string): number[] {
+	return referenceEntries(markdown).flatMap((entry, i) => {
+		const names = entryNames(entry);
+		if (names.length === 0) return [];
+		const cited = body.includes(`[${i + 1}]`) || names.some((name) => body.includes(name));
+		return cited ? [] : [i + 1];
+	});
+}
+
 /** The problems of one entry; `opened` (normalized URLs) is undefined when the session is not known. */
 export function checkEntry(entry: string, opened?: ReadonlySet<string>): RefProblem[] {
 	// URLs of the entry, the usable ones normalized, and the text that names it.

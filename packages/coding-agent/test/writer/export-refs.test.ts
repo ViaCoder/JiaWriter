@@ -11,6 +11,8 @@ import {
 	referenceEntries,
 	splitEntry,
 	unopenedUrls,
+	entryNames,
+	uncitedReferences,
 } from "../../src/writer/export/refs.ts";
 
 describe("normalizeUrl", () => {
@@ -95,5 +97,40 @@ describe("openedUrls", () => {
 			result("3", "https://c.example", 900, true),
 		];
 		expect(openedUrls(msgs)).toEqual(["https://a.example/new", "https://a.example/old"]);
+	});
+});
+
+// 2026-11-09: a third of 94 entries in ten research reports were cited nowhere in the text; the body named only an
+// institution (据中国民航局数据), or another outlet than the entry.
+describe("entryNames / uncitedReferences", () => {
+	const REPORT = [
+		"# 我国低空经济发展研究报告",
+		"",
+		"中国民航局预测，2025年市场规模达1.5万亿元。2025年12月30日《上海证券报》报道，美团无人机开通65条航线。",
+		"2025年11月12日《光明日报》刊文指出，制度规范存在空白[6]。",
+		"",
+		"## 参考文献",
+		"",
+		"1. [逐空而上！低空经济加速启航万亿新赛道，新华社，2025-12-22](https://www.news.cn/20251222/c.html)",
+		"2. [国家先后设立两个“低空司”，低空经济前景如何？，中国网《北京周报》，2026-05-25](http://www.beijingreview.cn/a.html)",
+		"3. [向天空要生产力！低空经济万翼齐扬，上海证券报，2025-12-30](https://m.cnstock.com/611057)",
+		"4. [迈入规模化落地关键期——2025年低空经济大事记，现代物流报，2025-12-31](https://news.xd56b.com/36187.html)",
+		"5. https://example.com/12345",
+		"6. [协同发力激发低空经济发展动能，求是网，2025-11-12](https://www.qstheory.cn/a.html)",
+	].join("\n");
+
+	it("entryNames: the outlets and the longer titles, without dates or addresses", () => {
+		expect(entryNames("[向天空要生产力！低空经济万翼齐扬，上海证券报，2025-12-30](https://m.cnstock.com/611057)")).toEqual([
+			"向天空要生产力！低空经济万翼齐扬",
+			"上海证券报",
+		]);
+		expect(entryNames("2. [国家先后设立两个“低空司”，中国网《北京周报》，2026-05-25](http://x.cn/a)")).toContain("北京周报");
+		expect(entryNames("5. https://example.com/12345")).toEqual([]);
+	});
+
+	it("uncitedReferences: entries named nowhere in the text and with no [n] marker", () => {
+		const body = REPORT.split("## 参考文献")[0];
+		// 3 is cited by its outlet, 6 by its marker, 5 names nothing to look for.
+		expect(uncitedReferences(REPORT, body)).toEqual([1, 2, 4]);
 	});
 });

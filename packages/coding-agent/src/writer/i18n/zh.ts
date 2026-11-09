@@ -52,6 +52,8 @@ export const zh = {
 		"提示：{count} 段一开头就是具体数据或事例。分析段先用几句话写出这段的判断（不出现具体的人、事、数），再给证明它的案例或数据；不是分析的段落不必改：",
 	"style.passShort": "AI 腔检查通过。",
 	"style.longSentences": "{count} 句超过 {limit} 字，拆开：{heads}。",
+	"style.uncitedRefs":
+		"参考文献第 {entries} 条在正文里没有引用：在用到它的事实处写明“××年××月××日《媒体》报道”，或删去这一条。",
 	"style.rareChars": "生僻字 {chars}：换成常用字，人名、地名和引文除外。",
 	"style.unsupported": "提示：问题或风险部分有 {count} 段只有判断，没有案例或数据。材料里有的补上，没有的不必补：",
 	"style.repeated":

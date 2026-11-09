@@ -20,6 +20,8 @@ import { resolveToCwd } from "../../core/tools/path-utils.ts";
 import { isDraftPath } from "../../writer/docs/auto.ts";
 // The imported references beside a draft.
 import { parsedFiles } from "../../writer/docs/import.ts";
+// Reference entries the body never cites.
+import { uncitedReferences } from "../../writer/export/refs.ts";
 // The 公文 parameter check, run by the program at the end of a turn.
 // Output messages.
 import { t } from "../../writer/i18n/index.ts";
@@ -289,6 +291,9 @@ export function finishedChecks(text: string): string[] {
 	// Level-2 characters are common enough; only those beyond them.
 	const rare = rareChars(text).filter((c) => c.level !== 2);
 	if (rare.length > 0) out.push(t("style.rareChars", { chars: rare.map((c) => c.char).join("、") }));
+	// Each reference entry cited where its fact is used, so the reader can tell which source holds which fact.
+	const uncited = uncitedReferences(text, bodyBeforeReferences(text));
+	if (uncited.length > 0) out.push(t("style.uncitedRefs", { entries: uncited.join("、") }));
 	return out;
 }
 
