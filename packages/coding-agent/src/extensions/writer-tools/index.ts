@@ -214,6 +214,39 @@ export function unusedMaterials(text: string, file: string, cwd: string): string
 	});
 }
 
+/** Words that report research the writer did: a survey, a visit, a meeting, a questionnaire. */
+const METHOD_WORDS =
+	/调研组|开展调研|专题调研|实地走访|入户走访|走访了|座谈|问卷|抽样调查|调研了解到|调研发现|实地察看/g;
+
+/** Every text of the materials beside a draft: 素材.md, imported references, saved searches and pages. */
+export function materialText(file: string, cwd: string): string {
+	const texts: string[] = [];
+	for (const dir of draftFolders(file, cwd)) {
+		const material = join(dir, MATERIAL_FILE);
+		if (existsSync(material)) texts.push(readFileSync(material, "utf-8"));
+		for (const path of parsedFiles(dir)) texts.push(readFileSync(path, "utf-8"));
+		for (const sub of [TOPIC_DIRS.search, TOPIC_DIRS.web]) {
+			const folder = join(dir, sub);
+			if (!existsSync(folder)) continue;
+			for (const name of readdirSync(folder))
+				if (name.endsWith(".md")) texts.push(readFileSync(join(folder, name), "utf-8"));
+		}
+	}
+	return texts.join("\n");
+}
+
+/**
+ * The research steps a draft reports that no material mentions (2026-11-09: three report runs opened with a survey
+ * team and checks the materials never named, though a rule forbade it): empty when the materials speak of research.
+ */
+export function inventedMethods(text: string, file: string, cwd: string): string[] {
+	const found = [...new Set(text.match(METHOD_WORDS) ?? [])];
+	if (found.length === 0) return [];
+	const materials = materialText(file, cwd);
+	if (!materials.trim() || /调研|走访|座谈|问卷|调查/.test(materials)) return [];
+	return found;
+}
+
 /** The titles of the references imported beside a draft: 报告 for 参考资料/.parsed/报告.pdf.md. */
 export function referenceTitles(file: string, cwd: string): string[] {
 	return draftFolders(file, cwd)
@@ -333,6 +366,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			if (inferRegister(text) === "report" && /\d/.test(text) && !cites && materialsNameSources(file, ctx.cwd))
 				own.push(t("style.noCitation"));
 			if (lacksReferences(text, file, ctx.cwd)) own.push(t("style.noReferences"));
+			const methods = inventedMethods(text, file, ctx.cwd);
+			if (methods.length > 0) own.push(t("style.inventedMethods", { words: methods.join("、") }));
 			// The whole document's measures wait until its outline has no section left (written one per turn).
 			if (!outlineOpen(file)) {
 				const unused = unusedMaterials(text, file, ctx.cwd);

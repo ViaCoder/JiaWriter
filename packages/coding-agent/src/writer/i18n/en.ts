@@ -76,6 +76,8 @@ export const en: Record<MessageKey, string> = {
 		"The report uses materials but names no source: cite search results and published files as the citation rule says; from the user's notes and fact lists cite the sources they name, never the notes file.",
 	"style.noReferences":
 		"The text cites reports from the searches but ends with no references: list each source's title, outlet, date and address as the citation rule says.",
+	"style.inventedMethods":
+		"The draft reports research no material mentions ({words}): cut it, and say only what the materials tell of their source.",
 	"style.unusedMaterials":
 		"These materials are not used: {items}. If one proves a judgment, put it right after that judgment; leave out only what has no bearing here.",
 	"style.length":

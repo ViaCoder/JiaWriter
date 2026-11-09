@@ -20,10 +20,12 @@ import writerToolsExtension, {
 	draftFolders,
 	finishedChecks,
 	hasMaterials,
+	inventedMethods,
 	itemMarks,
 	lacksReferences,
 	MAX_ROUNDS,
 	materialsNameSources,
+	materialText,
 	modelAsker,
 	outlineOpen,
 	referenceTitles,
@@ -360,6 +362,33 @@ describe("lacksReferences", () => {
 	});
 });
 
+describe("materialText", () => {
+	it("joins 素材.md, the imported references and the saved searches and pages beside a draft", () => {
+		const topic = join(cwd, "20261109-材料");
+		mkdirSync(join(topic, "稿件"), { recursive: true });
+		mkdirSync(join(topic, "检索"), { recursive: true });
+		writeFileSync(join(topic, "素材.md"), "素材一条");
+		writeFileSync(join(topic, "检索", "001-结果.md"), "检索一页");
+		const text = materialText(join(topic, "稿件", "稿.md"), cwd);
+		expect([text.includes("素材一条"), text.includes("检索一页")]).toEqual([true, true]);
+		expect(materialText(join(cwd, "别处", "稿.md"), cwd)).toBe("");
+	});
+});
+
+describe("inventedMethods", () => {
+	it("names research steps the draft reports and no material mentions, and none when the materials do", () => {
+		// 2026-11-09: report runs opened with a survey team the materials never named.
+		const draft = join(cwd, "稿.md");
+		const report = "# 调研报告\n\n为掌握情况，调研组开展座谈，现将有关情况报告如下。";
+		mkdirSync(join(cwd, "参考资料", ".parsed"), { recursive: true });
+		writeFileSync(join(cwd, "参考资料", ".parsed", "材料.md.md"), "1. 全市老旧小区共412个。");
+		expect(inventedMethods(report, draft, cwd)).toEqual(["调研组", "座谈"]);
+		writeFileSync(join(cwd, "参考资料", ".parsed", "材料.md.md"), "1. 市住建局组织座谈，了解到全市老旧小区共412个。");
+		expect(inventedMethods(report, draft, cwd)).toEqual([]);
+		rmSync(join(cwd, "参考资料"), { recursive: true });
+	});
+});
+
 describe("outlineOpen", () => {
 	it("is true while the outline beside a draft has a section to write", () => {
 		const draft = join(cwd, "稿.md");
@@ -487,7 +516,8 @@ describe("the automatic check of each draft", () => {
 	it("asks for sources and the requested length when a report lacks them", async () => {
 		const { handlers, sent, wrote } = started();
 		mkdirSync(join(cwd, "参考资料", ".parsed"), { recursive: true });
-		writeFileSync(join(cwd, "参考资料", ".parsed", "东坡村调查.pdf.md"), "资料");
+		// The material records the survey the report tells of, so only sources and length are asked for.
+		writeFileSync(join(cwd, "参考资料", ".parsed", "东坡村调查.pdf.md"), "调研组走访记录");
 		handlers.input({ text: "写一篇约3000字的调研报告" }, { cwd });
 		wrote("稿.md", FACT_REPORT);
 		await handlers.agent_end({}, { cwd });
