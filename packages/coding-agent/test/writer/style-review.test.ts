@@ -101,6 +101,10 @@ describe("spoken-register", () => {
 	it("is a category the prompt explains and the parser keeps", () => {
 		// 2026-11-09: drafts kept 随手可承受 and 以快制快 at language score 4; no category named them.
 		expect(REVIEW_PROMPT).toContain("- spoken-register:");
+		// 2026-11-09: a review suggested 一是/二是, which the numbering rule forbids, and missed an invented research opening.
+		expect(REVIEW_PROMPT).not.toContain("一是……二是……");
+		expect(REVIEW_PROMPT).toContain("never one that numbers points with 一是/二是");
+		expect(REVIEW_PROMPT).toContain("the opening's account of how the research was done");
 		const kept = parseReview(
 			`{"issues":[{"category":"spoken-register","quote":"以快制快","why":"口号","fix":"写出具体时限"}]}`,
 			"要以快制快。",

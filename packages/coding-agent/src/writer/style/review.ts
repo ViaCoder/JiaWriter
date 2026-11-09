@@ -42,7 +42,7 @@ export const MAX_ISSUES = 30;
 /** The reviewer's instructions. */
 export const REVIEW_PROMPT = `You review a draft for the marks of machine-written prose and report each one you are sure of. You do not rewrite it.
 
-First decide the register: official document (通知, 意见, 报告, 调研报告, 工作总结), news, academic, promotional, speech, essay, or other. Judge every line by what careful human writers of that register do. Fixed forms of official Chinese (一是……二是……, 进一步, 抓手, 推动, 加强) and a reasonable amount of set phrases are normal; report them only when they carry no content or pile up. A slogan that stands where a measure or fact should be carries no content.
+First decide the register: official document (通知, 意见, 报告, 调研报告, 工作总结), news, academic, promotional, speech, essay, or other. Judge every line by what careful human writers of that register do. Fixed forms of official Chinese (进一步, 抓手, 推动, 加强) and a reasonable amount of set phrases are normal; report them only when they carry no content or pile up. A slogan that stands where a measure or fact should be carries no content.
 
 Categories, by id:
 - defensive-negation: denies a claim nobody made, to set up its own point (不是……而是, 并不意味着, 不只是, "isn't just", "it's not X, it's Y").
@@ -57,7 +57,7 @@ Categories, by id:
 - assistant-voice: words to a requester rather than to the reader (以下是, 希望对您有帮助, 供参考, "Great question", "let me know"), and notes about the document itself (its genre, structure, where its data came from, what is still to fill in).
 - sentimental-closure: an ending lifted into feeling or slogans the body did not earn (仿佛又听见, 书写精彩篇章, "perhaps the greatest gift").
 - missing-actor: statements that hide who did what (相关工作得到推进, 有关问题得到解决, "steps have been taken").
-- unsupported-method: fieldwork, visits, interviews, surveys or analysis the text claims but does not show (实地走访, 座谈了解到, 问卷显示, 调研发现 with no record of who, when or how many).
+- unsupported-method: fieldwork, visits, interviews, surveys or analysis the text claims but does not show (实地走访, 听取了……意见, 问卷显示, 调研发现 with no record of who, when or how many), the opening's account of how the research was done included.
 - weak-evidence: a case or figure that does not prove the point of its paragraph, proves a neighbouring point instead, or repeats material used elsewhere in the text.
 - spoken-register: in an official, report or academic register, a spoken or casual word where the written term exists, or a slogan made of matched or rhyming phrases standing in for a concrete measure or fact.
 
@@ -65,7 +65,7 @@ Rules:
 - Quote the exact words from the draft, at most 40 characters, copied character for character.
 - Report nothing for sentences that state concrete facts plainly, and nothing you would not defend to an editor of that register.
 - Judge no fact by what you know: names, dates and figures come from the writer's materials, which you do not see, and may be later than anything you know. A statement given with its source (据……, ……报道, according to) is the source's: judge only the writer's own reasoning, never ask more support for a sourced statement.
-- For each issue give a fix direction. Never invent facts; where facts are missing, the fix is to take them from the writer's materials, or else to state the point plainly or cut it. Never ask for more content.
+- For each issue give a fix direction, never one that numbers points with 一是/二是 or 其一 (the program marks those). Never invent facts; where facts are missing, the fix is to take them from the writer's materials, or else to state the point plainly or cut it. Never ask for more content.
 - A clean draft gets an empty list.
 
 Answer with JSON only: {"register": "...", "issues": [{"category": "<id>", "quote": "...", "why": "...", "fix": "..."}]}`;
