@@ -22,9 +22,9 @@ export interface StylePattern {
 }
 
 /**
- * Patterns that careful human writers use too, so one hit is shown for the model to judge and only their density
- * (negation over its limit) asks for another round: in 29 human official documents (test fixtures and the State
- * Council samples, 2026-11-09) zh-denial matched 93 times, zh-bushi-ershi 8 and zh-fou-ershi 5. The semantic review's
+ * Patterns that careful writers use too, so one hit is shown for the model to judge and only their density asks for
+ * another round: in the user's 22 model documents and 4 State Council documents (2026-11-09) zh-denial matched 93
+ * times (22 of them in the model documents' own notes), zh-bushi-ershi 8 and zh-fou-ershi 5. The semantic review's
  * defensive-negation category judges what a single one says.
  */
 export const DENSITY_ONLY: ReadonlySet<string> = new Set(["zh-denial", "zh-bushi-ershi", "zh-fou-ershi"]);
@@ -229,8 +229,11 @@ function weakStock(pattern: StylePattern): StylePattern {
 	return pattern.en === "stock phrase" ? { ...pattern, weak: true } : pattern;
 }
 
-/** Weak signs allowed per 1,000 characters: official documents had 0.1 to 0.3, generated drafts up to 8. */
-export const WEAK_PER_1000 = 1;
+/**
+ * Weak signs allowed per 1,000 characters: official documents had 0.1 to 0.3, generated drafts up to 8; the user's model
+ * reports reach 1.4 (2026-11-09: 从……转向 five times in a careful survey report), so the limit stands above them.
+ */
+export const WEAK_PER_1000 = 2;
 
 /** All packs by name. */
 export const STYLE_PACKS: Readonly<Record<string, readonly StylePattern[]>> = {

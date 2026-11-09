@@ -304,11 +304,18 @@ export function styleCheck(text: string, options: StyleOptions = {}): StyleRepor
 export function styleMustFix(report: StyleReport): boolean {
 	// What styleClean asks, less the single hits of patterns human writers use too (DENSITY_ONLY).
 	const strong = report.hits.some((hit) => !hit.weak && !DENSITY_ONLY.has(hit.id));
-	// Those patterns count by density, at the negation limit: human documents reach 1.5 per 10 sentences (2026-11-09).
+	// Those patterns count by density, at the negation limit: the model and State Council documents reach 1.5 per 10
+	// sentences (2026-11-09).
 	const frames = report.hits.filter((hit) => DENSITY_ONLY.has(hit.id)).length;
 	const sentences = Math.max(1, report.negation.sentences);
 	const framesOver = frames >= 2 && (frames * 10) / sentences > report.negation.threshold;
-	return strong || framesOver || !styleClean({ ...report, hits: [] });
+	// Measures that real official writing crosses too are shown, not enforced: over 1,151 official texts (white papers,
+	// audit and inspection reports, government work reports, statistics, 2026-11-09) the vague-word density passed its
+	// limit in 145, the even sentence length in 144 and the dash density in 44. The review judges vagueness by meaning.
+	const p = report.prose;
+	const measures =
+		p.weakOver || report.negation.over || report.structure.listOver || report.structure.boldOver || p.factsLow;
+	return strong || framesOver || measures;
 }
 
 /** True when the report has nothing to show. */

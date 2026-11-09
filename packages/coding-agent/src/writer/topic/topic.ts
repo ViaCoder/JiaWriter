@@ -297,8 +297,8 @@ export function materialUrls(dir: string): string[] {
 
 /** Fields a material must have, by kind. */
 const REQUIRED: Readonly<Record<Material["kind"], readonly (keyof Material)[]>> = {
-	// Time, reporter, the acting subject and the action.
-	case: ["time", "reporter", "subject", "action"],
+	// Time, the acting subject and the action; the reporter too when the case is from the web (below).
+	case: ["time", "subject", "action"],
 	// Time, region, industry, indicator and value.
 	data: ["time", "region", "industry", "indicator", "value"],
 };
@@ -317,7 +317,14 @@ export function asFileSource(item: Material): Material {
 export function materialProblem(item: Material, archived: readonly string[]): string {
 	// Missing fields first.
 	const missing = REQUIRED[item.kind].filter((f) => !String(item[f] ?? "").trim());
-	if (missing.length > 0) return t("topic.missingFields", { fields: missing.join("、") });
+	// A case from the user's own file has no outlet: the file is its source (2026-11-09: a speech run asked a reporter of
+	// the user's material, failed five times and ended with no draft).
+	if (item.kind === "case" && !item.file?.trim() && !item.reporter?.trim()) missing.push("reporter");
+	if (missing.length > 0)
+		return t("topic.missingFields", {
+			fields: missing.join("、"),
+			meaning: t(item.kind === "case" ? "topic.caseFields" : "topic.dataFields"),
+		});
 	// A reference file needs its page, unless it has none.
 	if (item.file?.trim())
 		return item.page?.trim() || PAGELESS.test(item.file.trim()) ? "" : t("topic.missingPage", { file: item.file });
@@ -335,7 +342,7 @@ export function renderMaterial(item: Material): string {
 	const source = item.file?.trim() ? `《${item.file}》${page}` : (item.url ?? "");
 	const body =
 		item.kind === "case"
-			? `案例｜时间：${item.time}｜报道方：${item.reporter}｜主体：${item.subject}｜行为：${item.action}`
+			? `案例｜时间：${item.time}｜${item.reporter?.trim() ? `报道方：${item.reporter}｜` : ""}主体：${item.subject}｜行为：${item.action}`
 			: `数据｜时间：${item.time}｜地区：${item.region}｜行业：${item.industry}｜指标：${item.indicator}｜数值：${item.value}`;
 	return `- ${item.section?.trim() ? `【${item.section.trim()}】` : ""}${body}｜来源：${source}`;
 }

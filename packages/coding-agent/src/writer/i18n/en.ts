@@ -284,7 +284,10 @@ export const en: Record<MessageKey, string> = {
 	"topic.earlier": "Earlier research stays in {dir}: read it there when needed.",
 	"topic.archived": "Archived: {path}",
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
-	"topic.missingFields": "missing {fields}",
+	"topic.missingFields": "missing {fields} ({meaning})",
+	"topic.caseFields":
+		"a case: time, subject (who acted), action (what they did), reporter (the outlet, for web sources only)",
+	"topic.dataFields": "data: time, region, industry or field, indicator, value",
 	"topic.missingPage": "no page for {file}",
 	"topic.missingSource": "no source: give url, or file and page",
 	"topic.notArchived":

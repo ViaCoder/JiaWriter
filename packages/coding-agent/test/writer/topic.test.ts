@@ -235,6 +235,18 @@ describe("materials", () => {
 		expect(materialProblem(CASE, opened)).toBe("");
 		expect(materialProblem(DATA, [])).toBe("");
 		expect(materialProblem({ ...CASE, reporter: " " }, opened)).toContain("reporter");
+		// A case from the user's own file needs no outlet, and the message says what each field means (2026-11-09).
+		const fromFile: Material = {
+			kind: "case",
+			time: "2025年7月",
+			subject: "城西物流园冷库",
+			action: "发生氨泄漏",
+			file: "材料.md",
+		};
+		expect(materialProblem(fromFile, [])).toBe("");
+		expect(materialProblem({ ...CASE, reporter: undefined }, opened)).toMatch(/reporter.*subject/);
+		expect(renderMaterial(fromFile)).not.toContain("报道方");
+		expect(renderMaterial(fromFile)).toContain("主体：城西物流园冷库");
 		expect(materialProblem({ ...DATA, value: "" }, [])).toContain("value");
 		expect(materialProblem({ ...DATA, page: "" }, [])).toContain("年鉴.pdf");
 		expect(materialProblem({ ...CASE, url: "" }, opened)).not.toBe("");

@@ -74,7 +74,7 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		label: "Add material",
 		// Full description sent to the model.
 		description:
-			"Records cases and data in 素材.md.\n\nUsage:\n - A case needs time, reporter, subject, action\n - Data needs time, region, industry, indicator, value\n - Each needs url, or file and page",
+			"Records cases and data in 素材.md.\n\nUsage:\n - A case needs time, subject, action, and reporter when it is from the web\n - Data needs time, region, industry, indicator, value\n - Each needs url, or file and page",
 		// Argument schema.
 		parameters: Type.Object({
 			items: Type.Array(
