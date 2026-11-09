@@ -13,6 +13,14 @@ import {
 	trackDetachedChildPid,
 	untrackDetachedChildPid,
 } from "../../utils/shell.ts";
+// JiaWriter: commands in the background (Ctrl+B, run_in_background), as in Claude Code.
+import {
+	addBackgroundTask,
+	appendTaskOutput,
+	type BackgroundTask,
+	endTask,
+	registerForeground,
+} from "../../writer/background.ts";
 import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
 import { OutputAccumulator } from "./output-accumulator.ts";
 import { BASH_UPDATE_THROTTLE_MS, createShellRenderers } from "./renderers/bash.ts";
@@ -40,6 +48,12 @@ function resolveTimeoutMs(timeout: number | undefined): number | undefined {
 const bashSchema = Type.Object({
 	command: Type.String({ description: "Shell command to execute" }),
 	timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (optional, no default timeout)" })),
+	run_in_background: Type.Optional(
+		Type.Boolean({
+			description:
+				"Run a long command (a build, a server, a long download) in the background and go on; the result names the file its output goes to, and you are told when it ends",
+		}),
+	),
 });
 
 export const bashToolSystemPromptContribution = {
@@ -66,6 +80,8 @@ export type BashToolOutput = Static<typeof bashOutputSchema>;
 export interface BashToolDetails {
 	truncation?: TruncationResult;
 	fullOutputPath?: string;
+	// JiaWriter: the task a command went on as in the background; the screen shows it in the interface language.
+	background?: { id: number; outputFile: string; byUser: boolean };
 }
 
 /**
@@ -260,7 +276,7 @@ export function createShellToolDefinition(
 		constrainedSampling: { type: "json_schema", strict: "prefer" },
 		async execute(
 			_toolCallId,
-			{ command, timeout }: { command: string; timeout?: number },
+			{ command, timeout, run_in_background }: { command: string; timeout?: number; run_in_background?: boolean },
 			signal?: AbortSignal,
 			onUpdate?,
 			ctx?: ExtensionContext,
@@ -319,7 +335,13 @@ export function createShellToolDefinition(
 				onUpdate({ content: [], details: undefined });
 			}
 
+			// A command sent to the background writes to its task's file from then on.
+			let task: BackgroundTask | undefined;
 			const handleData = (data: Buffer) => {
+				if (task) {
+					appendTaskOutput(task, data.toString("utf-8"));
+					return;
+				}
 				if (!acceptingOutput) return;
 				output.append(data);
 				scheduleOutputUpdate();
@@ -358,16 +380,61 @@ export function createShellToolDefinition(
 			const appendStatus = (text: string, status: string) => `${text ? `${text}\n\n` : ""}${status}`;
 			const startedAt = performance.now();
 
+			// The command's own stop: the call's signal reaches it only while it runs in the foreground, so Esc after
+			// Ctrl+B leaves it running.
+			const inner = new AbortController();
+			const onOuterAbort = () => inner.abort();
+			if (signal?.aborted) inner.abort();
+			else signal?.addEventListener("abort", onOuterAbort, { once: true });
+			let moved: (task: BackgroundTask) => void = () => {};
+			const backgrounded = new Promise<BackgroundTask>((resolve) => {
+				moved = resolve;
+			});
+			const toBackground = (): BackgroundTask => {
+				if (task) return task;
+				signal?.removeEventListener("abort", onOuterAbort);
+				task = addBackgroundTask(command, output.snapshot({ persistIfTruncated: false }).content, () =>
+					inner.abort(),
+				);
+				moved(task);
+				return task;
+			};
+			const unregister = run_in_background ? () => {} : registerForeground({ toBackground });
+
 			try {
 				let exitCode: number | null;
 				try {
-					const result = await ops.exec(spawnContext.command, spawnContext.cwd, {
+					const running = ops.exec(spawnContext.command, spawnContext.cwd, {
 						onData: handleData,
-						signal,
+						signal: inner.signal,
 						timeout,
 						env: spawnContext.env,
 					});
-					exitCode = result.exitCode;
+					if (run_in_background) toBackground();
+					const first = await Promise.race([
+						running.then((result) => ({ result })),
+						backgrounded.then((bg) => ({ bg })),
+					]);
+					if ("bg" in first) {
+						// It goes on alone; its end is written to its file and heard by the interface.
+						const bg = first.bg;
+						running.then(
+							(result) => endTask(bg, result.exitCode ?? 1),
+							() => endTask(bg, inner.signal.aborted ? 130 : 1),
+						);
+						await finishOutput();
+						const how = run_in_background ? "Started in the background" : "Moved to the background by the user";
+						return {
+							content: [
+								{
+									type: "text",
+									text: `${how} as task ${bg.id}; it keeps running. Its output goes to ${bg.outputFile}, which ends with "[exit code N]" when it is done: read that file to check on it. You are told when it ends.`,
+								},
+							],
+							details: { background: { id: bg.id, outputFile: bg.outputFile, byUser: !run_in_background } },
+						};
+					}
+					exitCode = first.result.exitCode;
 				} catch (err) {
 					const snapshot = await finishOutput();
 					const { text } = formatOutput(snapshot, "");
@@ -408,6 +475,8 @@ export function createShellToolDefinition(
 				return { content: [{ type: "text", text: outputText }], details, structuredContent };
 			} finally {
 				clearUpdateTimer();
+				unregister();
+				if (!task) signal?.removeEventListener("abort", onOuterAbort);
 			}
 		},
 		...createShellRenderers(config.prompt),

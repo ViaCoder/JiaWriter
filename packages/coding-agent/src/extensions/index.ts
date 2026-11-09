@@ -26,6 +26,8 @@ import writerRewindExtension from "./writer-rewind/index.ts";
 import writerSearchExtension from "./writer-search/index.ts";
 // JiaWriter: built-in writing skills, /skills and /skill-new.
 import writerSkillsExtension from "./writer-skills/index.ts";
+// JiaWriter: commands in the background (Ctrl+B, /tasks).
+import writerTasksExtension from "./writer-tasks/index.ts";
 // JiaWriter: the task list above the editor.
 import writerTodoExtension from "./writer-todo/index.ts";
 import writerToolsExtension from "./writer-tools/index.ts";
@@ -41,6 +43,7 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-guard", factory: writerGuardExtension, builtin: true },
 	{ name: "writer-permission", factory: writerPermissionExtension, builtin: true },
 	{ name: "writer-todo", factory: writerTodoExtension, builtin: true },
+	{ name: "writer-tasks", factory: writerTasksExtension, builtin: true },
 	{ name: "writer-ask", factory: writerAskExtension, builtin: true },
 	{ name: "writer-plan", factory: writerPlanExtension, builtin: true },
 	// JiaWriter: registers the JW_* model and clamps its output limit.

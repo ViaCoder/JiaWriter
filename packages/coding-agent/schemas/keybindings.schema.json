@@ -255,6 +255,10 @@
       "$ref": "#/$defs/KeybindingValue",
       "description": "Search the input history"
     },
+    "app.task.background": {
+      "$ref": "#/$defs/KeybindingValue",
+      "description": "Move running commands to the background"
+    },
     "app.session.toggleNamedFilter": {
       "$ref": "#/$defs/KeybindingValue",
       "description": "Toggle named session filter"

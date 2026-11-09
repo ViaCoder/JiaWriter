@@ -63,6 +63,7 @@ const APP_KEYBINDINGS = {
 	"app.todo.toggle": { defaultKeys: "ctrl+t", description: "Show or hide the task list" },
 	"app.screen.redraw": { defaultKeys: "ctrl+l", description: "Redraw the screen" },
 	"app.history.search": { defaultKeys: "ctrl+r", description: "Search the input history" },
+	"app.task.background": { defaultKeys: "ctrl+b", description: "Move running commands to the background" },
 	"app.session.toggleNamedFilter": {
 		defaultKeys: "ctrl+n",
 		description: "Toggle named session filter",

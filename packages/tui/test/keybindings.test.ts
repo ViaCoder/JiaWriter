@@ -78,6 +78,7 @@ describe("KeybindingsManager", () => {
 				keybindings: ["tui.input.submit", "tui.select.confirm"],
 			},
 		]);
-		assert.deepStrictEqual(keybindings.getKeys("tui.editor.cursorLeft"), ["left", "ctrl+b"]);
+		// JiaWriter: Ctrl+B is the background key of the app, as in Claude Code.
+		assert.deepStrictEqual(keybindings.getKeys("tui.editor.cursorLeft"), ["left"]);
 	});
 });

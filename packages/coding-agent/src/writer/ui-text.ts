@@ -211,6 +211,15 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"for all shortcuts": "查看全部快捷键（输入为空时）",
 	mode: "切换模式",
 	shortcuts: "快捷键",
+	// Background commands (Ctrl+B, /tasks).
+	"Moved to the background: task {ids} (/tasks to see them)": "已转到后台：任务 {ids}（/tasks 查看）",
+	"No command is running": "没有正在运行的命令",
+	"Move the running command to the background": "把正在运行的命令转到后台",
+	"Background commands: see or stop them": "后台命令：查看或停止",
+	"to move a running command to the background": "把正在运行的命令转到后台",
+	"{count} in the background": "后台 {count}",
+	"Moved to the background as task {id}; output: {file}": "已转到后台，任务 {id}，输出写入 {file}",
+	"Running in the background as task {id}; output: {file}": "在后台运行，任务 {id}，输出写入 {file}",
 	// Resource sections at startup.
 	Skills: "技能",
 	Context: "上下文文件",

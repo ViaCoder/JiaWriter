@@ -135,6 +135,8 @@ import { killTrackedDetachedChildren } from "../../utils/shell.ts";
 import { loadAllHighlightLanguages } from "../../utils/syntax-highlight.ts";
 import { ensureTool, type ToolStatus } from "../../utils/tools-manager.ts";
 import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-check.ts";
+// Commands Ctrl+B sends to the background.
+import { backgroundAll } from "../../writer/background.ts";
 // JiaWriter: interface text in the chosen language.
 import { brandText } from "../../writer/brand.ts";
 // JiaWriter: the "Jia" logo for release packages.
@@ -1061,6 +1063,7 @@ export class InteractiveMode {
 					hint("app.tools.expand", "for the detailed view"),
 					hint("app.todo.toggle", "to show or hide the task list"),
 					hint("app.history.search", "to search the input history"),
+					hint("app.task.background", "to move a running command to the background"),
 					hint("app.thinking.toggle", "to expand thinking"),
 					hint("app.editor.external", "for external editor"),
 					rawKeyHint("/", "for commands"),
@@ -3138,6 +3141,7 @@ export class InteractiveMode {
 		this.defaultEditor.onAction("app.todo.toggle", () => this.toggleTaskList());
 		this.defaultEditor.onAction("app.screen.redraw", () => this.ui.requestRender(true));
 		this.defaultEditor.onAction("app.history.search", () => this.showHistorySearch());
+		this.defaultEditor.onAction("app.task.background", () => this.sendToBackground());
 		this.defaultEditor.onAction("app.editor.external", () => void this.handleOpenExternalEditor());
 		this.defaultEditor.onAction(
 			"app.message.copy",
@@ -4692,6 +4696,18 @@ export class InteractiveMode {
 		applyWorkMode(next);
 		this.showStatus(uiText("Work mode: {mode}", { mode: uiText(next) }));
 		this.ui.requestRender();
+	}
+
+	/** Ctrl+B: the commands running now go on in the background, and the conversation goes on (as Claude Code). */
+	private sendToBackground(): void {
+		const moved = backgroundAll();
+		this.showStatus(
+			moved.length > 0
+				? uiText("Moved to the background: task {ids} (/tasks to see them)", {
+						ids: moved.map((t) => t.id).join(", "),
+					})
+				: uiText("No command is running"),
+		);
 	}
 
 	/** Ctrl+T: show or hide the task list above the input. */
@@ -7013,6 +7029,8 @@ export class InteractiveMode {
 					row(selectModel, "Switch model") +
 					row(cycleThinkingLevel, "Cycle thinking level") +
 					row(app("app.history.search"), "Search the input history") +
+					row(app("app.task.background"), "Move the running command to the background") +
+					row("/tasks", "Background commands: see or stop them") +
 					row(app("app.screen.redraw"), "Redraw the screen") +
 					row(externalEditor, "Edit the input in an external editor") +
 					row(this.sendNowKeys(), "Send queued messages now") +

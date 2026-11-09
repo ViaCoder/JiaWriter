@@ -114,6 +114,7 @@ const RESERVED_KEYBINDINGS_FOR_EXTENSION_CONFLICTS = [
 	"app.todo.toggle",
 	"app.screen.redraw",
 	"app.history.search",
+	"app.task.background",
 	"tui.editor.historyPrevious",
 	"tui.editor.historyNext",
 	"tui.input.submit",

@@ -3,7 +3,8 @@
 The keys of Claude Code in a real terminal (2026-11-09: "The operation should be consistent with Claude Code ...
 ensure that the key bindings for macOS are correctly implemented"): Shift+Tab cycles the work mode, ? shows the
 shortcut list, Ctrl+O the detailed view, Ctrl+R searches the history, Esc Esc clears the input into the history,
-Option+Enter adds a line, Ctrl+P recalls the last input, Ctrl+T hides the task list; the whole of a long
+Option+Enter adds a line, Ctrl+P recalls the last input, Ctrl+T hides the task list, Ctrl+B sends a running
+command to the background and /tasks lists it; the whole of a long
 conversation can be scrolled back to its first message, also after the session is continued with --continue. A fake model answers on a local
 port; nothing leaves the machine.
 
@@ -35,6 +36,7 @@ CTRL_O = b"\x0f"
 CTRL_R = b"\x12"
 CTRL_P = b"\x10"
 CTRL_T = b"\x14"
+CTRL_B = b"\x02"
 ESC = b"\x1b"
 OPTION_ENTER = b"\x1b\r"
 PAGE_UP = b"\x1b[5~"
@@ -52,6 +54,10 @@ def answer(messages):
     while since > 0 and messages[since - 1].get("role") != "assistant":
         since -= 1
     text = json.dumps([m.get("content", "") for m in messages[since:]], ensure_ascii=False)
+    if "跑命令" in text:
+        call = {"index": 0, "id": f"c{time.time_ns()}", "type": "function",
+                "function": {"name": "bash", "arguments": json.dumps({"command": "echo bg-start; sleep 4; echo bg-end"})}}
+        return {"tool_calls": [call]}, "tool_calls"
     if "写稿" in text:
         call = {"index": 0, "id": f"c{time.time_ns()}", "type": "function",
                 "function": {"name": "write", "arguments": json.dumps({"path": "稿.md", "content": "# 标题\n\n正文。\n"}, ensure_ascii=False)}}
@@ -238,6 +244,27 @@ def main():
         press(fd, CTRL_T, 1)
         shown = wait_screen(fd, "任务清单：", 4)
         check("Ctrl+T 显示或隐藏任务清单", "任务清单：隐藏" in shown)
+        # Ctrl+B: the command goes on in the background and the reply comes at once.
+        press(fd, "跑命令".encode("utf-8"), 0.6)
+        press(fd, b"\r")
+        shown = wait_screen(fd, "允许执行这条命令", 15)
+        if "允许执行这条命令" in shown:
+            press(fd, b"1", 0.3)
+        wait_screen(fd, "bg-start", 8)
+        sent = time.monotonic()
+        press(fd, CTRL_B, 0.5)
+        shown = wait_screen(fd, "已转到后台：任务 1", 4)
+        check("Ctrl+B 把正在运行的命令转到后台", "已转到后台：任务 1" in shown)
+        check("屏幕上写的是中文说明，不是给模型的英文", "已转到后台，任务 1，输出写入" in wait_screen(fd, "输出写入", 4) and "Moved to the background" not in screen())
+        shown = wait_screen(fd, r"完成了[\s\S]*完成了", 6)
+        check("转到后台后对话马上继续（不等命令结束）", time.monotonic() - sent < 3.5 and shown.count("完成了") >= 2)
+        check("状态栏显示后台任务数", "后台 1" in shown)
+        shown = wait_screen(fd, "后台任务 1 已结束", 10)
+        check("后台命令结束时屏幕提示", "后台任务 1 已结束（退出码 0）" in shown)
+        press(fd, "/tasks".encode("utf-8"), 0.4)
+        press(fd, b"\r", 1)
+        shown = wait_screen(fd, "任务 1｜已结束", 4)
+        check("/tasks 列出后台命令和结果", "任务 1｜已结束（退出码 0）" in shown)
         # A long conversation: twenty more turns, then back to the first message.
         for i in range(1, 21):
             press(fd, f"第{i}条消息".encode("utf-8"), 0.3)

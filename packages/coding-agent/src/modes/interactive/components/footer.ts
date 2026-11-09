@@ -5,6 +5,8 @@ import { areExperimentalFeaturesEnabled } from "../../../core/experimental.ts";
 import type { ContextUsage } from "../../../core/extensions/types.ts";
 import type { ReadonlyFooterDataProvider } from "../../../core/footer-data-provider.ts";
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../../../core/usage-totals.ts";
+// Commands running in the background.
+import { runningTasks } from "../../../writer/background.ts";
 // The work mode the status line names.
 import { workMode } from "../../../writer/permission.ts";
 import { uiText } from "../../../writer/ui-text.ts";
@@ -196,6 +198,10 @@ export class FooterComponent implements Component {
 		// Manual stays plain; the others stand out, as Claude Code colours its mode line.
 		const modeColor = ({ auto: "success", bypass: "error", plan: "accent" } as const)[current as "auto"];
 		statsParts.push(modeColor ? theme.fg(modeColor, modeText) : modeText);
+		// Commands running in the background (Ctrl+B, /tasks).
+		const background = runningTasks().length;
+		if (background > 0)
+			statsParts.push(theme.fg("warning", uiText("{count} in the background", { count: String(background) })));
 		if (this.detailed && usageTotals.input) statsParts.push(`↑${formatTokens(usageTotals.input)}`);
 		if (this.detailed && usageTotals.output) statsParts.push(`↓${formatTokens(usageTotals.output)}`);
 		if (this.detailed && usageTotals.cacheRead) statsParts.push(`R${formatTokens(usageTotals.cacheRead)}`);

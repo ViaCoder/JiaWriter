@@ -10,6 +10,8 @@ import { Container, Spacer, Text } from "@earendil-works/pi-tui";
 import { keyHint } from "../../../modes/interactive/components/keybinding-hints.ts";
 import { VisualLinePreview } from "../../../modes/interactive/components/visual-truncate.ts";
 import { theme } from "../../../modes/interactive/theme/theme.ts";
+// JiaWriter: text in the interface language.
+import { uiText } from "../../../writer/ui-text.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
 import type { BashToolDetails } from "../bash.ts";
 import { getTextOutput, invalidArgText, startToolTimer, str, toolTimerText } from "../render-utils.ts";
@@ -37,6 +39,18 @@ function rebuildBashResultRenderComponent(
 	component.clear();
 
 	let output = getTextOutput(result as any, showImages).trim();
+	// JiaWriter: a command gone to the background is one line in the interface language; the model keeps its own text.
+	const background = result.details?.background;
+	if (background)
+		output = uiText(
+			background.byUser
+				? "Moved to the background as task {id}; output: {file}"
+				: "Running in the background as task {id}; output: {file}",
+			{
+				id: String(background.id),
+				file: background.outputFile,
+			},
+		);
 	const truncation = result.details?.truncation;
 	const fullOutputPath = result.details?.fullOutputPath;
 	if (!options.isPartial && truncation?.truncated && fullOutputPath && output.endsWith("]")) {

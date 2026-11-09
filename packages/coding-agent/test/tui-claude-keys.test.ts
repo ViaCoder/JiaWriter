@@ -33,6 +33,9 @@ describe("default keys follow Claude Code", () => {
 		expect(kb.getKeys("app.todo.toggle")).toEqual(["ctrl+t"]);
 		expect(kb.getKeys("app.history.search")).toEqual(["ctrl+r"]);
 		expect(kb.getKeys("app.screen.redraw")).toEqual(["ctrl+l"]);
+		// Ctrl+B sends a running command to the background; the left arrow still moves the cursor.
+		expect(kb.getKeys("app.task.background")).toEqual(["ctrl+b"]);
+		expect(kb.getKeys("tui.editor.cursorLeft")).toEqual(["left"]);
 		// Option+T thinking and Option+P model, as Claude Code; Ctrl+P / Ctrl+N browse the history.
 		expect(kb.getKeys("app.thinking.cycle")).toEqual(["alt+t"]);
 		expect(kb.getKeys("app.model.select")).toEqual(["alt+p"]);
@@ -54,6 +57,7 @@ describe("default keys follow Claude Code", () => {
 			"app.todo.toggle",
 			"app.screen.redraw",
 			"app.history.search",
+			"app.task.background",
 			"app.editor.external",
 			"app.message.followUp",
 			"app.message.dequeue",

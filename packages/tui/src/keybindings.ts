@@ -82,7 +82,8 @@ export const TUI_KEYBINDINGS = {
 		description: "Select next prompt history entry",
 	},
 	"tui.editor.cursorLeft": {
-		defaultKeys: ["left", "ctrl+b"],
+		// JiaWriter: Ctrl+B sends a running command to the background, as in Claude Code.
+		defaultKeys: "left",
 		description: "Move cursor left",
 	},
 	"tui.editor.cursorRight": {
