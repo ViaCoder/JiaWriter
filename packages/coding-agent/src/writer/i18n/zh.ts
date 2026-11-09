@@ -408,9 +408,6 @@ export const zh = {
 	"permission.declined": "用户没有同意执行 {what}",
 	"permission.declinedNote": "用户没有同意执行 {what}，并说：{note}",
 	"permission.yes": "是",
-	"guard.held":
-		"{host} 显示了验证页面（验证码、滑块等），只能由用户本人完成；在用户完成之前，任何工具都不访问这个网站，也不尝试绕过",
-	"guard.heldStill": "告诉用户在浏览器里完成验证后再说一声；其他网站和已有材料照常可用",
 	"tasks.description": "后台命令：查看，或停止正在运行的",
 	"tasks.none": "没有后台命令。命令运行时按 Ctrl+B 可以转到后台。",
 	"tasks.title": "后台命令（选中正在运行的一条即停止它）：",

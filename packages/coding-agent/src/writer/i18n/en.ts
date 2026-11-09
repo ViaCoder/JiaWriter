@@ -439,10 +439,6 @@ export const en: Record<MessageKey, string> = {
 	"permission.declined": "the user did not agree to {what}",
 	"permission.declinedNote": "the user did not agree to {what}, and said: {note}",
 	"permission.yes": "Yes",
-	"guard.held":
-		"{host} showed a verification page (a captcha, a slider): only the user can pass it; until they have, no tool reaches this site and nothing tries to get around it",
-	"guard.heldStill":
-		"ask the user to pass it in the browser and say so; other sites and the materials at hand stay usable",
 	"tasks.description": "Background commands: see them, or stop a running one",
 	"tasks.none": "No background commands. Press Ctrl+B while a command runs to send it to the background.",
 	"tasks.title": "Background commands (pick a running one to stop it):",
