@@ -367,7 +367,6 @@ describe("JW_* end to end", () => {
 			"export_document",
 			"fetch_web",
 			"find",
-			"gongwen_check",
 			"grep",
 			"import_document",
 			"ls",

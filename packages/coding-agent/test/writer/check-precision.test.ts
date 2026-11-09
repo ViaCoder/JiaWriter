@@ -1,6 +1,6 @@
 // The draft checks against careful writing (2026-11-09): a check that asks for another round must not ask it of the
-// user's model documents (the test fixtures: model essays per genre, each headed by a note that says so) or of the
-// State Council documents of the gongwen skill (real official documents).
+// State Council documents of the gongwen skill. The calibration on 1,151 real published texts runs on this machine
+// only (.tmp/corpus-precision.ts over ~/.jiawriter/jwcorpus), since those texts may not be published.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -26,8 +26,7 @@ function humanDocuments(): [string, string][] {
 			}
 		}
 	};
-	walk("test/writer/fixtures/gongwen-samples");
-	walk("skills/writer/lieflat-gongwen/参考/法定公文样例");
+	walk("skills/writer/gongwen-writing/参考/法定公文样例");
 	return found;
 }
 
@@ -36,7 +35,7 @@ describe("the checks on the model and State Council documents", () => {
 		// The heuristic layer only: the checks of the user's explicit rules (citations, numbering, in-text ordinals,
 		// marks, quotes, a figure used twice) hold the model documents to rules made after them, and should.
 		const docs = humanDocuments();
-		expect(docs.length).toBeGreaterThanOrEqual(25);
+		expect(docs.length).toBeGreaterThanOrEqual(4);
 		// The packs as draftCheck picks them: the official-document pack for documents only.
 		const style = (text: string) => {
 			const register = inferRegister(text);
@@ -48,7 +47,6 @@ describe("the checks on the model and State Council documents", () => {
 			);
 		};
 		const asked = docs.filter(([, text]) => style(text)).map(([name]) => name);
-		// At most one: the vague-word limit stands where careful writing ends (1 of 26 above it, a State Council reply).
 		expect(asked.length, asked.join("\n")).toBeLessThanOrEqual(1);
 	});
 	it("still list single denials for the model to judge, without asking for a round", () => {

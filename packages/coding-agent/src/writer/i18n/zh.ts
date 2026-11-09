@@ -53,7 +53,6 @@ export const zh = {
 	"style.passShort": "AI 腔检查通过。",
 	"style.longSentences": "{count} 句超过 {limit} 字，拆开：{heads}。",
 	"style.rareChars": "生僻字 {chars}：换成常用字，人名、地名和引文除外。",
-	"style.gongwenFails": "{genre}的硬冲突：{items}。",
 	"style.unsupported": "提示：问题或风险部分有 {count} 段只有判断，没有案例或数据。材料里有的补上，没有的不必补：",
 	"style.repeated":
 		"同一素材用了不止一处：{figures}。全文每个案例和数据只用一次，留在最能说明问题的那段，别处换用没用过的材料或删去。",

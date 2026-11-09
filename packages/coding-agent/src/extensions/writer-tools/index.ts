@@ -21,7 +21,6 @@ import { isDraftPath } from "../../writer/docs/auto.ts";
 // The imported references beside a draft.
 import { parsedFiles } from "../../writer/docs/import.ts";
 // The 公文 parameter check, run by the program at the end of a turn.
-import { analyze, hardFails } from "../../writer/gongwen/check.ts";
 // Output messages.
 import { t } from "../../writer/i18n/index.ts";
 // The semantic review line.
@@ -239,20 +238,8 @@ export function requestedLength(message: string): number | undefined {
  * never disagree (a 2026-11-08 run kept cutting a draft word_count called long while the round passed it). */
 export const LENGTH_TOLERANCE = DEFAULT_TOLERANCE;
 
-/** The 公文 genre a draft's title names, as gongwen_check calls them; "" when it names none. */
-export function gongwenGenre(text: string): string {
-	const title = text.split("\n").find((line) => line.trim() !== "") ?? "";
-	if (/调研报告|考察报告/.test(title)) return "调研报告";
-	if (/讲话/.test(title)) return "领导讲话";
-	if (/意见/.test(title)) return "工作意见";
-	if (/方案/.test(title)) return "工作方案";
-	if (/交流材料|经验总结/.test(title)) return "经验总结";
-	if (/经验材料|做法和启示|的做法/.test(title)) return "经验材料";
-	return "";
-}
-
-/** What the program checks in a finished draft instead of the model calling the tools: sentences over the limit,
- * rare characters and, for a 公文 whose title names its genre, the hard conflicts of gongwen_check. */
+/** What the program checks in a finished draft instead of the model calling the tools: sentences over the limit and
+ * rare characters. */
 export function finishedChecks(text: string): string[] {
 	const out: string[] = [];
 	const long = longSentences(text);
@@ -267,12 +254,6 @@ export function finishedChecks(text: string): string[] {
 	// Level-2 characters are common enough; only those beyond them.
 	const rare = rareChars(text).filter((c) => c.level !== 2);
 	if (rare.length > 0) out.push(t("style.rareChars", { chars: rare.map((c) => c.char).join("、") }));
-	// A title that names a 公文 genre is enough: a speech's title names no document kind.
-	const genre = gongwenGenre(text);
-	const metrics = genre ? analyze(text) : null;
-	// Length is the user's to set: the corpus minimum (1200 characters, else "write it as 党建") is left out.
-	const fails = metrics ? hardFails(metrics, genre).filter((f) => f.key !== "chars") : [];
-	if (fails.length > 0) out.push(t("style.gongwenFails", { genre, items: fails.map((f) => f.msg).join("；") }));
 	return out;
 }
 

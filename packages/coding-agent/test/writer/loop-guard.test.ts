@@ -17,8 +17,8 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("callKey", () => {
 	it("is the same for the same arguments in any key order, and differs by tool or value", () => {
-		expect(callKey("gongwen_check", { genre: "调研报告", path: "a" })).toBe(
-			callKey("gongwen_check", { path: "a", genre: "调研报告" }),
+		expect(callKey("style_check", { genre: "调研报告", path: "a" })).toBe(
+			callKey("style_check", { path: "a", genre: "调研报告" }),
 		);
 		expect(callKey("read", { path: "a" })).not.toBe(callKey("write", { path: "a" }));
 		expect(callKey("read", { path: "a" })).not.toBe(callKey("read", { path: "b" }));
@@ -28,7 +28,7 @@ describe("callKey", () => {
 describe("checkCall and recordResult", () => {
 	it("blocks a call after MAX_SAME_FAILURES failures in a row, and a success starts them again", () => {
 		const guard = newGuard();
-		const key = callKey("gongwen_check", { genre: "调研报告" });
+		const key = callKey("style_check", { genre: "调研报告" });
 		for (let i = 0; i < MAX_SAME_FAILURES; i++) {
 			expect(checkCall(guard, key)).toBe("ok");
 			recordResult(guard, key, true);
@@ -88,10 +88,10 @@ describe("writer-guard", () => {
 			},
 		} as unknown as ExtensionAPI);
 		const call = (input: unknown) =>
-			handlers.tool_call({ toolName: "gongwen_check", input }) as
+			handlers.tool_call({ toolName: "style_check", input }) as
 				| { block: boolean; reason: string; terminate: boolean }
 				| undefined;
-		const fail = (input: unknown) => handlers.tool_result({ toolName: "gongwen_check", input, isError: true });
+		const fail = (input: unknown) => handlers.tool_result({ toolName: "style_check", input, isError: true });
 		return { handlers, call, fail };
 	}
 
@@ -105,7 +105,7 @@ describe("writer-guard", () => {
 		for (let block = 1; block <= MAX_BLOCKS; block++) {
 			const out = call(input);
 			expect(out?.block).toBe(true);
-			expect(out?.reason).toContain("gongwen_check");
+			expect(out?.reason).toContain("style_check");
 			expect(out?.terminate).toBe(block === MAX_BLOCKS);
 		}
 		expect(call(input)?.reason).toContain("本轮到此结束");

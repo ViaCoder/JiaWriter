@@ -201,7 +201,7 @@ for platform in "${PLATFORMS[@]}"; do
         cp ../../scripts/ocr/ocr.ps1 "$OUTPUT_DIR/$platform/ocr/"
     fi
     # JiaWriter: the license files that came along with the copied folders stay in the repository only.
-    rm -f "$OUTPUT_DIR/$platform/writer-skills/lieflat-gongwen/LICENSE" "$OUTPUT_DIR/$platform/chrome-extension/vendor/Readability-LICENSE.md"
+    rm -f "$OUTPUT_DIR/$platform/chrome-extension/vendor/Readability-LICENSE.md"
     mkdir -p "$OUTPUT_DIR/$platform/参考资料"
 
     # JiaWriter: the search_fetch binary of this platform, where locateSf looks.

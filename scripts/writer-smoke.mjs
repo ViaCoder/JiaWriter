@@ -130,7 +130,7 @@ export const REPLY = "冒烟测试回复";
 /** Dummy key; it must appear nowhere in the output. */
 export const SECRET = "sk-smoke-0000-dummy";
 /** Tools the writing agent must offer. */
-export const TOOLS = ["export_document", "gongwen_check", "import_document", "read", "style_check", "search_web", "write"];
+export const TOOLS = ["export_document", "import_document", "read", "style_check", "search_web", "write"];
 
 /** A minimal one-page PDF with an ASCII text line (Helvetica). */
 export function onePagePdf(text) {
@@ -258,7 +258,7 @@ export async function smoke(command, args) {
 		rows.push(["writing tools", TOOLS.every((t) => names.includes(t)), names.join(",")]);
 		const system = JSON.stringify(body.messages?.[0] ?? "");
 		rows.push(["writing prompt", system.includes("general-purpose agent"), ""]);
-		rows.push(["built-in skills", system.includes("deep-research") && system.includes("lieflat-gongwen"), ""]);
+		rows.push(["built-in skills", system.includes("deep-research") && system.includes("gongwen-writing"), ""]);
 		rows.push(["key hidden", !p.stdout.includes(SECRET) && !p.stderr.includes(SECRET) && !anyFileContains(home, SECRET), ""]);
 		// Import a PDF and export a .docx through tool calls (pdf.js, docx and fflate inside the build).
 		const work = join(home, "work");

@@ -60,7 +60,6 @@ export const en: Record<MessageKey, string> = {
 	"style.passShort": "AI-style check passed.",
 	"style.longSentences": "{count} sentences over {limit} characters; split them: {heads}.",
 	"style.rareChars": "Rare characters {chars}: use common ones, except in names and quotations.",
-	"style.gongwenFails": "Hard conflicts for {genre}: {items}.",
 	"style.unsupported":
 		"Note: {count} paragraphs on problems or risks state a judgment with no case or figure. Add them where the materials have them:",
 	"style.repeated":

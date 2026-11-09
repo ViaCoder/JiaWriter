@@ -19,7 +19,6 @@ import writerToolsExtension, {
 	draftCheck,
 	draftFolders,
 	finishedChecks,
-	gongwenGenre,
 	hasMaterials,
 	itemMarks,
 	lacksReferences,
@@ -250,25 +249,15 @@ describe("draftCheck", () => {
 	});
 });
 
-describe("gongwenGenre and finishedChecks", () => {
-	it("names the genre from the title, or none", () => {
-		expect(gongwenGenre("# 关于长江流域生态环境保护情况的调研报告")).toBe("调研报告");
-		expect(gongwenGenre("# 在全市安全生产工作会议上的讲话")).toBe("领导讲话");
-		expect(gongwenGenre("# 低空经济应用场景培育工作方案")).toBe("工作方案");
-		expect(gongwenGenre("# 故乡的秋天")).toBe("");
-	});
-	it("reports long sentences, rare characters and hard conflicts, but never the corpus length", () => {
+describe("finishedChecks", () => {
+	it("reports long sentences and rare characters", () => {
 		const long = `# 关于禁渔情况的调研报告\n\n${"退捕渔民转产就业".repeat(14)}。`;
 		expect(finishedChecks(long)[0]).toContain("超过 100 字");
 		// Level-3 characters are reported, level-2 ones (饕餮) are common enough.
 		expect(finishedChecks("# 故乡\n\n桌上放着一坛鬯酒。")[0]).toContain("鬯");
 		expect(finishedChecks("# 故乡\n\n他住在饕餮楼。")).toEqual([]);
-		// A short report is not told to reach 1200 characters.
+		// A short report is not told to reach a length.
 		expect(finishedChecks(FACT_REPORT)).toEqual([]);
-		// A speech with a third-level heading is.
-		expect(finishedChecks("# 在全市安全生产工作会议上的讲话\n\n#### 1．抓好排查\n\n要抓好排查。").join("")).toContain(
-			"三级标题",
-		);
 	});
 });
 

@@ -34,7 +34,7 @@ export const WORKING_RULES: readonly string[] = [
 ];
 
 /** The skill that serves as the default genre (the user, 2026-11-05). */
-export const DEFAULT_SKILL = "lieflat-gongwen";
+export const DEFAULT_SKILL = "gongwen-writing";
 
 /** The rule that makes that skill the default, while it is offered to the model. */
 export function defaultSkillRule(skills: readonly { name: string; disableModelInvocation?: boolean }[]): string[] {

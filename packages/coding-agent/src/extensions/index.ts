@@ -12,8 +12,6 @@ import writerComputerExtension from "./writer-computer/index.ts";
 import writerDocsExtension from "./writer-docs/index.ts";
 // JiaWriter: the "jw" provider from JW_* environment variables.
 import writerEnvExtension from "./writer-env/index.ts";
-// JiaWriter: gongwen_check for the lieflat-gongwen skill (PolyForm Noncommercial, see its LICENSE).
-import writerGongwenExtension from "./writer-gongwen/index.ts";
 // JiaWriter: stops a call repeated where it cannot help.
 import writerGuardExtension from "./writer-guard/index.ts";
 // JiaWriter: bash, write and edit under the permission modes.
@@ -49,8 +47,6 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-env", factory: writerEnvExtension, builtin: true },
 	// JiaWriter: the writing checks.
 	{ name: "writer-tools", factory: writerToolsExtension, builtin: true },
-	// JiaWriter: the 公文 self-check.
-	{ name: "writer-gongwen", factory: writerGongwenExtension, builtin: true },
 	// JiaWriter: web search.
 	{ name: "writer-prompts", factory: writerPromptsExtension, builtin: true },
 	{ name: "writer-search", factory: writerSearchExtension, builtin: true },

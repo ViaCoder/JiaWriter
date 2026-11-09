@@ -99,14 +99,14 @@ describe("shipped skills", () => {
 		expect(readdirSync(getWriterSkillsDir()).sort()).toEqual([
 			"academic-writing",
 			"deep-research",
-			"lieflat-gongwen",
+			"gongwen-writing",
 			"skill-creator",
 		]);
 		// Loader accepts all of them.
 		const r = loadSkillsFromDir({ dir: getWriterSkillsDir(), source: "path" });
 		expect([r.skills.length, r.diagnostics]).toEqual([4, []]);
-		// No AI-style hits and no negation over the threshold (lieflat-gongwen quotes a failing example on purpose).
-		for (const s of r.skills.filter((x) => x.name !== "lieflat-gongwen")) {
+		// No AI-style hits and no negation over the threshold (gongwen-writing quotes a failing example on purpose).
+		for (const s of r.skills.filter((x) => x.name !== "gongwen-writing")) {
 			const body = readFileSync(s.filePath, "utf-8").replace(/^---[\s\S]*?---\n/, "");
 			const rep = styleCheck(body, { packs: ["core-zh", "core-en"] });
 			expect([s.name, rep.hits.length, rep.negation.over]).toEqual([s.name, 0, false]);
@@ -128,7 +128,7 @@ describe("skills load only when needed", () => {
 			skills,
 		});
 		// The index names the skill; its body stays in its file.
-		expect(prompt).toContain("lieflat-gongwen");
+		expect(prompt).toContain("gongwen-writing");
 		expect(prompt).not.toContain(readFileSync(skills[0].filePath, "utf-8").split("\n---\n")[1].slice(0, 200));
 		expect(prompt).not.toContain("公文写作 DNA");
 	});
@@ -140,12 +140,12 @@ describe("skills load only when needed", () => {
 	});
 
 	it("makes the gongwen skill the default genre while it is on", () => {
-		const rule = "read the lieflat-gongwen skill first";
+		const rule = "read the gongwen-writing skill first";
 		const build = (skills: ReturnType<typeof shipped>) =>
 			buildSystemPrompt({ cwd: "/work", selectedTools: ["read"], toolSnippets: { read: "x" }, skills });
 		expect(build(shipped())).toContain(rule);
 		// Turned off in /skills: it is no longer among the skills, and the rule goes with it.
-		expect(build(shipped().filter((s) => s.name !== "lieflat-gongwen"))).not.toContain(rule);
+		expect(build(shipped().filter((s) => s.name !== "gongwen-writing"))).not.toContain(rule);
 	});
 });
 

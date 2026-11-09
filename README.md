@@ -134,9 +134,9 @@ After writing the docx, the export checks its XML: every run with Chinese text c
 
 ## Writing skills
 
-A skill's text is read only when needed; the system prompt holds a one-line index. A document with no named genre uses the 公文 skill (lieflat-gongwen) by default; turning that skill off in `/skills` drops the default too.
+A skill's text is read only when needed; the system prompt holds a one-line index. A document with no named genre uses the 公文 skill (gongwen-writing) by default; turning that skill off in `/skills` drops the default too.
 
-Four built-in skills, one set for every interface language, with their rules in English: the Chinese official-document skill [lieflat-gongwen](https://github.com/larashero3-dotcom/lieflat-gongwen) (调研报告, 领导讲话, 工作意见, 经验材料, 工作方案 and statutory documents such as 通知, with parameters from a corpus of official documents; the program checks drafts against them), deep research (research a question across sources and write a sourced report or news round-up), academic writing, and skill-creator. How analysis paragraphs are built is in the writing rules, so every document follows it. Your own skills go in `~/.jiawriter/agent/skills/<name>/SKILL.md` and take the place of a built-in skill with the same name.
+Four built-in skills, one set for every interface language, with their rules in English: the Chinese official-document skill gongwen-writing (first drafted after [lieflat-gongwen](https://github.com/larashero3-dotcom/lieflat-gongwen), since rewritten; 调研报告, 领导讲话, 工作意见, 经验材料, 工作方案 and statutory documents such as 通知, with report parameters measured on real published reports), deep research (research a question across sources and write a sourced report or news round-up), academic writing, and skill-creator. How analysis paragraphs are built is in the writing rules, so every document follows it. Your own skills go in `~/.jiawriter/agent/skills/<name>/SKILL.md` and take the place of a built-in skill with the same name.
 
 A skill made from a session collects only what you wrote in the current session and the reasons you gave for refused tool calls, never model replies; keys, tokens and passwords are removed first, and for a repeated topic the latest request is kept. You review the draft before anything is written.
 
@@ -177,7 +177,6 @@ The development machine is Linux x64, where the Linux setup commands were run; t
 
 MIT, see [LICENSE](LICENSE), with pi's original copyright notice kept. The release packages carry no license files; the licenses are in this repository or with the upstream projects:
 
-- in this repository: Readability (`search_fetch/src/search_fetch/extension/vendor/Readability-LICENSE.md`), the Unicode data (`packages/coding-agent/src/writer/data/UNICODE-LICENSE.txt`), lieflat-gongwen (see below), and the parts of crawl4ai copied into `search_fetch/src/search_fetch/vendor/crawl4ai/` (crawl4ai and rank_bm25 Apache-2.0, html2text GPL-3.0);
+- in this repository: Readability (`search_fetch/src/search_fetch/extension/vendor/Readability-LICENSE.md`), the Unicode data (`packages/coding-agent/src/writer/data/UNICODE-LICENSE.txt`), and the parts of crawl4ai copied into `search_fetch/src/search_fetch/vendor/crawl4ai/` (crawl4ai and rank_bm25 Apache-2.0, html2text GPL-3.0);
 - with the upstream projects: fd, ripgrep, unpdf (with pdf.js and its decoders), docx, fflate, Python and the Python packages inside sf (pinned in `search_fetch/pyproject.toml`).
 
-Exception: `skills/writer/lieflat-gongwen/`, `src/writer/gongwen/` and `src/extensions/writer-gongwen/` are under the [PolyForm Noncommercial License 1.0.0](packages/coding-agent/skills/writer/lieflat-gongwen/LICENSE), for noncommercial use only. Remove these three before commercial use, or get a license from the original author. `search_fetch/src/search_fetch/vendor/crawl4ai/html2text/` (inside sf) is under the GPL-3.0 (its COPYING file).

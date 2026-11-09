@@ -87,7 +87,7 @@ describe("budgets", () => {
 		for (const name of ["academic-writing", "deep-research"]) {
 			expect(readFileSync(`skills/writer/${name}/SKILL.md`, "utf-8").length).toBeLessThanOrEqual(2000);
 		}
-		expect(readFileSync("skills/writer/lieflat-gongwen/SKILL.md", "utf-8").length).toBeLessThanOrEqual(6000);
+		expect(readFileSync("skills/writer/gongwen-writing/SKILL.md", "utf-8").length).toBeLessThanOrEqual(6000);
 	});
 });
 
