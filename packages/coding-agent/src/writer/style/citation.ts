@@ -13,6 +13,9 @@ export interface CitationIssue {
 	quote: string;
 	// The right form for them.
 	form: string;
+	// No date, or no day, in the words: right as they stand when the source gives none (the user, 2026-11-10: "if
+	// there's no date, don't write it down—and certainly don't fabricate one").
+	undated?: boolean;
 }
 
 /** A date with its year, as the form wants it. */
@@ -86,6 +89,15 @@ export function citationIssues(text: string): CitationIssue[] {
 		if (/\d{1,2}月\d{1,2}日[，,、\s]{0,2}$/.test(body.slice(Math.max(0, at - 14), at))) continue;
 		issues.push({ quote: m[0], form: `YYYY年MM月DD日《${m[1]}》${m[2]}` });
 	}
+	// An outlet that carried an article, with no date: 《21世纪经济报道》刊发的《低空经济下半场》一文 (2026-11-10, a
+	// research report). Only names that end as outlets: 5 of the 7 《…》刊发/发表 in 1,575 published texts name a document.
+	for (const m of body.matchAll(
+		/(?<![日\d])据?《([^》\n]{0,12}(?:报道|报|网|社|台|刊|杂志|新闻))》上?(刊发|刊登|发表|登载)/g,
+	)) {
+		const at = m.index ?? 0;
+		if (/\d{1,2}月\d{1,2}日[，,、\s]{0,2}$/.test(body.slice(Math.max(0, at - 14), at))) continue;
+		issues.push({ quote: m[0], form: `YYYY年MM月DD日《${m[1]}》${m[2]}` });
+	}
 	// A year and month with no day before book-title marks: 2025年5月《中国民航报》 (2026-11-09, a research report).
 	for (const m of text.matchAll(/(\d{4}年\d{1,2}月)(?!\d)《([^》\n]{1,40})》/g))
 		issues.push({ quote: m[0], form: `${m[1]}DD日《${m[2]}》` });
@@ -95,11 +107,11 @@ export function citationIssues(text: string): CitationIssue[] {
 	// The date after the title, in brackets: 《报告》（2021年6月7日）.
 	for (const m of text.matchAll(/《([^》\n]{2,60})》[（(]\s*(\d{4}年\d{1,2}月\d{1,2}日)\s*[）)]/g))
 		issues.push({ quote: m[0], form: `${m[2]}《${m[1]}》` });
-	// In the order they come in the text.
+	// In the order they come in the text; a form that still has to be given its date or day is undated.
 	return issues
 		.map((issue) => [text.indexOf(issue.quote), issue] as const)
 		.sort((x, y) => x[0] - y[0])
-		.map(([, issue]) => issue);
+		.map(([, issue]) => (/MM月DD日|DD日/.test(issue.form) ? { ...issue, undated: true } : issue));
 }
 
 /** The issues as lines the drafting model works through. */

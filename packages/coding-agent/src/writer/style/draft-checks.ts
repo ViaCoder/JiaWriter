@@ -55,8 +55,17 @@ export const DRAFT_CHECKS: readonly DraftCheck[] = [
 		when: ALL,
 		run: (text) => {
 			const found = citationIssues(text);
-			if (found.length === 0) return NONE;
-			return { fail: [`${t("style.citation", { count: found.length })}\n${formatCitationIssues(found)}`], note: [] };
+			// A wrong form fails; a citation with no date only asks for the source's date, since a source may have none.
+			const wrong = found.filter((i) => !i.undated);
+			const undated = found.filter((i) => i.undated);
+			return {
+				fail: wrong.length
+					? [`${t("style.citation", { count: wrong.length })}\n${formatCitationIssues(wrong)}`]
+					: [],
+				note: undated.length
+					? [`${t("style.citationUndated", { count: undated.length })}\n${formatCitationIssues(undated)}`]
+					: [],
+			};
 		},
 	},
 	{

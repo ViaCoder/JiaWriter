@@ -75,6 +75,8 @@ export const en: Record<MessageKey, string> = {
 		"Leave nothing marked to check or fill in later: write what the materials hold, else cut the point ({marks}).",
 	"style.citation":
 		"{count} citations in another form; write reports as 2026年10月31日《路透社》报道 and files as 2021年6月7日《文件名》:",
+	"style.citationUndated":
+		"{count} citations without a date: give the date the source gives, as 2026年10月31日《路透社》报道; leave those whose source has none as they are, never invent one:",
 	"style.noCitation":
 		"The report uses materials but names no source: cite search results and published files as the citation rule says; from the user's notes and fact lists cite the sources they name, never the notes file.",
 	"style.noReferences":
@@ -292,12 +294,15 @@ export const en: Record<MessageKey, string> = {
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
 	"topic.missingFields": "missing {fields} ({meaning})",
 	"topic.caseFields":
-		"a case: time, subject (who acted), action (what they did), reporter (the outlet, for web sources only)",
-	"topic.dataFields": "data: time, region, industry or field, indicator, value",
+		"a case: time (as the source gives it, none when it gives none), subject (who acted), action (what they did), reporter (the outlet, for web sources only)",
+	"topic.dataFields":
+		"data: time (as the source gives it, none when it gives none), region, industry or field, indicator, value",
 	"topic.missingPage": "no page for {file}",
 	"topic.missingSource": "no source: give url, or file and page",
 	"topic.notArchived":
 		"{url} is not among this topic's search results or pages: search for it or read it with fetch_web first",
+	"topic.timeNotInSource":
+		"the time “{time}” is not in the source: give the time the source states or its date, or leave time out when it has none; never infer one",
 	"topic.itemProblem": "Item {n}: {problem}",
 	"topic.materialAdded": "Recorded {count}; {file} now holds {total}.",
 	"rewind.pick": "Go back to before which message?",

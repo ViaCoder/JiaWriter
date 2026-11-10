@@ -51,7 +51,7 @@ describe("a writing topic", () => {
 		vi.stubGlobal("fetch", async (url: string) => {
 			const data = String(url).endsWith("/v1/extract")
 				? { url: URL_A, title: "巴黎新增绿地", content: "巴黎市政府新增绿地。".repeat(4000) }
-				: { results: [{ title: "巴黎新增绿地", url: URL_A, snippet: "摘要" }] };
+				: { results: [{ title: "巴黎新增绿地", url: URL_A, snippet: "2026年10月31日 摘要" }] };
 			return new Response(JSON.stringify({ code: 0, data }));
 		});
 	});

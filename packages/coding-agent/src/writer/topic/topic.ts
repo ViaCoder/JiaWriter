@@ -68,7 +68,8 @@ export interface IndexEntry {
 export interface Material {
 	// A case: time, reporter, subject, action. Data: time, region, industry, indicator, value.
 	kind: "case" | "data";
-	time: string;
+	// As the source states it; none when it states none (the user, 2026-11-10: "if there's no date, don't write it down").
+	time?: string;
 	reporter?: string;
 	subject?: string;
 	action?: string;
@@ -297,10 +298,11 @@ export function materialUrls(dir: string): string[] {
 
 /** Fields a material must have, by kind. */
 const REQUIRED: Readonly<Record<Material["kind"], readonly (keyof Material)[]>> = {
-	// Time, the acting subject and the action; the reporter too when the case is from the web (below).
-	case: ["time", "subject", "action"],
-	// Time, region, industry, indicator and value.
-	data: ["time", "region", "industry", "indicator", "value"],
+	// The acting subject and the action; the reporter too when the case is from the web (below). The time only when the
+	// source gives one, so it is never required (2026-11-10: a page said 近期 and the material said 2025年10月).
+	case: ["subject", "action"],
+	// Region, industry, indicator and value.
+	data: ["region", "industry", "indicator", "value"],
 };
 
 /** Reference files with no pages to cite (text, Markdown, HTML, as imported or as they stand). */
@@ -319,7 +321,11 @@ export function materialProblem(item: Material, archived: readonly string[]): st
 	const missing = REQUIRED[item.kind].filter((f) => !String(item[f] ?? "").trim());
 	// A case from the user's own file has no outlet: the file is its source (2026-11-09: a speech run asked a reporter of
 	// the user's material, failed five times and ended with no draft).
-	if (item.kind === "case" && !item.file?.trim() && !item.reporter?.trim()) missing.push("reporter");
+	// Only a web case needs one: a case with no source at all is told to give its source (2026-11-10: a case from the
+	// user's material with no file was asked for a reporter "only web sources need", retried the same call and the turn
+	// ended with no outline).
+	if (item.kind === "case" && item.url?.trim() && !item.file?.trim() && !item.reporter?.trim())
+		missing.push("reporter");
 	if (missing.length > 0)
 		return t("topic.missingFields", {
 			fields: missing.join("、"),
@@ -333,18 +339,25 @@ export function materialProblem(item: Material, archived: readonly string[]): st
 	return archived.includes(materialKey(item.url)) ? "" : t("topic.notArchived", { url: item.url });
 }
 
-/** One material as a Markdown list item. */
-export function renderMaterial(item: Material): string {
+/**
+ * One material as a Markdown list item; `published` (YYYY-MM-DD) is its web source's date, written as 报道日期 for the
+ * citation, since the time of the fact may be another (2026-11-10: a 2025年3月 report cited from a 2025-12-27 page).
+ */
+export function renderMaterial(item: Material, published = ""): string {
 	// The source line ends every item.
 	// A number or a range is a page (第3页); anything else is written as given (第1条, not 第第1条页).
 	const at = item.page?.trim() ?? "";
 	const page = /^\d+(?:\s*[-–—~～]\s*\d+)?$/.test(at) ? `第${at}页` : at;
 	const source = item.file?.trim() ? `《${item.file}》${page}` : (item.url ?? "");
+	// No time field when the source gives none.
+	const time = item.time?.trim() ? `时间：${item.time.trim()}｜` : "";
 	const body =
 		item.kind === "case"
-			? `案例｜时间：${item.time}｜${item.reporter?.trim() ? `报道方：${item.reporter}｜` : ""}主体：${item.subject}｜行为：${item.action}`
-			: `数据｜时间：${item.time}｜地区：${item.region}｜行业：${item.industry}｜指标：${item.indicator}｜数值：${item.value}`;
-	return `- ${item.section?.trim() ? `【${item.section.trim()}】` : ""}${body}｜来源：${source}`;
+			? `案例｜${time}${item.reporter?.trim() ? `报道方：${item.reporter}｜` : ""}主体：${item.subject}｜行为：${item.action}`
+			: `数据｜${time}地区：${item.region}｜行业：${item.industry}｜指标：${item.indicator}｜数值：${item.value}`;
+	const [y, m, d] = published.split("-").map(Number);
+	const dated = published ? `｜报道日期：${y}年${m}月${d}日` : "";
+	return `- ${item.section?.trim() ? `【${item.section.trim()}】` : ""}${body}${dated}｜来源：${source}`;
 }
 
 /**
@@ -391,19 +404,100 @@ export function siteName(url: string): string {
 	return URL.canParse(url) ? new URL(url).hostname.replace(/^www\./, "") : "";
 }
 
+/**
+ * The archived text of a web source and its own date (YYYY-MM-DD, or empty): the fetched page, else its entry in a
+ * search report (from its address to the next numbered result). Undefined when the topic holds neither.
+ */
+export function sourceOf(dir: string, url: string): { text: string; date: string } | undefined {
+	const key = materialKey(url);
+	const index = readIndex(dir);
+	// A fetched page first: the fuller record, with 发布日期 in its head.
+	const page = index.find((e) => e.kind === "page" && [e.url, e.requested].some((u) => u && materialKey(u) === key));
+	if (page && existsSync(join(dir, page.file))) {
+		const text = readFileSync(join(dir, page.file), "utf-8");
+		return { text, date: /^发布日期：(\d{4}-\d{2}-\d{2})/m.exec(text)?.[1] ?? "" };
+	}
+	// Else the search that listed it: its address as written there, without the #1 the result numbers add.
+	const bare = url.trim().replace(/#\d+$/, "");
+	for (const e of index) {
+		if (e.kind !== "search" || !(e.urls ?? []).some((u) => materialKey(u) === key)) continue;
+		if (!existsSync(join(dir, e.file))) continue;
+		const report = readFileSync(join(dir, e.file), "utf-8");
+		const at = report.indexOf(bare);
+		if (at < 0) continue;
+		// The entry ends where the next numbered result starts.
+		const rest = report.slice(at);
+		const next = rest.slice(1).search(/\n\d+\. /);
+		const text = next < 0 ? rest : rest.slice(0, next + 1);
+		// The date the result gives, in brackets after the address: …（2025-12-27）.
+		return { text, date: /^\S*（(\d{4}-\d{2}-\d{2})）/.exec(text)?.[1] ?? "" };
+	}
+	return undefined;
+}
+
+/**
+ * Whether a material's time is in its source: written there, as 2025年12月27日, 2025-12-27 or 12月27日 in a text of that
+ * year, or the source's own date (2026-11-10: a page said 近期 and the material said 2025年10月). A time with no year
+ * (近期, 截至目前) names no date and passes.
+ */
+export function timeInSource(time: string, text: string, date: string): boolean {
+	const m = /(\d{4})年(?:(\d{1,2})月(?:(\d{1,2})日)?)?/.exec(time);
+	if (!m) return true;
+	const [y, mo, d] = [m[1], m[2] ? Number(m[2]) : 0, m[3] ? Number(m[3]) : 0];
+	// The source's own date, as numbers.
+	const [sy, sm, sd] = date ? date.split("-").map(Number) : [0, 0, 0];
+	// A number as written: 3 or 03.
+	const n = (v: number) => `0?${v}`;
+	const has = (re: string) => new RegExp(re).test(text);
+	// The year: in the text, or the source's own.
+	const year = has(`${y}(?:年|[-/.]\\d)`) || sy === Number(y);
+	if (!mo) return year;
+	// The month and the day as the text writes them, with the year or in a text of that year (今年3月).
+	const day = d ? `${n(d)}日` : "";
+	const numeric = d ? `${y}[-/.]${n(mo)}[-/.]${n(d)}(?!\\d)` : `${y}[-/.]${n(mo)}(?!\\d)`;
+	if (has(numeric) || has(`${y}年${n(mo)}月${day}`)) return true;
+	if (year && has(`(?<!\\d)${n(mo)}月${day}`)) return true;
+	// Or the source's own date: the same month, or the same day.
+	return sy === Number(y) && sm === mo && (!d || sd === d);
+}
+
+/**
+ * Web materials with no time given take their source's own date (the user, 2026-11-10: "data pulled from a webpage
+ * should typically contain such time information"); with no date in the source they stay without one.
+ */
+export function withSourceTimes(dir: string, items: readonly Material[]): Material[] {
+	return items.map((item) => {
+		if (item.time?.trim() || item.file?.trim() || !item.url?.trim()) return item;
+		const date = sourceOf(dir, item.url)?.date ?? "";
+		const [y, m, d] = date.split("-").map(Number);
+		return date ? { ...item, time: `${y}年${m}月${d}日` } : item;
+	});
+}
+
 /** Add materials to 素材.md, all or none; returns how many it holds now. */
 export function addMaterials(dir: string, given: readonly Material[]): number {
 	// Local paths in url are files; a case's outlet comes from its fetched page when it was left out.
-	const items = withPageReporters(dir, given.map(asFileSource));
+	// A web material with no time takes its source's date.
+	const items = withSourceTimes(dir, withPageReporters(dir, given.map(asFileSource)));
 	// Every item is checked before anything is written.
 	const archived = materialUrls(dir);
 	const problems = items.flatMap((item, i) => {
-		const problem = materialProblem(item, archived);
+		// A time the web source does not give is sent back: the time as the source gives it, or none.
+		const source = !item.file?.trim() && item.url?.trim() && item.time?.trim() ? sourceOf(dir, item.url) : undefined;
+		const problem =
+			materialProblem(item, archived) ||
+			(source && !timeInSource(item.time ?? "", source.text, source.date)
+				? t("topic.timeNotInSource", { time: item.time ?? "" })
+				: "");
 		return problem ? [t("topic.itemProblem", { n: i + 1, problem })] : [];
 	});
 	if (problems.length > 0) throw new Error(problems.join("\n"));
 	const file = join(dir, MATERIAL_FILE);
 	const before = existsSync(file) ? readFileSync(file, "utf-8") : "# 素材\n\n";
-	writeFileSync(file, `${before}${items.map(renderMaterial).join("\n")}\n`);
+	// A web material with its source's date.
+	const lines = items.map((item) =>
+		renderMaterial(item, !item.file?.trim() && item.url?.trim() ? (sourceOf(dir, item.url)?.date ?? "") : ""),
+	);
+	writeFileSync(file, `${before}${lines.join("\n")}\n`);
 	return `${before}`.split("\n").filter((l) => l.startsWith("- ")).length + items.length;
 }

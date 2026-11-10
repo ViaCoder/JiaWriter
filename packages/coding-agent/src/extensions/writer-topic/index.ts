@@ -74,13 +74,13 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		label: "Add material",
 		// Full description sent to the model.
 		description:
-			"Records cases and data in 素材.md.\n\nUsage:\n - A case needs time, subject, action, and reporter when it is from the web\n - Data needs time, region, industry, indicator, value\n - Each needs url, or file and page",
+			"Records cases and data in 素材.md.\n\nUsage:\n - A case needs subject, action, and reporter when it is from the web\n - Data needs region, industry, indicator, value\n - time is the one the source states, else the source's own date; leave it out when the source has none, never infer one\n - Each needs url, or file and page",
 		// Argument schema.
 		parameters: Type.Object({
 			items: Type.Array(
 				Type.Object({
 					kind: StringEnum(["case", "data"] as const),
-					time: Type.String(),
+					time: Type.Optional(Type.String({ description: "As the source states it, else its date" })),
 					reporter: Type.Optional(Type.String({ description: "Outlet's name, such as 路透社" })),
 					subject: Type.Optional(Type.String({ description: "Named company, body or person" })),
 					action: Type.Optional(Type.String()),

@@ -209,7 +209,7 @@ describe("archive", () => {
 		const { dir } = openTopic(cwd, "t");
 		const file = archivePage(
 			dir,
-			{ url: "https://a.example/x", title: "T", date: "", content: "x" },
+			{ url: "https://a.example/x", title: "T", date: "2026-10-31", content: "2025年数据" },
 			"https://a.example/x",
 			"m",
 			"时间",
@@ -253,6 +253,11 @@ describe("materials", () => {
 		expect(materialProblem({ ...DATA, value: "" }, [])).toContain("value");
 		expect(materialProblem({ ...DATA, page: "" }, [])).toContain("年鉴.pdf");
 		expect(materialProblem({ ...CASE, url: "" }, opened)).not.toBe("");
+		// A case with no source is asked for its source, not for the reporter only web cases need (2026-11-10: the
+		// same call was retried until the loop guard ended the turn).
+		const noSource = materialProblem({ ...fromFile, file: undefined }, []);
+		expect(noSource).toContain("缺少来源");
+		expect(noSource).not.toContain("reporter");
 		// A page never opened in the topic is refused.
 		expect(materialProblem(CASE, [])).toContain("https://a.example/x");
 	});
@@ -293,7 +298,7 @@ describe("materials", () => {
 		const { dir } = openTopic(cwd, "t");
 		archivePage(
 			dir,
-			{ url: "https://a.example/x", title: "T", date: "", content: "x" },
+			{ url: "https://a.example/x", title: "T", date: "2026-10-31", content: "2025年数据" },
 			"https://a.example/x",
 			"m",
 			"时间",
@@ -336,7 +341,7 @@ describe("pageReporter / withPageReporters", () => {
 	};
 	const CASE_NO_REPORTER: Material = {
 		kind: "case",
-		time: "2025年12月10日",
+		time: "2025年12月22日",
 		subject: "国产AR-E800飞行器",
 		action: "国产首款800公斤级重载eVTOL首飞成功",
 		url: XINHUA.url,
@@ -405,7 +410,7 @@ describe("pageReporter / withPageReporters", () => {
 		// A page that names no outlet still asks for one.
 		archivePage(
 			dir,
-			{ url: "https://c.example/1", title: "观察", date: "", content: "正文" },
+			{ url: "https://c.example/1", title: "观察", date: "2025-12-22", content: "正文" },
 			"https://c.example/1",
 			"x",
 			"t",

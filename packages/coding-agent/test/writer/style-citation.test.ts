@@ -85,14 +85,14 @@ describe("citationIssues: an outlet with no date", () => {
 	it("finds it in the body and gives the user's form", () => {
 		// A 2026-11-08 research brief wrote the first one.
 		expect(citationIssues("伊朗称三艘油轮遇袭，路透社援引澳新银行称通行量不足六成。")).toEqual([
-			{ quote: "路透社", form: "YYYY年MM月DD日《路透社》" },
+			{ quote: "路透社", form: "YYYY年MM月DD日《路透社》", undated: true },
 		]);
 		expect(citationIssues("据新华社报道，谈判将于下周举行。")).toEqual([
-			{ quote: "据新华社报道", form: "YYYY年MM月DD日《新华社》报道" },
+			{ quote: "据新华社报道", form: "YYYY年MM月DD日《新华社》报道", undated: true },
 		]);
 		// Words before 据 are not the outlet's name.
 		expect(citationIssues("但据路透社援引消息人士称，……")).toEqual([
-			{ quote: "据路透社", form: "YYYY年MM月DD日《路透社》" },
+			{ quote: "据路透社", form: "YYYY年MM月DD日《路透社》", undated: true },
 		]);
 	});
 	it("leaves generic words, dated forms, open source brackets and reference entries to other rules", () => {
@@ -109,7 +109,7 @@ describe("citationIssues: a month with no day, and 刊文", () => {
 	it("asks for the day and for book-title marks", () => {
 		// 2026-11-09, a research report.
 		expect(citationIssues("机队规模增长（2025年5月《中国民航报》）。")).toEqual([
-			{ quote: "2025年5月《中国民航报》", form: "2025年5月DD日《中国民航报》" },
+			{ quote: "2025年5月《中国民航报》", form: "2025年5月DD日《中国民航报》", undated: true },
 		]);
 		expect(citationIssues("据统计（2025年11月11日求是网刊文）。").map((i) => i.form)).toEqual([
 			"2025年11月11日《求是网》报道",
@@ -122,9 +122,20 @@ describe("citationIssues: a month with no day, and 刊文", () => {
 describe("citationIssues: book-title marks with no date", () => {
 	it("asks for the date, and leaves dated ones and documents alone", () => {
 		expect(citationIssues("据《中国经济时报》报道，核心零部件仍有瓶颈。")).toEqual([
-			{ quote: "据《中国经济时报》报道", form: "YYYY年MM月DD日《中国经济时报》报道" },
+			{ quote: "据《中国经济时报》报道", form: "YYYY年MM月DD日《中国经济时报》报道", undated: true },
 		]);
 		expect(citationIssues("2026年8月21日《中国经济时报》报道，核心零部件仍有瓶颈。")).toEqual([]);
 		expect(citationIssues("按照《关于加快场景培育的实施意见》的要求推进。")).toEqual([]);
+	});
+});
+
+// 2026-11-10, a research report: an outlet that carried an article, with no date.
+describe("citationIssues: 《outlet》刊发", () => {
+	it("flags an outlet that carried an article undated, not a dated one or a document", () => {
+		expect(citationIssues("《21世纪经济报道》刊发的《低空经济下半场》一文披露，广东企业超1.5万家。")).toEqual([
+			{ quote: "《21世纪经济报道》刊发", form: "YYYY年MM月DD日《21世纪经济报道》刊发", undated: true },
+		]);
+		expect(citationIssues("2026年7月3日《21世纪经济报道》刊发的文章披露，广东企业超1.5万家。")).toEqual([]);
+		expect(citationIssues("《关于促进低空经济发展的意见》发表后，各地相继出台措施。")).toEqual([]);
 	});
 });

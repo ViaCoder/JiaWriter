@@ -65,6 +65,8 @@ export const zh = {
 	"style.placeholders": "不要留待核实、待补的标记：材料里有的写上，没有的删去这一处（{marks}）。",
 	"style.citation":
 		"引用格式不符 {count} 处，报道写成 2026年10月31日《路透社》报道，文件写成 2021年6月7日《文件名》：",
+	"style.citationUndated":
+		"引用没有日期 {count} 处：来源给出日期的，照来源补成 2026年10月31日《路透社》报道；来源没有日期的保持原样，不要编日期：",
 	"style.noCitation":
 		"报告用了素材却没有注明出处：检索结果和发表的文件按引用规则写明来源；用户的笔记和事实清单引用其中写明的来源，不引用笔记文件本身。",
 	"style.noReferences": "正文引用了检索到的报道，文末却没有参考文献：按引用规则列出每条来源的标题、媒体、日期和网址。",
@@ -267,11 +269,15 @@ export const zh = {
 	"topic.archived": "已归档：{path}",
 	"topic.archiveFailed": "归档失败（{reason}），本次结果没有保存到主题文件夹。",
 	"topic.missingFields": "缺少 {fields}（{meaning}）",
-	"topic.caseFields": "案例：time 时间，subject 谁做的，action 做了什么，reporter 报道的媒体（只有网页来源需要）",
-	"topic.dataFields": "数据：time 时间，region 地区，industry 行业或领域，indicator 指标，value 数值",
+	"topic.caseFields":
+		"案例：time 时间（照来源写或用来源的发布日期，来源没有就不填），subject 谁做的，action 做了什么，reporter 报道的媒体（只有网页来源需要）",
+	"topic.dataFields":
+		"数据：time 时间（照来源写或用来源的发布日期，来源没有就不填），region 地区，industry 行业或领域，indicator 指标，value 数值",
 	"topic.missingPage": "《{file}》缺少页码",
 	"topic.missingSource": "缺少来源：要有 url，或 file 加 page",
 	"topic.notArchived": "网址 {url} 不在本主题的检索结果或已读页面里，请先检索或用 fetch_web 读取",
+	"topic.timeNotInSource":
+		"时间“{time}”在来源里找不到：照来源写时间，或写来源的发布日期；来源没有日期就不填 time，不要推测",
 	"topic.itemProblem": "第{n}条：{problem}",
 	"topic.materialAdded": "已记录 {count} 条，{file} 共 {total} 条。",
 	"rewind.pick": "回退到哪条消息之前？",
