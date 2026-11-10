@@ -68,7 +68,8 @@ describe("budgets", () => {
 	it("keeps every text short", () => {
 		// 1100 since 2026-11-09: work done (surveys, visits) counts as a fact from the materials; 1300 the same day for
 		// the user's rule on verification checks.
-		expect(size(CORE_RULES)).toBeLessThanOrEqual(1300);
+		// 1700 since 2026-11-10 for the user's rule that no reply reads as a machine's, with its one example pair.
+		expect(size(CORE_RULES)).toBeLessThanOrEqual(1700);
 		expect(size(WORKING_RULES)).toBeLessThanOrEqual(700);
 		// Raised from 1500 for the evidence rule (2026-11-08); the user: no "arbitrary or nonsensical limitations" of my own making.
 		// The analysis method moved here from the gongwen skill on 2026-11-08, so it is in one place for every document;
