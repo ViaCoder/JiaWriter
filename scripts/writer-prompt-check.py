@@ -198,8 +198,9 @@ def main():
     check("写作中压缩后要求先读大纲和稿件", "先读大纲和当前稿件" in after)
     check("写作中压缩后重发写作手册", "Writing rules:" in after)
 
-    # Research before the topic has a name.
-    late = Script([("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "time": "2026年", "reporter": "路透社", "subject": "甲", "action": "乙", "url": "https://news.example.com/a"}]})])
+    # Research before the topic has a name. The result has no date, so the material has no time (2026-11-10: a time
+    # the source does not give is sent back).
+    late = Script([("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "reporter": "路透社", "subject": "甲", "action": "乙", "url": "https://news.example.com/a"}]})])
     run(late, ["查一下再写"])
     last = text_of(late.requests[-1])
     check("先搜索后开主题，资料并入主题", "已建立主题文件夹" in last and f"{time.strftime('%Y%m%d')}-绿化" in last and "已记录" in last)
