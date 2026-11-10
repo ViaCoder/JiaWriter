@@ -34,6 +34,7 @@ export const REVIEW_CATEGORIES = [
 	"unsupported-method",
 	"weak-evidence",
 	"spoken-register",
+	"unfounded-inference",
 ] as const;
 
 /** Most findings kept from one review, so a long draft's list stays readable. */
@@ -60,11 +61,12 @@ Categories, by id:
 - unsupported-method: fieldwork, visits, interviews, surveys or analysis the text claims but does not show (实地走访, 听取了……意见, 问卷显示, 调研发现 with no record of who, when or how many), the opening's account of how the research was done included.
 - weak-evidence: a case or figure that does not prove the point of its paragraph, proves a neighbouring point instead, or repeats material used elsewhere in the text.
 - spoken-register: in an official, report or academic register, a spoken or casual word where the written term exists, or a slogan made of matched or rhyming phrases standing in for a concrete measure or fact.
+- unfounded-inference: only when the writer's materials are given, a cause, motive, mechanism, condition or consequence in the writer's own analysis that no fact in the materials or the draft bears out, such as an actor, a practice or a reason the materials never mention. A step reasoned plainly from given facts is fine, and so are measures and recommendations.
 
 Rules:
 - Quote the exact words from the draft, at most 40 characters, copied character for character.
 - Report nothing for sentences that state concrete facts plainly, and nothing you would not defend to an editor of that register.
-- Judge no fact by what you know: names, dates and figures come from the writer's materials, which you do not see, and may be later than anything you know. A statement given with its source (据……, ……报道, according to) is the source's: judge only the writer's own reasoning, never ask more support for a sourced statement.
+- Judge no fact by what you know: names, dates and figures come from the writer's materials, which may be later than anything you know. When the materials are given before the draft, judge the draft's facts and reasoning against them alone; otherwise you do not see them. A statement given with its source (据……, ……报道, according to) is the source's: judge only the writer's own reasoning, never ask more support for a sourced statement.
 - For each issue give a fix direction, never one that numbers points with 一是/二是 or 其一 (the program marks those). Never invent facts; where facts are missing, the fix is to take them from the writer's materials, or else to state the point plainly or cut it. Never ask for more content.
 - A clean draft gets an empty list.
 
@@ -104,7 +106,8 @@ export function parseReview(answer: string, draft: string): ReviewIssue[] | unde
 }
 
 /** Categories whose fix is facts: without materials to take them from, they would only invite invented ones. */
-export const NEEDS_MATERIALS: ReadonlySet<string> = new Set(["vague-no-facts"]);
+// A finding of unfounded inference needs the materials too: without them it is the reviewer's guess (2026-11-10).
+export const NEEDS_MATERIALS: ReadonlySet<string> = new Set(["vague-no-facts", "unfounded-inference"]);
 
 /** The findings the writer can act on: those asking for facts only when there are materials (the user, 2026-11-08: no
  * request for content that is not there). */
@@ -122,13 +125,24 @@ export function reviewEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
 	return env.JW_REVIEW?.trim().toLowerCase() !== "off";
 }
 
+/** Most characters of the materials sent with a draft: enough for a report's sources, short enough for the review's time. */
+export const MAX_REVIEW_MATERIALS = 40_000;
+
+/** What the reviewer reads: the draft alone, or the writer's materials before it (2026-11-10, the user: "inferences
+ * are permitted, but only those that are well-founded"; a review without them could not tell which). */
+export function reviewInput(draft: string, materials = ""): string {
+	const given = materials.trim().slice(0, MAX_REVIEW_MATERIALS);
+	return given ? `Materials:\n${given}\n\nDraft:\n${draft}` : draft;
+}
+
 /** Review a draft through `ask` (instructions, text → answer); undefined when the model could not be asked. */
 export async function reviewDraft(
 	draft: string,
 	ask: (instructions: string, text: string) => Promise<string>,
+	materials = "",
 ): Promise<ReviewIssue[] | undefined> {
 	try {
-		return parseReview(await ask(REVIEW_PROMPT, draft), draft);
+		return parseReview(await ask(REVIEW_PROMPT, reviewInput(draft, materials)), draft);
 	} catch {
 		// The review helps; its failure never stops the writing.
 		return undefined;

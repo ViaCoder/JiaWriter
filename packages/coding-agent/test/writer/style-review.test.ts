@@ -5,11 +5,13 @@ import {
 	formatReview,
 	keepAnswerable,
 	MAX_ISSUES,
+	MAX_REVIEW_MATERIALS,
 	parseReview,
 	REVIEW_CATEGORIES,
 	REVIEW_PROMPT,
 	reviewDraft,
 	reviewEnabled,
+	reviewInput,
 } from "../../src/writer/style/review.ts";
 
 const DRAFT = "政策红利像一场春雨，点燃了企业创新的引擎。全年增长7.5%。";
@@ -110,5 +112,30 @@ describe("spoken-register", () => {
 			"要以快制快。",
 		);
 		expect(kept?.map((i) => i.category)).toEqual(["spoken-register"]);
+	});
+});
+
+describe("reviewInput and unfounded inference", () => {
+	it("puts the materials before the draft, up to MAX_REVIEW_MATERIALS, and the draft alone without them", () => {
+		expect(reviewInput("稿件", "")).toBe("稿件");
+		expect(reviewInput("稿件", "材料一")).toBe("Materials:\n材料一\n\nDraft:\n稿件");
+		const long = "材".repeat(MAX_REVIEW_MATERIALS + 10);
+		expect(reviewInput("稿件", long).length).toBe(
+			"Materials:\n".length + MAX_REVIEW_MATERIALS + "\n\nDraft:\n稿件".length,
+		);
+	});
+
+	it("sends the materials to the reviewer and keeps an unfounded inference only when there are materials", async () => {
+		const draft = "攻击方再以低廉账号批量投放。";
+		let seen = "";
+		const ask = async (_: string, text: string) => {
+			seen = text;
+			return `{"issues":[{"category":"unfounded-inference","quote":"以低廉账号批量投放","why":"材料没有提到账号","fix":"删去"}]}`;
+		};
+		const found = (await reviewDraft(draft, ask, "1. 深度伪造工具已开源。")) ?? [];
+		expect(seen.startsWith("Materials:\n1. 深度伪造工具已开源。")).toBe(true);
+		expect(REVIEW_CATEGORIES).toContain("unfounded-inference");
+		expect(keepAnswerable(found, true).map((i) => i.category)).toEqual(["unfounded-inference"]);
+		expect(keepAnswerable(found, false)).toEqual([]);
 	});
 });
