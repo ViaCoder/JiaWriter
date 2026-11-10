@@ -24,8 +24,15 @@ const FULL_DATE = /^\d{4}年\d{1,2}月\d{1,2}日$/;
 // 新闻, 周刊 and 杂志 since 2026-11-09 (CBS新闻 was not taken for an outlet).
 const OUTLET = "[\\u4e00-\\u9fa5A-Za-z]{1,12}?(?:通讯社|电视台|新闻社|新闻|周刊|杂志|社|日报|晚报|报|网|台)";
 
+/** True for a name in book-title marks that is an outlet's (证券时报网, 新华社, 广州日报), not a document's. */
+export function isOutletName(name: string): boolean {
+	return new RegExp(`^${OUTLET}$`).test(name.trim()) && !GENERIC_NAME.test(name.trim());
+}
+
 /** The opening words of a phrase that ends like an outlet but names none. */
 const GENERIC = /^(?:相关|有关|各|多家|该|此|本|这|那|上述|其他|其它|境外|境内|国内|国外|海外|主流|官方|地方|新闻)/;
+/** The same, for a whole name. */
+const GENERIC_NAME = GENERIC;
 
 /** The citations in a wrong form, in the order they come. */
 export function citationIssues(text: string): CitationIssue[] {

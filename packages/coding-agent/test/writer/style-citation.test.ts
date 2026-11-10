@@ -1,6 +1,11 @@
 // The form of citations (src/writer/style/citation.ts): xx年xx月xx日《xx》报道 (the user, 2026-11-08).
 import { describe, expect, it } from "vitest";
-import { citationIssues, formatCitationIssues, numberedCitations } from "../../src/writer/style/citation.ts";
+import {
+	citationIssues,
+	formatCitationIssues,
+	isOutletName,
+	numberedCitations,
+} from "../../src/writer/style/citation.ts";
 
 describe("citationIssues", () => {
 	it("passes the forms the user asked for", () => {
@@ -164,5 +169,14 @@ describe("numberedCitations", () => {
 		expect(numberedCitations(paper)).toEqual([]);
 		// The user's form.
 		expect(numberedCitations("# 报告\n\n据2025年12月22日《新华网》报道，规模达1.5万亿元。\n")).toEqual([]);
+	});
+});
+
+describe("isOutletName", () => {
+	it("tells an outlet from a document", () => {
+		for (const name of ["证券时报网", "新华社", "广州日报", "法治网", "中央电视台"])
+			expect(isOutletName(name)).toBe(true);
+		for (const name of ["低空经济数据治理研究报告", "低空经济及其核心产业统计分类（试行）", "相关报道"])
+			expect(isOutletName(name)).toBe(false);
 	});
 });

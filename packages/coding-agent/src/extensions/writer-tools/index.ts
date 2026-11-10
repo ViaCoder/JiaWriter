@@ -56,7 +56,7 @@ import { bodyBeforeReferences, countText, REFERENCES_HEADING } from "../../write
 // Shared input loading.
 import { loadToolText, setLastDraft } from "../../writer/tool-input.ts";
 // The materials folders and file of a topic.
-import { MATERIAL_FILE, TOPIC_DIRS } from "../../writer/topic/topic.ts";
+import { MATERIAL_FILE, misattributedFigures, TOPIC_DIRS } from "../../writer/topic/topic.ts";
 // Length check.
 import { DEFAULT_TOLERANCE, formatWordCount, wordCount } from "../../writer/word-count.ts";
 
@@ -363,6 +363,10 @@ export function ownFindings(
 	if (lacksReferences(text, file, cwd)) own.push(t("style.noReferences"));
 	const methods = inventedMethods(text, file, cwd);
 	if (methods.length > 0) own.push(t("style.inventedMethods", { words: methods.join("、") }));
+	// Figures cited to a dated outlet whose sources of that date do not hold them (2026-11-10).
+	const wrong = draftFolders(file, cwd).flatMap((dir) => misattributedFigures(text, dir));
+	if (wrong.length > 0)
+		own.push(t("style.misattributed", { count: wrong.length, items: wrong.map((s) => `“${s}”`).join("；") }));
 	// The whole document's measures wait until its outline has no section left (written one per turn); materials
 	// left out are named when the draft is first written, not again with each revision.
 	if (!outlineOpen(file)) {
@@ -505,9 +509,9 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			const check = draftCheck(text);
 			const checkLines = revision ? freshLines(draftCheck(old).text.split("\n"), check.text.split("\n")) : [];
 			const mustFix = revision ? check.mustFix && checkLines.length > 0 : check.mustFix;
-			const found = ask ? await reviewDraft(text, ask) : undefined;
-			// Findings that ask for facts only where there are materials to take them from.
+			// Findings that ask for facts only where there are materials to take them from; the review reads them too.
 			const materials = hasMaterials(file, ctx.cwd);
+			const found = ask ? await reviewDraft(text, ask, materials ? materialText(file, ctx.cwd) : "") : undefined;
 			const answerable = found && keepAnswerable(found, materials);
 			const issues = answerable && revision ? inChanged(answerable, changed) : answerable;
 			// What the program itself sees; a length far from the one asked is the whole document's, so it counts in a

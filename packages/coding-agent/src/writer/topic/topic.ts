@@ -26,6 +26,12 @@ import { basename, join } from "node:path";
 import { normalizeUrl } from "../export/refs.ts";
 // Output messages.
 import { t } from "../i18n/index.ts";
+// Outlets, as opposed to documents, in citations.
+import { isOutletName } from "../style/citation.ts";
+// The body of a draft, without its reference list.
+import { bodyBeforeReferences } from "../text-stats.ts";
+// The date in an address.
+import { urlDate } from "../websearch/core.ts";
 
 /** Subfolders of a topic. */
 export const TOPIC_DIRS = { drafts: "稿件", refs: "参考资料", search: "检索", web: "网页" } as const;
@@ -449,7 +455,11 @@ export function sourceOf(dir: string, url: string): { text: string; date: string
  * (近期, 截至目前) names no date and passes.
  */
 export function timeInSource(time: string, text: string, date: string): boolean {
-	const m = /(\d{4})年(?:(\d{1,2})月(?:(\d{1,2})日)?)?/.exec(time);
+	// 2025年12月27日, or the same as numbers: 2026-01-29, 2026/1/29, 2026.01.29 (2026-11-10: a time written 2026-01-29
+	// passed unchecked, and it was another page's date).
+	const m =
+		/(\d{4})年(?:(\d{1,2})月(?:(\d{1,2})日)?)?/.exec(time) ??
+		/(\d{4})[-/.](\d{1,2})(?:[-/.](\d{1,2}))?(?!\d)/.exec(time);
 	if (!m) return true;
 	const [y, mo, d] = [m[1], m[2] ? Number(m[2]) : 0, m[3] ? Number(m[3]) : 0];
 	// The source's own date, as numbers.
@@ -480,6 +490,66 @@ export function withSourceTimes(dir: string, items: readonly Material[]): Materi
 		const [y, m, d] = date.split("-").map(Number);
 		return date ? { ...item, time: `${y}年${m}月${d}日` } : item;
 	});
+}
+
+/** Traditional forms of the units, as a BIG5 page writes them: 449個 is 449个 (2026-11-10, a people.com.cn page). */
+const UNIT_FORMS: Readonly<Record<string, string>> = { 個: "个", 萬: "万", 億: "亿", 條: "条", 戶: "户", 項: "项" };
+
+/** A figure with its unit as a draft writes it: 30个, 1.5万亿元, 6702.5亿, 15%. */
+const FIGURE = /\d+(?:\.\d+)?(?:[%％]|[万亿千百]+[元人户家个架座条起部项次]?|[元人户家个架座条起部项次倍])/g;
+
+/**
+ * Sentences of a draft that cite a dated source (2026年1月29日《证券时报网》) and give figures that no archived source
+ * of that date holds: the figure came from another source (2026-11-10: 30个省市 from a C114 page of 2026-02-03 cited as
+ * 2026年1月29日《证券时报网》, the second such case in research runs). A source of that date is one whose own date it is,
+ * or whose text names it. Each sentence as its first 60 characters.
+ */
+export function misattributedFigures(text: string, dir: string): string[] {
+	const index = readIndex(dir);
+	if (index.length === 0) return [];
+	// Every archived source on its own: each fetched page, and each result of each search, with the dates it bears (its
+	// own, and the one in its address: an older archive has result dates a day early).
+	const sources: { text: string; dates: string[] }[] = [];
+	for (const e of index) {
+		if (!existsSync(join(dir, e.file))) continue;
+		const file = readFileSync(join(dir, e.file), "utf-8").replace(/[個萬億條戶項]/g, (c) => UNIT_FORMS[c] ?? c);
+		if (e.kind === "page") {
+			const own = /^发布日期：(\d{4}-\d{2}-\d{2})/m.exec(file)?.[1] ?? "";
+			sources.push({ text: file, dates: [own, urlDate(e.url ?? "")] });
+			continue;
+		}
+		for (const url of e.urls ?? []) {
+			const bare = url.replace(/#\d+$/, "");
+			const at = file.indexOf(bare);
+			if (at < 0) continue;
+			const rest = file.slice(at);
+			const next = rest.slice(1).search(/\n\d+\. /);
+			const entry = next < 0 ? rest : rest.slice(0, next + 1);
+			sources.push({ text: entry, dates: [/^\S*（(\d{4}-\d{2}-\d{2})）/.exec(entry)?.[1] ?? "", urlDate(bare)] });
+		}
+	}
+	const out: string[] = [];
+	for (const sentence of bodyBeforeReferences(text).split(/(?<=[。！？；\n])/)) {
+		const cite = /(\d{4})年(\d{1,2})月(\d{1,2})日《([^》\n]+)》/.exec(sentence);
+		// A report, by an outlet; a document's date is its own, not a report's.
+		if (!cite || !isOutletName(cite[4])) continue;
+		// The figures the sentence gives, beside its citation.
+		const figures = sentence.replace(cite[0], "").match(FIGURE) ?? [];
+		if (figures.length === 0) continue;
+		const [y, m, d] = [cite[1], Number(cite[2]), Number(cite[3])];
+		const day = `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+		const named = [`${y}年${m}月${d}日`, day];
+		const ofDay = sources.filter((src) => src.dates.includes(day) || named.some((n) => src.text.includes(n)));
+		// One figure found in a source of that date is enough: the others may be worked out from it.
+		// A figure of three digits or with decimals counts without its unit too: 328万 is in 328.7万架.
+		const forms = (f: string) => {
+			const bare = f.match(/^\d+(?:\.\d+)?/)?.[0] ?? f;
+			return bare.replace(".", "").length >= 3 || bare.includes(".") ? [f, bare] : [f];
+		};
+		if (!figures.some((f) => ofDay.some((src) => forms(f).some((x) => src.text.includes(x)))))
+			out.push(sentence.trim().slice(0, 60));
+	}
+	return out;
 }
 
 /** Add materials to 素材.md, all or none; returns how many it holds now. */

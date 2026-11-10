@@ -16,6 +16,7 @@ import {
 	archivePage,
 	archiveSearch,
 	type Material,
+	misattributedFigures,
 	openTopic,
 	renderMaterial,
 	sourceOf,
@@ -113,6 +114,10 @@ describe("timeInSource", () => {
 		// A day the source does not give, and a year it does not have.
 		expect(timeInSource("2025年12月10日", text, "2025-12-27")).toBe(false);
 		expect(timeInSource("2023年", text, "2025-12-27")).toBe(false);
+		// Numbers for a date are checked the same way (2026-11-10: 2026-01-29 passed unchecked).
+		expect(timeInSource("2025-06-19", text, "")).toBe(true);
+		expect(timeInSource("2026-01-29", text, "2025-12-27")).toBe(false);
+		expect(timeInSource("2025/12/27", text, "2025-12-27")).toBe(true);
 		// Words with no date name none.
 		expect(timeInSource("近期", text, "")).toBe(true);
 	});
@@ -173,5 +178,30 @@ describe("renderMaterial", () => {
 			url: "https://a.example/",
 		});
 		expect(line).toBe("- 数据｜地区：全国｜行业：低空｜指标：企业数｜数值：15.43万家｜来源：https://a.example/");
+	});
+});
+
+describe("misattributedFigures", () => {
+	it("finds a figure cited to a dated outlet whose sources of that day do not hold it", () => {
+		archiveSearch(dir, "低空经济", REPORT, "2026-11-10 06:57", [
+			"https://finance.example/2025/doc-1.shtml#1",
+			"https://other.example/b#2",
+		]);
+		archiveSearch(
+			dir,
+			"乙",
+			"1. 题\n   https://c114.example/a.html（2026-02-03）\n   已有30个省市将低空经济纳入政府工作报告",
+			"t",
+			["https://c114.example/a.html"],
+		);
+		// The figure is in a source of another day (2026-11-10: a C114 figure cited to 证券时报网).
+		const wrong = "据2026年1月29日《证券时报网》报道，全国已有30个省市将低空经济纳入政府工作报告。";
+		expect(misattributedFigures(wrong, dir)).toEqual([wrong.slice(0, 60)]);
+		// The same figure cited to its own source's day; a document's date; a sentence with no figure.
+		expect(
+			misattributedFigures("据2026年2月3日《C114通信网》报道，已有30个省市将低空经济纳入政府工作报告。", dir),
+		).toEqual([]);
+		expect(misattributedFigures("2025年12月22日《低空经济统计分类》印发，涵盖4个大类。", dir)).toEqual([]);
+		expect(misattributedFigures("据2026年1月29日《证券时报网》报道，低空经济加快发展。", dir)).toEqual([]);
 	});
 });
