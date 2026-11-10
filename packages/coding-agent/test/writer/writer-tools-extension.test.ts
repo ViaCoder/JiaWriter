@@ -34,6 +34,7 @@ import writerToolsExtension, {
 	ownFindings,
 	referenceTitles,
 	requestedLength,
+	shownRound,
 	unusedMaterials,
 } from "../../src/extensions/writer-tools/index.ts";
 // The semantic review line the automatic check ends with.
@@ -63,6 +64,7 @@ function registeredTools(): Map<string, ToolDefinition> {
 	// Fake API: the tools are kept, the event handlers are not used here.
 	const pi = {
 		registerTool: (tool: ToolDefinition) => tools.set(tool.name, tool),
+		registerMessageRenderer: () => undefined,
 		on: () => undefined,
 	} as unknown as ExtensionAPI;
 	// Run the factory.
@@ -453,6 +455,7 @@ describe("the automatic check of each draft", () => {
 		const sent: { message: { customType: string; content: string; display: boolean }; options: unknown }[] = [];
 		const pi = {
 			registerTool: () => undefined,
+			registerMessageRenderer: () => undefined,
 			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
 				handlers[name] = fn;
 			},
@@ -648,5 +651,45 @@ describe("changedParagraphs / freshLines / inChanged / ownFindings", () => {
 			"3000",
 		);
 		rmSync(dir, { recursive: true, force: true });
+	});
+});
+
+describe("shownRound", () => {
+	it("shows the report without the editor's English instructions to the model", () => {
+		const content = [
+			"自动检查：草稿还有问题（第 1/2 轮）。",
+			"",
+			"稿件/报告.md",
+			"篇幅 759 字，要求约 1200 字",
+			STYLE_REVIEW,
+		].join("\n");
+		expect(shownRound(content)).toBe(
+			"自动检查：草稿还有问题（第 1/2 轮）。\n\n稿件/报告.md\n篇幅 759 字，要求约 1200 字",
+		);
+	});
+
+	it("is how the automatic check is drawn: the report, no English instructions", () => {
+		// The renderer the extension registers, with a theme that leaves text as it is.
+		let render:
+			| ((message: unknown, options: unknown, theme: unknown) => { render(width: number): string[] })
+			| undefined;
+		const pi = {
+			registerTool: () => undefined,
+			registerMessageRenderer: (_type: string, fn: typeof render) => {
+				render = fn;
+			},
+			on: () => undefined,
+		} as unknown as ExtensionAPI;
+		writerToolsExtension(pi);
+		const theme = { fg: (_c: string, text: string) => text, bg: (_c: string, text: string) => text };
+		const message = {
+			customType: "jiawriter-style-round",
+			content: `自动检查：第 1/2 轮。\n稿件/报告.md\n${STYLE_REVIEW}`,
+			display: true,
+		};
+		const lines = render?.(message, { expanded: false, outputPad: 1 }, theme).render(120).join("\n") ?? "";
+		expect(lines).toContain("自动检查：第 1/2 轮。");
+		expect(lines).toContain("稿件/报告.md");
+		expect(lines).not.toContain("reread the draft");
 	});
 });

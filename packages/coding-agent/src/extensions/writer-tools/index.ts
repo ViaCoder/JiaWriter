@@ -10,6 +10,8 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 // One request to the session's model, for the semantic review.
 import { type Api, completeSimple, type Model } from "@earendil-works/pi-ai/compat";
+// Text for the automatic check as shown.
+import { Text } from "@earendil-works/pi-tui";
 // Parameter schemas.
 import { Type } from "typebox";
 // Extension API types.
@@ -389,7 +391,30 @@ export function modelAsker(
 }
 
 /** Extension factory; `complete` reaches the model for the semantic review (tests pass a stand-in). */
+/**
+ * An automatic check as the user sees it: the report without the editor's instructions to the model, which are English
+ * prompt text (2026-11-10: the reread instructions showed in English under a Chinese report).
+ */
+export function shownRound(content: string): string {
+	return content
+		.split("\n")
+		.filter((line) => line !== STYLE_REVIEW)
+		.join("\n")
+		.replace(/\n{3,}/g, "\n\n")
+		.trim();
+}
+
 export default function writerToolsExtension(pi: ExtensionAPI, complete: Complete = completeSimple): void {
+	// The automatic check is shown with its report only; the model still gets all of it.
+	pi.registerMessageRenderer("jiawriter-style-round", (message, { outputPad }, theme) => {
+		const text =
+			typeof message.content === "string"
+				? message.content
+				: message.content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
+		return new Text(theme.fg("customMessageText", shownRound(text)), outputPad, 1, (line) =>
+			theme.bg("customMessageBg", line),
+		);
+	});
 	// Drafts written since the user's last message, and the automatic rounds they have had.
 	const written = new Set<string>();
 	// Each draft as it was before this message changed it ("" for a new one): a revision is checked for what it
