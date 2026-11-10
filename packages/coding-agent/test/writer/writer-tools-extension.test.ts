@@ -224,6 +224,14 @@ describe("modelAsker", () => {
 		// Later reviews in the run go without it.
 		await ask?.("说明", "正文");
 		expect(seen[2].options.onPayload).toBeUndefined();
+		// Another error is not retried.
+		const once: unknown[] = [];
+		const failing = (async (_m: unknown, _c: unknown, options: never) => {
+			once.push(options);
+			return { role: "assistant", content: [], stopReason: "error", errorMessage: "network down" };
+		}) as unknown as Complete;
+		await expect(modelAsker(reviewCtx() as never, failing)?.("说明", "正文")).rejects.toThrow("network down");
+		expect(once).toHaveLength(1);
 		expect(withReviewBudget("x")).toBe("x");
 		expect(REVIEW_TIMEOUT_MS).toBe(180_000);
 	});

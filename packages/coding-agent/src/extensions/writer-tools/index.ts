@@ -442,8 +442,13 @@ export function modelAsker(
 				},
 			);
 		let reply = await ask(budget);
-		// An upstream that does not take the budget: once more without it, and never again in this run.
-		if (reply.stopReason === "error" && budget) {
+		// An upstream that refuses the budget's field: once more without it, and never again in this run. Other
+		// errors are not retried (2026-11-10: a retry on any error took the next scripted reply in a compaction test).
+		if (
+			reply.stopReason === "error" &&
+			budget &&
+			/\b400\b|reasoning|max_tokens|unknown|unsupported|unrecognized|invalid/i.test(reply.errorMessage ?? "")
+		) {
 			budget = false;
 			reply = await ask(false);
 		}
