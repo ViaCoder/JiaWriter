@@ -17,6 +17,7 @@ import writerToolsExtension, {
 	type Complete,
 	changedParagraphs,
 	citesMaterials,
+	cutOffWithoutCalls,
 	draftCheck,
 	draftFolders,
 	finishedChecks,
@@ -26,6 +27,7 @@ import writerToolsExtension, {
 	inventedMethods,
 	itemMarks,
 	lacksReferences,
+	MAX_CUT_RESUMES,
 	MAX_ROUNDS,
 	materialsNameSources,
 	materialText,
@@ -691,5 +693,42 @@ describe("shownRound", () => {
 		expect(lines).toContain("自动检查：第 1/2 轮。");
 		expect(lines).toContain("稿件/报告.md");
 		expect(lines).not.toContain("reread the draft");
+	});
+});
+
+describe("cutOffWithoutCalls", () => {
+	it("finds a reply cut at the output limit before any tool call, and nothing else", () => {
+		const cut = {
+			role: "assistant",
+			stopReason: "length",
+			content: [{ type: "text", text: "先登记素材，再拟大纲。" }],
+		};
+		expect(cutOffWithoutCalls([{ role: "user" }, cut])).toBe(true);
+		// A cut reply with a call: the loop fails the call and goes on by itself.
+		expect(cutOffWithoutCalls([{ ...cut, content: [{ type: "toolCall" }] }])).toBe(false);
+		// A finished reply, none, and no messages at all.
+		expect(cutOffWithoutCalls([{ ...cut, stopReason: "stop" }])).toBe(false);
+		expect(cutOffWithoutCalls([])).toBe(false);
+		expect(cutOffWithoutCalls(undefined)).toBe(false);
+	});
+
+	it("is resumed at most MAX_CUT_RESUMES times until the user writes again", async () => {
+		const handlers: Record<string, (event: unknown, ctx: unknown) => unknown> = {};
+		const sent: { customType: string }[] = [];
+		const pi = {
+			registerTool: () => undefined,
+			registerMessageRenderer: () => undefined,
+			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
+				handlers[name] = fn;
+			},
+			sendMessage: (message: { customType: string }) => sent.push(message),
+		} as unknown as ExtensionAPI;
+		writerToolsExtension(pi);
+		const ended = { messages: [{ role: "assistant", stopReason: "length", content: [] }] };
+		for (let i = 0; i < 4; i++) await handlers.agent_end(ended, { cwd: process.cwd() });
+		expect(sent.filter((m) => m.customType === "jiawriter-cut-resume").length).toBe(MAX_CUT_RESUMES);
+		handlers.input({ text: "继续" }, {});
+		await handlers.agent_end(ended, { cwd: process.cwd() });
+		expect(sent.filter((m) => m.customType === "jiawriter-cut-resume").length).toBe(MAX_CUT_RESUMES + 1);
 	});
 });

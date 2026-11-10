@@ -84,6 +84,7 @@ export const zh = {
 	"style.materials":
 		"修改用到的事实和案例只取自已有材料：话题的素材.md、参考资料/.parsed/、检索/ 和 网页/ 里保存的结果，并注明出处；材料里没有的不编造，也不留待补标记。检查意见不是检索的理由：用户没有要求检索就不检索，材料与意见不符时以材料为准。",
 	// An automatic round of revision.
+	"style.cutResume": "上一条回复超出输出长度被截断，没有完成。请接着做刚才那一步，不要重复已经完成的内容。",
 	"style.round": "自动检查：草稿还有问题，请按下面的报告修改（第 {round}/{max} 轮）。",
 	// Clean result.
 	"style.clean": "检查通过：没有命中。",

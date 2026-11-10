@@ -76,6 +76,18 @@ const OUTLINE_FILE = "大纲.md";
 
 /** Automatic rounds of revision after one message of the user, so a draft that cannot be cleaned does not loop. */
 export const MAX_ROUNDS = 2;
+/** Replies cut off by the output limit with no tool call that the program resumes in a row (2026-11-10: a research
+ * run's reply ran 114,946 tokens of hidden reasoning, stopped at the limit with one sentence, and the run ended
+ * with no draft). */
+export const MAX_CUT_RESUMES = 2;
+
+/** True when the last reply stopped at the output limit before it called a tool: the turn ended on nothing. */
+export function cutOffWithoutCalls(messages: readonly unknown[] | undefined): boolean {
+	const last = [...(messages ?? [])].reverse().find((m) => (m as { role?: string }).role === "assistant") as
+		| { stopReason?: string; content?: { type?: string }[] }
+		| undefined;
+	return last?.stopReason === "length" && !(last.content ?? []).some((c) => c.type === "toolCall");
+}
 
 /** The automatic check of a draft: the rules for its register, then the semantic review only a reader can do. */
 export function draftCheck(text: string): { clean: boolean; mustFix: boolean; text: string } {
@@ -422,6 +434,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	// because the review read the whole notice again).
 	const before = new Map<string, string>();
 	let rounds = 0;
+	// Cut-off replies resumed since the user's last message.
+	let cutResumes = 0;
 	// A new message from the user starts again.
 	// The length the user's message asked for, if it named one.
 	let target: number | undefined;
@@ -431,6 +445,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		written.clear();
 		before.clear();
 		rounds = 0;
+		cutResumes = 0;
 		target = requestedLength(event.text ?? "") ?? (documentOpen ? target : undefined);
 	});
 	// The draft before its first change in this message.
@@ -466,8 +481,17 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	});
 	// When a reply ends, each draft it wrote gets the rules and one separate semantic review; while either finds
 	// something, the program asks for another round, at most MAX_ROUNDS.
-	pi.on("agent_end", async (_event, ctx) => {
+	pi.on("agent_end", async (event, ctx) => {
 		documentOpen = [...written].some((file) => existsSync(file) && outlineOpen(file));
+		// A reply cut off before its tool call is resumed first; the checks follow when the work is done.
+		if (cutOffWithoutCalls(event?.messages) && cutResumes < MAX_CUT_RESUMES) {
+			cutResumes++;
+			pi.sendMessage(
+				{ customType: "jiawriter-cut-resume", content: t("style.cutResume"), display: true },
+				{ deliverAs: "followUp", triggerTurn: true },
+			);
+			return;
+		}
 		if (rounds >= MAX_ROUNDS || written.size === 0) return;
 		const ask = modelAsker(ctx, complete);
 		const open: string[] = [];
