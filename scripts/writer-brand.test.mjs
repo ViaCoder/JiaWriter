@@ -15,7 +15,15 @@ import { test } from "node:test";
 // Resolve the script path from this file.
 import { fileURLToPath } from "node:url";
 // The functions under test.
-import { BRAND_CONFIG_DIR, BRAND_NAME, BRAND_TITLE, brandPackageJson, writeBrandedPackageJson } from "./writer-brand.mjs";
+import {
+	BRAND_CONFIG_DIR,
+	BRAND_NAME,
+	BRAND_TITLE,
+	brandPackageJson,
+	releaseVersion,
+	VERSION_FILE,
+	writeBrandedPackageJson,
+} from "./writer-brand.mjs";
 
 // Absolute path of the script, for the CLI test.
 const script = fileURLToPath(new URL("./writer-brand.mjs", import.meta.url));
@@ -73,4 +81,41 @@ test("CLI exits with code 2 and a usage line when arguments are missing", () => 
 	assert.equal(r.status, 2);
 	// The usage line is printed on stderr.
 	assert.match(r.stderr, /usage: node scripts\/writer-brand\.mjs/);
+});
+
+test("releaseVersion takes the upstream version or upstream.N, nothing smaller or other", () => {
+	const dir = mkdtempSync(join(tmpdir(), "wa-brand-"));
+	try {
+		const file = join(dir, "v.txt");
+		// The release number after the upstream version, and the upstream version alone.
+		writeFileSync(file, "1.4.0.1\n");
+		assert.equal(releaseVersion("1.4.0", file), "1.4.0.1");
+		writeFileSync(file, "1.4.0\n");
+		assert.equal(releaseVersion("1.4.0", file), "1.4.0");
+		// A pre-release sorts below 1.4.0, another upstream version is a forgotten bump, 0 is no release.
+		for (const bad of ["1.4.0-1", "1.5.0.1", "1.4.0.0", "1.4.01"]) {
+			writeFileSync(file, `${bad}\n`);
+			assert.throws(() => releaseVersion("1.4.0", file), /is not 1\.4\.0/);
+		}
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
+});
+
+test("writeBrandedPackageJson writes the release version, and the repository's file fits the upstream version", () => {
+	const dir = mkdtempSync(join(tmpdir(), "wa-brand-"));
+	try {
+		const src = join(dir, "in.json");
+		const dest = join(dir, "out.json");
+		const file = join(dir, "v.txt");
+		writeFileSync(src, JSON.stringify({ name: "p", version: "1.4.0", bin: { pi: "cli.js" } }));
+		writeFileSync(file, "1.4.0.2\n");
+		writeBrandedPackageJson(src, dest, file);
+		assert.equal(JSON.parse(readFileSync(dest, "utf-8")).version, "1.4.0.2");
+		// The file in the repository against the coding agent's version.
+		const upstream = JSON.parse(readFileSync(new URL("../packages/coding-agent/package.json", import.meta.url), "utf-8")).version;
+		assert.ok(releaseVersion(upstream, VERSION_FILE).startsWith(upstream));
+	} finally {
+		rmSync(dir, { recursive: true, force: true });
+	}
 });
