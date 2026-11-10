@@ -65,6 +65,32 @@ describe("sourceOf", () => {
 			"t",
 		);
 		expect(sourceOf(dir, "https://news.example/p")?.date).toBe("2025-07-16");
+		// A fetched page with no date of its own takes its search result's (2026-11-10, a 163.com page).
+		archivePage(
+			dir,
+			{ url: "https://finance.example/2025/doc-1.shtml", title: "页", date: "", content: "正文" },
+			"https://finance.example/2025/doc-1.shtml",
+			"sf",
+			"t",
+		);
+		const both = sourceOf(dir, "https://finance.example/2025/doc-1.shtml#1");
+		expect(both?.date).toBe("2025-12-27");
+		expect(both?.text).toContain("正文");
+		expect(both?.text).toContain("AR-E800");
+		// A result listed with an empty parameter is the same page (2026-11-10: …html?referFrom=).
+		archiveSearch(dir, "乙", "1. 题\n   https://m.example/a.html?referFrom=（2025-12-03）\n   摘要", "t", [
+			"https://m.example/a.html?referFrom=",
+		]);
+		archivePage(
+			dir,
+			{ url: "https://m.example/a.html", title: "a", date: "", content: "正文" },
+			"https://m.example/a.html",
+			"sf",
+			"t",
+		);
+		expect(sourceOf(dir, "https://m.example/a.html")?.date).toBe("2025-12-03");
+		// A parameter with a value names another page.
+		expect(sourceOf(dir, "https://m.example/a.html?id=2")).toBeUndefined();
 		// Nothing archived.
 		expect(sourceOf(dir, "https://none.example/")).toBeUndefined();
 	});

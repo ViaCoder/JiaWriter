@@ -410,17 +410,22 @@ export function siteName(url: string): string {
  */
 export function sourceOf(dir: string, url: string): { text: string; date: string } | undefined {
 	const key = materialKey(url);
+	// The same address with empty parameters left out: a result listed …html?referFrom= for the page …html.
+	const loose = (u: string) =>
+		materialKey(u)
+			.replace(/([?&])[^=&]+=(?=&|$)/g, "$1")
+			.replace(/[?&]+$/, "");
 	const index = readIndex(dir);
 	// A fetched page first: the fuller record, with 发布日期 in its head.
 	const page = index.find((e) => e.kind === "page" && [e.url, e.requested].some((u) => u && materialKey(u) === key));
-	if (page && existsSync(join(dir, page.file))) {
-		const text = readFileSync(join(dir, page.file), "utf-8");
-		return { text, date: /^发布日期：(\d{4}-\d{2}-\d{2})/m.exec(text)?.[1] ?? "" };
-	}
-	// Else the search that listed it: its address as written there, without the #1 the result numbers add.
+	const pageText = page && existsSync(join(dir, page.file)) ? readFileSync(join(dir, page.file), "utf-8") : "";
+	const pageDate = /^发布日期：(\d{4}-\d{2}-\d{2})/m.exec(pageText)?.[1] ?? "";
+	if (pageDate) return { text: pageText, date: pageDate };
+	// Else the search that listed it, also for a page that shows no date (2026-11-10: a 163.com page had none, its
+	// search result said 2025-12-03): its address as written there, without the #1 the result numbers add.
 	const bare = url.trim().replace(/#\d+$/, "");
 	for (const e of index) {
-		if (e.kind !== "search" || !(e.urls ?? []).some((u) => materialKey(u) === key)) continue;
+		if (e.kind !== "search" || !(e.urls ?? []).some((u) => loose(u) === loose(url))) continue;
 		if (!existsSync(join(dir, e.file))) continue;
 		const report = readFileSync(join(dir, e.file), "utf-8");
 		const at = report.indexOf(bare);
@@ -429,10 +434,13 @@ export function sourceOf(dir: string, url: string): { text: string; date: string
 		const rest = report.slice(at);
 		const next = rest.slice(1).search(/\n\d+\. /);
 		const text = next < 0 ? rest : rest.slice(0, next + 1);
-		// The date the result gives, in brackets after the address: …（2025-12-27）.
-		return { text, date: /^\S*（(\d{4}-\d{2}-\d{2})）/.exec(text)?.[1] ?? "" };
+		// The date the result gives, in brackets after the address: …（2025-12-27）; the page's text joins it.
+		return {
+			text: pageText ? `${pageText}\n${text}` : text,
+			date: /^\S*（(\d{4}-\d{2}-\d{2})）/.exec(text)?.[1] ?? "",
+		};
 	}
-	return undefined;
+	return pageText ? { text: pageText, date: "" } : undefined;
 }
 
 /**
