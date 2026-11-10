@@ -1,7 +1,7 @@
 // Unit tests for src/writer/websearch/firecrawl.ts (fetch replaced; no network).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readSearchEnv } from "../../src/writer/websearch/core.ts";
+import { dayOf, readSearchEnv } from "../../src/writer/websearch/core.ts";
 import {
 	FIRECRAWL_MAX_AGE_MS,
 	firecrawlError,
@@ -76,7 +76,8 @@ describe("firecrawlSearch", () => {
 		);
 		const out = await firecrawlSearch(cfg, "Ukraine", { news: true, fresh: "day" }, undefined, f.fn);
 		expect(JSON.parse(String(f.calls[0].init.body))).toEqual({ query: "Ukraine", limit: 10, sources: ["news"] });
-		expect(out).toEqual([{ title: "T", url: "https://apnews.com/a", snippet: "S", date: "3 hours ago" }]);
+		// The age becomes the day it points to (2026-11-10).
+		expect(out).toEqual([{ title: "T", url: "https://apnews.com/a", snippet: "S", date: dayOf("3 hours ago") }]);
 	});
 	it("asks for web results with the time window, and reads description", async () => {
 		const f = fakeFetch(

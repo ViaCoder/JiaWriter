@@ -136,7 +136,8 @@ describe("anysearchSearch and anysearchExtract", () => {
 		// Mapped.
 		expect(out).toEqual([
 			{ title: "T", url: "https://a.example/", snippet: "2026-10-31 消息", date: "2026-10-31" },
-			{ title: "", url: "https://b.example/", snippet: "3 hours ago long text", date: "3 hours ago" },
+			// An age in page text is its menus, not a date (2026-11-10).
+			{ title: "", url: "https://b.example/", snippet: "3 hours ago long text", date: "" },
 		]);
 	});
 	it("sends a capability tag when one is given", async () => {

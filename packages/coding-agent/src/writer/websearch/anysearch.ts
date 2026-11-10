@@ -8,7 +8,7 @@
 // Output messages.
 import { t } from "../i18n/index.ts";
 // Shared types and helpers.
-import { type FetchResult, findDate, type SearchConfig, type SearchResult, urlDate } from "./core.ts";
+import { absoluteDate, type FetchResult, pageDate, type SearchConfig, type SearchResult } from "./core.ts";
 
 /** fetch-compatible function (tests pass a fake). */
 export type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
@@ -125,7 +125,8 @@ export async function anysearchSearch(
 			url: String(r.url ?? ""),
 			snippet,
 			// The head of the text only: further in, a date is about something else.
-			date: findDate(`${short} ${content.slice(0, 2000)}`),
+			// Absolute dates only: an age in page text is its menus.
+			date: absoluteDate(`${short} ${content.slice(0, 2000)}`),
 		};
 	});
 }
@@ -149,6 +150,6 @@ export async function anysearchExtract(
 		url: final,
 		title: String(data.title ?? ""),
 		content,
-		date: findDate(content.slice(0, 3000)) || urlDate(final),
+		date: pageDate(content, final),
 	};
 }

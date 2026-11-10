@@ -11,7 +11,7 @@ import { pdfPages } from "../docs/import.ts";
 // Dates in metadata.
 // Output messages.
 import { t } from "../i18n/index.ts";
-import { type FetchResult, findDate } from "../websearch/core.ts";
+import { dayOf, type FetchResult } from "../websearch/core.ts";
 // Real addresses behind result links.
 import { resultTarget } from "./engines.ts";
 // Address policy.
@@ -314,7 +314,7 @@ export async function browserFetch(
 			url: meta.final_url || url,
 			title: art.title,
 			content: art.markdown,
-			date: findDate(meta.pub || art.published || ""),
+			date: dayOf(meta.pub || art.published || ""),
 			...(art.site ? { site: art.site } : {}),
 			...(art.filtered?.length ? { filtered: art.filtered } : {}),
 			...(unsure ? { unsure } : {}),

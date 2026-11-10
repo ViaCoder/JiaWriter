@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { readSearchEnv } from "../../src/writer/websearch/core.ts";
 // Functions under test.
 import {
+	beijingDay,
 	DEEPSEEK_QUERY_MAX,
 	deepseekError,
 	deepseekFetch,
@@ -80,7 +81,7 @@ describe("deepseekQuery", () => {
 });
 
 describe("deepseekSearch and deepseekFetch", () => {
-	it("sends query and count, maps summary and the day of the date", async () => {
+	it("sends query and count, maps summary and the Beijing day of the date", async () => {
 		const f = fakeFetch(
 			json(200, {
 				results: [
@@ -102,7 +103,7 @@ describe("deepseekSearch and deepseekFetch", () => {
 			ori_question: "What happened?",
 		});
 		expect(out).toEqual([
-			{ title: "T", url: "https://a.example/", snippet: "较长的摘要", date: "2026-11-06" },
+			{ title: "T", url: "https://a.example/", snippet: "较长的摘要", date: "2026-11-07" },
 			{ title: "U", url: "https://b.example/", snippet: "只有短的", date: "" },
 		]);
 	});
@@ -112,6 +113,11 @@ describe("deepseekSearch and deepseekFetch", () => {
 			"请缩短",
 		);
 		expect(f.calls.length).toBe(0);
+	});
+	it("takes a page's date from its address when its text has none", async () => {
+		const f = fakeFetch(json(200, { title: "页", content: "正文 刚刚" }));
+		const page = await deepseekFetch(cfg, "https://finance.sina.cn/2026-07-03/detail-x.d.html", undefined, f.fn);
+		expect(page.date).toBe("2026-07-03");
 	});
 	it("fetches a page's text with its date", async () => {
 		const f = fakeFetch(json(200, { title: "页", content: "2026年11月6日 正文" }));
@@ -135,5 +141,16 @@ describe("deepseek dates", () => {
 		await expect(deepseekSearch(cfg, q, undefined, undefined, f.fn, { after: "2026-01-01" })).rejects.toThrow();
 		await deepseekSearch(cfg, "budget", undefined, undefined, f.fn, { before: "2026-06-30" });
 		expect(JSON.parse(String(f.calls[0].init.body)).query).toBe("budget before:2026-06-30");
+	});
+});
+
+// 2026-11-10: the API's dates are midnight Beijing time in UTC; their first ten characters were a day early.
+describe("beijingDay", () => {
+	it("moves a zoned time to UTC+8 and keeps a bare date", () => {
+		expect(beijingDay("2026-07-02T16:00:00Z")).toBe("2026-07-03");
+		expect(beijingDay("2026-07-02T15:59:00Z")).toBe("2026-07-02");
+		expect(beijingDay("2026-07-02T23:00:00+08:00")).toBe("2026-07-02");
+		expect(beijingDay("2026-07-02")).toBe("2026-07-02");
+		expect(beijingDay("2026-07-02 10:00")).toBe("2026-07-02");
 	});
 });

@@ -8,7 +8,7 @@
 // Output messages.
 import { t } from "../i18n/index.ts";
 // Shared types and helpers.
-import { type FetchResult, findDate, type SearchConfig, type SearchResult } from "./core.ts";
+import { type FetchResult, pageDate, type SearchConfig, type SearchResult } from "./core.ts";
 
 /** fetch-compatible function (tests pass a fake). */
 export type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
@@ -102,9 +102,22 @@ export async function deepseekSearch(
 		url: String(r.url ?? ""),
 		// The longer summary is written for model reading.
 		snippet: String(r.summary || r.snippet || ""),
-		// The day only: the time of day is not reliable (always 16:00 UTC in the test).
-		date: typeof r.date === "string" ? r.date.slice(0, 10) : "",
+		date: typeof r.date === "string" ? beijingDay(r.date) : "",
 	}));
+}
+
+/**
+ * The day of a result's date in Beijing time. The API gives midnight Beijing time in UTC (2026-07-02T16:00:00Z for a
+ * page of 2026-07-03): its first ten characters were a day early for 17 of the 19 results whose address shows the
+ * day (2026-11-10), and the drafts cited those days. A date without a time is taken as it is.
+ */
+export function beijingDay(stamp: string): string {
+	// A time with its zone: the moment, moved to UTC+8.
+	if (/T\d{2}:\d{2}.*(?:Z|[+-]\d{2}:?\d{2})$/.test(stamp)) {
+		const ms = Date.parse(stamp);
+		if (!Number.isNaN(ms)) return new Date(ms + 8 * 3600_000).toISOString().slice(0, 10);
+	}
+	return stamp.slice(0, 10);
 }
 
 /** Fetch one page's text. */
@@ -117,5 +130,5 @@ export async function deepseekFetch(
 	const data = await deepseekPost(cfg, "/v1/tools/fetch", { url }, signal, fetchFn);
 	// Page text in Markdown.
 	const content = String(data.content ?? "");
-	return { url, title: String(data.title ?? ""), content, date: findDate(content.slice(0, 3000)) };
+	return { url, title: String(data.title ?? ""), content, date: pageDate(content, url) };
 }

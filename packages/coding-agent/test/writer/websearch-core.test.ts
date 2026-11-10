@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import {
 	cleanWebText,
 	DEFAULT_ANYSEARCH_URL,
-	findDate,
 	formatFetch,
 	formatSearch,
 	hostOf,
@@ -14,6 +13,7 @@ import {
 	isHttpUrl,
 	MAX_FETCH_CHARS,
 	normalizeResults,
+	pageDate,
 	readSearchEnv,
 	urlDate,
 } from "../../src/writer/websearch/core.ts";
@@ -90,17 +90,6 @@ describe("URL helpers", () => {
 			true,
 			false,
 		]);
-	});
-});
-
-describe("findDate", () => {
-	it("finds absolute and relative dates", () => {
-		// ISO, slash and Chinese forms; relative markers; nothing.
-		expect(findDate("published 2026-10-31T08:00")).toBe("2026-10-31");
-		expect(findDate("新华社2026年10月3日电")).toBe("2026-10-03");
-		expect(findDate("3 hours ago · Reuters")).toBe("3 hours ago");
-		expect(findDate("5 小时前")).toBe("5 小时前");
-		expect(findDate("no date here")).toBe("");
 	});
 });
 
@@ -208,5 +197,15 @@ describe("reports", () => {
 			"zh",
 		);
 		expect(long.endsWith(`（正文过长，已截取前 ${MAX_FETCH_CHARS} 字）`)).toBe(true);
+	});
+});
+
+// 2026-11-10: a page's "刚刚" was its menus, and a page with no date in its text had one in its address.
+describe("pageDate", () => {
+	it("takes an absolute date near the top, else the address's, never a relative marker", () => {
+		expect(pageDate("标题\n2026-02-10 14:10 来源：中国航空报", "https://a.example/p")).toBe("2026-02-10");
+		expect(pageDate("正文", "https://finance.sina.cn/2026-07-03/detail.d.html")).toBe("2026-07-03");
+		expect(pageDate("刚刚 · 首页", "https://m.jiemian.com/article/1.html")).toBe("");
+		expect(pageDate(`${"字".repeat(250)}2026年1月2日`, "https://a.example/", 200)).toBe("");
 	});
 });

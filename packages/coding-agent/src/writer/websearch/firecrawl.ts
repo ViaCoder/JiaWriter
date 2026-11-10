@@ -7,7 +7,7 @@
 // Output messages.
 import { t } from "../i18n/index.ts";
 // Shared types and helpers.
-import { type FetchResult, findDate, type SearchConfig, type SearchResult } from "./core.ts";
+import { dayOf, type FetchResult, pageDate, type SearchConfig, type SearchResult } from "./core.ts";
 
 /** fetch-compatible function (tests pass a fake). */
 export type FetchFn = (url: string, init: RequestInit) => Promise<Response>;
@@ -105,8 +105,8 @@ export async function firecrawlSearch(
 		title: String(r.title ?? ""),
 		url: String(r.url ?? ""),
 		snippet: String(r.snippet ?? r.description ?? ""),
-		// News dates come as given ("3 hours ago", "Nov 7, 2026"); web results have none.
-		date: typeof r.date === "string" ? findDate(r.date) || r.date : "",
+		// News dates come as given ("3 hours ago", "Nov 7, 2026") and become days; web results have none.
+		date: typeof r.date === "string" ? dayOf(r.date) : "",
 	}));
 }
 
@@ -126,7 +126,8 @@ export async function firecrawlFetch(
 	const content = String(data.markdown ?? "");
 	// The title may come as a list.
 	const title = Array.isArray(meta.title) ? String(meta.title[0] ?? "") : String(meta.title ?? "");
-	// The publication time where the page states it, else a date in the text.
+	// The publication time where the page states it (in the publisher's zone), else a date in the text or address.
 	const published = typeof meta.publishedTime === "string" ? meta.publishedTime.slice(0, 10) : "";
-	return { url: String(meta.sourceURL ?? url), title, content, date: published || findDate(content.slice(0, 3000)) };
+	const final = String(meta.sourceURL ?? url);
+	return { url: final, title, content, date: published || pageDate(content, final) };
 }

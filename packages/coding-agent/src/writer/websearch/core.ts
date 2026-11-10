@@ -132,21 +132,63 @@ export function isBlocked(host: string, blocklist: readonly string[]): boolean {
 	return blocklist.some((d) => host === d || host.endsWith(`.${d}`));
 }
 
+// Every date a backend or page gives becomes one calendar day, YYYY-MM-DD, or nothing (2026-11-10, the user: "The
+// source material must include accurate timestamps"; "if there's no date, don't write it down"). The model never
+// works a date out of 9小时前 or Nov 7, 2026 itself.
+
 // Absolute dates: 2026-10-31, 2026/10/31, 2026.10.31, 2026年10月31日.
 const DATE_RE = /(20\d{2})[-/.年](1[0-2]|0?[1-9])[-/.月](3[01]|[12]\d|0?[1-9])日?/;
-// Relative markers within days: 3 hours ago, 2 days ago, 5 分钟前, 2 小时前, 3 天前, 昨天, 刚刚.
-const RELATIVE_RE = /\b\d{1,2}\s*(?:minutes?|mins?|hours?|hrs?|days?)\s+ago\b|\d{1,2}\s*(?:分钟|小时|天)前|昨天|刚刚/i;
+// English month names, as firecrawl's news results give them.
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTH = "(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?";
+// Nov 7, 2026 / November 7 2026, and 7 Nov 2026 / 7 November, 2026.
+const EN_MDY_RE = new RegExp(`\\b${MONTH}\\s+(3[01]|[12]\\d|0?[1-9]),?\\s+(20\\d{2})\\b`, "i");
+const EN_DMY_RE = new RegExp(`\\b(3[01]|[12]\\d|0?[1-9])\\s+${MONTH},?\\s+(20\\d{2})\\b`, "i");
+// Ages within days: 3 hours ago, 2 days ago, 5 分钟前, 9小时前, 3 天前, 昨天, 前天, 刚刚.
+const RELATIVE_RE =
+	/\b(\d{1,2})\s*(minutes?|mins?|hours?|hrs?|days?)\s+ago\b|(\d{1,2})\s*(分钟|小时|天)前|(昨天|前天|刚刚|今天)/i;
 
-/** First date in text as YYYY-MM-DD, else a relative-time marker, else "". */
-export function findDate(text: string): string {
-	// Absolute date first.
+/** A calendar day as YYYY-MM-DD. */
+function day(y: number | string, m: number | string, d: number | string): string {
+	return `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/** The first absolute date in text as YYYY-MM-DD (numbers, 年月日 or an English month), else "". */
+export function absoluteDate(text: string): string {
 	const m = DATE_RE.exec(text);
-	// Zero-padded.
-	if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
-	// Relative marker as written.
+	if (m) return day(m[1], m[2], m[3]);
+	const a = EN_MDY_RE.exec(text);
+	if (a) return day(a[3], MONTHS.indexOf(a[1].toLowerCase()) + 1, a[2]);
+	const b = EN_DMY_RE.exec(text);
+	return b ? day(b[3], MONTHS.indexOf(b[2].toLowerCase()) + 1, b[1]) : "";
+}
+
+/** The local day an age given as 9小时前 or 3 days ago points to, counted back from `now`; "" when text has none. */
+export function relativeDate(text: string, now: number): string {
 	const r = RELATIVE_RE.exec(text);
-	// The marker or nothing.
-	return r ? r[0] : "";
+	if (!r) return "";
+	// The age in hours: minutes and 刚刚 count as now, days as 24 hours, 昨天 and 前天 as one and two days.
+	const n = Number(r[1] ?? r[3] ?? 0);
+	const unit = (r[2] ?? r[4] ?? r[5] ?? "").toLowerCase();
+	// 昨天 and 前天 first: they end in 天 too.
+	const named = unit === "昨天" ? 24 : unit === "前天" ? 48 : -1;
+	const hours = named >= 0 ? named : /^h|小时/.test(unit) ? n : /^d|天$/.test(unit) ? n * 24 : 0;
+	const at = new Date(now - hours * 3600_000);
+	return day(at.getFullYear(), at.getMonth() + 1, at.getDate());
+}
+
+/** A search result's date as YYYY-MM-DD: an absolute date, else its age counted back from `now`, else "". */
+export function dayOf(text: string, now: number = Date.now()): string {
+	return absoluteDate(text) || relativeDate(text, now);
+}
+
+/**
+ * A fetched page's date: an absolute date in its first `head` characters, else the one in its address. A relative
+ * marker in a page is its menus ("刚刚" in a 2025 article on jiemian.com, 2026-11-10), not its age; and a page whose
+ * text has no date (finance.sina.cn) still has one in its address.
+ */
+export function pageDate(content: string, url: string, head = 3000): string {
+	return absoluteDate(content.slice(0, head)) || urlDate(url);
 }
 
 // Compact path dates: /20261101/ (news.cn) and /2026/1101/ (people.com.cn), not inside longer numbers.
@@ -163,7 +205,7 @@ export function urlDate(url: string): string {
 	}
 	// Separated forms, as in text.
 	const m = DATE_RE.exec(path);
-	if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+	if (m) return day(m[1], m[2], m[3]);
 	// Compact forms.
 	const c = COMPACT_DATE_RE.exec(path);
 	// The date or nothing.
@@ -185,8 +227,13 @@ export function cleanWebText(text: string): string {
 /** How much of a snippet is searched for its date. */
 const DATE_CHARS = 300;
 
-/** Clean a backend's raw results: everything stays except hosts the user blocked and repeats; dates are filled in. */
-export function normalizeResults(raw: readonly SearchResult[], blocklist: readonly string[]): SearchResult[] {
+/** Clean a backend's raw results: everything stays except hosts the user blocked and repeats; dates become days. */
+export function normalizeResults(
+	raw: readonly SearchResult[],
+	blocklist: readonly string[],
+	// The moment of the search, for ages such as 9小时前.
+	now: number = Date.now(),
+): SearchResult[] {
 	// Kept results.
 	const out: SearchResult[] = [];
 	// URLs already kept (without the fragment).
@@ -206,7 +253,7 @@ export function normalizeResults(raw: readonly SearchResult[], blocklist: readon
 			url: r.url,
 			snippet,
 			// The head of the text only: further in, a date is about something else.
-			date: r.date || findDate(`${r.title} ${snippet.slice(0, DATE_CHARS)}`) || urlDate(r.url),
+			date: r.date || dayOf(`${r.title} ${snippet.slice(0, DATE_CHARS)}`, now) || urlDate(r.url),
 		});
 	}
 	// The results.

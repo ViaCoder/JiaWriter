@@ -16,7 +16,7 @@ import { bridgeAddress } from "../browser/bridge.ts";
 // Output messages.
 import { t } from "../i18n/index.ts";
 // Shared types.
-import { type FetchResult, findDate, type SearchConfig, type SearchResult, urlDate } from "./core.ts";
+import { type FetchResult, pageDate, type SearchConfig, type SearchResult } from "./core.ts";
 
 /** Result of one sf run. */
 export interface SfRun {
@@ -211,5 +211,5 @@ export function parseSfFetch(stdout: string, url: string): FetchResult {
 	// Final address.
 	const final = data.final_url || url;
 	// Common shape; the date from the text, else from the address.
-	return { url: final, title: "", content, date: findDate(content.slice(0, 200)) || urlDate(final) };
+	return { url: final, title: "", content, date: pageDate(content, final, 200) };
 }
