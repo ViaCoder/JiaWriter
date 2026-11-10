@@ -27,6 +27,15 @@ describe("citationIssues", () => {
 				form: "2021年6月7日《国务院关于长江流域生态环境保护工作情况的报告》",
 			},
 		]);
+		// With the word for the text between title and date (2026-11-10, a research report).
+		expect(
+			citationIssues("据大河财立方《低空经济产业发展的政策演进与实践案例》一文（2025年4月9日）梳理，……"),
+		).toEqual([
+			{
+				quote: "《低空经济产业发展的政策演进与实践案例》一文（2025年4月9日）",
+				form: "2025年4月9日《低空经济产业发展的政策演进与实践案例》一文",
+			},
+		]);
 	});
 	it("leaves dates that cite nothing alone", () => {
 		const plain = [

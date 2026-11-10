@@ -104,9 +104,13 @@ export function citationIssues(text: string): CitationIssue[] {
 	// Book-title marks with a date that has no year: 11月7日《路透社》报道.
 	for (const m of text.matchAll(/(?<!\d{4}年)(?<![\d年])(\d{1,2}月\d{1,2}日)《([^》\n]{1,40})》/g))
 		issues.push({ quote: m[0], form: `YYYY年${m[1]}《${m[2]}》` });
-	// The date after the title, in brackets: 《报告》（2021年6月7日）.
-	for (const m of text.matchAll(/《([^》\n]{2,60})》[（(]\s*(\d{4}年\d{1,2}月\d{1,2}日)\s*[）)]/g))
-		issues.push({ quote: m[0], form: `${m[2]}《${m[1]}》` });
+	// The date after the title, in brackets: 《报告》（2021年6月7日）, also with the word for the text between them:
+	// 《……》一文（2025年4月9日）, 《……》报道（2025年12月3日） (2026-11-10, a research report; none in 1,575 published
+	// texts).
+	for (const m of text.matchAll(
+		/《([^》\n]{2,60})》(一文|报道|文章|刊文)?[（(]\s*(\d{4}年\d{1,2}月\d{1,2}日)\s*[）)]/g,
+	))
+		issues.push({ quote: m[0], form: `${m[3]}《${m[1]}》${m[2] ?? ""}` });
 	// In the order they come in the text; a form that still has to be given its date or day is undated.
 	return issues
 		.map((issue) => [text.indexOf(issue.quote), issue] as const)
