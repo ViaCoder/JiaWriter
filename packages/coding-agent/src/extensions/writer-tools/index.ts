@@ -198,7 +198,13 @@ export function materialsNameSources(file: string, cwd: string): boolean {
  */
 export function lacksReferences(text: string, file: string, cwd: string): boolean {
 	if (REFERENCES_HEADING.test(text)) return false;
-	if (!/《[^》\n]{1,20}》报道|据[^，。\n]{1,12}(?:社|报|网|台)|https?:\/\//.test(text)) return false;
+	// An outlet in brackets counts too: （路透社） (2026-11-10, a brief with no reference list).
+	if (
+		!/《[^》\n]{1,20}》报道|据[^，。\n]{1,12}(?:社|报|网|台)|[（(][^）)\n]{1,10}(?:社|报|网|台)[^）)\n]{0,14}[）)]|https?:\/\//.test(
+			text,
+		)
+	)
+		return false;
 	const filled = (dir: string) => existsSync(dir) && readdirSync(dir).some((name) => !name.startsWith("."));
 	return draftFolders(file, cwd).some((dir) => [join(dir, TOPIC_DIRS.search), join(dir, TOPIC_DIRS.web)].some(filled));
 }
@@ -241,6 +247,20 @@ export function unusedMaterials(text: string, file: string, cwd: string): string
 // 进行实地调研, 赴……调研, 调研组.
 const METHOD_WORDS =
 	/调研组|(?:进行|开展|组织)了?(?:专题|深入|实地)?调研|赴[^，。\n]{1,10}调研|实地走访|入户走访|走访了|座谈|问卷|抽样调查|调研了解到|调研发现|实地察看/g;
+
+/**
+ * What the semantic review reads beside a draft: 素材.md, where each fact stands with its source, and the user's imported
+ * references; not the saved searches and pages, which made one review of a research brief take 498 s (2026-11-10).
+ */
+export function reviewMaterialText(file: string, cwd: string): string {
+	const texts: string[] = [];
+	for (const dir of draftFolders(file, cwd)) {
+		const material = join(dir, MATERIAL_FILE);
+		if (existsSync(material)) texts.push(readFileSync(material, "utf-8"));
+		for (const path of parsedFiles(dir)) texts.push(readFileSync(path, "utf-8"));
+	}
+	return texts.join("\n");
+}
 
 /** Every text of the materials beside a draft: 素材.md, imported references, saved searches and pages. */
 export function materialText(file: string, cwd: string): string {
@@ -385,23 +405,50 @@ export function ownFindings(
 export type Complete = typeof completeSimple;
 
 /** A way to ask the session's model one question with its own credentials; undefined without a model or with JW_REVIEW=off. */
+/** Reasoning tokens a review may use: with 4,096 it caught the same 5 of 5 seeded faults, its median fell from 108 to
+ * 23 s and its longest from 719 to 124 s (2026-11-10; one review of a 400-character brief had waited 607 s). */
+export const REVIEW_REASONING_TOKENS = 4096;
+/** Longest wait for one review: past it the draft goes on without one. */
+export const REVIEW_TIMEOUT_MS = 180_000;
+
+/** The request body with the review's reasoning budget, in OpenRouter's form (other APIs keep theirs). */
+export function withReviewBudget(payload: unknown): unknown {
+	if (!payload || typeof payload !== "object") return payload;
+	return { ...(payload as Record<string, unknown>), reasoning: { max_tokens: REVIEW_REASONING_TOKENS } };
+}
+
 export function modelAsker(
 	ctx: ExtensionContext,
 	complete: Complete = completeSimple,
 ): ((instructions: string, text: string) => Promise<string>) | undefined {
 	const model = ctx.model;
 	if (!model || !reviewEnabled()) return undefined;
+	// The budget goes to OpenAI-style requests until an upstream refuses it.
+	let budget = model.api === "openai-completions";
 	return async (instructions, text) => {
 		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
 		if (!auth.ok) throw new Error(auth.error);
 		// The same address and keys the conversation uses.
 		const target: Model<Api> = { ...model, baseUrl: auth.baseUrl ?? model.baseUrl };
-		const reply = await complete(
-			target,
-			{ systemPrompt: instructions, messages: [{ role: "user", content: text, timestamp: Date.now() }] },
-			{ apiKey: auth.apiKey, headers: auth.headers },
-		);
-		if (reply.stopReason === "error") throw new Error(reply.errorMessage ?? "review failed");
+		const ask = (capped: boolean) =>
+			complete(
+				target,
+				{ systemPrompt: instructions, messages: [{ role: "user", content: text, timestamp: Date.now() }] },
+				{
+					apiKey: auth.apiKey,
+					headers: auth.headers,
+					signal: AbortSignal.timeout(REVIEW_TIMEOUT_MS),
+					...(capped ? { onPayload: withReviewBudget } : {}),
+				},
+			);
+		let reply = await ask(budget);
+		// An upstream that does not take the budget: once more without it, and never again in this run.
+		if (reply.stopReason === "error" && budget) {
+			budget = false;
+			reply = await ask(false);
+		}
+		if (reply.stopReason === "error" || reply.stopReason === "aborted")
+			throw new Error(reply.errorMessage ?? "review failed");
 		return reply.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("");
 	};
 }
@@ -511,7 +558,10 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			const mustFix = revision ? check.mustFix && checkLines.length > 0 : check.mustFix;
 			// Findings that ask for facts only where there are materials to take them from; the review reads them too.
 			const materials = hasMaterials(file, ctx.cwd);
-			const found = ask ? await reviewDraft(text, ask, materials ? materialText(file, ctx.cwd) : "") : undefined;
+			const given = materials ? reviewMaterialText(file, ctx.cwd) : "";
+			const reviewed = ask ? await reviewDraft(text, ask, given) : undefined;
+			// An unfounded inference is judged against what the review read: with no record of facts it is a guess.
+			const found = given.trim() ? reviewed : reviewed?.filter((issue) => issue.category !== "unfounded-inference");
 			const answerable = found && keepAnswerable(found, materials);
 			const issues = answerable && revision ? inChanged(answerable, changed) : answerable;
 			// What the program itself sees; a length far from the one asked is the whole document's, so it counts in a

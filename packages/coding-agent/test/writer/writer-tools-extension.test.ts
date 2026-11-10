@@ -34,10 +34,14 @@ import writerToolsExtension, {
 	modelAsker,
 	outlineOpen,
 	ownFindings,
+	REVIEW_REASONING_TOKENS,
+	REVIEW_TIMEOUT_MS,
 	referenceTitles,
 	requestedLength,
+	reviewMaterialText,
 	shownRound,
 	unusedMaterials,
+	withReviewBudget,
 } from "../../src/extensions/writer-tools/index.ts";
 // The semantic review line the automatic check ends with.
 import { STYLE_REVIEW } from "../../src/writer/prompts/manuals.ts";
@@ -196,6 +200,32 @@ describe("modelAsker", () => {
 			context: { systemPrompt: "说明", messages: [{ role: "user", content: "正文" }] },
 			options: { apiKey: "sk-test-review", headers: { "x-a": "1" } },
 		});
+	});
+	it("caps the review's reasoning, with a time limit, and drops the cap when the upstream refuses it", async () => {
+		// 2026-11-10: one review of a short brief waited 607 s; with the cap the median was 23 s.
+		const seen: { options: { onPayload?: (p: unknown) => unknown; signal?: AbortSignal } }[] = [];
+		let calls = 0;
+		const refusing = (async (_model: unknown, _context: unknown, options: never) => {
+			seen.push({ options });
+			calls++;
+			return calls === 1
+				? { role: "assistant", content: [], stopReason: "error", errorMessage: "400 unknown field reasoning" }
+				: { role: "assistant", content: [{ type: "text", text: "答复" }], stopReason: "stop" };
+		}) as unknown as Complete;
+		const ask = modelAsker(reviewCtx() as never, refusing);
+		expect(await ask?.("说明", "正文")).toBe("答复");
+		// The first request carried the budget, the second did not; both had the time limit.
+		expect(seen[0].options.onPayload?.({ model: "m1" })).toEqual({
+			model: "m1",
+			reasoning: { max_tokens: REVIEW_REASONING_TOKENS },
+		});
+		expect(seen[1].options.onPayload).toBeUndefined();
+		expect(seen.every((x) => x.options.signal instanceof AbortSignal)).toBe(true);
+		// Later reviews in the run go without it.
+		await ask?.("说明", "正文");
+		expect(seen[2].options.onPayload).toBeUndefined();
+		expect(withReviewBudget("x")).toBe("x");
+		expect(REVIEW_TIMEOUT_MS).toBe(180_000);
 	});
 	it("is not there without a model, or with JW_REVIEW=off", () => {
 		expect(modelAsker({ cwd } as never)).toBeUndefined();
@@ -380,6 +410,20 @@ describe("materialText", () => {
 		const text = materialText(join(topic, "稿件", "稿.md"), cwd);
 		expect([text.includes("素材一条"), text.includes("检索一页")]).toEqual([true, true]);
 		expect(materialText(join(cwd, "别处", "稿.md"), cwd)).toBe("");
+	});
+});
+
+describe("reviewMaterialText", () => {
+	it("gives the review 素材.md and the references, not the saved searches and pages", () => {
+		// 2026-11-10: with the whole archive one review of a research brief took 498 s.
+		const topic = join(cwd, "20261110-材料");
+		mkdirSync(join(topic, "稿件"), { recursive: true });
+		mkdirSync(join(topic, "检索"), { recursive: true });
+		writeFileSync(join(topic, "素材.md"), "素材一条");
+		writeFileSync(join(topic, "检索", "001-结果.md"), "检索一页");
+		const text = reviewMaterialText(join(topic, "稿件", "稿.md"), cwd);
+		expect([text.includes("素材一条"), text.includes("检索一页")]).toEqual([true, false]);
+		expect(reviewMaterialText(join(cwd, "别处", "稿.md"), cwd)).toBe("");
 	});
 });
 
