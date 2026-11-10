@@ -1,6 +1,6 @@
 // The form of citations (src/writer/style/citation.ts): xx年xx月xx日《xx》报道 (the user, 2026-11-08).
 import { describe, expect, it } from "vitest";
-import { citationIssues, formatCitationIssues } from "../../src/writer/style/citation.ts";
+import { citationIssues, formatCitationIssues, numberedCitations } from "../../src/writer/style/citation.ts";
 
 describe("citationIssues", () => {
 	it("passes the forms the user asked for", () => {
@@ -137,5 +137,23 @@ describe("citationIssues: 《outlet》刊发", () => {
 		]);
 		expect(citationIssues("2026年7月3日《21世纪经济报道》刊发的文章披露，广东企业超1.5万家。")).toEqual([]);
 		expect(citationIssues("《关于促进低空经济发展的意见》发表后，各地相继出台措施。")).toEqual([]);
+	});
+});
+
+describe("numberedCitations", () => {
+	it("finds a report's citations by number, not a paper's in GB/T 7714 or the user's form", () => {
+		// A research report of 2026-11-10: numbers in the text, web pages in the references.
+		const report =
+			"# 我国低空经济发展研究报告\n\n据中国民航局预测，市场规模将达1.5万亿元[1]。标准规范仍不统一[6][7]。\n\n## 参考文献\n\n[1] [逐空而上，新华网，2025-12-22](https://www.news.cn/x.html)\n";
+		expect(numberedCitations(report)).toEqual([
+			"据中国民航局预测，市场规模将达1.5万亿元[1]",
+			"标准规范仍不统一[6][7]",
+		]);
+		// An academic paper: its references are GB/T 7714.
+		const paper =
+			"# 论文\n\n已有研究指出[1]。\n\n## 参考文献\n\n[1] 张三. 低空经济研究[J]. 经济研究, 2025(3): 1-10.\n";
+		expect(numberedCitations(paper)).toEqual([]);
+		// The user's form.
+		expect(numberedCitations("# 报告\n\n据2025年12月22日《新华网》报道，规模达1.5万亿元。\n")).toEqual([]);
 	});
 });

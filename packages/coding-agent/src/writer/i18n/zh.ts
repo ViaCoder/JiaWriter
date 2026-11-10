@@ -65,6 +65,8 @@ export const zh = {
 	"style.placeholders": "不要留待核实、待补的标记：材料里有的写上，没有的删去这一处（{marks}）。",
 	"style.citation":
 		"引用格式不符 {count} 处，报道写成 2026年10月31日《路透社》报道，文件写成 2021年6月7日《文件名》：",
+	"style.numberedCitation":
+		"正文用编号引用 {count} 处：改成 2026年10月31日《路透社》报道 的写法（日期用素材的报道日期，没有就不写），文末参考文献保留：",
 	"style.citationUndated":
 		"引用没有日期 {count} 处：来源给出日期的，照来源补成 2026年10月31日《路透社》报道；来源没有日期的保持原样，不要编日期：",
 	"style.noCitation":

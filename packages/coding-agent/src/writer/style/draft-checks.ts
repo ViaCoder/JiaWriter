@@ -9,7 +9,7 @@ import { t } from "../i18n/index.ts";
 // The register of a text.
 import type { StyleRegister } from "./check.ts";
 // Citation form.
-import { citationIssues, formatCitationIssues } from "./citation.ts";
+import { citationIssues, formatCitationIssues, numberedCitations } from "./citation.ts";
 // Heading numbers and in-text ordinals.
 import { headingIssues, listMarkers } from "./numbering.ts";
 // Paragraph shape and repeated material.
@@ -115,6 +115,17 @@ export const DRAFT_CHECKS: readonly DraftCheck[] = [
 		run: (text) => {
 			const found = repeatedFigures(text);
 			return found.length === 0 ? NONE : { fail: [t("style.repeated", { figures: found.join("、") })], note: [] };
+		},
+	},
+	{
+		// A report that cites by number instead of 2026年10月31日《路透社》报道 (the user, 2026-11-08).
+		id: "numbered-citation",
+		when: (register) => register === "report",
+		run: (text) => {
+			const found = numberedCitations(text);
+			return found.length === 0
+				? NONE
+				: { fail: [quoted(t("style.numberedCitation", { count: found.length }), found)], note: [] };
 		},
 	},
 	{

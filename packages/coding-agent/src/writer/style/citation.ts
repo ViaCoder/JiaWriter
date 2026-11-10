@@ -114,6 +114,19 @@ export function citationIssues(text: string): CitationIssue[] {
 		.map(([, issue]) => (/MM月DD日|DD日/.test(issue.form) ? { ...issue, undated: true } : issue));
 }
 
+/**
+ * Sentences of the body that cite by number ([3], [6][7]) where the user's form names the date and the outlet (2 of 18
+ * research reports until 2026-11-10 did so throughout). None when the references are in GB/T 7714 form ([J], [M],
+ * [EB/OL]), as an academic paper's are.
+ */
+export function numberedCitations(text: string): string[] {
+	const body = bodyBeforeReferences(text);
+	const references = text.slice(body.length);
+	if (/\[(?:J|M|D|C|N|R|S|P|EB\/OL|DB\/OL)\]/.test(references)) return [];
+	// The words before each run of numbers, up to the start of their sentence.
+	return [...body.matchAll(/[^。！？\n]{0,24}(?:\[\d{1,3}\])+/g)].map((m) => m[0].trim());
+}
+
 /** The issues as lines the drafting model works through. */
 export function formatCitationIssues(issues: readonly CitationIssue[]): string {
 	return issues.map((i) => `- “${i.quote}” → ${i.form}`).join("\n");

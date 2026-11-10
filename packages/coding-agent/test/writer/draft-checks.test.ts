@@ -28,6 +28,7 @@ describe("runDraftChecks", () => {
 			"placeholders",
 			"ascii-quotes",
 			"repeated",
+			"numbered-citation",
 			"evidence-first",
 			"unsupported",
 		]);
