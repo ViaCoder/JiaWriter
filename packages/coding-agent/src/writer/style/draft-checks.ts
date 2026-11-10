@@ -9,7 +9,7 @@ import { t } from "../i18n/index.ts";
 // The register of a text.
 import type { StyleRegister } from "./check.ts";
 // Citation form.
-import { citationIssues, formatCitationIssues, numberedCitations } from "./citation.ts";
+import { citationIssues, formatCitationIssues, incompleteReferences, numberedCitations } from "./citation.ts";
 // Heading numbers and in-text ordinals.
 import { headingIssues, listMarkers } from "./numbering.ts";
 // Paragraph shape and repeated material.
@@ -119,13 +119,31 @@ export const DRAFT_CHECKS: readonly DraftCheck[] = [
 	},
 	{
 		// A report that cites by number instead of 2026年10月31日《路透社》报道 (the user, 2026-11-08).
+		// Every register: a brief with web references cited [1]…[9] beside the user's form (2026-11-10); a paper in GB/T 7714
+		// is left out by numberedCitations itself.
 		id: "numbered-citation",
-		when: (register) => register === "report",
+		when: ALL,
 		run: (text) => {
 			const found = numberedCitations(text);
 			return found.length === 0
 				? NONE
 				: { fail: [quoted(t("style.numberedCitation", { count: found.length }), found)], note: [] };
+		},
+	},
+	{
+		// Reference entries without the title, publisher or date of [page title, publisher, date](URL): a note.
+		id: "reference-form",
+		when: ALL,
+		run: (text) => {
+			const found = incompleteReferences(text);
+			return found.length === 0
+				? NONE
+				: {
+						fail: [],
+						note: [
+							`${t("style.referenceForm", { count: found.length })}\n${found.map((s) => `- ${s}`).join("\n")}`,
+						],
+					};
 		},
 	},
 	{

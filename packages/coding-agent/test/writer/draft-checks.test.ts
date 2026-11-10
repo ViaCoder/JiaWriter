@@ -29,6 +29,7 @@ describe("runDraftChecks", () => {
 			"ascii-quotes",
 			"repeated",
 			"numbered-citation",
+			"reference-form",
 			"evidence-first",
 			"unsupported",
 		]);

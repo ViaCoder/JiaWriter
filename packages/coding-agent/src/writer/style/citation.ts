@@ -63,6 +63,16 @@ export function citationIssues(text: string): CitationIssue[] {
 		if (GENERIC.test(name)) continue;
 		issues.push({ quote, form: `YYYY年MM月DD日《${name}》${m[2]}` });
 	}
+	// An outlet with words before its 报道 and no date: 美联社市场综述也报道了这一跌幅 (2026-11-10, a research brief; 4
+	// such phrases in 1,575 published texts, two of them real citations).
+	// Only names that end as outlets do, not in 新闻 or a bare 报 (通过新闻媒体报道, 美报刊上报道).
+	const named = "[\\u4e00-\\u9fa5A-Za-z]{1,12}?(?:通讯社|电视台|新闻社|日报|晚报|时报|社|网|台)";
+	for (const m of body.matchAll(
+		new RegExp(`(?<![《\\u4e00-\\u9fa5\\d])(${named})[^，,。；《》\\n\\d]{1,8}?报道`, "g"),
+	)) {
+		if (GENERIC.test(m[1])) continue;
+		issues.push({ quote: m[0], form: `YYYY年MM月DD日《${m[1]}》报道` });
+	}
 	// Forms found by the patterns below, with where they start.
 	const found: [number, CitationIssue][] = [];
 	// The outlet before the date: 据路透社2026年11月6日报道 / 彭博社11月7日调查显示 (2026-11-09, a research brief).
@@ -85,6 +95,20 @@ export function citationIssues(text: string): CitationIssue[] {
 		found.push([m.index ?? 0, { quote: m[0], form: `${date}《${m[1]}》报道` }]);
 	}
 	issues.push(...found.map(([, issue]) => issue));
+	// An outlet alone in brackets, or with words the bracket rule above does not take: （路透社）, （路透社11月6日周度报道）
+	// (2026-11-10, a research brief). The bracket holds the outlet and at most a date or a word for the report; 简称 and
+	// 含 open other brackets (（以下简称人教社）, （含合流制管网）): none left in 1,575 published texts.
+	for (const m of body.matchAll(new RegExp(`[（(]\\s*(${OUTLET})([^）)\\n《》]{0,14})[）)]`, "g"))) {
+		const [quote, name, rest] = [m[0], m[1], m[2]];
+		if (GENERIC.test(name) || /^(?:以下简称|简称|含|包括|如|即)/.test(name)) continue;
+		const date = /^[，,、\s]*((?:\d{4}年)?\d{1,2}月\d{1,2}日)(.*)$/.exec(rest);
+		// A date and nothing after it is the bracket rule's.
+		if (date && !date[2].trim()) continue;
+		if (date)
+			issues.push({ quote, form: `${FULL_DATE.test(date[1]) ? date[1] : `YYYY年${date[1]}`}《${name}》报道` });
+		else if (!rest.trim() || /(?:报道|消息)$/.test(rest))
+			issues.push({ quote, form: `YYYY年MM月DD日《${name}》报道` });
+	}
 	// A source in brackets with no date at all: （来源：央广网援引中汽协） (2026-11-09).
 	for (const m of text.matchAll(/[（(]\s*来源[:：]\s*([^（）()\n]{1,40}?)\s*[）)]/g))
 		if (!/\d{1,2}月\d{1,2}日/.test(m[1]))
@@ -136,6 +160,17 @@ export function numberedCitations(text: string): string[] {
 	if (/\[(?:J|M|D|C|N|R|S|P|EB\/OL|DB\/OL)\]/.test(references)) return [];
 	// The words before each run of numbers, up to the start of their sentence.
 	return [...body.matchAll(/[^。！？\n]{0,24}(?:\[\d{1,3}\])+/g)].map((m) => m[0].trim());
+}
+
+/**
+ * Reference entries whose link text lacks the title, publisher or date of the user's form [page title, publisher,
+ * date](URL): [Reuters, 2026-11-03](…) gives no title (2026-11-10, a research brief: six of nine entries).
+ */
+export function incompleteReferences(text: string): string[] {
+	const references = text.slice(bodyBeforeReferences(text).length);
+	return [...references.matchAll(/^\s*(?:\d+[.．、]\s*|[-*]\s*)?\[([^\]\n]+)\]\((https?:[^)\s]+)\)/gm)]
+		.filter((m) => m[1].split(/[,，]/).filter((part) => part.trim()).length < 3)
+		.map((m) => `[${m[1]}]`);
 }
 
 /** The issues as lines the drafting model works through. */

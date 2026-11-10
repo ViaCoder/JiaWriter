@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	citationIssues,
 	formatCitationIssues,
+	incompleteReferences,
 	isOutletName,
 	numberedCitations,
 } from "../../src/writer/style/citation.ts";
@@ -178,5 +179,50 @@ describe("isOutletName", () => {
 			expect(isOutletName(name)).toBe(true);
 		for (const name of ["低空经济数据治理研究报告", "低空经济及其核心产业统计分类（试行）", "相关报道"])
 			expect(isOutletName(name)).toBe(false);
+	});
+});
+
+describe("citationIssues: an outlet with words before 报道", () => {
+	it("asks for the date and book-title marks, and leaves generic words alone", () => {
+		expect(citationIssues("布伦特结算价大跌5.85%，美联社市场综述也报道了这一跌幅。")).toEqual([
+			{ quote: "美联社市场综述也报道", form: "YYYY年MM月DD日《美联社》报道", undated: true },
+		]);
+		expect(citationIssues("通过新闻媒体报道、召开座谈会等方式开展警示教育。")).toEqual([]);
+		expect(citationIssues("据2026年11月10日《美联社》报道，油价回落。")).toEqual([]);
+	});
+});
+
+describe("citationIssues: an outlet in brackets", () => {
+	it("asks for the user's form, and leaves brackets that name no source alone", () => {
+		// 2026-11-10, a research brief.
+		expect(citationIssues("布伦特收于每桶103.60美元（路透社）。")).toEqual([
+			{ quote: "（路透社）", form: "YYYY年MM月DD日《路透社》报道", undated: true },
+		]);
+		expect(citationIssues("油价单日下跌8%（路透社11月6日周度报道）。")).toEqual([
+			{ quote: "（路透社11月6日周度报道）", form: "YYYY年11月6日《路透社》报道" },
+		]);
+		for (const text of [
+			"实物商品网上零售额（实物商品网上零售额）增长。",
+			"人民教育出版社（以下简称人教社）出版。",
+			"管网改造（含合流制管网）完成。",
+		])
+			expect(citationIssues(text)).toEqual([]);
+	});
+});
+
+describe("incompleteReferences", () => {
+	it("finds entries without title, publisher and date, in any list form", () => {
+		// 2026-11-10, a research brief: six of nine entries gave no title.
+		const text = [
+			"正文。",
+			"",
+			"参考文献",
+			"",
+			"[Reuters, 2026-11-03](https://www.reuters.com/a-2026-11-03/)",
+			"1. [Oil falls as Trump downplays escalation, Reuters, 2026-11-10](https://www.reuters.com/b/)",
+			"- [AP, 2026-11-05](https://apnews.com/article/c)",
+		].join("\n");
+		expect(incompleteReferences(text)).toEqual(["[Reuters, 2026-11-03]", "[AP, 2026-11-05]"]);
+		expect(incompleteReferences("正文，无参考文献。")).toEqual([]);
 	});
 });

@@ -77,6 +77,8 @@ export const en: Record<MessageKey, string> = {
 		"{count} citations in another form; write reports as 2026年10月31日《路透社》报道 and files as 2021年6月7日《文件名》:",
 	"style.numberedCitation":
 		"{count} citations by number in the text: write them as 2026年10月31日《路透社》报道 (the material's 报道日期, none when it has none), keeping the references:",
+	"style.referenceForm":
+		"{count} reference entries lack the title, publisher or date: write each as [page title, publisher, date](URL), the title as the search result or page gives it:",
 	"style.citationUndated":
 		"{count} citations without a date: give the date the source gives, as 2026年10月31日《路透社》报道; leave those whose source has none as they are, never invent one:",
 	"style.noCitation":
