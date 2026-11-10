@@ -490,8 +490,9 @@ describe("AgentSession compaction characterization", () => {
 			const observedSettings: unknown[] = [];
 			const harness = await createHarness({
 				// JiaWriter: room for its longer system prompt between the threshold (window - 400) and the window, so the
-				// oversized result still compacts on the threshold rather than on overflow.
-				models: [{ id: "faux-1", contextWindow: 2800, maxTokens: 100 }],
+				// oversized result still compacts on the threshold rather than on overflow. 3000 since 2026-11-10: with the
+				// rule on how replies read, 2800 failed in 1 to 2 of 3 runs here and twice in CI; 3000 passed 5 of 5.
+				models: [{ id: "faux-1", contextWindow: 3000, maxTokens: 100 }],
 				settings: {
 					compaction: modelOverride
 						? {
