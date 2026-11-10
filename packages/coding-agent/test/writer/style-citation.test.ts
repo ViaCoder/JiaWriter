@@ -226,3 +226,15 @@ describe("incompleteReferences", () => {
 		expect(incompleteReferences("正文，无参考文献。")).toEqual([]);
 	});
 });
+
+describe("citationIssues: a body cited as an outlet", () => {
+	it("asks for the title of what the body put out", () => {
+		// 2026-11-10: a brief cited a city's press release as 《奥斯汀市政府》报道.
+		expect(citationIssues("据2025年8月14日《奥斯汀市政府》报道，预算总额63亿美元。")).toEqual([
+			{ quote: "2025年8月14日《奥斯汀市政府》报道", form: "2025年8月14日《奥斯汀市政府发布的文件或新闻稿的标题》" },
+		]);
+		expect(citationIssues("据2025年8月14日《奥斯汀市议会通过2025-2026财年63亿美元预算》，总额63亿美元。")).toEqual(
+			[],
+		);
+	});
+});

@@ -129,6 +129,13 @@ export function citationIssues(text: string): CitationIssue[] {
 		if (/\d{1,2}月\d{1,2}日[，,、\s]{0,2}$/.test(body.slice(Math.max(0, at - 14), at))) continue;
 		issues.push({ quote: m[0], form: `YYYY年MM月DD日《${m[1]}》${m[2]}` });
 	}
+	// A body in book-title marks as if it were an outlet: 2025年8月14日《奥斯汀市政府》报道 (2026-11-10, a research
+	// brief citing a press release). What a government or agency puts out is cited by its title, as a file is; none of
+	// these in 1,575 published texts.
+	for (const m of text.matchAll(
+		/((?:\d{4}年)?\d{1,2}月\d{1,2}日)《([^》\n]{2,20}(?:政府|局|委员会|委|部|厅|办公室|办|议会|署|院))》(报道|发布|称)/g,
+	))
+		issues.push({ quote: m[0], form: `${m[1]}《${m[2]}发布的文件或新闻稿的标题》` });
 	// A year and month with no day before book-title marks: 2025年5月《中国民航报》 (2026-11-09, a research report).
 	for (const m of text.matchAll(/(\d{4}年\d{1,2}月)(?!\d)《([^》\n]{1,40})》/g))
 		issues.push({ quote: m[0], form: `${m[1]}DD日《${m[2]}》` });
