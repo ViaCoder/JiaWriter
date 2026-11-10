@@ -185,11 +185,15 @@ def main():
         shown = wait_screen(fd, r"Shift\+Tab 切换", 30)
         check("状态栏写出工作模式和切换键", re.search(r"(自动|手动确认|全部放行)（Shift\+Tab 切换）", shown))
         check("状态栏默认不显示 token 统计", "↑" not in shown.split("\n")[-1])
-        # Shift+Tab: auto → plan → manual → auto.
+        # Shift+Tab: auto → plan → manual → auto. The status line is drawn before keys are read: a press at once was
+        # lost on a loaded machine (2026-11-10, the modes came one step late), so the program settles first.
+        pump(fd, 2)
         modes = []
-        for _ in range(3):
+        # Each press waits for the mode it should reach: the label is on screen before the redraw too (2026-11-10: a
+        # loaded machine read the old mode once).
+        for expected in ("规划模式", "手动确认", "自动"):
             press(fd, SHIFT_TAB)
-            modes.append(re.findall(r"(自动|手动确认|规划模式|全部放行)（Shift\+Tab 切换）", wait_screen(fd, r"（Shift\+Tab 切换）", 4)))
+            modes.append(re.findall(r"(自动|手动确认|规划模式|全部放行)（Shift\+Tab 切换）", wait_screen(fd, rf"{expected}（Shift\+Tab 切换）", 4)))
         check("Shift+Tab 依次切换 规划模式 → 手动确认 → 自动", [m[-1] if m else "" for m in modes] == ["规划模式", "手动确认", "自动"])
         # ? on an empty input: the shortcut list.
         press(fd, b"?", 1)
