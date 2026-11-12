@@ -6,6 +6,8 @@ import { afterEach, describe, expect, test, vi } from "vitest";
 import { APP_NAME } from "../../../src/config.ts";
 import type { SessionManager } from "../../../src/core/session-manager.ts";
 import { InteractiveMode } from "../../../src/modes/interactive/interactive-mode.ts";
+// JiaWriter: interface text in the interface language.
+import { uiText } from "../../../src/writer/ui-text.ts";
 
 // Regression for https://github.com/earendil-works/pi/issues/5080
 //
@@ -153,7 +155,8 @@ describe("InteractiveMode.shutdown ordering (#5080)", () => {
 
 		expect(order).toEqual(["drainInput", "stop", "dispose"]);
 		expect(stdoutWrite).toHaveBeenCalledWith(
-			`${chalk.dim("To resume this session:")} ${APP_NAME} --session test-session\n`,
+			// JiaWriter: the hint in the interface language.
+			`${chalk.dim(uiText("To resume this session:"))} ${APP_NAME} --session test-session\n`,
 		);
 	});
 
@@ -171,7 +174,7 @@ describe("InteractiveMode.shutdown ordering (#5080)", () => {
 		await callShutdown(context, { fromSignal: true });
 
 		for (const call of stdoutWrite.mock.calls) {
-			expect(call[0]).not.toContain("To resume this session:");
+			expect(call[0]).not.toContain(uiText("To resume this session:"));
 		}
 	});
 
