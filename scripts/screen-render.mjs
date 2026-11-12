@@ -35,6 +35,34 @@ term.write(readFileSync(file), () => {
 		coloured.push(count);
 		if (count > term.cols / 2) banded.push(i);
 	}
+	// With JW_SCREEN_CELLS set, also every cell with its colours and styles, for a picture of the screen
+	// (scripts/screen-png.py): fg and bg are -1 for the default, 0–255 for a palette colour, else 0xRRGGBB + 1<<24.
+	const cells = [];
+	if (process.env.JW_SCREEN_CELLS) {
+		for (let i = 0; i < term.rows; i++) {
+			const line = buffer.getLine(buffer.viewportY + i);
+			const row = [];
+			for (let x = 0; x < term.cols; x++) {
+				const c = line?.getCell(x);
+				if (!c) continue;
+				// xterm's colour modes: 0 default, 0x1000000 16 colours, 0x2000000 256 colours, 0x3000000 RGB.
+				const colour = (mode, value) => (mode === 0 ? -1 : mode === 0x3000000 ? value + (1 << 24) : value);
+				row.push({
+					ch: c.getChars(),
+					w: c.getWidth(),
+					fg: colour(c.getFgColorMode(), c.getFgColor()),
+					bg: colour(c.getBgColorMode(), c.getBgColor()),
+					b: c.isBold() ? 1 : 0,
+					d: c.isDim() ? 1 : 0,
+					i: c.isInverse() ? 1 : 0,
+					u: c.isUnderline() ? 1 : 0,
+				});
+			}
+			cells.push(row);
+		}
+	}
 	// Which buffer it is, then the lines.
-	process.stdout.write(`${JSON.stringify({ buffer: buffer.type, lines, ...(process.env.JW_SCREEN_BG ? { banded, coloured } : {}) })}\n`);
+	process.stdout.write(
+		`${JSON.stringify({ buffer: buffer.type, lines, ...(process.env.JW_SCREEN_BG ? { banded, coloured } : {}), ...(process.env.JW_SCREEN_CELLS ? { cells } : {}) })}\n`,
+	);
 });
