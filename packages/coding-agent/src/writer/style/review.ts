@@ -35,6 +35,7 @@ export const REVIEW_CATEGORIES = [
 	"weak-evidence",
 	"spoken-register",
 	"unfounded-inference",
+	"coined-term",
 ] as const;
 
 /** Most findings kept from one review, so a long draft's list stays readable. */
@@ -61,6 +62,7 @@ Categories, by id:
 - unsupported-method: fieldwork, visits, interviews, surveys or analysis the text claims but does not show (实地走访, 听取了……意见, 问卷显示, 调研发现 with no record of who, when or how many), the opening's account of how the research was done included.
 - weak-evidence: a case or figure that does not prove the point of its paragraph, proves a neighbouring point instead, or repeats material used elsewhere in the text.
 - spoken-register: in an official, report or academic register, a spoken or casual word where the written term exists, or a slogan made of matched or rhyming phrases standing in for a concrete measure or fact.
+- coined-term: an obscure, academic or newly coined term where an established plain one exists (价值重塑, 数智底座, 生态位, 势能), or a term of the writer's own making that a general reader would have to work out.
 - unfounded-inference: only when the writer's materials are given, a cause, motive, mechanism, condition or consequence in the writer's own analysis that no fact in the materials or the draft bears out, such as an actor, a practice or a reason the materials never mention. A step reasoned plainly from given facts is fine, and so are measures and recommendations.
 
 Rules:

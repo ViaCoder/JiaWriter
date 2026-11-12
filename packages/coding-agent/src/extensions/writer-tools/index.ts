@@ -5,7 +5,7 @@
  */
 
 // The drafts an automatic check reads, and the materials beside them.
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 // Walking from a draft up to the writing folder.
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 // One request to the session's model, for the semantic review.
@@ -22,6 +22,20 @@ import { resolveToCwd } from "../../core/tools/path-utils.ts";
 import { isDraftPath } from "../../writer/docs/auto.ts";
 // The imported references beside a draft.
 import { parsedFiles } from "../../writer/docs/import.ts";
+// One section written in a clean context.
+import {
+	cleanSectionText,
+	headingOf,
+	markOutline,
+	outlinePart,
+	outlineTitle,
+	SECTION_REASONING_TOKENS,
+	SECTION_TIMEOUT_MS,
+	sectionInstructions,
+	sectionMaterials,
+	sectionRequest,
+	spliceSection,
+} from "../../writer/draft/section.ts";
 // Reference entries the body never cites.
 import { uncitedReferences } from "../../writer/export/refs.ts";
 // The 公文 parameter check, run by the program at the end of a turn.
@@ -73,6 +87,8 @@ const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: 
 
 /** The outline of a long document, beside its drafts. */
 const OUTLINE_FILE = "大纲.md";
+/** Tools whose result changes a draft at input.path, which the program then checks. */
+const DRAFT_TOOLS: ReadonlySet<string> = new Set(["write", "edit", "draft_section"]);
 
 /** Automatic rounds of revision after one message of the user, so a draft that cannot be cleaned does not loop. */
 export const MAX_ROUNDS = 2;
@@ -411,18 +427,27 @@ export const REVIEW_REASONING_TOKENS = 4096;
 /** Longest wait for one review: past it the draft goes on without one. */
 export const REVIEW_TIMEOUT_MS = 180_000;
 
-/** The request body with the review's reasoning budget, in OpenRouter's form (other APIs keep theirs). */
-export function withReviewBudget(payload: unknown): unknown {
+/** The request body with a reasoning budget, in OpenRouter's form (other APIs keep theirs). */
+export function withReviewBudget(payload: unknown, tokens = REVIEW_REASONING_TOKENS): unknown {
 	if (!payload || typeof payload !== "object") return payload;
-	return { ...(payload as Record<string, unknown>), reasoning: { max_tokens: REVIEW_REASONING_TOKENS } };
+	return { ...(payload as Record<string, unknown>), reasoning: { max_tokens: tokens } };
+}
+
+/** How one clean request is bounded: its reasoning tokens and its longest wait. */
+export interface AskBudget {
+	reasoningTokens: number;
+	timeoutMs: number;
 }
 
 export function modelAsker(
 	ctx: ExtensionContext,
 	complete: Complete = completeSimple,
+	budgetOf: AskBudget = { reasoningTokens: REVIEW_REASONING_TOKENS, timeoutMs: REVIEW_TIMEOUT_MS },
+	// The review can be switched off (JW_REVIEW=off); a section must still be written.
+	always = false,
 ): ((instructions: string, text: string) => Promise<string>) | undefined {
 	const model = ctx.model;
-	if (!model || !reviewEnabled()) return undefined;
+	if (!model || (!always && !reviewEnabled())) return undefined;
 	// The budget goes to OpenAI-style requests until an upstream refuses it.
 	let budget = model.api === "openai-completions";
 	return async (instructions, text) => {
@@ -437,8 +462,10 @@ export function modelAsker(
 				{
 					apiKey: auth.apiKey,
 					headers: auth.headers,
-					signal: AbortSignal.timeout(REVIEW_TIMEOUT_MS),
-					...(capped ? { onPayload: withReviewBudget } : {}),
+					signal: AbortSignal.timeout(budgetOf.timeoutMs),
+					...(capped
+						? { onPayload: (payload: unknown) => withReviewBudget(payload, budgetOf.reasoningTokens) }
+						: {}),
 				},
 			);
 		let reply = await ask(budget);
@@ -506,7 +533,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	});
 	// The draft before its first change in this message.
 	pi.on("tool_call", (event, ctx) => {
-		if (event.toolName !== "write" && event.toolName !== "edit") return undefined;
+		if (!DRAFT_TOOLS.has(event.toolName)) return undefined;
 		const path = (event.input as { path?: unknown }).path;
 		const file = typeof path === "string" ? resolveToCwd(path, ctx.cwd) : "";
 		if (file && isDraftPath(file, ctx.cwd) && !before.has(file))
@@ -515,7 +542,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	});
 	// After each write or edit of a draft, the program checks it: the model never has to remember to.
 	pi.on("tool_result", (event, ctx) => {
-		if (event.isError || (event.toolName !== "write" && event.toolName !== "edit")) return;
+		if (event.isError || !DRAFT_TOOLS.has(event.toolName)) return;
 		const path = (event.input as { path?: unknown }).path;
 		const file = typeof path === "string" ? resolveToCwd(path, ctx.cwd) : "";
 		if (!file || !isDraftPath(file, ctx.cwd) || !existsSync(file)) return;
@@ -594,6 +621,91 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			},
 			{ deliverAs: "followUp", triggerTurn: true },
 		);
+	});
+
+	// draft_section: one section of a long document, written by the model in a context of its own (the writing rules,
+	// the outline, the section's material excerpts, the text so far), so that the research in this conversation does
+	// not colour it (the user, 2026-11-12).
+	pi.registerTool({
+		// Name the model calls.
+		name: "draft_section",
+		// Name shown in the interface.
+		label: "Draft section",
+		// Full description sent to the model.
+		description:
+			"Writes one section of a long document into its draft from 大纲.md beside it and its items in 素材.md, in a context free of this conversation, and ticks the outline line. Once per section, in order, after the outline.\n\nUsage:\n - section: the words of its line in 大纲.md\n - heading: its heading in the document (default: the line up to its colon; empty for none)\n - chars: about how long\n - notes: the user's requirements, in their words",
+		// Argument schema.
+		parameters: Type.Object({
+			path: Type.String({ description: "The draft file" }),
+			section: Type.String(),
+			heading: Type.Optional(Type.String()),
+			chars: Type.Optional(Type.Number()),
+			notes: Type.Optional(Type.String()),
+		}),
+		// Writes the draft and the outline.
+		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+		// Build the clean request, ask once, put the text in.
+		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const file = resolveToCwd(params.path, ctx.cwd);
+			// The outline beside the draft, else in a folder above it (2026-11-12: a run wrote it in the topic folder).
+			const outlineFile =
+				draftFolders(file, ctx.cwd)
+					.map((dir) => join(dir, OUTLINE_FILE))
+					.find((p) => existsSync(p)) ?? join(dirname(file), OUTLINE_FILE);
+			const fail = (text: string) => ({ content: [{ type: "text" as const, text }], details: {}, isError: true });
+			if (!existsSync(outlineFile)) return fail(t("draft.noOutline", { path: params.path }));
+			const outline = readFileSync(outlineFile, "utf-8");
+			const part = outlinePart(outline, params.section);
+			if (!part) return fail(t("draft.noSection", { section: params.section }));
+			const ask = modelAsker(
+				ctx,
+				complete,
+				{ reasoningTokens: SECTION_REASONING_TOKENS, timeoutMs: SECTION_TIMEOUT_MS },
+				true,
+			);
+			if (!ask) return fail(t("draft.noModel"));
+			const heading = headingOf(part.line, params.heading);
+			const previous = existsSync(file) ? readFileSync(file, "utf-8") : "";
+			// The section's excerpts from every 素材.md beside or above the draft.
+			const materials = draftFolders(file, ctx.cwd).flatMap((dir) => {
+				const material = join(dir, MATERIAL_FILE);
+				return existsSync(material) ? sectionMaterials(readFileSync(material, "utf-8"), part.line) : [];
+			});
+			const request = sectionRequest({
+				brief: part.brief,
+				outline,
+				line: part.line,
+				items: part.items,
+				heading,
+				materials,
+				previous: bodyBeforeReferences(previous),
+				chars: params.chars,
+				notes: params.notes,
+			});
+			let reply: string;
+			try {
+				reply = await ask(sectionInstructions(), request);
+			} catch (error) {
+				return fail(t("draft.failed", { reason: error instanceof Error ? error.message : String(error) }));
+			}
+			const text = cleanSectionText(reply, heading);
+			if (!text.trim()) return fail(t("draft.failed", { reason: "empty reply" }));
+			const draft = spliceSection(previous, heading, text, outlineTitle(outline));
+			mkdirSync(dirname(file), { recursive: true });
+			writeFileSync(file, draft);
+			writeFileSync(outlineFile, markOutline(outline, part.line));
+			const chars = countText(text).total;
+			const total = countText(bodyBeforeReferences(draft)).total;
+			return {
+				content: [
+					{
+						type: "text",
+						text: t("draft.written", { heading: heading || part.line, chars, path: params.path, total }),
+					},
+				],
+				details: { file, chars, total },
+			};
+		},
 	});
 
 	// style_check.

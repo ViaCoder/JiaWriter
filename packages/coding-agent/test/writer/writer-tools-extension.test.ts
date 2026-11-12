@@ -1,7 +1,7 @@
 // Unit tests for the built-in writer-tools extension (src/extensions/writer-tools/index.ts).
 
 // Temp working directory.
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
@@ -44,6 +44,7 @@ import writerToolsExtension, {
 	withReviewBudget,
 } from "../../src/extensions/writer-tools/index.ts";
 // The semantic review line the automatic check ends with.
+import { SECTION_REASONING_TOKENS } from "../../src/writer/draft/section.ts";
 import { STYLE_REVIEW } from "../../src/writer/prompts/manuals.ts";
 
 // Working directory of each test.
@@ -96,11 +97,14 @@ async function run(name: string, params: Record<string, unknown>) {
 }
 
 describe("writer-tools registration", () => {
-	it("registers three read-only tools with snippets and positive guidelines", () => {
+	it("registers three read-only tools with snippets and positive guidelines, and the section writer", () => {
 		// The tools.
 		const tools = registeredTools();
 		// Names.
-		expect([...tools.keys()]).toEqual(["style_check", "word_count", "readability_check"]);
+		expect([...tools.keys()]).toEqual(["draft_section", "style_check", "word_count", "readability_check"]);
+		// The section writer changes the draft.
+		expect(tools.get("draft_section")?.annotations?.readOnlyHint).toBe(false);
+		tools.delete("draft_section");
 		// Each tool.
 		for (const tool of tools.values()) {
 			// Shown in the tools section.
@@ -491,7 +495,7 @@ describe("materialsNameSources", () => {
 		const draft = join(topic, "稿件", "简报.md");
 		writeFileSync(
 			join(topic, "素材.md"),
-			"# 素材\n\n- 数据｜时间：2025年｜数值：5.2万人｜来源：《参考资料/材料.md》第1条\n",
+			"# 素材\n\n- 数据｜时间：2025年｜原文：“5.2万人”｜来源：《参考资料/材料.md》第1条\n",
 		);
 		expect(materialsNameSources(draft, cwd)).toBe(false);
 		writeFileSync(
@@ -782,5 +786,96 @@ describe("cutOffWithoutCalls", () => {
 		handlers.input({ text: "继续" }, {});
 		await handlers.agent_end(ended, { cwd: process.cwd() });
 		expect(sent.filter((m) => m.customType === "jiawriter-cut-resume").length).toBe(MAX_CUT_RESUMES + 1);
+	});
+});
+
+// One section written in a context of its own (the user, 2026-11-12: the research in the conversation colours the
+// writing, and more reasoning makes it worse).
+describe("draft_section", () => {
+	/** The outline and materials of a report, in a topic folder. */
+	function topic() {
+		const dir = join(cwd, "20261112-低空", "稿件");
+		mkdirSync(dir, { recursive: true });
+		writeFileSync(
+			join(dir, "大纲.md"),
+			"# 大纲：低空报告\n\n报告对象：公开报道，约600字。\n\n- [ ] 一、现状：规模增长\n  - 民航局预测1.5万亿元\n- [ ] 二、问题：法规滞后\n",
+		);
+		writeFileSync(
+			join(cwd, "20261112-低空", "素材.md"),
+			"# 素材\n\n- 【现状】数据｜时间：2025年12月22日｜原文：“2025年市场规模将达1.5万亿元。”｜来源：https://a.example/1\n- 【问题】案例｜主体：某市｜原文：“空域规则待完善。”｜来源：https://a.example/2\n",
+		);
+		return "20261112-低空/稿件/报告.md";
+	}
+	/** The tool with a model stand-in that records what it was asked and answers with text. */
+	function tool(answer: string | Error) {
+		const asked: { system: string; user: string; payload: unknown }[] = [];
+		const tools = new Map<string, ToolDefinition>();
+		const pi = {
+			registerTool: (t: ToolDefinition) => tools.set(t.name, t),
+			registerMessageRenderer: () => undefined,
+			on: () => undefined,
+		} as unknown as ExtensionAPI;
+		const complete = (async (
+			_model: unknown,
+			context: { systemPrompt: string; messages: { content: string }[] },
+			options: { onPayload?: (p: unknown) => unknown },
+		) => {
+			asked.push({
+				system: context.systemPrompt,
+				user: String(context.messages[0]?.content),
+				payload: options.onPayload?.({}),
+			});
+			if (answer instanceof Error)
+				return { role: "assistant", content: [], stopReason: "error", errorMessage: answer.message };
+			return { role: "assistant", content: [{ type: "text", text: answer }], stopReason: "stop" };
+		}) as unknown as Complete;
+		writerToolsExtension(pi, complete);
+		const ctx = {
+			cwd,
+			model: { api: "openai-completions", baseUrl: "https://x.example" },
+			modelRegistry: { getApiKeyAndHeaders: async () => ({ ok: true, apiKey: "k", headers: {} }) },
+		} as unknown as ExtensionToolContext;
+		const run = (params: Record<string, unknown>) =>
+			tools.get("draft_section")?.execute("c", params, undefined, undefined, ctx) as Promise<{
+				content: { text: string }[];
+				isError?: boolean;
+				details?: Record<string, unknown>;
+			}>;
+		return { run, asked };
+	}
+
+	it("asks the model with the rules, the section's items and materials only, and puts the text into the draft", async () => {
+		const path = topic();
+		const { run, asked } = tool("## 一、现状\n\n据中国民航局预测，2025年市场规模将达1.5万亿元。");
+		const result = await run({ path, section: "一、现状", chars: 300 });
+		expect(result.isError).toBeUndefined();
+		expect(result.content[0].text).toContain("已写入“一、现状”");
+		// The clean request: the rules, this section's material, not the other section's, and a small budget.
+		expect(asked).toHaveLength(1);
+		expect(asked[0].system).toContain("A person quoted in the materials");
+		expect(asked[0].user).toContain("1.5万亿元");
+		expect(asked[0].user).not.toContain("空域规则");
+		expect(asked[0].user).toContain("约 300 字");
+		expect(asked[0].payload).toEqual({ reasoning: { max_tokens: SECTION_REASONING_TOKENS } });
+		// The draft, with the title, and the outline ticked.
+		const draft = readFileSync(join(cwd, path), "utf-8");
+		expect(draft).toBe("# 低空报告\n\n## 一、现状\n\n据中国民航局预测，2025年市场规模将达1.5万亿元。\n");
+		expect(readFileSync(join(cwd, "20261112-低空", "稿件", "大纲.md"), "utf-8")).toContain("- [x] 一、现状");
+		// The second section goes after it, with the first as its 前文.
+		await run({ path, section: "二、问题" });
+		expect(asked[1].user).toContain("前文（已写好的部分");
+		expect(asked[1].user).toContain("1.5万亿元。");
+		expect(readFileSync(join(cwd, path), "utf-8")).toContain("1.5万亿元。\n\n## 二、问题");
+	});
+
+	it("says what is missing: the outline, the section, the model's answer", async () => {
+		const { run } = tool("正文");
+		expect((await run({ path: "没有/稿.md", section: "一" })).content[0].text).toContain("大纲.md");
+		const path = topic();
+		expect((await run({ path, section: "九、没有" })).content[0].text).toContain("大纲里没有");
+		const failed = await tool(new Error("network down")).run({ path, section: "一、现状" });
+		expect(failed.isError).toBe(true);
+		expect(failed.content[0].text).toContain("network down");
+		expect(existsSync(join(cwd, path))).toBe(false);
 	});
 });

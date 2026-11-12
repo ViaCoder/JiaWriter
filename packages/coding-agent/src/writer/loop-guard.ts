@@ -11,6 +11,12 @@ export const MAX_SAME_CALLS = 4;
 /** At the third blocked call the run stops. */
 export const MAX_BLOCKS = 3;
 /**
+ * A tool that failed this many times in a row, whatever its arguments, is blocked: on 2026-11-12 a run sent
+ * material_add 510 times, each with a new number in its items, every one refused, and the same-arguments rule
+ * never matched.
+ */
+export const MAX_TOOL_FAILURES = 6;
+/**
  * Tools that change files, the topic, a page or the desktop: after one of them works, an earlier call may answer
  * differently. browser and computer since 2026-11-09: reading a page again after a click is new information, and the
  * package check's fifth page read was blocked.
@@ -18,6 +24,7 @@ export const MAX_BLOCKS = 3;
 export const CHANGING_TOOLS: ReadonlySet<string> = new Set([
 	"write",
 	"edit",
+	"draft_section",
 	"bash",
 	"material_add",
 	"topic_open",
@@ -39,13 +46,15 @@ interface CallRecord {
 export interface LoopGuard {
 	// Every call by its key.
 	calls: Map<string, CallRecord>;
+	// Failures in a row of each tool, with any arguments.
+	failing: Map<string, number>;
 	// Calls blocked so far.
 	blocks: number;
 }
 
 /** A fresh guard. */
 export function newGuard(): LoopGuard {
-	return { calls: new Map(), blocks: 0 };
+	return { calls: new Map(), failing: new Map(), blocks: 0 };
 }
 
 /** The same value with object keys in order, so that equal arguments give equal text. */
@@ -68,8 +77,12 @@ export function callKey(tool: string, input: unknown): string {
 	return `${tool}\n${JSON.stringify(ordered(what) ?? null)}`;
 }
 
-/** Whether a call may run: "ok", or why not ("failed": it keeps failing; "repeated": it was made enough times). */
-export function checkCall(guard: LoopGuard, key: string): "ok" | "failed" | "repeated" {
+/**
+ * Whether a call may run: "ok", or why not ("failed": it keeps failing; "repeated": it was made enough times;
+ * "failing": the tool keeps failing whatever it is given).
+ */
+export function checkCall(guard: LoopGuard, key: string, tool = ""): "ok" | "failed" | "repeated" | "failing" {
+	if (tool && (guard.failing.get(tool) ?? 0) >= MAX_TOOL_FAILURES) return "failing";
 	const record = guard.calls.get(key);
 	if (!record) return "ok";
 	if (record.failures >= MAX_SAME_FAILURES) return "failed";
@@ -86,4 +99,6 @@ export function recordResult(guard: LoopGuard, key: string, isError: boolean, to
 	// Failures in a row: a success in between starts them again.
 	record.failures = isError ? record.failures + 1 : 0;
 	guard.calls.set(key, record);
+	// The tool's own run of failures, with any arguments.
+	if (tool) guard.failing.set(tool, isError ? (guard.failing.get(tool) ?? 0) + 1 : 0);
 }

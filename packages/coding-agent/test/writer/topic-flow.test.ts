@@ -2,7 +2,7 @@
 // open the topic, search, fetch, record materials, write, edit, export automatically, resume.
 
 // Temp files.
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 // OS temp directory.
 import { tmpdir } from "node:os";
 // Path helpers.
@@ -51,7 +51,11 @@ describe("a writing topic", () => {
 		vi.stubGlobal("fetch", async (url: string) => {
 			const data = String(url).endsWith("/v1/extract")
 				? { url: URL_A, title: "巴黎新增绿地", content: "巴黎市政府新增绿地。".repeat(4000) }
-				: { results: [{ title: "巴黎新增绿地", url: URL_A, snippet: "2026年10月31日 摘要" }] };
+				: {
+						results: [
+							{ title: "巴黎新增绿地", url: URL_A, snippet: "2026年10月31日 巴黎市政府新增绿地 12 公顷" },
+						],
+					};
 			return new Response(JSON.stringify({ code: 0, data }));
 		});
 	});
@@ -88,7 +92,7 @@ describe("a writing topic", () => {
 			time: "2026年10月31日",
 			reporter: "法新社",
 			subject: "巴黎市政府",
-			action: "新增绿地",
+			start: "巴黎市政府新增绿地",
 			url: URL_A,
 		};
 		harness.setResponses([
@@ -96,8 +100,11 @@ describe("a writing topic", () => {
 			call("search_web", { query: "巴黎 绿地", method: "anysearch" }),
 			// An address the topic has never seen is refused.
 			call("material_add", { items: [{ ...material, url: "https://elsewhere.example/x" }] }),
-			// A search result is enough.
+			// Words the source does not have are refused: the program takes the passage out of the source (2026-11-11).
+			call("material_add", { items: [{ ...material, start: "巴黎扩大了城市绿化面积" }] }),
+			// A search result is enough; a whole sentence as start still works, with a reminder that a few words do.
 			call("material_add", { items: [material] }),
+			call("material_add", { items: [{ ...material, start: "2026年10月31日 巴黎市政府新增绿地 12 公顷" }] }),
 			call("fetch_web", { url: URL_A, method: "anysearch" }),
 			call("write", {
 				path: draft,
@@ -120,9 +127,15 @@ describe("a writing topic", () => {
 		const said = JSON.stringify(harness.session.messages.filter((m) => m.role === "toolResult"));
 		expect(said).not.toMatch(/不可信|untrusted/);
 		expect(page).not.toMatch(/不可信|untrusted/);
-		// The unknown address was refused; the search result went in.
+		// The unknown address and the summary were refused; the excerpt of the search result went in.
 		const results = harness.session.messages.filter((m) => m.role === "toolResult" && m.toolName === "material_add");
-		expect(results.map((r) => (r as { isError?: boolean }).isError)).toEqual([true, false]);
+		expect(results.map((r) => (r as { isError?: boolean }).isError)).toEqual([true, true, false, false]);
+		// A call sent back says what went in and what to resend.
+		expect(JSON.stringify(results[1])).toContain("退回 1 条");
+		expect(JSON.stringify(results[2])).not.toContain("不用整句照抄");
+		expect(JSON.stringify(results[3])).toContain("不用整句照抄");
+		expect(JSON.stringify(results[1])).toContain("找不到");
+		expect(readFileSync(join(topic, "素材.md"), "utf-8")).toContain("原文：“巴黎市政府新增绿地 12 公顷”");
 		// The draft was edited and exported beside itself; research stayed out of the export.
 		expect(readFileSync(join(topic, "稿件", "初稿.md"), "utf-8")).toContain("修改后的正文");
 		expect(existsSync(join(topic, "稿件", "初稿.docx"))).toBe(true);
@@ -135,13 +148,13 @@ describe("a writing topic", () => {
 		const material = {
 			kind: "data",
 			time: "2025年",
-			region: "苏州",
-			industry: "纺织",
-			indicator: "产值",
-			value: "1亿",
+			start: "苏州纺织产值",
 			file: "年鉴.pdf",
 			page: "3",
 		};
+		// The yearbook as imported, where the program takes the passage from.
+		mkdirSync(join(harness.tempDir, "参考资料", ".parsed"), { recursive: true });
+		writeFileSync(join(harness.tempDir, "参考资料", ".parsed", "年鉴.pdf.md"), "2025年苏州纺织产值1亿元。");
 		harness.setResponses([
 			call("topic_open", { name: "主题乙" }),
 			call("material_add", { items: [material] }),

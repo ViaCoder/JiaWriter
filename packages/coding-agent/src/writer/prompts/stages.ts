@@ -53,7 +53,13 @@ function methodStages(tool: string, methods: Readonly<Record<string, readonly st
 /** Every stage, in the order they are added to one result. */
 export const PROMPT_STAGES: readonly PromptStage[] = [
 	// Searching is not writing: these rules wait until a document is really started.
-	{ id: WRITING_STAGE, title: "Writing rules", rules: WRITING_MANUAL, tools: ["write", "edit"], onSkill: true },
+	{
+		id: WRITING_STAGE,
+		title: "Writing rules",
+		rules: WRITING_MANUAL,
+		tools: ["write", "edit", "draft_section"],
+		onSkill: true,
+	},
 	{ id: "research", title: "Research rules", rules: RESEARCH_MANUAL, tools: ["search_web", "fetch_web"] },
 	...methodStages("search_web", SEARCH_METHODS),
 	...methodStages("fetch_web", FETCH_METHODS),

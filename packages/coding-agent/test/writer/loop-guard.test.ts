@@ -8,6 +8,7 @@ import {
 	MAX_BLOCKS,
 	MAX_SAME_CALLS,
 	MAX_SAME_FAILURES,
+	MAX_TOOL_FAILURES,
 	newGuard,
 	recordResult,
 } from "../../src/writer/loop-guard.ts";
@@ -50,6 +51,22 @@ describe("checkCall and recordResult", () => {
 		recordResult(guard, other, true);
 		recordResult(guard, other, false);
 		expect(checkCall(guard, other)).toBe("ok");
+	});
+	it("blocks a tool that fails MAX_TOOL_FAILURES times in a row with changing arguments", () => {
+		// 2026-11-12: material_add was sent 510 times, each with a new number in its items, every one refused.
+		const guard = newGuard();
+		for (let i = 0; i < MAX_TOOL_FAILURES; i++) {
+			const key = callKey("material_add", { items: [{ section: `现状${i}` }] });
+			expect(checkCall(guard, key, "material_add")).toBe("ok");
+			recordResult(guard, key, true, "material_add");
+		}
+		expect(checkCall(guard, callKey("material_add", { items: [{ section: "现状9" }] }), "material_add")).toBe(
+			"failing",
+		);
+		// Other tools are not touched, and one success starts the count again.
+		expect(checkCall(guard, callKey("read", { path: "a" }), "read")).toBe("ok");
+		recordResult(guard, callKey("material_add", { items: [{ start: "x" }] }), false, "material_add");
+		expect(checkCall(guard, callKey("material_add", { items: [{ section: "现状10" }] }), "material_add")).toBe("ok");
 	});
 	it("starts every count again after a change that worked, since a check then reads a new text", () => {
 		const guard = newGuard();

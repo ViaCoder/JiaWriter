@@ -6,6 +6,8 @@
 
 // Output messages.
 import { t } from "../i18n/index.ts";
+// The body of a draft, without its reference list.
+import { bodyBeforeReferences } from "../text-stats.ts";
 // The register of a text.
 import type { StyleRegister } from "./check.ts";
 // Citation form.
@@ -43,6 +45,47 @@ const ALL = () => true;
  */
 export const PLACEHOLDER =
 	/待核[实查]|待补(?![助偿贴发])|待确认|(?:需|有待)(?:进一步)?核实|[【[]待[^】\]\n]{0,10}[】\]]|此处(?:补充|填写|插入)|×{2,}/g;
+
+/**
+ * Paragraphs that open by restating the problem they answer: 针对…问题，/围绕…短板，/着眼…不足，. One is ordinary official
+ * writing (11 of 3,138 paragraphs in human research documents, never twice in one); several in one document are the
+ * machine's turn-taking (77 of 1,179 paragraphs in model drafts; a run on 2026-11-12 opened five measures with 针对, 围绕,
+ * 着眼, 鉴于 and 面向 in turn, a rule with an example pair notwithstanding).
+ */
+const FRAME_OPENER =
+	/^(?:针对|围绕|着眼|鉴于|面向|聚焦|立足|对于|基于)[^。\n]{0,40}?(?:问题|短板|不足|困难|矛盾|需求)[，,]/;
+/** Paragraphs of a text's body: its non-empty lines that are not headings or list items. */
+function paragraphs(text: string): string[] {
+	return bodyBeforeReferences(text)
+		.split("\n")
+		.map((p) => p.trim())
+		.filter((p) => p && !/^(?:#|[-*]\s)/.test(p));
+}
+/** The paragraphs that open with a problem frame. */
+export function frameOpeners(text: string): string[] {
+	return paragraphs(text).filter((p) => FRAME_OPENER.test(p));
+}
+/**
+ * The opening formula 现将…报告如下: proper in a report to a superior, and the model's habit everywhere (38 of 87 drafts
+ * against 5 of 552 human research documents).
+ */
+export function openingFormula(text: string): string | undefined {
+	return paragraphs(text)
+		.slice(0, 3)
+		.map((p) => /现将[^。\n]{0,30}(?:报告|汇报|总结|说明)如下/.exec(p)?.[0])
+		.find((m) => m !== undefined);
+}
+
+/**
+ * An opening that describes the document itself (本报告依据…梳理…并提出…): 1 of 552 human research documents, and every
+ * one of the first three clean-context runs (2026-11-12).
+ */
+export function selfDescription(text: string): string | undefined {
+	return paragraphs(text)
+		.slice(0, 2)
+		.map((p) => /(?:本报告|本文|本调研报告)[^。\n]{0,60}(?:梳理|分析|提出|总结|探讨)[^。\n]{0,40}/.exec(p)?.[0])
+		.find((m) => m !== undefined);
+}
 
 /** A list of quoted openings under a heading line. */
 const quoted = (head: string, items: readonly string[]) => `${head}\n${items.map((s) => `- “${s}”`).join("\n")}`;
@@ -159,6 +202,40 @@ export const DRAFT_CHECKS: readonly DraftCheck[] = [
 	},
 	{
 		// Problem and risk paragraphs with no case or figure: a note, since some problems have no data.
+		id: "frame-openers",
+		when: DOCUMENTS,
+		run: (text) => {
+			const found = frameOpeners(text);
+			return found.length < 2
+				? NONE
+				: {
+						fail: [
+							quoted(
+								t("style.frameOpeners", { count: found.length }),
+								found.map((p) => p.slice(0, 30)),
+							),
+						],
+						note: [],
+					};
+		},
+	},
+	{
+		id: "self-description",
+		when: DOCUMENTS,
+		run: (text) => {
+			const found = selfDescription(text);
+			return found ? { fail: [], note: [t("style.selfDescription", { text: found.slice(0, 40) })] } : NONE;
+		},
+	},
+	{
+		id: "opening-formula",
+		when: DOCUMENTS,
+		run: (text) => {
+			const found = openingFormula(text);
+			return found ? { fail: [], note: [t("style.openingFormula", { text: found })] } : NONE;
+		},
+	},
+	{
 		id: "unsupported",
 		when: (register) => register === "report",
 		run: (text) => {

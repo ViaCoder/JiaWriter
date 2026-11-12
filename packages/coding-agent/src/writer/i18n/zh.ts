@@ -57,6 +57,11 @@ export const zh = {
 	"style.uncitedEntry": "第 {n} 条（找的是：{names}）",
 	"style.rareChars": "生僻字 {chars}：换成常用字，人名、地名和引文除外。",
 	"style.unsupported": "提示：问题或风险部分有 {count} 段只有判断，没有案例或数据。材料里有的补上，没有的不必补：",
+	"style.frameOpeners":
+		"有 {count} 段都用“针对/围绕/着眼…问题”这类框架开头，这是复述问题再给措施。改成直接写措施：谁、做什么、做到什么程度，各段开头不要一样：",
+	"style.selfDescription":
+		"提示：开头“{text}……”在介绍报告自己。调研报告、研究报告一般直接从情况或判断写起，删掉这句不影响内容。",
+	"style.openingFormula": "提示：开头用了“{text}”，这是上报用的套语，调研报告、研究报告一般直接从事实或判断写起。",
 	"style.repeated":
 		"同一素材用了不止一处：{figures}。全文每个案例和数据只用一次，留在最能说明问题的那段，别处换用没用过的材料或删去。",
 	"style.asciiQuotes": '{count} 处中文用了英文引号 "……"：改成中文引号“……”。',
@@ -152,6 +157,7 @@ export const zh = {
 	// The loop guard.
 	"guard.failed": "{tool} 用相同参数已连续失败 {count} 次",
 	"guard.repeated": "{tool} 用相同参数已调用 {count} 次，结果不会变",
+	"guard.failing": "{tool} 已连续失败 {count} 次，参数每次都不同：停下来，把失败的原因告诉用户",
 	"blocked.why": "已拦下：{why}。",
 	"blocked.change": "下一步：换参数、换方法或用已有结果继续；同样的调用不要再试。",
 	"blocked.user": "下一步：问用户想怎么做；被拦下的这一步不要换工具、命令或路径再试。",
@@ -277,16 +283,29 @@ export const zh = {
 	"topic.archiveFailed": "归档失败（{reason}），本次结果没有保存到主题文件夹。",
 	"topic.missingFields": "缺少 {fields}（{meaning}）",
 	"topic.caseFields":
-		"案例：time 时间（照来源写或用来源的发布日期，来源没有就不填），subject 谁做的，action 做了什么，reporter 报道的媒体（只有网页来源需要）",
+		"案例：time 时间（照来源写或用来源的发布日期，来源没有就不填），subject 哪家单位或哪个人，start 来源里讲这件事那段话开头的几个字，reporter 报道的媒体（只有网页来源需要）",
 	"topic.dataFields":
-		"数据：time 时间（照来源写或用来源的发布日期，来源没有就不填），region 地区，industry 行业或领域，indicator 指标，value 数值",
+		"数据：time 时间（照来源写或用来源的发布日期，来源没有就不填），start 来源里含这个数那段话开头的几个字",
 	"topic.missingPage": "《{file}》缺少页码",
 	"topic.missingSource": "缺少来源：要有 url，或 file 加 page",
 	"topic.notArchived": "网址 {url} 不在本主题的检索结果或已读页面里，请先检索或用 fetch_web 读取",
 	"topic.timeNotInSource":
 		"时间“{time}”在来源里找不到：照来源写时间，或写来源的发布日期；来源没有日期就不填 time，不要推测",
+	"topic.passageNotFound":
+		"来源里找不到“{words}”：start 和 end 照来源原样写开头和结尾的几个字，用来源的语言，不要改写或翻译",
+	"topic.passageTooLong": "这段原文有 {length} 字，超过 {max} 字：start 和 end 只框住讲这件事的一到三句",
+	"topic.anchorsLong":
+		"start 和 end 各写开头、结尾几个字就够了（不超过 {max} 字），整段由程序从来源里取出来，不用整句照抄",
+	"topic.itemsEmpty": "这 {count} 条只有类别，没有来源和 start，内容没有传过来：重新发送完整的条目",
+	"topic.sourceUnreadable": "读不到《{file}》的文字，取不了原文：先用 import_document 导入",
 	"topic.itemProblem": "第{n}条：{problem}",
-	"topic.materialAdded": "已记录 {count} 条，{file} 共 {total} 条。",
+	"draft.noOutline": "{path} 旁边没有 大纲.md：先用 write 写大纲，再逐节调用 draft_section",
+	"draft.noSection": "大纲里没有“{section}”这一节：section 写大纲清单行里的文字",
+	"draft.written": "已写入“{heading}”，本节 {chars} 字，{path} 正文共 {total} 字；大纲里这一节已标记。",
+	"draft.failed": "这一节没有写成：{reason}",
+	"draft.noModel": "当前没有可用的模型，写不了这一节",
+	"topic.materialAdded": "已记录 {count} 条（第 {which} 条），{file} 共 {total} 条。",
+	"topic.materialBack": "退回 {count} 条，只重发这几条，改好退回的原因：",
 	"rewind.pick": "回退到哪条消息之前？",
 	"rewind.mode": "退回什么？",
 	"rewind.both": "对话和文件一起退回（恢复 {count} 个文件）",

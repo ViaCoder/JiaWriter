@@ -155,7 +155,8 @@ export function toolRequest(
 			inDirFile: false,
 		};
 	}
-	if (toolName === "write" || toolName === "edit") {
+	// draft_section writes the draft at its path as write does.
+	if (toolName === "write" || toolName === "edit" || toolName === "draft_section") {
 		const path = String(input.path ?? "");
 		const inside = insideDir(path, cwd);
 		return {

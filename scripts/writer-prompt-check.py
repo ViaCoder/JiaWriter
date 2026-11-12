@@ -152,7 +152,8 @@ def main():
     tools = len(json.dumps(first.get("tools", []), ensure_ascii=False))
     # 13000 since 2026-11-09: bash, todo_write and ask_user joined the default tools (about 2000 characters) and search_web
     # took dates (about 500); still a guard against descriptions that grow.
-    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 5000 and tools <= 13000)
+    # 14000 since 2026-11-12: draft_section (a section written in a clean context) joined the tools.
+    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 5000 and tools <= 14000)
     check("闲聊时没有任何手册", not any(w in text_of(first) for w in ("Writing rules", "Research rules", "2026年10月31日")))
     said = json.dumps(first["messages"][1:], ensure_ascii=False)
     check("日期只有一个 [Date: …]，没有其他时间", said.count("[Date: ") == 1 and "[Sent" not in said)
@@ -200,7 +201,7 @@ def main():
 
     # Research before the topic has a name. The result has no date, so the material has no time (2026-11-10: a time
     # the source does not give is sent back).
-    late = Script([("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "reporter": "路透社", "subject": "甲", "action": "乙", "url": "https://news.example.com/a"}]})])
+    late = Script([("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "reporter": "路透社", "subject": "甲", "start": "新闻", "url": "https://news.example.com/a"}]})])
     run(late, ["查一下再写"])
     last = text_of(late.requests[-1])
     check("先搜索后开主题，资料并入主题", "已建立主题文件夹" in last and f"{time.strftime('%Y%m%d')}-绿化" in last and "已记录" in last)

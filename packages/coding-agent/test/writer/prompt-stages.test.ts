@@ -77,7 +77,9 @@ describe("budgets", () => {
 		// of a requested outline (a 提纲 written to 大纲.md skipped the checks and the export).
 		// 2800 since 2026-11-09: long documents are outlined as a checklist with their items and written one section per
 		// turn with the user (the user's request), or in one run with nobody to answer.
-		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(2800);
+		// 3400 since 2026-11-10: the user's rule that wording comes first, in one general description at the top.
+		// 3600 since 2026-11-12: sections are written with draft_section, in a context of their own.
+		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(3600);
 		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);
@@ -133,7 +135,7 @@ describe("the user's requirements", () => {
 			"take every case, figure and account of work done (surveys, visits) from the reference materials",
 		],
 		// Long documents section by section (the user, 2026-11-09).
-		["section by section", "Write one section at a time from its own items"],
+		["section by section", "write each section with draft_section"],
 		// The user's later words change the plan (2026-11-09).
 		["later requests first", "A later request of the user changes the outline before the text"],
 		["running the checks", "program checks each write and, at the end, length, readability and 公文 parameters"],
@@ -277,7 +279,7 @@ describe("dueStages", () => {
 		givenStages().add(WRITING_STAGE);
 		const lines = stageLines();
 		expect(lines).toHaveLength(PROMPT_STAGES.length);
-		expect(lines[0]).toMatch(/^✓ Writing rules: write, edit, SKILL\.md, \d+ chars$/);
+		expect(lines[0]).toMatch(/^✓ Writing rules: write, edit, draft_section, SKILL\.md, \d+ chars$/);
 		expect(lines[1]).toMatch(/^· Research rules/);
 	});
 });

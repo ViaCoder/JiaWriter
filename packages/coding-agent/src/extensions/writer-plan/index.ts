@@ -20,6 +20,7 @@ import { bashRisk } from "../../writer/tool-risk.ts";
 export const PLAN_REFUSED = new Set([
 	"write",
 	"edit",
+	"draft_section",
 	"export_document",
 	"material_add",
 	"topic_open",

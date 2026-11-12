@@ -18,7 +18,9 @@ import {
 	addMaterials,
 	adoptUnnamedTopic,
 	isUnnamedTopic,
+	longAnchors,
 	MATERIAL_FILE,
+	MAX_ANCHOR,
 	type Material,
 	openTopic,
 } from "../../writer/topic/topic.ts";
@@ -74,7 +76,7 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		label: "Add material",
 		// Full description sent to the model.
 		description:
-			"Records cases and data in 素材.md.\n\nUsage:\n - A case needs subject, action, and reporter when it is from the web\n - Data needs region, industry, indicator, value\n - time is the one the source states, else the source's own date; leave it out when the source has none, never infer one\n - Each needs url, or file and page",
+			"Records cases and data in 素材.md: the program copies each one's passage out of its source, so you write only where it starts and ends.\n\nUsage:\n - Name the one to three sentences that state the fact: start is their first few words and end their last few, about 4 to 12 characters each as the source writes them, in its language; leave end out for one sentence. For 据中国民航局预测，2025年中国低空经济市场规模将达1.5万亿元。 start is 据中国民航局预测, not the whole sentence\n - A case also needs subject, and reporter when it is from the web\n - time is the one the source states, else the source's own date; leave it out when the source has none, never infer one\n - Each needs url, or file and page",
 		// Argument schema.
 		parameters: Type.Object({
 			items: Type.Array(
@@ -83,11 +85,10 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 					time: Type.Optional(Type.String({ description: "As the source states it, else its date" })),
 					reporter: Type.Optional(Type.String({ description: "Outlet's name, such as 路透社" })),
 					subject: Type.Optional(Type.String({ description: "Named company, body or person" })),
-					action: Type.Optional(Type.String()),
-					region: Type.Optional(Type.String()),
-					industry: Type.Optional(Type.String()),
-					indicator: Type.Optional(Type.String()),
-					value: Type.Optional(Type.String({ description: "With its unit" })),
+					start: Type.String({ description: "First 4 to 12 characters of the passage, as in the source" }),
+					end: Type.Optional(
+						Type.String({ description: "Last 4 to 12 characters, when it runs past that sentence" }),
+					),
 					url: Type.Optional(Type.String()),
 					file: Type.Optional(Type.String()),
 					page: Type.Optional(Type.String()),
@@ -101,9 +102,26 @@ export default function writerTopicExtension(pi: ExtensionAPI): void {
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			// The first item says what the material is about, when no topic was opened.
 			const dir = ensureTopic(ctx.cwd, String(params.items[0]?.subject ?? ""));
-			const total = addMaterials(dir, params.items as Material[]);
-			const text = t("topic.materialAdded", { count: params.items.length, total, file: MATERIAL_FILE });
-			return { content: [{ type: "text", text }], details: { topicDir: dir, total } };
+			const items = params.items as Material[];
+			const { total, written, problems } = addMaterials(dir, items);
+			// What went in, then what came back: an error only when something came back, so the model resends only that.
+			const added =
+				written.length > 0
+					? t("topic.materialAdded", {
+							count: written.length,
+							which: written.join("、"),
+							total,
+							file: MATERIAL_FILE,
+						})
+					: "";
+			if (problems.length === 0) {
+				// Whole sentences as start or end: the next call needs only a few words of each.
+				const text = longAnchors(items) ? `${added}\n${t("topic.anchorsLong", { max: MAX_ANCHOR })}` : added;
+				return { content: [{ type: "text", text }], details: { topicDir: dir, total } };
+			}
+			const back = t("topic.materialBack", { count: items.length - written.length });
+			const text = [added, back, ...problems].filter(Boolean).join("\n");
+			return { content: [{ type: "text", text }], details: { topicDir: dir, total }, isError: true };
 		},
 	});
 }

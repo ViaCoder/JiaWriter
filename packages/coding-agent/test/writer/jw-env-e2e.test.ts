@@ -363,6 +363,7 @@ describe("JW_* end to end", () => {
 			"ask_user",
 			"bash",
 			"draft_restore",
+			"draft_section",
 			"edit",
 			"export_document",
 			"fetch_web",

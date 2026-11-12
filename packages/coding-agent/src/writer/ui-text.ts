@@ -27,6 +27,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"↓ Jump to latest message": "↓ 回到最新消息",
 	// Collapsed lines of a skill, a compaction summary and a branch summary.
 	"[skill]": "[技能]",
+	"To resume this session:": "继续这次会话：",
 	"Compacted from {tokens} tokens": "上下文已压缩，原 {tokens} token",
 	"Branch summary": "分支摘要",
 	// Startup help, full form.
@@ -240,6 +241,7 @@ export const TOOL_LABELS_ZH: Readonly<Record<string, string>> = {
 	search_web: "网络检索",
 	fetch_web: "打开网页",
 	material_add: "记录素材",
+	draft_section: "撰写章节",
 	word_count: "统计字数",
 	readability_check: "可读性检查",
 	style_check: "文风检查",

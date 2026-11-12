@@ -16,6 +16,7 @@ import {
 	MAX_BLOCKS,
 	MAX_SAME_CALLS,
 	MAX_SAME_FAILURES,
+	MAX_TOOL_FAILURES,
 	newGuard,
 	recordResult,
 } from "../../writer/loop-guard.ts";
@@ -30,14 +31,16 @@ export default function writerGuardExtension(pi: ExtensionAPI): void {
 
 	// Before a call: the same call again, where it cannot help, is blocked.
 	pi.on("tool_call", (event) => {
-		const verdict = checkCall(guard, callKey(event.toolName, event.input));
+		const verdict = checkCall(guard, callKey(event.toolName, event.input), event.toolName);
 		if (verdict === "ok") return;
 		guard.blocks++;
 		const stop = guard.blocks >= MAX_BLOCKS;
 		const why =
 			verdict === "failed"
 				? t("guard.failed", { tool: event.toolName, count: MAX_SAME_FAILURES })
-				: t("guard.repeated", { tool: event.toolName, count: MAX_SAME_CALLS });
+				: verdict === "failing"
+					? t("guard.failing", { tool: event.toolName, count: MAX_TOOL_FAILURES })
+					: t("guard.repeated", { tool: event.toolName, count: MAX_SAME_CALLS });
 		return { block: true, reason: blockedText({ why, next: stop ? "stop" : "change" }), terminate: stop };
 	});
 

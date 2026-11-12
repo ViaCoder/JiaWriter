@@ -65,6 +65,12 @@ export const en: Record<MessageKey, string> = {
 	"style.rareChars": "Rare characters {chars}: use common ones, except in names and quotations.",
 	"style.unsupported":
 		"Note: {count} paragraphs on problems or risks state a judgment with no case or figure. Add them where the materials have them:",
+	"style.frameOpeners":
+		"{count} paragraphs open with a 针对/围绕/着眼…问题 frame, which restates the problem before the measure. Open with the measure itself: who does what, to what end, each paragraph in its own way:",
+	"style.selfDescription":
+		"Note: the opening “{text}…” describes the document itself; a research report starts from the situation or a judgment, and this sentence can go without loss.",
+	"style.openingFormula":
+		"Note: the opening uses “{text}”, a formula of reports to a superior; a research report starts from a fact or a judgment.",
 	"style.repeated":
 		"The same material appears more than once: {figures}. Use each case and figure once, where it proves most; elsewhere use unused material or cut it.",
 	"style.asciiQuotes": '{count} Chinese phrases in English quotes "…": use Chinese quotes “…”.',
@@ -173,6 +179,7 @@ export const en: Record<MessageKey, string> = {
 	// AnySearch quota exhausted (402 body discarded).
 	"guard.failed": "{tool} failed {count} times in a row with the same arguments",
 	"guard.repeated": "{tool} was called {count} times with the same arguments, and the result will not change",
+	"guard.failing": "{tool} failed {count} times in a row with changing arguments: stop and tell the user why it fails",
 	"blocked.why": "Blocked: {why}. ",
 	"blocked.change":
 		"Next: change the arguments or the method, or go on with what you have; do not make the same call again.",
@@ -302,17 +309,34 @@ export const en: Record<MessageKey, string> = {
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
 	"topic.missingFields": "missing {fields} ({meaning})",
 	"topic.caseFields":
-		"a case: time (as the source gives it, none when it gives none), subject (who acted), action (what they did), reporter (the outlet, for web sources only)",
+		"a case: time (as the source gives it, none when it gives none), subject (the named body or person), start (the first words of the source's passage on it), reporter (the outlet, for web sources only)",
 	"topic.dataFields":
-		"data: time (as the source gives it, none when it gives none), region, industry or field, indicator, value",
+		"data: time (as the source gives it, none when it gives none), start (the first words of the source's passage with the figure)",
 	"topic.missingPage": "no page for {file}",
 	"topic.missingSource": "no source: give url, or file and page",
 	"topic.notArchived":
 		"{url} is not among this topic's search results or pages: search for it or read it with fetch_web first",
 	"topic.timeNotInSource":
 		"the time “{time}” is not in the source: give the time the source states or its date, or leave time out when it has none; never infer one",
+	"topic.passageNotFound":
+		"“{words}” is not in the source: give a few first and last words as the source writes them, in its language, never reworded or translated",
+	"topic.passageTooLong":
+		"the passage has {length} characters, over {max}: let start and end mark the one to three sentences on the fact",
+	"topic.anchorsLong":
+		"a few first and last words are enough for start and end (at most {max} characters): the program takes the whole passage from the source, so never copy whole sentences",
+	"topic.itemsEmpty":
+		"these {count} items came with no source and no start, so their content was lost: send the complete items again",
+	"topic.sourceUnreadable":
+		"the text of {file} cannot be read, so no passage can be taken: import it with import_document first",
 	"topic.itemProblem": "Item {n}: {problem}",
-	"topic.materialAdded": "Recorded {count}; {file} now holds {total}.",
+	"draft.noOutline":
+		"no 大纲.md beside {path}: write the outline with write, then call draft_section for each section",
+	"draft.noSection": "the outline has no section “{section}”: give the words of its checklist line",
+	"draft.written": "Wrote “{heading}”: {chars} characters; {path} now holds {total}; the outline line is ticked.",
+	"draft.failed": "The section was not written: {reason}",
+	"draft.noModel": "No model is available to write the section",
+	"topic.materialAdded": "Recorded {count} (items {which}); {file} now holds {total}.",
+	"topic.materialBack": "{count} sent back: resend only these, with the reasons fixed:",
 	"rewind.pick": "Go back to before which message?",
 	"rewind.mode": "What goes back?",
 	"rewind.both": "Conversation and files ({count} files restored)",
