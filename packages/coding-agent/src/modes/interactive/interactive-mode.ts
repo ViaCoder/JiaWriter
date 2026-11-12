@@ -1830,13 +1830,14 @@ export class InteractiveMode {
 		}
 
 		// JiaWriter: section names in the interface language.
-		const sectionHeader = (name: string, color: ThemeColor = "mdHeading") => theme.fg(color, `[${uiText(name)}]`);
+		// JiaWriter: a section's name as a label (技能：), not a bracketed tag.
+		const sectionHeader = (name: string, color: ThemeColor = "mdHeading") => theme.fg(color, `${uiText(name)}：`);
 		const formatCompactList = (items: string[], options?: { sort?: boolean }): string => {
 			const labels = items.map((item) => item.trim()).filter((item) => item.length > 0);
 			if (options?.sort !== false) {
 				labels.sort((a, b) => a.localeCompare(b));
 			}
-			return theme.fg("dim", `  ${labels.join(", ")}`);
+			return theme.fg("dim", labels.join("、"));
 		};
 		// Bodies are built on demand so the listing follows theme changes.
 		const addLoadedSection = (
@@ -1846,7 +1847,8 @@ export class InteractiveMode {
 			color: ThemeColor = "mdHeading",
 		): void => {
 			const section = new ExpandableText(
-				() => `${sectionHeader(name, color)}\n${collapsedBody()}`,
+				// Collapsed: the label and the list on one line.
+				() => `${sectionHeader(name, color)}${collapsedBody().trim()}`,
 				() => `${sectionHeader(name, color)}\n${expandedBody()}`,
 				this.getStartupExpansionState(),
 				0,
@@ -4385,7 +4387,7 @@ export class InteractiveMode {
 
 		const resumeCommand = formatResumeCommand(this.sessionManager);
 		if (resumeCommand) {
-			process.stdout.write(`${chalk.dim("To resume this session:")} ${resumeCommand}\n`);
+			process.stdout.write(`${chalk.dim(uiText("To resume this session:"))} ${resumeCommand}\n`);
 		}
 
 		process.exit(0);

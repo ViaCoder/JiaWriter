@@ -270,11 +270,9 @@ export class ToolExecutionComponent extends Container {
 	}
 
 	private updateDisplay(): void {
-		const bgFn = this.isPartial
-			? (text: string) => theme.bg("toolPendingBg", text)
-			: this.result?.isError
-				? (text: string) => theme.bg("toolErrorBg", text)
-				: (text: string) => theme.bg("toolSuccessBg", text);
+		// JiaWriter: no background band behind a tool call (2026-11-12: a full-width green band for every read was the
+		// heaviest thing on the screen); a failed call keeps its band, so that it stands out.
+		const bgFn = this.result?.isError ? (text: string) => theme.bg("toolErrorBg", text) : (text: string) => text;
 
 		let hasContent = false;
 		this.hideComponent = false;
@@ -283,6 +281,8 @@ export class ToolExecutionComponent extends Container {
 			if (renderContainer instanceof Box) {
 				renderContainer.setBgFn(bgFn);
 				renderContainer.setPaddingX(this.outputPad);
+				// No padding rows without a band.
+				renderContainer.setPaddingY(this.result?.isError ? 1 : 0);
 			}
 			renderContainer.clear();
 

@@ -50,6 +50,11 @@ export class Box implements Component {
 		// Don't invalidate here - we'll detect bgFn changes by sampling output
 	}
 
+	setPaddingY(paddingY: number): void {
+		this.paddingY = paddingY;
+		this.invalidateCache();
+	}
+
 	setPaddingX(paddingX: number): void {
 		this.paddingX = paddingX;
 		this.invalidateCache();
