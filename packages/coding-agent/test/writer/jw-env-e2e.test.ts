@@ -362,6 +362,7 @@ describe("JW_* end to end", () => {
 		expect(((realRequest()?.body.tools as { name: string }[]) ?? []).map((t) => t.name).sort()).toEqual([
 			"ask_user",
 			"bash",
+			"delegate",
 			"draft_restore",
 			"draft_section",
 			"edit",
@@ -374,6 +375,7 @@ describe("JW_* end to end", () => {
 			"material_add",
 			"read",
 			"readability_check",
+			"schedule_task",
 			"search_web",
 			"style_check",
 			"todo_write",
