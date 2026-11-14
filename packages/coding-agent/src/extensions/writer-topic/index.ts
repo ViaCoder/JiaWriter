@@ -33,6 +33,7 @@ import {
 	adoptUnnamedTopic,
 	asFileSource,
 	isUnnamedTopic,
+	lastPageUrl,
 	MATERIAL_FILE,
 	type Material,
 	materialCount,
@@ -122,7 +123,7 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 		label: "Add material",
 		// Full description sent to the model.
 		description:
-			"Records the facts of a source in 素材.md: you name the source and what you need from it; the program extracts the facts with a request of its own, checks their figures and names against the source, and files them with the source's outlet and date.\n\nUsage:\n - One item per source: url of a search result or fetched page of this topic, or file (and page) of an imported reference\n - section is the outline part the facts are for; focus says what to take when the source covers more than that (大众汽车在华销量和高管表态)\n - The reply lists the facts recorded: read them to see what the source gave and what is still missing",
+			"Records the facts of a source in 素材.md: you name the source and what you need from it; the program extracts the facts with a request of its own, checks their figures and names against the source, and files them with the source's outlet and date.\n\nUsage:\n - One item per source: url of a search result or fetched page of this topic, or file (and page) of an imported reference; an item with neither takes the page last read with fetch_web\n - section is the outline part the facts are for; focus says what to take when the source covers more than that (大众汽车在华销量和高管表态)\n - The reply lists the facts recorded: read them to see what the source gave and what is still missing",
 		// Argument schema.
 		parameters: Type.Object({
 			// A string too: GLM sends items as JSON text at times (2026-11-14: a run sent one string holding three items
@@ -165,7 +166,9 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 			// A source the topic does not hold is an error, so the model gives another; an empty extraction is not.
 			let error = false;
 			for (const [i, given] of items.entries()) {
-				const item = asFileSource(given as Material);
+				// No source named: the page read last (2026-11-14: GLM names only what to take from the page it just read).
+				const named = given.url?.trim() || given.file?.trim() ? given : { ...given, url: lastPageUrl(dir) };
+				const item = asFileSource(named as Material);
 				const name = item.file?.trim() ? `《${item.file.trim()}》` : (item.url?.trim() ?? "");
 				const problem = sourceProblem(item, archived) || (name ? "" : t("topic.missingSource"));
 				if (problem) {

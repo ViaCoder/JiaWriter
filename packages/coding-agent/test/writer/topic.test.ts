@@ -20,6 +20,7 @@ import {
 	asFileSource,
 	fileSourceText,
 	isUnnamedTopic,
+	lastPageUrl,
 	type Material,
 	materialCount,
 	materialProblem,
@@ -193,6 +194,28 @@ describe("archive", () => {
 		const titled = { ...page, url: "https://news.example.com/c", title: "https://news.example.com/c" };
 		expect(basename(archivePage(dir, titled, titled.url, "codex", "时间"))).toBe("003-page.md");
 		expect(basename(archiveSearch(dir, "绿化 site:fcc.gov www.example.com/a", "结果", "时间"))).toBe("004-绿化.md");
+	});
+
+	it("lastPageUrl: the page read last, none before any", () => {
+		const { dir } = openTopic(cwd, "t");
+		expect(lastPageUrl(dir)).toBe("");
+		archiveSearch(dir, "甲", "结果", "时间", ["https://s.example/"]);
+		expect(lastPageUrl(dir)).toBe("");
+		archivePage(
+			dir,
+			{ url: "https://a.example/1", title: "一", date: "", content: "正文" },
+			"https://a.example/1",
+			"m",
+			"t",
+		);
+		archivePage(
+			dir,
+			{ url: "https://a.example/2", title: "二", date: "", content: "正文" },
+			"https://a.example/2",
+			"m",
+			"t",
+		);
+		expect(lastPageUrl(dir)).toBe("https://a.example/2");
 	});
 
 	it("keeps one file per page, and knows a page by the address asked for and the one it ended at", () => {

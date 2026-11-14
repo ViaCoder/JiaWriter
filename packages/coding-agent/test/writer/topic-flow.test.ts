@@ -113,6 +113,8 @@ describe("a writing topic", () => {
 			// The items as JSON text, as GLM sends them at times (2026-11-14): read all the same.
 			call("material_add", { items: [JSON.stringify([material])] }),
 			call("fetch_web", { url: URL_A, method: "anysearch" }),
+			// No source named after a page was read: the page read last (2026-11-14).
+			call("material_add", { items: [{ section: "现状", focus: "绿地面积" }] }),
 			call("write", {
 				path: draft,
 				content: "# 巴黎绿化\n\n正文。\n\n## 参考文献\n\n1．[巴黎新增绿地，法新社](https://a.example/news)\n",
@@ -136,13 +138,18 @@ describe("a writing topic", () => {
 		expect(page).not.toMatch(/不可信|untrusted/);
 		// The unknown address was refused; the facts of the search result went in, once.
 		const results = harness.session.messages.filter((m) => m.role === "toolResult" && m.toolName === "material_add");
-		expect(results.map((r) => (r as { isError?: boolean }).isError)).toEqual([true, false, false]);
+		expect(results.map((r) => (r as { isError?: boolean }).isError)).toEqual([true, false, false, false]);
+		// The item without a source went to the page read last, whose facts were there already.
+		expect(JSON.stringify(results[3])).toContain(URL_A);
+		expect(JSON.stringify(results[3])).toContain("1 条素材里已有");
 		expect(JSON.stringify(results[0])).toContain("不在本主题");
 		expect(JSON.stringify(results[1])).toContain("记下 1 条");
 		expect(JSON.stringify(results[1])).toContain("- 巴黎市政府：巴黎市政府新增绿地12公顷");
 		expect(JSON.stringify(results[2])).toContain("1 条素材里已有");
 		// The extraction was asked with the search entry and what to take, nothing of the conversation.
-		expect(extractions).toHaveLength(2);
+		expect(extractions).toHaveLength(3);
+		// The third extraction read the fetched page's text.
+		expect(extractions[2]).toContain("需要的内容：绿地面积");
 		expect(extractions[0]).toContain("需要的内容：巴黎新增绿地");
 		expect(extractions[0]).toContain("用于：现状");
 		expect(extractions[0]).toContain(URL_A);

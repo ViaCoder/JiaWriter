@@ -291,6 +291,15 @@ export function archiveFiltered(dir: string, pageFile: string, filtered: readonl
 	return file;
 }
 
+/**
+ * The address of the page read last in a topic (empty when none was): a material_add item with no source means it
+ * (2026-11-14: twice a run read a page with fetch_web and then named only what to take from it, eight times in a row).
+ */
+export function lastPageUrl(dir: string): string {
+	const pages = readIndex(dir).filter((e) => e.kind === "page" && e.url);
+	return pages.at(-1)?.url ?? "";
+}
+
 /** Addresses archived in a topic, normalized for comparison: where each page ended and what was asked for. */
 export function archivedUrls(dir: string): string[] {
 	// The pages of the index.
