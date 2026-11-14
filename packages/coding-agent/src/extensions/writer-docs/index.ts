@@ -1,6 +1,6 @@
 /**
  * Built-in JiaWriter extension: reference import and draft export.
- * - import_document / /import-doc: PDF, Word, HTML and text → Markdown with page markers in 参考资料/.parsed/.
+ * - import_document / /import-doc: PDF, Word, Excel, PowerPoint, HTML and text → Markdown with page markers in 参考资料/.parsed/.
  *   The reference folder is also scanned automatically: in the background when a session starts and
  *   before every run, so files added during a session are ready for the model. There is no OCR: a scan
  *   without a text layer is reported.
@@ -150,7 +150,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		label: "Import document",
 		// Full description sent to the model.
 		description:
-			"Imports a reference file (pdf, docx, txt, md, html) to Markdown with page markers under 参考资料/.parsed/; without path, every new file in 参考资料/",
+			"Imports a reference file (pdf, docx, xlsx, pptx, txt, md, html) to Markdown with page markers under 参考资料/.parsed/; without path, every new file in 参考资料/",
 		// Argument schema.
 		parameters: Type.Object({
 			path: Type.Optional(Type.String({ description: "File" })),

@@ -1,5 +1,5 @@
 /**
- * Reference import: PDF, Word (.docx), text, Markdown and HTML → Markdown with page markers in
+ * Reference import: PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx), text, Markdown and HTML → Markdown with page markers in
  * <sources>/.parsed/<file>.md, where read and grep find them. 参考资料/ (or sources/) in the working
  * folder is scanned; unchanged files are skipped. A PDF without a text layer is a scan: there is no
  * OCR, so the report asks for a version with a text layer. Imported text is untrusted material.
@@ -16,6 +16,10 @@ import { extractText } from "unpdf";
 import { t, type WriterLang } from "../i18n/index.ts";
 // Word reader.
 import { decodeXml, docxToPages } from "./docx-read.ts";
+// Slides reader.
+import { pptxToPages } from "./pptx-read.ts";
+// Spreadsheet reader.
+import { xlsxToPages } from "./xlsx-read.ts";
 
 /** Reference folders looked for in the working folder, in order. */
 export const SOURCE_DIRS = ["参考资料", "sources"];
@@ -33,7 +37,7 @@ export function parsedFiles(root: string): string[] {
 }
 
 /** File types read. */
-export const IMPORT_EXTS = [".pdf", ".docx", ".txt", ".md", ".html", ".htm"];
+export const IMPORT_EXTS = [".pdf", ".docx", ".xlsx", ".pptx", ".txt", ".md", ".html", ".htm"];
 /** Below this many visible characters per page a PDF counts as scanned. */
 const SCAN_CHARS_PER_PAGE = 30;
 
@@ -124,8 +128,10 @@ async function readPages(file: string): Promise<{ pages: string[]; status: Impor
 		const pages = await pdfPages(bytes);
 		return isScanned(pages) ? { pages: [], status: "scanned" } : { pages, status: "ok" };
 	}
-	// Word.
+	// Word, Excel (a page per sheet) and PowerPoint (a page per slide).
 	if (ext === ".docx") return { pages: docxToPages(bytes), status: "ok" };
+	if (ext === ".xlsx") return { pages: xlsxToPages(bytes), status: "ok" };
+	if (ext === ".pptx") return { pages: pptxToPages(bytes), status: "ok" };
 	// Text and Markdown (BOM dropped).
 	const text = new TextDecoder("utf-8").decode(bytes).replace(/^﻿/, "");
 	if (ext === ".txt" || ext === ".md") return { pages: [text.trim()], status: "ok" };

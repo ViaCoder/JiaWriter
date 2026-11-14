@@ -243,7 +243,7 @@ export const en: Record<MessageKey, string> = {
 	"import.scanned":
 		"- {source}: a scan without a text layer; JiaWriter does no text recognition. Use a PDF or Word file with a text layer.",
 	// Unsupported type.
-	"import.unsupported": "- {source}: unsupported file type; pdf, docx, txt, md and html can be imported.",
+	"import.unsupported": "- {source}: unsupported file type; pdf, docx, xlsx, pptx, txt, md and html can be imported.",
 	// Failure.
 	"import.failed": "- {source}: could not be read: {error}",
 	// Notice for the model.

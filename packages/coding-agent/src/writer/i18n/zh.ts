@@ -223,7 +223,7 @@ export const zh = {
 	// Scan without a text layer (there is no OCR).
 	"import.scanned": "- {source}：扫描件，没有文字层，JiaWriter 不做文字识别。请换成带文字层的 PDF 或 Word 文件。",
 	// Unsupported type.
-	"import.unsupported": "- {source}：不支持这种文件，可导入 pdf、docx、txt、md、html。",
+	"import.unsupported": "- {source}：不支持这种文件，可导入 pdf、docx、xlsx、pptx、txt、md、html。",
 	// Failure.
 	"import.failed": "- {source}：读取失败：{error}",
 	// Notice for the model.
