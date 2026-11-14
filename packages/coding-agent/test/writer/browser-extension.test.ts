@@ -288,7 +288,9 @@ describe("readTree", () => {
 		expect(read.acts).toBe(0);
 	});
 
-	it("reads a page of 20000 nodes in under 300 ms", async () => {
+	// The bound guards against a slow algorithm, not a slow machine: a shared CI runner took 310 ms (macos-15-intel,
+	// CI 43621494528, 2026-11-15), so it stands at a second.
+	it("reads a page of 20000 nodes in under a second", async () => {
 		const nodes = Array.from({ length: 20000 }, (_, i) => axNode(i % 2 ? "link" : "StaticText", `节点${i}`, i));
 		const made = load({ "Accessibility.getFullAXTree": () => ({ nodes }) });
 		const started = performance.now();
@@ -296,7 +298,7 @@ describe("readTree", () => {
 			acts: number;
 		};
 		expect(read.acts).toBe(10000);
-		expect(performance.now() - started).toBeLessThan(300);
+		expect(performance.now() - started).toBeLessThan(1000);
 	});
 });
 
