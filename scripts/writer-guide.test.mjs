@@ -34,11 +34,11 @@ test("systemParts gives each system its own commands", () => {
 	assert.ok(l.env.includes("~/.bashrc") && l.safety === "" && l.run.includes("./jiawriter"));
 });
 
-test("every guide has the six steps, the three screenshots and Chrome's real button names", () => {
+test("every guide has the seven steps, the three screenshots and Chrome's real button names", () => {
 	for (const p of PLATFORMS) {
 		const html = guideHtml(p);
 		// Six numbered sections.
-		for (let i = 1; i <= 6; i++) assert.ok(html.includes(`<h2>${i}. `), `${p} step ${i}`);
+		for (let i = 1; i <= 7; i++) assert.ok(html.includes(`<h2>${i}. `), `${p} step ${i}`);
 		// Three embedded images.
 		assert.equal(html.match(/data:image\/png;base64,/g)?.length, 3, p);
 		// Chinese Chrome 156: 开发者模式 and 加载未打包的扩展程序; the folder to choose.
