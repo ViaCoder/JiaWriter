@@ -312,7 +312,10 @@ export const en: Record<MessageKey, string> = {
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
 	"topic.missingFields": "missing {fields}",
 	"topic.missingPage": "no page for {file}",
-	"topic.missingSource": "no source: give url, or file and page",
+	"topic.missingSource":
+		"no source: give each item a url (a search result or page of this topic, as the results write it), or file and page; no page has been read in this topic yet, so it cannot be left out",
+	"topic.materialByTool":
+		"素材.md is written by material_add only, not changed with {tool}: the program extracts and checks the facts",
 	"topic.notArchived":
 		"{url} is not among this topic's search results or pages: search for it or read it with fetch_web first",
 	"topic.timeNotInSource":

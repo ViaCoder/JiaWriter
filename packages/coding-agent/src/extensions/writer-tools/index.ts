@@ -18,6 +18,8 @@ import { Type } from "typebox";
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Upstream path resolution (cwd, ~).
 import { resolveToCwd } from "../../core/tools/path-utils.ts";
+// One form for a stopped call.
+import { blockedText } from "../../writer/blocked.ts";
 // Which files are drafts.
 import { isDraftPath } from "../../writer/docs/auto.ts";
 // The imported references beside a draft.
@@ -152,6 +154,18 @@ export function draftFolders(file: string, cwd: string): string[] {
 		const rel = relative(cwd, dir);
 		if (rel === "" || rel.startsWith("..") || isAbsolute(rel) || dirname(dir) === dir) return dirs;
 	}
+}
+
+/**
+ * Whether a call would write 素材.md itself: write or edit with its path, or a bash command naming it (2026-11-14: after
+ * material_add sent items back, a run appended its own lines to 素材.md with edit four times and tried cat >>). The
+ * file holds facts the program extracted and checked; the model's own lines there would be neither.
+ */
+export function touchesMaterials(tool: string, input: unknown): boolean {
+	const args = (input ?? {}) as { path?: unknown; command?: unknown };
+	if ((tool === "write" || tool === "edit") && typeof args.path === "string")
+		return basename(args.path.trim()) === MATERIAL_FILE;
+	return tool === "bash" && typeof args.command === "string" && args.command.includes(MATERIAL_FILE);
 }
 
 /** Whether a draft has materials to take facts from: 素材.md, imported references, saved searches or pages, in its folder
@@ -469,8 +483,13 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		cutResumes = 0;
 		target = requestedLength(event.text ?? "") ?? (documentOpen ? target : undefined);
 	});
-	// The draft before its first change in this message.
+	// The draft before its first change in this message; the materials file is material_add's alone.
 	pi.on("tool_call", (event, ctx) => {
+		if (touchesMaterials(event.toolName, event.input))
+			return {
+				block: true,
+				reason: blockedText({ why: t("topic.materialByTool", { tool: event.toolName }), next: "change" }),
+			};
 		if (!DRAFT_TOOLS.has(event.toolName)) return undefined;
 		const path = (event.input as { path?: unknown }).path;
 		const file = typeof path === "string" ? resolveToCwd(path, ctx.cwd) : "";

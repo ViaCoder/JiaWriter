@@ -286,7 +286,9 @@ export const zh = {
 	"topic.archiveFailed": "归档失败（{reason}），本次结果没有保存到主题文件夹。",
 	"topic.missingFields": "缺少 {fields}",
 	"topic.missingPage": "《{file}》缺少页码",
-	"topic.missingSource": "缺少来源：要有 url，或 file 加 page",
+	"topic.missingSource":
+		"缺少来源：每条写 url（本主题检索结果或已读网页的地址，照结果里的写），或 file 加 page；本主题还没读过网页，不能省略",
+	"topic.materialByTool": "素材.md 只由 material_add 写入，不能用 {tool} 改：事实由程序从来源提取并核对",
 	"topic.notArchived": "网址 {url} 不在本主题的检索结果或已读页面里，请先检索或用 fetch_web 读取",
 	"topic.timeNotInSource":
 		"时间“{time}”在来源里找不到：照来源写时间，或写来源的发布日期；来源没有日期就不填 time，不要推测",

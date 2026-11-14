@@ -40,6 +40,7 @@ import writerToolsExtension, {
 	requestedLength,
 	reviewMaterialText,
 	shownRound,
+	touchesMaterials,
 	unusedMaterials,
 	withReviewBudget,
 } from "../../src/extensions/writer-tools/index.ts";
@@ -791,6 +792,33 @@ describe("cutOffWithoutCalls", () => {
 
 // One section written in a context of its own (the user, 2026-11-12: the research in the conversation colours the
 // writing, and more reasoning makes it worse).
+describe("touchesMaterials", () => {
+	it("names a write, edit or bash command on 素材.md, and nothing else", () => {
+		expect(touchesMaterials("edit", { path: "20261114-主题/素材.md" })).toBe(true);
+		expect(touchesMaterials("write", { path: "素材.md" })).toBe(true);
+		expect(touchesMaterials("bash", { command: 'cat >> "20261114-主题/素材.md" << EOF' })).toBe(true);
+		expect(touchesMaterials("edit", { path: "20261114-主题/稿件/报告.md" })).toBe(false);
+		expect(touchesMaterials("read", { path: "20261114-主题/素材.md" })).toBe(false);
+		expect(touchesMaterials("bash", { command: "ls 稿件" })).toBe(false);
+		// The extension blocks such a call with the reason.
+		const handlers: Record<string, (event: unknown, ctx: unknown) => unknown> = {};
+		writerToolsExtension({
+			registerTool: () => undefined,
+			registerMessageRenderer: () => undefined,
+			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
+				handlers[name] = fn;
+			},
+		} as unknown as ExtensionAPI);
+		const out = handlers.tool_call({ toolName: "edit", input: { path: "x/素材.md" } }, { cwd }) as {
+			block: boolean;
+			reason: string;
+		};
+		expect(out.block).toBe(true);
+		expect(out.reason).toContain("material_add");
+		expect(handlers.tool_call({ toolName: "edit", input: { path: "x/稿件/a.md" } }, { cwd })).toBeUndefined();
+	});
+});
+
 describe("draft_section", () => {
 	/** The outline and materials of a report, in a topic folder. */
 	function topic() {
