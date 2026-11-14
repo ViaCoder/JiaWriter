@@ -93,6 +93,24 @@ export const zh = {
 	"style.materials":
 		"修改用到的事实和案例只取自已有材料：话题的素材.md、参考资料/.parsed/、检索/ 和 网页/ 里保存的结果，并注明出处；材料里没有的不编造，也不留待补标记。检查意见不是检索的理由：用户没有要求检索就不检索，材料与意见不符时以材料为准。",
 	// An automatic round of revision.
+	// Scheduled tasks and delegated subtasks (2026-11-15).
+	"schedule.badWhen":
+		"看不懂时间“{when}”。可以写：每天 08:00、工作日 08:30、每周一 09:00、每月1日 09:00，或 cron 的五段（0 8 * * 1-5）。",
+	"schedule.noTask": "缺少 task：要做的事，写成用户会输入的完整请求。",
+	"schedule.added": "已添加定时任务 {id}：{when}，下次 {next}，在 {folder} 运行。",
+	"schedule.cronHint": "程序开着时到点自动运行；关着时请把这一行加进系统的 crontab（crontab -e）：\n{line}",
+	"schedule.none": "没有定时任务。",
+	"schedule.line": "- {id}：{when}，下次 {next}{last}｜{task}｜{folder}",
+	"schedule.noSuch": "没有 id 为“{id}”的定时任务。",
+	"schedule.removed": "已删除定时任务：{task}",
+	"schedule.ran": "定时任务「{task}」已运行：{status}，日志 {log}",
+	"schedule.nothingDue": "没有到点的定时任务。",
+	"schedule.usage": "用法：jiawriter schedule run（运行到点的任务）| jiawriter schedule list（列出任务）",
+	"schedule.command": "列出定时任务",
+	"delegate.depth": "子任务里不能再派子任务：直接做。",
+	"delegate.noTask": "缺少 task：写成用户会输入的完整请求。",
+	"delegate.timeout": "子任务超过 {minutes} 分钟被停止，已有的回复：\n{reply}",
+	"delegate.failed": "子任务失败（退出码 {code}）。回复：\n{reply}\n错误输出：\n{error}",
 	"style.replyMarks":
 		"回复里有机器写作的说法：{list}。把这段话按写作规则重说一遍，不用这些框架和套话，内容不变；稿件文件不用动。",
 	"style.cutResume": "上一条回复超出输出长度被截断，没有完成。请接着做刚才那一步，不要重复已经完成的内容。",

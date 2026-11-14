@@ -107,6 +107,25 @@ export const en: Record<MessageKey, string> = {
 	"style.materials":
 		"Facts and cases in a revision come only from the materials at hand: the topic's 素材.md, 参考资料/.parsed/, and the results saved in 检索/ and 网页/, cited; nothing the materials lack is invented, and no placeholder is left. A check's finding is no reason to search: search only when the user asked, and where the materials and a finding disagree, the materials stand.",
 	// An automatic round of revision.
+	// Scheduled tasks and delegated subtasks (2026-11-15).
+	"schedule.badWhen":
+		"The time “{when}” is not understood. Write 每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields (0 8 * * 1-5).",
+	"schedule.noTask": "task is missing: the request, complete, as the user would type it.",
+	"schedule.added": "Scheduled task {id} added: {when}, next {next}, in {folder}.",
+	"schedule.cronHint":
+		"It runs on time while the program is open; for when it is closed, add this line to the system's crontab (crontab -e):\n{line}",
+	"schedule.none": "No scheduled tasks.",
+	"schedule.line": "- {id}: {when}, next {next}{last} | {task} | {folder}",
+	"schedule.noSuch": "No scheduled task with id “{id}”.",
+	"schedule.removed": "Scheduled task removed: {task}",
+	"schedule.ran": "Scheduled task “{task}” ran: {status}, log {log}",
+	"schedule.nothingDue": "No scheduled task is due.",
+	"schedule.usage": "Usage: jiawriter schedule run (run the due tasks) | jiawriter schedule list",
+	"schedule.command": "List the scheduled tasks",
+	"delegate.depth": "A subtask cannot delegate further: do it directly.",
+	"delegate.noTask": "task is missing: the whole request, as the user would type it.",
+	"delegate.timeout": "The subtask was stopped after {minutes} minutes; its reply so far:\n{reply}",
+	"delegate.failed": "The subtask failed (exit code {code}). Reply:\n{reply}\nError output:\n{error}",
 	"style.replyMarks":
 		"The reply carries marks of machine writing: {list}. Say it again under the writing rules, without these frames and stock phrases and with the same content; leave the draft files alone.",
 	"style.cutResume":
