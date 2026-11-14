@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""Pictures of JiaWriter's interface at the moments a user sees most: the start, a question being worked on (a tool
-call under way), the finished reply with a written file, and the configuration dialog. A pseudo-terminal of 120 x 40
+"""Pictures of JiaWriter's interface at the moments a user sees most: the start, the task list, a question being worked
+on (a tool call under way), the finished reply with a written file, and the configuration dialog. A pseudo-terminal of 120 x 40
 runs the program against a local mock of the model (nothing leaves 127.0.0.1, the key is a dummy); the bytes the
 program wrote up to each moment are played through scripts/screen-render.mjs and drawn with scripts/screen-png.py.
 Usage: python3 -I scripts/writer-ui-shots.py <out dir> [program]   (default program: the source launcher)
@@ -88,15 +88,20 @@ class Model(http.server.BaseHTTPRequestHandler):
         self.send_header("content-type", "text/event-stream")
         self.end_headers()
         if done == 0:
+            # The task list first, as the rules ask for work of several steps.
+            stream_call(self, "todo_write", {"todos": [{"content": "读取纪要文件夹", "status": "in_progress"}, {"content": "写材料说明", "status": "pending"}, {"content": "核对说明并汇报", "status": "pending"}]})
+        elif done == 1:
             stream_text(self, "我先看一下文件夹里有什么。")
             # A pause with the call under way, for the picture of work in progress.
             time.sleep(4)
             stream_call(self, "bash", {"command": "ls -la 纪要 && cat 纪要/*.md"})
-        elif done == 1:
+        elif done == 2:
             # A pause with the call's result on the screen, for the picture of a tool row.
             time.sleep(5)
             stream_text(self, REPLY)
             stream_call(self, "write", {"path": "说明.md", "content": NOTE})
+        elif done == 3:
+            stream_call(self, "todo_write", {"todos": [{"content": "读取纪要文件夹", "status": "completed"}, {"content": "写材料说明", "status": "completed"}, {"content": "核对说明并汇报", "status": "in_progress"}]})
         else:
             stream_text(self, "说明.md 已写好，312 字；检查没有发现问题。")
             self.wfile.write(event({}, "stop") + b"data: [DONE]\n\n")
@@ -213,6 +218,10 @@ def main():
         time.sleep(0.8)
         shots.append(("2-typed", picture(cap.snapshot(), out, "2-typed")))
         os.write(fd, b"\r")
+        # The task list stands above the editor.
+        cap.wait("读取纪要文件夹", 20)
+        time.sleep(1.0)
+        shots.append(("2b-tasks", picture(cap.snapshot(), out, "2b-tasks")))
         # The first text has arrived and the tool call is still under way.
         cap.wait("文件夹里有什么", 20)
         time.sleep(2.5)

@@ -1,5 +1,5 @@
 /**
- * Export a Markdown draft to .docx (with an export profile) or to Markdown, after the symbol pass (LaTeX,
+ * Export a Markdown draft to .docx (with an export profile), .xlsx (its tables), .pptx (its sections) or Markdown, after the symbol pass (LaTeX,
  * HTML entities), the Chinese punctuation pass and the space pass, and report what the final check of the
  * written file and of the reference list found.
  */
@@ -14,6 +14,8 @@ import { t, type WriterLang } from "../i18n/index.ts";
 import { type Block, parseBlocks, punctMarkdown } from "./blocks.ts";
 // docx writer and check.
 import { auditDocx, buildDocx, type DocxAudit } from "./docx.ts";
+// Slides writer.
+import { buildPptx } from "./pptx.ts";
 // Profiles.
 import { loadProfile } from "./profile.ts";
 // Punctuation and spaces.
@@ -22,11 +24,13 @@ import { countAsciiNextToHan, countLooseSpaces, normalizePunct, tightenSpaces } 
 import { checkReferences, type RefReport } from "./refs.ts";
 // Unicode symbols for LaTeX and HTML entities.
 import { fixSymbols } from "./symbols.ts";
+// Spreadsheet writer.
+import { buildXlsx } from "./xlsx.ts";
 
 /** Export options. */
 export interface ExportOptions {
-	// "docx" (default) or "md".
-	format?: "docx" | "md";
+	// "docx" (default), "xlsx", "pptx" or "md".
+	format?: ExportFormat;
 	// Profile name or JSON path (default default-zh).
 	profile?: string;
 	// Output path (default next to the draft).
@@ -40,7 +44,7 @@ export interface ExportResult {
 	// Written file, relative to the working folder.
 	out: string;
 	// Format written.
-	format: "docx" | "md";
+	format: ExportFormat;
 	// Profile used.
 	profile: string;
 	// Whether the punctuation pass ran.
@@ -63,11 +67,14 @@ export interface ExportResult {
 	audit?: DocxAudit;
 }
 
-/** Default output path: the draft's name with .docx, or .export.md for Markdown. */
-export function defaultOutput(draft: string, format: "docx" | "md"): string {
+/** The formats export writes. */
+export type ExportFormat = "docx" | "md" | "xlsx" | "pptx";
+
+/** Default output path: the draft's name with the format's extension, or .export.md for Markdown. */
+export function defaultOutput(draft: string, format: ExportFormat): string {
 	// Name without its extension.
 	const stem = join(dirname(draft), basename(draft, extname(draft)));
-	return format === "docx" ? `${stem}.docx` : `${stem}.export.md`;
+	return format === "md" ? `${stem}.export.md` : `${stem}.${format}`;
 }
 
 /** Export the draft at the absolute path `draft`. */
@@ -107,6 +114,11 @@ export async function exportDraft(
 		looseSpaces = blocks.reduce((n, b) => n + blockSpaces(b), 0);
 		bytes = await buildDocx(blocks, profile);
 		audit = auditDocx(bytes);
+	} else if (format === "xlsx" || format === "pptx") {
+		// The same blocks: tables as sheets, sections as slides.
+		const blocks = parseBlocks(markdown, fix);
+		looseSpaces = blocks.reduce((n, b) => n + blockSpaces(b), 0);
+		bytes = format === "xlsx" ? buildXlsx(blocks, profile.levels.body.eastAsia) : buildPptx(blocks);
 	} else {
 		const text = punctMarkdown(markdown, fix);
 		const prose = text.replace(/```[\s\S]*?```|`[^`]*`|\]\([^)]*\)|https?:\/\/\S+/g, "");

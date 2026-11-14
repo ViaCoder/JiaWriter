@@ -7,6 +7,8 @@
 
 // Schema helpers.
 import { StringEnum } from "@earendil-works/pi-ai/utils/typebox-helpers";
+// The call row.
+import { Text } from "@earendil-works/pi-tui";
 // Schemas.
 import { Type } from "typebox";
 // Extension API types.
@@ -88,6 +90,23 @@ export default function writerTodoExtension(pi: ExtensionAPI): void {
 				}),
 			),
 		}),
+		// The call row as the list itself, not the JSON of the arguments (2026-11-14: the screen showed
+		// todos=[{"content":…, cut off).
+		renderCall: (args, theme) => {
+			const list = cleanTodos((args as { todos?: unknown }).todos);
+			const done = list.filter((x) => x.status === "completed").length;
+			const lines = [
+				`${theme.fg("toolTitle", t("todo.title", { done, total: list.length }))}`,
+				...list.map((x) =>
+					x.status === "completed"
+						? theme.fg("dim", `  ${MARK[x.status]} ${x.content}`)
+						: x.status === "in_progress"
+							? theme.fg("accent", `  ${MARK[x.status]} ${x.content}`)
+							: `  ${MARK[x.status]} ${x.content}`,
+				),
+			];
+			return new Text(lines.join("\n"), 0, 0);
+		},
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			todos = cleanTodos(params.todos);
 			show(ctx);

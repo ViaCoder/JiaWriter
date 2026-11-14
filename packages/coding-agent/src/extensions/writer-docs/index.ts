@@ -172,11 +172,12 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		// Name shown in the interface.
 		label: "Export document",
 		// Full description sent to the model.
-		description: "Exports a Markdown draft to .docx (default) or Markdown, with Chinese punctuation",
+		description:
+			"Exports a Markdown draft to .docx (default), .xlsx (its tables, one sheet each), .pptx (its sections as slides) or Markdown, with Chinese punctuation",
 		// Argument schema.
 		parameters: Type.Object({
 			path: Type.String({ description: "Draft" }),
-			format: Type.Optional(StringEnum(["docx", "md"] as const)),
+			format: Type.Optional(StringEnum(["docx", "md", "xlsx", "pptx"] as const)),
 			profile: Type.Optional(Type.String({ description: "Profile name or .json path" })),
 			output: Type.Optional(Type.String({ description: "Output path" })),
 		}),
