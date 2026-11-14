@@ -125,6 +125,7 @@ def main():
             ("/skills", 3, ["写作 skill（4 个）", "公文写作", "内置"]),
             ("\x1b", 2, []),
             ("/rewind", 3, ["还没有可以回退的消息"]),
+            ("/schedule", 3, ["没有定时任务"]),
             ("/effort", 3, ["思考强度（当前", "xhigh"]),
             ("\x1b", 2, []),
             ("/lang en", 3, ["Interface language set to English"]),
