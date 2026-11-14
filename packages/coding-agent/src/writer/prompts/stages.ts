@@ -38,6 +38,33 @@ export interface PromptStage {
 /** Stage of the writing manual, also sent when a run starts inside a topic. */
 export const WRITING_STAGE = "writing";
 
+/** Marks that number the items of a request: 1. 2) （3） ① 一、 第二， each followed by something other than a digit. */
+const ITEM_MARK =
+	/(?:(?:^|[\s，。；：、])(?:\d{1,2}[.、．)）]|[（(]\d{1,2}[)）]|[①②③④⑤⑥⑦⑧⑨⑩]|[一二三四五六七八九十]+[、．])|第[一二三四五六七八九十]+[，、：:])(?!\d)/g;
+/** A count of things asked for: 三件事, 四项, 五点. */
+const ITEM_COUNT = /([三四五六七八九十])(?:件事|项|点|个任务|步)/;
+/** Chinese numerals' values. */
+const NUMERAL: Readonly<Record<string, number>> = { 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 十: 10 };
+
+/** How many items a request lists: its numbered marks, or the count it names, whichever is larger; 0 for none. */
+export function listedSteps(prompt: string): number {
+	const marks = [...prompt.matchAll(ITEM_MARK)].length;
+	const named = NUMERAL[ITEM_COUNT.exec(prompt)?.[1] ?? ""] ?? 0;
+	return Math.max(marks, named);
+}
+
+/** Fewest listed items that call for the task list. */
+export const STEPS_FOR_TODO = 3;
+
+/**
+ * The note given with a request that lists STEPS_FOR_TODO items or more (exp-p24r1 F1, 2026-11-14: three numbered
+ * tasks were done well, but without todo_write, which the core rule asks for; the rule is read once, the request is
+ * the moment it applies).
+ */
+export function stepsNote(count: number): string {
+	return `This request lists ${count} items: put them in todo_write before starting the first, mark each done as it is finished, and at the end report on each in the user's order.`;
+}
+
 /** The stages of each method. */
 function methodStages(tool: string, methods: Readonly<Record<string, readonly string[]>>): PromptStage[] {
 	// One stage per method.

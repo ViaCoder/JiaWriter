@@ -9,7 +9,16 @@ import type { AgentMessage } from "@earendil-works/pi-agent-core";
 // Extension API types.
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Stages and their text.
-import { dueStages, givenStages, PROMPT_STAGES, stageText, WRITING_STAGE } from "../../writer/prompts/stages.ts";
+import {
+	dueStages,
+	givenStages,
+	listedSteps,
+	PROMPT_STAGES,
+	STEPS_FOR_TODO,
+	stageText,
+	stepsNote,
+	WRITING_STAGE,
+} from "../../writer/prompts/stages.ts";
 
 /** Told once to a session nobody can answer (print mode): a run on 2026-11-08 stopped at its outline, asking. */
 export const NO_USER_NOTE =
@@ -96,9 +105,14 @@ export default function writerPromptsExtension(pi: ExtensionAPI): void {
 
 	// Without an interface there is nobody to answer a question: said once, before the first run. After compaction a
 	// document under way needs its rules back; a topic alone asks for nothing.
-	pi.on("before_agent_start", (_event, ctx) => {
+	pi.on("before_agent_start", (event, ctx) => {
 		// One message holds whatever is due, so a note never pushes the writing rules out (after a compaction both are).
 		const parts: { type: string; text: string }[] = [];
+		// A request that lists several items: the task list, now that it applies.
+		if (event.messageType === "user") {
+			const steps = listedSteps(event.prompt);
+			if (steps >= STEPS_FOR_TODO) parts.push({ type: "jiawriter-steps", text: stepsNote(steps) });
+		}
 		if (!ctx.hasUI && !toldNoUser) {
 			toldNoUser = true;
 			parts.push({ type: "jiawriter-no-user", text: NO_USER_NOTE });

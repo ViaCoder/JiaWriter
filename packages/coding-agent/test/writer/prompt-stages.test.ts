@@ -26,9 +26,12 @@ import { FETCH_METHODS, SEARCH_METHODS } from "../../src/writer/prompts/methods.
 import {
 	dueStages,
 	givenStages,
+	listedSteps,
 	PROMPT_STAGES,
+	STEPS_FOR_TODO,
 	stageLines,
 	stageText,
+	stepsNote,
 	WRITING_STAGE,
 } from "../../src/writer/prompts/stages.ts";
 import { styleCheck, styleClean } from "../../src/writer/style/check.ts";
@@ -348,6 +351,21 @@ describe("the extension", () => {
 		expect(map.get("tool_result")?.(result("write"))).toBeDefined();
 	});
 
+	it("gives the task-list note with a request that lists three items or more, every such request", () => {
+		const map = handlers();
+		const start = (prompt: string) =>
+			map.get("before_agent_start")?.({ messageType: "user", prompt }, UI) as
+				| { message: { content: string } }
+				| undefined;
+		// The interactive note comes with the first run; the steps note is in the same message.
+		const first = start("请完成三件事：1. 整理目录；2. 汇总要点；3. 加一行。");
+		expect(first?.message.content).toContain(USER_TURNS_NOTE);
+		expect(first?.message.content).toContain("lists 3 items");
+		// A request without a list: nothing; a later list: the note again.
+		expect(start("写一份通知")).toBeUndefined();
+		expect(start("①检索 ②记素材 ③写大纲 ④写稿")?.message.content).toContain("lists 4 items");
+	});
+
 	it("adds nothing to a run in a topic where only research happened, also after compaction", () => {
 		const map = handlers();
 		setCurrentTopic("/tmp/主题");
@@ -424,5 +442,21 @@ describe("USER_TURNS_NOTE", () => {
 		expect(USER_TURNS_NOTE).toContain("show the outline and stop");
 		expect(USER_TURNS_NOTE).toContain("one section per turn");
 		expect(USER_TURNS_NOTE).toContain("unless they ask for it at once");
+	});
+});
+
+describe("listedSteps / stepsNote", () => {
+	it("counts the numbered items of a request, or the count it names, and leaves dates and decimals alone", () => {
+		expect(listedSteps("请完成三件事：1. 整理目录；2. 汇总要点；3. 在待办末尾加一行。")).toBe(3);
+		expect(listedSteps("两件事：（1）复制说明；（2）建备份文件夹。")).toBe(2);
+		expect(listedSteps("一、现状 二、问题 三、对策 四、启示")).toBe(4);
+		expect(listedSteps("先做第一，再做第二，最后第三，")).toBe(3);
+		expect(listedSteps("①检索 ②记素材 ③写大纲")).toBe(3);
+		expect(listedSteps("写四项内容，具体你定")).toBe(4);
+		expect(listedSteps("11月20日前反馈，份额 4.8%，2026年1.5万亿元")).toBe(0);
+		expect(listedSteps("写一份通知")).toBe(0);
+		expect(STEPS_FOR_TODO).toBe(3);
+		expect(stepsNote(3)).toContain("lists 3 items");
+		expect(stepsNote(3)).toContain("todo_write");
 	});
 });
