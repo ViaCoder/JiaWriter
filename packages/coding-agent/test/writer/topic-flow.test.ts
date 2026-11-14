@@ -11,6 +11,7 @@ import { basename, join } from "node:path";
 import { fauxAssistantMessage, fauxToolCall } from "@earendil-works/pi-ai";
 // Test API.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 // Session store.
 import { SessionManager } from "../../src/core/session-manager.ts";
 // Extensions under test.
@@ -18,6 +19,8 @@ import writerDocsExtension from "../../src/extensions/writer-docs/index.ts";
 import writerRewindExtension from "../../src/extensions/writer-rewind/index.ts";
 import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
 import writerTopicExtension from "../../src/extensions/writer-topic/index.ts";
+// The extraction's model stand-in.
+import type { Complete } from "../../src/writer/model-ask.ts";
 // Snapshots.
 import { readSnapshots, storeDir } from "../../src/writer/rewind/rewind.ts";
 // The current topic.
@@ -68,10 +71,22 @@ describe("a writing topic", () => {
 		rmSync(agentDir, { recursive: true, force: true });
 	});
 
+	/** What the extraction was asked (its request text), and the fact lines it answers with. */
+	const extractions: string[] = [];
+	const CASE_LINE = "案例｜时间：2026年10月31日｜主体：巴黎市政府｜事实：巴黎市政府新增绿地12公顷";
+	let factLines = CASE_LINE;
+	const complete = (async (_model: unknown, context: { messages: { content: string }[] }) => {
+		extractions.push(String(context.messages[0]?.content));
+		return { role: "assistant", content: [{ type: "text", text: factLines }], stopReason: "stop" };
+	}) as unknown as Complete;
+	const topicExtension = (pi: ExtensionAPI) => writerTopicExtension(pi, complete);
+
 	/** A harness with the three extensions. */
 	async function setup(sessionManager?: SessionManager): Promise<Harness> {
+		extractions.length = 0;
+		factLines = CASE_LINE;
 		return createHarness({
-			extensionFactories: [writerTopicExtension, writerSearchExtension, writerDocsExtension, writerRewindExtension],
+			extensionFactories: [topicExtension, writerSearchExtension, writerDocsExtension, writerRewindExtension],
 			initialActiveToolNames: TOOLS,
 			sessionManager,
 		});
@@ -87,24 +102,15 @@ describe("a writing topic", () => {
 		const folder = basename(topicPath(harness.tempDir, "巴黎绿化"));
 		const topic = join(harness.tempDir, folder);
 		const draft = join(folder, "稿件", "初稿.md");
-		const material = {
-			kind: "case",
-			time: "2026年10月31日",
-			reporter: "法新社",
-			subject: "巴黎市政府",
-			start: "巴黎市政府新增绿地",
-			url: URL_A,
-		};
+		const material = { url: URL_A, section: "现状", focus: "巴黎新增绿地" };
 		harness.setResponses([
 			call("topic_open", { name: "巴黎绿化" }),
 			call("search_web", { query: "巴黎 绿地", method: "anysearch" }),
 			// An address the topic has never seen is refused.
 			call("material_add", { items: [{ ...material, url: "https://elsewhere.example/x" }] }),
-			// Words the source does not have are refused: the program takes the passage out of the source (2026-11-11).
-			call("material_add", { items: [{ ...material, start: "巴黎扩大了城市绿化面积" }] }),
-			// A search result is enough; a whole sentence as start still works, with a reminder that a few words do.
+			// A search result is enough: the program extracts the facts from its entry; the same facts again are skipped.
 			call("material_add", { items: [material] }),
-			call("material_add", { items: [{ ...material, start: "2026年10月31日 巴黎市政府新增绿地 12 公顷" }] }),
+			call("material_add", { items: [material] }),
 			call("fetch_web", { url: URL_A, method: "anysearch" }),
 			call("write", {
 				path: draft,
@@ -127,15 +133,24 @@ describe("a writing topic", () => {
 		const said = JSON.stringify(harness.session.messages.filter((m) => m.role === "toolResult"));
 		expect(said).not.toMatch(/不可信|untrusted/);
 		expect(page).not.toMatch(/不可信|untrusted/);
-		// The unknown address and the summary were refused; the excerpt of the search result went in.
+		// The unknown address was refused; the facts of the search result went in, once.
 		const results = harness.session.messages.filter((m) => m.role === "toolResult" && m.toolName === "material_add");
-		expect(results.map((r) => (r as { isError?: boolean }).isError)).toEqual([true, true, false, false]);
-		// A call sent back says what went in and what to resend.
-		expect(JSON.stringify(results[1])).toContain("退回 1 条");
-		expect(JSON.stringify(results[2])).not.toContain("不用整句照抄");
-		expect(JSON.stringify(results[3])).toContain("不用整句照抄");
-		expect(JSON.stringify(results[1])).toContain("找不到");
-		expect(readFileSync(join(topic, "素材.md"), "utf-8")).toContain("原文：“巴黎市政府新增绿地 12 公顷”");
+		expect(results.map((r) => (r as { isError?: boolean }).isError)).toEqual([true, false, false]);
+		expect(JSON.stringify(results[0])).toContain("不在本主题");
+		expect(JSON.stringify(results[1])).toContain("记下 1 条");
+		expect(JSON.stringify(results[1])).toContain("- 巴黎市政府：巴黎市政府新增绿地12公顷");
+		expect(JSON.stringify(results[2])).toContain("1 条素材里已有");
+		// The extraction was asked with the search entry and what to take, nothing of the conversation.
+		expect(extractions).toHaveLength(2);
+		expect(extractions[0]).toContain("需要的内容：巴黎新增绿地");
+		expect(extractions[0]).toContain("用于：现状");
+		expect(extractions[0]).toContain(URL_A);
+		expect(extractions[0]).not.toContain("写巴黎绿化");
+		// The fact with the page's outlet and date, and the section.
+		const materials = readFileSync(join(topic, "素材.md"), "utf-8");
+		expect(materials).toContain("【现状】案例｜时间：2026年10月31日｜报道方：");
+		expect(materials).toContain("主体：巴黎市政府｜事实：巴黎市政府新增绿地12公顷｜");
+		expect(materials.split("\n").filter((l) => l.startsWith("- "))).toHaveLength(1);
 		// The draft was edited and exported beside itself; research stayed out of the export.
 		expect(readFileSync(join(topic, "稿件", "初稿.md"), "utf-8")).toContain("修改后的正文");
 		expect(existsSync(join(topic, "稿件", "初稿.docx"))).toBe(true);
@@ -145,14 +160,9 @@ describe("a writing topic", () => {
 
 	it("saves the materials file before a change, so going back covers it", async () => {
 		harness = await setup();
-		const material = {
-			kind: "data",
-			time: "2025年",
-			start: "苏州纺织产值",
-			file: "年鉴.pdf",
-			page: "3",
-		};
-		// The yearbook as imported, where the program takes the passage from.
+		const material = { file: "年鉴.pdf", page: "3", section: "现状" };
+		factLines = "数据｜时间：2025年｜事实：苏州纺织产值1亿元";
+		// The yearbook as imported, where the program takes the facts from.
 		mkdirSync(join(harness.tempDir, "参考资料", ".parsed"), { recursive: true });
 		writeFileSync(join(harness.tempDir, "参考资料", ".parsed", "年鉴.pdf.md"), "2025年苏州纺织产值1亿元。");
 		harness.setResponses([

@@ -83,7 +83,10 @@ describe("budgets", () => {
 		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);
-		for (const rules of [MATERIAL_MANUAL, EXPORT_MANUAL, RESTORE_MANUAL, ...Object.values(CHECK_MANUALS)])
+		// 400 since 2026-11-14: material_add extracts the facts of a source in a request of its own, and the manual says
+		// how a source is given and that the list it returns is read first.
+		expect(size(MATERIAL_MANUAL)).toBeLessThanOrEqual(400);
+		for (const rules of [EXPORT_MANUAL, RESTORE_MANUAL, ...Object.values(CHECK_MANUALS)])
 			expect(size(rules)).toBeLessThanOrEqual(300);
 		for (const rules of [...Object.values(SEARCH_METHODS), ...Object.values(FETCH_METHODS)])
 			expect(size(rules)).toBeLessThanOrEqual(350);

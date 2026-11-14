@@ -9,13 +9,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 // Walking from a draft up to the writing folder.
 import { basename, dirname, isAbsolute, join, relative } from "node:path";
 // One request to the session's model, for the semantic review.
-import { type Api, completeSimple, type Model } from "@earendil-works/pi-ai/compat";
+import { completeSimple } from "@earendil-works/pi-ai/compat";
 // Text for the automatic check as shown.
 import { Text } from "@earendil-works/pi-tui";
 // Parameter schemas.
 import { Type } from "typebox";
 // Extension API types.
-import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
+import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // Upstream path resolution (cwd, ~).
 import { resolveToCwd } from "../../core/tools/path-utils.ts";
 // Which files are drafts.
@@ -41,8 +41,20 @@ import { uncitedReferences } from "../../writer/export/refs.ts";
 // The 公文 parameter check, run by the program at the end of a turn.
 // Output messages.
 import { t } from "../../writer/i18n/index.ts";
+// One clean request to the model, for the review and the sections.
+import {
+	type AskBudget,
+	type Complete,
+	modelAsker,
+	REVIEW_REASONING_TOKENS,
+	REVIEW_TIMEOUT_MS,
+	withReviewBudget,
+} from "../../writer/model-ask.ts";
 // The semantic review line.
 import { STYLE_REVIEW } from "../../writer/prompts/manuals.ts";
+
+export { type AskBudget, type Complete, modelAsker, REVIEW_REASONING_TOKENS, REVIEW_TIMEOUT_MS, withReviewBudget };
+
 // Readability check.
 import {
 	DEFAULT_SENTENCE_LIMIT,
@@ -58,13 +70,7 @@ import { runDraftChecks } from "../../writer/style/draft-checks.ts";
 // The default threshold for the schema description.
 import { DEFAULT_NEGATION_THRESHOLD } from "../../writer/style/patterns.ts";
 // The semantic review by a separate request.
-import {
-	formatReview,
-	keepAnswerable,
-	type ReviewIssue,
-	reviewDraft,
-	reviewEnabled,
-} from "../../writer/style/review.ts";
+import { formatReview, keepAnswerable, type ReviewIssue, reviewDraft } from "../../writer/style/review.ts";
 // Length as writers count it.
 import { bodyBeforeReferences, countText, REFERENCES_HEADING } from "../../writer/text-stats.ts";
 // Shared input loading.
@@ -415,74 +421,6 @@ export function ownFindings(
 	}
 	own.push(...finishedChecks(text));
 	return own;
-}
-
-/** How one request reaches a model: completeSimple, or a stand-in in tests. */
-export type Complete = typeof completeSimple;
-
-/** A way to ask the session's model one question with its own credentials; undefined without a model or with JW_REVIEW=off. */
-/** Reasoning tokens a review may use: with 4,096 it caught the same 5 of 5 seeded faults, its median fell from 108 to
- * 23 s and its longest from 719 to 124 s (2026-11-10; one review of a 400-character brief had waited 607 s). */
-export const REVIEW_REASONING_TOKENS = 4096;
-/** Longest wait for one review: past it the draft goes on without one. */
-export const REVIEW_TIMEOUT_MS = 180_000;
-
-/** The request body with a reasoning budget, in OpenRouter's form (other APIs keep theirs). */
-export function withReviewBudget(payload: unknown, tokens = REVIEW_REASONING_TOKENS): unknown {
-	if (!payload || typeof payload !== "object") return payload;
-	return { ...(payload as Record<string, unknown>), reasoning: { max_tokens: tokens } };
-}
-
-/** How one clean request is bounded: its reasoning tokens and its longest wait. */
-export interface AskBudget {
-	reasoningTokens: number;
-	timeoutMs: number;
-}
-
-export function modelAsker(
-	ctx: ExtensionContext,
-	complete: Complete = completeSimple,
-	budgetOf: AskBudget = { reasoningTokens: REVIEW_REASONING_TOKENS, timeoutMs: REVIEW_TIMEOUT_MS },
-	// The review can be switched off (JW_REVIEW=off); a section must still be written.
-	always = false,
-): ((instructions: string, text: string) => Promise<string>) | undefined {
-	const model = ctx.model;
-	if (!model || (!always && !reviewEnabled())) return undefined;
-	// The budget goes to OpenAI-style requests until an upstream refuses it.
-	let budget = model.api === "openai-completions";
-	return async (instructions, text) => {
-		const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-		if (!auth.ok) throw new Error(auth.error);
-		// The same address and keys the conversation uses.
-		const target: Model<Api> = { ...model, baseUrl: auth.baseUrl ?? model.baseUrl };
-		const ask = (capped: boolean) =>
-			complete(
-				target,
-				{ systemPrompt: instructions, messages: [{ role: "user", content: text, timestamp: Date.now() }] },
-				{
-					apiKey: auth.apiKey,
-					headers: auth.headers,
-					signal: AbortSignal.timeout(budgetOf.timeoutMs),
-					...(capped
-						? { onPayload: (payload: unknown) => withReviewBudget(payload, budgetOf.reasoningTokens) }
-						: {}),
-				},
-			);
-		let reply = await ask(budget);
-		// An upstream that refuses the budget's field: once more without it, and never again in this run. Other
-		// errors are not retried (2026-11-10: a retry on any error took the next scripted reply in a compaction test).
-		if (
-			reply.stopReason === "error" &&
-			budget &&
-			/\b400\b|reasoning|max_tokens|unknown|unsupported|unrecognized|invalid/i.test(reply.errorMessage ?? "")
-		) {
-			budget = false;
-			reply = await ask(false);
-		}
-		if (reply.stopReason === "error" || reply.stopReason === "aborted")
-			throw new Error(reply.errorMessage ?? "review failed");
-		return reply.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("");
-	};
 }
 
 /** Extension factory; `complete` reaches the model for the semantic review (tests pass a stand-in). */

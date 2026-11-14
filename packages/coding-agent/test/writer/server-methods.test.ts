@@ -282,8 +282,7 @@ describe("search_web with the upstream methods", () => {
 			time: "2026年",
 			reporter: "路透社",
 			subject: "甲",
-			// The result's title, as the source words it.
-			start: "新闻",
+			fact: "甲发布新闻",
 			url: URL_A,
 		} as const;
 		expect(addMaterials(topic, [item])).toMatchObject({ total: 1, written: [1], problems: [] });

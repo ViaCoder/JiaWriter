@@ -883,7 +883,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 			force: false,
 		});
 
-		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`"扩展：@scope/pi-scoped、answer.ts、cli-extension.ts、HazAT/pi-interactive-subagents、HazAT/pi-interactive-subagents:subagents、local-index、pi-markdown-preview、user-index"`);
+		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(
+			`"扩展：@scope/pi-scoped、answer.ts、cli-extension.ts、HazAT/pi-interactive-subagents、HazAT/pi-interactive-subagents:subagents、local-index、pi-markdown-preview、user-index"`,
+		);
 	});
 
 	test("adds more parent folders until local extension labels are unique", () => {
@@ -927,7 +929,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 			force: false,
 		});
 
-		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`"扩展：alpha/one、beta/one、gamma/one"`);
+		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(
+			`"扩展：alpha/one、beta/one、gamma/one"`,
+		);
 	});
 
 	test("strips index.ts from local extension label, showing parent dir", () => {
@@ -1014,7 +1018,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 			force: false,
 		});
 
-		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`"扩展：plan-mode、webfetch.ts"`);
+		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(
+			`"扩展：plan-mode、webfetch.ts"`,
+		);
 	});
 
 	test("multiple index.ts with unique parent dirs need no disambiguation", () => {
@@ -1084,7 +1090,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 			force: false,
 		});
 
-		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`"扩展：alpha/tools、beta/tools"`);
+		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(
+			`"扩展：alpha/tools、beta/tools"`,
+		);
 	});
 
 	test("non-index file in subdirectory stays as filename", () => {
@@ -1136,7 +1144,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 			force: false,
 		});
 
-		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`"扩展：pi-markdown-preview"`);
+		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(
+			`"扩展：pi-markdown-preview"`,
+		);
 	});
 
 	test("labels npm sibling extensions relative to the declaring package", () => {
@@ -1171,7 +1181,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 			force: false,
 		});
 
-		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`"扩展：primary-package、primary-package:../sibling-package"`);
+		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(
+			`"扩展：primary-package、primary-package:../sibling-package"`,
+		);
 	});
 
 	test("labels Windows npm sibling extensions relative to the declaring package", () => {
@@ -1209,7 +1221,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 			force: false,
 		});
 
-		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(`"扩展：primary-package、primary-package:../sibling-package"`);
+		expect(normalizeRenderedOutput(fakeThis.loadedResourcesContainer)).toMatchInlineSnapshot(
+			`"扩展：primary-package、primary-package:../sibling-package"`,
+		);
 	});
 
 	test("captures mixed extension layouts in expanded output", () => {

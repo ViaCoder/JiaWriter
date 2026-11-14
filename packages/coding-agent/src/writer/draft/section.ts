@@ -1,6 +1,6 @@
 /**
  * One section of a long document, written in a context of its own: the writing rules, the outline, this section's
- * material excerpts and the text written so far, and nothing else. The conversation that researched the topic holds
+ * material facts and the text written so far, and nothing else. The conversation that researched the topic holds
  * search results, tool output and the model's own summaries, and a model writing inside it takes their style (the
  * user, 2026-11-12: "when tools like search are invoked, this context can inadvertently bleed into" the writing, and
  * "higher levels of reasoning often tend to exacerbate this AI-like quality"). So the main model only names the
@@ -12,6 +12,8 @@
 import { WRITING_MANUAL } from "../prompts/manuals.ts";
 // Where the reference list starts, so a section goes before it.
 import { REFERENCES_HEADING } from "../text-stats.ts";
+// Paragraphs of published official documents, for the shape of a section's kind.
+import { exemplarsFor } from "./exemplars.ts";
 
 /** Reasoning tokens a section may use: a small budget, since long reasoning writes in the model's own register. */
 export const SECTION_REASONING_TOKENS = 1024;
@@ -31,7 +33,7 @@ export interface SectionInput {
 	items: string[];
 	// The heading the section opens with; empty for none.
 	heading: string;
-	// Material excerpts for this section, as 素材.md lines.
+	// The material of this section, as 素材.md lines: facts the program extracted from the sources.
 	materials: string[];
 	// The text written so far.
 	previous: string;
@@ -116,7 +118,7 @@ export function sectionInstructions(): string {
 	// The "Order" item is for the main model, which runs the document; here the order is given.
 	const rules = WRITING_MANUAL.filter((r) => !r.startsWith("Order:"));
 	return [
-		"You write one section of a Chinese official document for the program that assembles the document. The request gives the document's purpose, the outline, this section's judgments and material excerpts, and the text written so far. Write from those alone: every fact and figure from the excerpts, none from memory, each excerpt used at most once.",
+		"You write one section of a Chinese official document for the program that assembles the document. The request gives the document's purpose, the outline, this section's judgments and its material (fact records the program extracted from the sources), and the text written so far. Write from those alone: every fact and figure from the records, none from memory, each record used at most once.",
 		...rules,
 		// Quoted people (the user, 2026-11-12: material from international outlets "with quotes from individuals—particularly
 		// those containing metaphors or other vivid, expressive language" makes the output read as machine-written).
@@ -126,6 +128,9 @@ export function sectionInstructions(): string {
 		"Paragraphs open differently from one another, with the judgment or the measure itself: never by restating the problem it answers (not 针对起降设施不足的问题，要增加设施 but 民航局会同地方政府按飞行需求增建起降点), never by describing what the document does (not 本报告梳理现状、分析问题 but the first fact or judgment), and a measure names who does it",
 		// 2026-11-12, exp-p24u RI1: 总裁Poetzl表示, 首席执行官Filosa表示, 主席Mueller称 beside Alexander Seitz in full.
 		"A foreign person is named as Chinese documents name them: the full name in Chinese transliteration (福特首席执行官吉姆·法利), never a bare Latin surname; a company or product keeps its usual name (Stellantis, eVTOL)",
+		// Exemplars (the user, 2026-11-12: material that already reads as machine-written carries its register into the
+		// text; a paragraph of a published document in the request gives the model a register to match instead).
+		"The request may carry 范例: paragraphs of published official documents of this section's kind. Match their shape, the judgment or the measure first and the figures and parallel elements after it, sentences of their length, no commentary; take no fact, phrase or subject from them",
 		"Return the section's text only: its heading line when one is given, then its paragraphs, joined to the text written so far without repeating it; no notes, no preamble, no code fence, no reference list",
 	].join("\n");
 }
@@ -138,7 +143,8 @@ export function sectionRequest(input: SectionInput): string {
 		`本节：${input.line}`,
 		input.heading ? `本节标题行：${input.heading}` : "本节不设标题",
 		input.items.length > 0 ? `本节要点：\n${input.items.map((i) => `- ${i}`).join("\n")}` : "",
-		`本节素材（来源原文摘录，事实只从这里取）：\n${input.materials.length > 0 ? input.materials.join("\n") : "（无）"}`,
+		exemplarText(input),
+		`本节素材（程序从来源提取的事实记录，事实和数字只从这里取）：\n${input.materials.length > 0 ? input.materials.join("\n") : "（无）"}`,
 		input.previous.trim()
 			? `前文（已写好的部分，接着写，不要重复）：\n${lastChars(input.previous, MAX_PREVIOUS)}`
 			: "前文：无，这是第一节",
@@ -146,6 +152,15 @@ export function sectionRequest(input: SectionInput): string {
 		input.notes?.trim() ? `补充要求：${input.notes.trim()}` : "",
 	];
 	return parts.filter(Boolean).join("\n\n");
+}
+
+/** The 范例 part of a request: the exemplar paragraphs of the section's kind, each under its source; empty for none. */
+function exemplarText(input: SectionInput): string {
+	const found = exemplarsFor(input.line, input.heading, !input.previous.trim());
+	if (found.length === 0) return "";
+	return `范例（公开文件的段落，学它的开头、句式和节奏，内容和用语不照搬）：\n${found
+		.map((e) => `【${e.source}】\n${e.text}`)
+		.join("\n")}`;
 }
 
 /** The last n characters of text, from a line start. */

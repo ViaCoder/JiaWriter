@@ -129,7 +129,7 @@ describe("withSourceTimes and addMaterials", () => {
 		time,
 		reporter: "中国经营报",
 		subject: "AR-E800",
-		start: "国产首款800公斤级",
+		fact: "国产首款800公斤级重载电动垂直起降飞行器AR-E800首飞成功",
 		url: "https://finance.example/2025/doc-1.shtml#1",
 	});
 
@@ -150,32 +150,34 @@ describe("withSourceTimes and addMaterials", () => {
 
 	it("sends back a time that is not in the source and writes one that is", () => {
 		expect(addMaterials(dir, [item("2025年10月")]).problems.join()).toMatch(/2025年10月/);
-		expect(addMaterials(dir, [item()])).toMatchObject({ total: 1, written: [1], problems: [] });
+		expect(addMaterials(dir, [item()])).toMatchObject({ total: 1, written: [1], skipped: 0, problems: [] });
 		expect(readFileSync(join(dir, "素材.md"), "utf-8")).toContain(
-			"时间：2025年12月27日｜报道方：中国经营报｜主体：AR-E800｜原文：“国产首款800公斤级重载电动垂直起降飞行器AR-E800首飞成功。”｜报道日期：2025年12月27日｜来源：",
+			"时间：2025年12月27日｜报道方：中国经营报｜主体：AR-E800｜事实：国产首款800公斤级重载电动垂直起降飞行器AR-E800首飞成功｜报道日期：2025年12月27日｜来源：",
 		);
+		// The same fact again is skipped, not written twice.
+		expect(addMaterials(dir, [item()])).toMatchObject({ total: 1, written: [], skipped: 1, problems: [] });
 	});
 });
 
 describe("renderMaterial", () => {
 	it("writes the source's date as 报道日期", () => {
 		const line = renderMaterial(
-			{ kind: "case", time: "2025年3月", subject: "国务院", quote: "国务院提出", url: "https://a.example/" },
+			{ kind: "case", time: "2025年3月", subject: "国务院", fact: "国务院提出", url: "https://a.example/" },
 			"2025-12-27",
 		);
 		expect(line).toBe(
-			"- 案例｜时间：2025年3月｜主体：国务院｜原文：“国务院提出”｜报道日期：2025年12月27日｜来源：https://a.example/",
+			"- 案例｜时间：2025年3月｜主体：国务院｜事实：国务院提出｜报道日期：2025年12月27日｜来源：https://a.example/",
 		);
 	});
 
 	it("leaves the time field out when there is no time", () => {
 		const line = renderMaterial({
 			kind: "data",
-			quote: "全国低空经济企业\n达15.43万家",
+			fact: "全国低空经济企业\n达15.43万家",
 			url: "https://a.example/",
 		});
-		// The excerpt on one line.
-		expect(line).toBe("- 数据｜原文：“全国低空经济企业 达15.43万家”｜来源：https://a.example/");
+		// The fact on one line.
+		expect(line).toBe("- 数据｜事实：全国低空经济企业 达15.43万家｜来源：https://a.example/");
 	});
 });
 

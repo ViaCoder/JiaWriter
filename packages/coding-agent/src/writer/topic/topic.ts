@@ -5,7 +5,7 @@
  *   <topic>/参考资料/  the user's files
  *   <topic>/检索/      every search, one file each
  *   <topic>/网页/      every fetched page in full
- *   <topic>/素材.md    the cases and data chosen for the draft, as excerpts of their sources
+ *   <topic>/素材.md    the cases and data chosen for the draft, as facts extracted from their sources
  *   <topic>/.index.jsonl  what was archived, one JSON line each
  */
 
@@ -35,6 +35,8 @@ import { isOutletName } from "../style/citation.ts";
 import { bodyBeforeReferences } from "../text-stats.ts";
 // The date in an address.
 import { urlDate } from "../websearch/core.ts";
+// Facts compared with their file in the same form the extraction compares them with their source.
+import { comparable } from "./extract.ts";
 
 /** Subfolders of a topic. */
 export const TOPIC_DIRS = { drafts: "稿件", refs: "参考资料", search: "检索", web: "网页" } as const;
@@ -74,9 +76,10 @@ export interface IndexEntry {
 }
 
 /**
- * A case or a data point for the draft, kept as the source's own words: an excerpt, never the model's summary (the
- * user, 2026-11-11: "everything is saved as a direct excerpt rather than being paraphrased by AI. This avoids wasting
- * tokens and prevents the introduction of an "AI-like" tone").
+ * A case or a data point for the draft: a fact the program extracted from the source in a request of its own, with
+ * its figures, dates and names checked against the source; never a sentence of the source and never the main model's
+ * summary (the user, 2026-11-14: one tool extracts "basic facts and data", another writes, "so that the context of
+ * each tool is clean").
  */
 export interface Material {
 	// A case: time, reporter, subject, passage. Data: time, passage.
@@ -86,11 +89,8 @@ export interface Material {
 	reporter?: string;
 	// The named company, body or person of a case.
 	subject?: string;
-	// The model names the passage by its first words and, when it runs beyond that sentence, its last words.
-	start?: string;
-	end?: string;
-	// The passage itself, as the program took it from the source.
-	quote?: string;
+	// The fact as the extraction states it: one plain sentence with its figures, dates and names.
+	fact?: string;
 	// Where it comes from: a URL archived in this topic, or a reference file and page.
 	url?: string;
 	file?: string;
@@ -312,26 +312,11 @@ export function materialUrls(dir: string): string[] {
 
 /** Fields a material must have, by kind. */
 const REQUIRED: Readonly<Record<Material["kind"], readonly (keyof Material)[]>> = {
-	// The acting subject and where its passage starts; the reporter too when the case is from the web (below). The
-	// time only when the source gives one, so it is never required (2026-11-10: a page said 近期 and the material said
-	// 2025年10月).
-	case: ["subject", "start"],
-	// Where the passage with the figure starts.
-	data: ["start"],
+	// The acting subject and the fact; the reporter too when the case is from the web (below). The time only when the
+	// source gives one, so it is never required (2026-11-10: a page said 近期 and the material said 2025年10月).
+	case: ["subject", "fact"],
+	data: ["fact"],
 };
-
-/** Longest passage (characters): the sentences that hold the fact, not the page. */
-export const MAX_QUOTE = 300;
-/** Longest start or end (characters) before the model is reminded that a few words name the passage. */
-export const MAX_ANCHOR = 20;
-
-/**
- * Whether a model wrote out whole sentences as start or end (2026-11-11: GLM gave 2,311 characters of start and end
- * for 1,589 characters of passages): the program then reminds it, without sending the items back for it.
- */
-export function longAnchors(items: readonly Material[]): boolean {
-	return items.some((i) => (i.start?.trim().length ?? 0) > MAX_ANCHOR || (i.end?.trim().length ?? 0) > MAX_ANCHOR);
-}
 
 /** Reference files with no pages to cite (text, Markdown, HTML, as imported or as they stand). */
 const PAGELESS = /\.(txt|md|html?)(\.md)?$/i;
@@ -354,11 +339,12 @@ export function materialProblem(item: Material, archived: readonly string[]): st
 	// ended with no outline).
 	if (item.kind === "case" && item.url?.trim() && !item.file?.trim() && !item.reporter?.trim())
 		missing.push("reporter");
-	if (missing.length > 0)
-		return t("topic.missingFields", {
-			fields: missing.join("、"),
-			meaning: t(item.kind === "case" ? "topic.caseFields" : "topic.dataFields"),
-		});
+	if (missing.length > 0) return t("topic.missingFields", { fields: missing.join("、") });
+	return sourceProblem(item, archived);
+}
+
+/** What is wrong with a material's source, as a sentence; empty when the source is one the topic holds. */
+export function sourceProblem(item: Pick<Material, "url" | "file" | "page">, archived: readonly string[]): string {
 	// A reference file needs its page, unless it has none.
 	if (item.file?.trim())
 		return item.page?.trim() || PAGELESS.test(item.file.trim()) ? "" : t("topic.missingPage", { file: item.file });
@@ -379,12 +365,12 @@ export function renderMaterial(item: Material, published = ""): string {
 	const source = item.file?.trim() ? `《${item.file}》${page}` : (item.url ?? "");
 	// No time field when the source gives none.
 	const time = item.time?.trim() ? `时间：${item.time.trim()}｜` : "";
-	// The excerpt on one line, so that the item stays one list item.
-	const quote = `原文：“${(item.quote ?? "").trim().replace(/\s*\n\s*/g, " ")}”`;
+	// The fact on one line, so that the item stays one list item.
+	const fact = `事实：${(item.fact ?? "").trim().replace(/\s*\n\s*/g, " ")}`;
 	const body =
 		item.kind === "case"
-			? `案例｜${time}${item.reporter?.trim() ? `报道方：${item.reporter}｜` : ""}主体：${item.subject}｜${quote}`
-			: `数据｜${time}${quote}`;
+			? `案例｜${time}${item.reporter?.trim() ? `报道方：${item.reporter}｜` : ""}主体：${item.subject}｜${fact}`
+			: `数据｜${time}${fact}`;
 	const [y, m, d] = published.split("-").map(Number);
 	const dated = published ? `｜报道日期：${y}年${m}月${d}日` : "";
 	return `- ${item.section?.trim() ? `【${item.section.trim()}】` : ""}${body}${dated}｜来源：${source}`;
@@ -577,111 +563,7 @@ export function misattributedFigures(text: string, dir: string): string[] {
 }
 
 /**
- * text as the program compares a model's words with a source: compatibility forms folded (，to , and ：to :), case
- * dropped, and spaces, quotation marks and Markdown marks left out, which a model drops or changes when it copies.
- */
-function comparable(text: string): string {
-	return text
-		.normalize("NFKC")
-		.replace(/[\s*_#>|`[\]"'“”‘’「」『』]/g, "")
-		.toLowerCase();
-}
-
-/** text in comparable form, with the offsets in text where each compared character's own character starts and ends. */
-function comparableWithOffsets(text: string): { flat: string; from: number[]; to: number[] } {
-	let flat = "";
-	const from: number[] = [];
-	const to: number[] = [];
-	let i = 0;
-	// Character by character, so that each compared character knows where it came from.
-	for (const ch of text) {
-		const c = comparable(ch);
-		for (let k = 0; k < c.length; k++) {
-			from.push(i);
-			to.push(i + ch.length);
-		}
-		flat += c;
-		i += ch.length;
-	}
-	return { flat, from, to };
-}
-
-/**
- * The passage of text that runs from the words start through the words end, cut out of the text as the source writes
- * it and put on one line; without end, through the end of start's sentence. Empty when start, or end after it, is not
- * there. The model names the passage and the program copies it, so the material is the source's words, never a
- * summary, and the model spends no tokens writing them out (the user, 2026-11-11: "Not a verbatim transcription, but
- * rather an extraction and output generated by an AI-powered program").
- */
-export function excerptOf(text: string, start: string, end = ""): string {
-	const { flat, from, to } = comparableWithOffsets(text);
-	const s = comparable(start);
-	const e = comparable(end);
-	const at = s ? flat.indexOf(s) : -1;
-	if (at < 0) return "";
-	// Where start's words end in the text.
-	const startEnd = to[at + s.length - 1];
-	let stop = startEnd;
-	if (e) {
-		// The first end that finishes at or after start's last word.
-		const found = flat.indexOf(e, Math.max(at, at + s.length - e.length));
-		if (found < 0) return "";
-		stop = to[found + e.length - 1];
-	} else if (!/[。！？!?；;.]$/.test(text.slice(0, startEnd))) {
-		// Through the end of the sentence: its mark, or the end of the line.
-		const m = /[。！？!?；;]|\.(?=\s|$)|\n/.exec(text.slice(startEnd));
-		stop = m ? startEnd + m.index + (m[0] === "\n" ? 0 : m[0].length) : text.length;
-	}
-	// A passage that ends inside a link's text runs on to the end of the link, which then becomes its text.
-	const cut = text.slice(from[at], stop);
-	const link = /^[^[\]\n]*\]\([^)]*\)/.exec(text.slice(stop));
-	if (link && cut.lastIndexOf("[") > cut.lastIndexOf("]")) stop += link[0].length;
-	return text
-		.slice(from[at], stop)
-		.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-		.replace(/\*\*|__|`/g, "")
-		.replace(/\s*\n\s*/g, " ")
-		.trim();
-}
-
-/**
- * Every archived text of a web source, where its excerpt is looked for: the fetched page and each search entry that
- * listed it (a model may copy the snippet of the result before it opens the page).
- */
-export function webSourceTexts(dir: string, url: string): string[] {
-	const key = materialKey(url);
-	// The same address with empty parameters left out, as in sourceOf.
-	const loose = (u: string) =>
-		materialKey(u)
-			.replace(/([?&])[^=&]+=(?=&|$)/g, "$1")
-			.replace(/[?&]+$/, "");
-	const bare = url.trim().replace(/#\d+$/, "");
-	const texts: string[] = [];
-	for (const e of readIndex(dir)) {
-		if (!existsSync(join(dir, e.file))) continue;
-		const page = e.kind === "page" && [e.url, e.requested].some((u) => u && materialKey(u) === key);
-		const listed = e.kind === "search" && (e.urls ?? []).some((u) => loose(u) === loose(url));
-		if (!page && !listed) continue;
-		const text = readFileSync(join(dir, e.file), "utf-8");
-		// A search report holds other results too: only this one's entry, from its numbered title line up to the next
-		// result; the whole report when the address is written there in another form. An upstream's own answer above
-		// the list is its summary, not the source's words.
-		const at = page ? -1 : text.indexOf(bare);
-		if (at < 0) {
-			texts.push(text);
-			continue;
-		}
-		const line = text.lastIndexOf("\n", at) + 1;
-		const title = text.lastIndexOf("\n", line - 2) + 1;
-		const rest = text.slice(line > 0 && /^\d+\. /.test(text.slice(title, line)) ? title : line);
-		const next = rest.slice(1).search(/\n\d+\. /);
-		texts.push(next < 0 ? rest : rest.slice(0, next + 1));
-	}
-	return texts;
-}
-
-/**
- * The text of a reference file, where its excerpt is looked for: its parsed copy (材料.docx as .parsed/材料.docx.md),
+ * The text of a reference file, where its facts are extracted from: its parsed copy (材料.docx as .parsed/材料.docx.md),
  * in the topic or the working folder, else a text file as it stands; undefined when there is none to read.
  */
 export function fileSourceText(dir: string, file: string): string | undefined {
@@ -696,56 +578,48 @@ export function fileSourceText(dir: string, file: string): string | undefined {
 	return undefined;
 }
 
-/** A material's passage as its source writes it, or what kept the program from taking it, as a sentence. */
-export function materialExcerpt(dir: string, item: Material): { quote: string; problem: string } {
-	const start = item.start?.trim() ?? "";
-	const end = item.end?.trim() ?? "";
+/**
+ * The archived text of a material's source, for the extraction: a reference file's parsed copy or text, else the
+ * fetched page with the search entry that listed it. Undefined when the topic holds neither.
+ */
+export function sourceTextOf(dir: string, item: Pick<Material, "url" | "file">): string | undefined {
 	const file = item.file?.trim() ?? "";
-	const read = file ? fileSourceText(dir, file) : undefined;
-	if (file && read === undefined) return { quote: "", problem: t("topic.sourceUnreadable", { file }) };
-	const texts = file && read !== undefined ? [read] : webSourceTexts(dir, item.url ?? "");
-	// The first source that holds the passage: the page, else the search entry.
-	const quote = texts.map((text) => excerptOf(text, start, end)).find(Boolean) ?? "";
-	if (!quote) return { quote, problem: t("topic.passageNotFound", { words: end ? `${start}……${end}` : start }) };
-	if (quote.length > MAX_QUOTE)
-		return { quote: "", problem: t("topic.passageTooLong", { max: MAX_QUOTE, length: quote.length }) };
-	return { quote, problem: "" };
+	if (file) return fileSourceText(dir, file);
+	return item.url?.trim() ? sourceOf(dir, item.url)?.text : undefined;
 }
 
-/** Add materials to 素材.md, all or none; returns how many it holds now. */
-/** What one material_add call did: how many 素材.md holds, which items (1-based) went in, and why the others did not. */
+/**
+ * What one addMaterials call did: how many 素材.md holds, which items (1-based) went in, how many it held already, and
+ * why the others did not go in.
+ */
 export interface AddResult {
 	total: number;
 	written: number[];
+	skipped: number;
 	problems: string[];
 }
 
 /**
- * Add materials to 素材.md: the complete ones are written, the others sent back with their reasons, so that the next
- * call carries only those (2026-11-11: all-or-none made GLM resend 18 items for 2 wrong ones, and resent batches
- * often came back stripped of their fields).
+ * Add extracted facts to 素材.md: the complete ones are written, a fact the file holds already is skipped, the others
+ * are returned with their reasons (2026-11-11: all-or-none made GLM resend 18 items for 2 wrong ones).
  */
 export function addMaterials(dir: string, given: readonly Material[]): AddResult {
-	// Local paths in url are files; a case's outlet comes from its fetched page when it was left out.
-	// A web material with no time takes its source's date.
-	// Items that came with neither a source nor a passage: the call lost its content on the way, and one short line
-	// says so instead of a list of missing fields for each (2026-11-11: GLM sent kind, reporter and section only, in
-	// 4 of 9 calls, and was told every field each item lacked).
-	if (given.length > 0 && given.every((i) => !i.url?.trim() && !i.file?.trim() && !i.start?.trim()))
-		return { total: materialCount(dir), written: [], problems: [t("topic.itemsEmpty", { count: given.length })] };
+	// Local paths in url are files; a case's outlet comes from its fetched page when it was left out; a web material
+	// with no time takes its source's date.
 	const checked = withSourceTimes(dir, withPageReporters(dir, given.map(asFileSource)));
-	// Every item is checked; the complete ones go in.
 	const archived = materialUrls(dir);
+	const file = join(dir, MATERIAL_FILE);
+	const before = existsSync(file) ? readFileSync(file, "utf-8") : "# 素材\n\n";
+	// The facts the file holds, in comparable form.
+	const held = new Set((before.match(/事实：[^｜\n]*/g) ?? []).map((f) => comparable(f.slice(3))));
 	const problems: string[] = [];
 	const written: number[] = [];
+	let skipped = 0;
 	const items = checked.flatMap((item, i) => {
-		// The fields and the source first; then the program takes the passage out of the source.
-		const missing = materialProblem(item, archived);
-		const taken = missing ? { quote: "", problem: missing } : materialExcerpt(dir, item);
-		// A time the web source does not give is sent back: the time as the source gives it, or none.
+		// The fields and the source; a time the web source does not give is sent back.
 		const source = !item.file?.trim() && item.url?.trim() && item.time?.trim() ? sourceOf(dir, item.url) : undefined;
 		const problem =
-			taken.problem ||
+			materialProblem(item, archived) ||
 			(source && !timeInSource(item.time ?? "", source.text, source.date)
 				? t("topic.timeNotInSource", { time: item.time ?? "" })
 				: "");
@@ -753,20 +627,22 @@ export function addMaterials(dir: string, given: readonly Material[]): AddResult
 			problems.push(t("topic.itemProblem", { n: i + 1, problem }));
 			return [];
 		}
+		const key = comparable(item.fact ?? "");
+		if (held.has(key)) {
+			skipped++;
+			return [];
+		}
+		held.add(key);
 		written.push(i + 1);
-		return [{ ...item, quote: taken.quote }];
+		return [item];
 	});
-	// Whole sentences as start or end: the next call needs only a few words of each.
-	if (problems.length > 0 && longAnchors(given)) problems.push(t("topic.anchorsLong", { max: MAX_ANCHOR }));
-	if (items.length === 0) return { total: materialCount(dir), written, problems };
-	const file = join(dir, MATERIAL_FILE);
-	const before = existsSync(file) ? readFileSync(file, "utf-8") : "# 素材\n\n";
+	if (items.length === 0) return { total: materialCount(dir), written, skipped, problems };
 	// A web material with its source's date.
 	const lines = items.map((item) =>
 		renderMaterial(item, !item.file?.trim() && item.url?.trim() ? (sourceOf(dir, item.url)?.date ?? "") : ""),
 	);
 	writeFileSync(file, `${before}${lines.join("\n")}\n`);
-	return { total: materialCount(dir), written, problems };
+	return { total: materialCount(dir), written, skipped, problems };
 }
 
 /** How many items 素材.md holds. */

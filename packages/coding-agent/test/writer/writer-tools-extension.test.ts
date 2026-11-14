@@ -495,7 +495,7 @@ describe("materialsNameSources", () => {
 		const draft = join(topic, "稿件", "简报.md");
 		writeFileSync(
 			join(topic, "素材.md"),
-			"# 素材\n\n- 数据｜时间：2025年｜原文：“5.2万人”｜来源：《参考资料/材料.md》第1条\n",
+			"# 素材\n\n- 数据｜时间：2025年｜事实：从业人员5.2万人｜来源：《参考资料/材料.md》第1条\n",
 		);
 		expect(materialsNameSources(draft, cwd)).toBe(false);
 		writeFileSync(
@@ -802,7 +802,7 @@ describe("draft_section", () => {
 		);
 		writeFileSync(
 			join(cwd, "20261112-低空", "素材.md"),
-			"# 素材\n\n- 【现状】数据｜时间：2025年12月22日｜原文：“2025年市场规模将达1.5万亿元。”｜来源：https://a.example/1\n- 【问题】案例｜主体：某市｜原文：“空域规则待完善。”｜来源：https://a.example/2\n",
+			"# 素材\n\n- 【现状】数据｜时间：2025年12月22日｜事实：2025年市场规模将达1.5万亿元｜来源：https://a.example/1\n- 【问题】案例｜主体：某市｜事实：空域规则待完善｜来源：https://a.example/2\n",
 		);
 		return "20261112-低空/稿件/报告.md";
 	}

@@ -63,8 +63,10 @@ class Upstream(http.server.BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers.get("content-length", 0))))
         if self.path.split("?")[0] == "/v1/messages":
             return self.on_claude(body)
-        # Only the summary requests come without tools.
+        # The extraction request (material_add) comes without tools, with its own instructions; the summary too.
         if not body.get("tools"):
+            if "You extract facts" in json.dumps(body.get("messages"), ensure_ascii=False):
+                return self.send(200, chat({"content": "案例｜时间：｜主体：甲｜事实：甲发布新闻"}) + chat({}, "stop") + "data: [DONE]\n\n")
             return self.on_summary(json.dumps(body.get("messages"), ensure_ascii=False))
         self.on_model(body)
 
@@ -201,10 +203,10 @@ def main():
 
     # Research before the topic has a name. The result has no date, so the material has no time (2026-11-10: a time
     # the source does not give is sent back).
-    late = Script([("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"kind": "case", "reporter": "路透社", "subject": "甲", "start": "新闻", "url": "https://news.example.com/a"}]})])
+    late = Script([("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"url": "https://news.example.com/a", "section": "现状"}]})])
     run(late, ["查一下再写"])
     last = text_of(late.requests[-1])
-    check("先搜索后开主题，资料并入主题", "已建立主题文件夹" in last and f"{time.strftime('%Y%m%d')}-绿化" in last and "已记录" in last)
+    check("先搜索后开主题，资料并入主题", "已建立主题文件夹" in last and f"{time.strftime('%Y%m%d')}-绿化" in last and "记下 1 条" in last)
 
     # Compaction when the summary fails.
     broken = Script([("topic_open", {"name": "绿化"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000, summary_fails=True)

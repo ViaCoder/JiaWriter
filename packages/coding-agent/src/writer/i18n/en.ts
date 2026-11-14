@@ -307,27 +307,22 @@ export const en: Record<MessageKey, string> = {
 	"topic.earlier": "Earlier research stays in {dir}: read it there when needed.",
 	"topic.archived": "Archived: {path}",
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
-	"topic.missingFields": "missing {fields} ({meaning})",
-	"topic.caseFields":
-		"a case: time (as the source gives it, none when it gives none), subject (the named body or person), start (the first words of the source's passage on it), reporter (the outlet, for web sources only)",
-	"topic.dataFields":
-		"data: time (as the source gives it, none when it gives none), start (the first words of the source's passage with the figure)",
+	"topic.missingFields": "missing {fields}",
 	"topic.missingPage": "no page for {file}",
 	"topic.missingSource": "no source: give url, or file and page",
 	"topic.notArchived":
 		"{url} is not among this topic's search results or pages: search for it or read it with fetch_web first",
 	"topic.timeNotInSource":
 		"the time “{time}” is not in the source: give the time the source states or its date, or leave time out when it has none; never infer one",
-	"topic.passageNotFound":
-		"“{words}” is not in the source: give a few first and last words as the source writes them, in its language, never reworded or translated",
-	"topic.passageTooLong":
-		"the passage has {length} characters, over {max}: let start and end mark the one to three sentences on the fact",
-	"topic.anchorsLong":
-		"a few first and last words are enough for start and end (at most {max} characters): the program takes the whole passage from the source, so never copy whole sentences",
-	"topic.itemsEmpty":
-		"these {count} items came with no source and no start, so their content was lost: send the complete items again",
 	"topic.sourceUnreadable":
-		"the text of {file} cannot be read, so no passage can be taken: import it with import_document first",
+		"the text of {file} cannot be read: import a reference file with import_document, read a page with fetch_web first",
+	"topic.noModel": "No model is available to extract material",
+	"topic.extractFailed": "The extraction from {source} did not finish: {reason}",
+	"topic.extractNone": "{source}: no facts on this were found",
+	"topic.extracted": "{source}: {count} recorded",
+	"topic.duplicates": "{count} already in the materials, not recorded again",
+	"topic.factsDropped": "{count} not recorded ({why})",
+	"topic.materialTotal": "{file} now holds {total}.",
 	"topic.itemProblem": "Item {n}: {problem}",
 	"draft.noOutline":
 		"no 大纲.md beside {path}: write the outline with write, then call draft_section for each section",
@@ -335,8 +330,6 @@ export const en: Record<MessageKey, string> = {
 	"draft.written": "Wrote “{heading}”: {chars} characters; {path} now holds {total}; the outline line is ticked.",
 	"draft.failed": "The section was not written: {reason}",
 	"draft.noModel": "No model is available to write the section",
-	"topic.materialAdded": "Recorded {count} (items {which}); {file} now holds {total}.",
-	"topic.materialBack": "{count} sent back: resend only these, with the reasons fixed:",
 	"rewind.pick": "Go back to before which message?",
 	"rewind.mode": "What goes back?",
 	"rewind.both": "Conversation and files ({count} files restored)",

@@ -43,6 +43,7 @@ export const RESEARCH_MANUAL: readonly string[] = [
 /** Recording materials: the first material_add. */
 export const MATERIAL_MANUAL: readonly string[] = [
 	"A search result's address counts as a source; a fetched page is the fuller record",
+	"Call material_add once per source, with the outline part its facts are for and, when the page covers more, what to take; the program extracts and checks the facts in a request of its own and lists what it kept, so read the list before searching on",
 ];
 
 /** Handling check results: the first run of each check. */

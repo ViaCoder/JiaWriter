@@ -3,6 +3,8 @@
 
 // Test API.
 import { describe, expect, it } from "vitest";
+// The exemplar paragraphs and their choice by section kind.
+import { EXEMPLARS, exemplarsFor } from "../../src/writer/draft/exemplars.ts";
 // Functions under test.
 import {
 	cleanSectionText,
@@ -39,9 +41,9 @@ const OUTLINE = [
 const MATERIALS = [
 	"# 素材",
 	"",
-	"- 【发展现状】数据｜时间：2025年12月22日｜原文：“2025年市场规模将达1.5万亿元。”｜来源：https://a.example/1",
-	"- 【发展现状】数据｜时间：2026年5月26日｜原文：“注册无人机328.7万架。”｜来源：https://a.example/2",
-	"- 【突出问题】案例｜主体：某市｜原文：“空域分类规则待完善。”｜来源：https://a.example/3",
+	"- 【发展现状】数据｜时间：2025年12月22日｜事实：2025年市场规模将达1.5万亿元｜来源：https://a.example/1",
+	"- 【发展现状】数据｜时间：2026年5月26日｜事实：注册无人机328.7万架｜来源：https://a.example/2",
+	"- 【突出问题】案例｜主体：某市｜事实：空域分类规则待完善｜来源：https://a.example/3",
 ].join("\n");
 
 describe("outlinePart / headingOf / outlineTitle", () => {
@@ -104,7 +106,7 @@ describe("sectionInstructions / sectionRequest", () => {
 			line: "一、发展现状：市场规模迈向1.5万亿元",
 			items: ["民航局预测"],
 			heading: "一、发展现状",
-			materials: ["- 【发展现状】数据｜原文：“1.5万亿元。”"],
+			materials: ["- 【发展现状】数据｜事实：1.5万亿元"],
 			previous: `${"前文。".repeat(10)}\n${"末段。".repeat(MAX_PREVIOUS)}`,
 			chars: 400,
 			notes: "每节开头一句话概括",
@@ -135,6 +137,38 @@ describe("sectionInstructions / sectionRequest", () => {
 		expect(bare).toContain("本节不设标题");
 		expect(bare).toContain("（无）");
 		expect(bare).toContain("这是第一节");
+	});
+
+	it("gives exemplar paragraphs of the section's kind, under their source, and the rule to take their shape only", () => {
+		expect(sectionInstructions()).toContain("take no fact, phrase or subject from them");
+		const base = { brief: "", outline: OUTLINE, items: [], materials: [], previous: "前文。" };
+		// A measures section: the two measure exemplars, one naming who acts.
+		const measures = sectionRequest({ ...base, line: "三、对策建议", heading: "三、对策建议" });
+		expect(measures).toContain("范例（公开文件的段落");
+		expect(measures).toContain("【《政府工作报告》，国务院，2026年3月】\n优化提升传统产业。");
+		expect(measures).toContain("国家知识产权局要加强统筹协调");
+		expect(measures).not.toContain("顶压前行");
+		// A problems section, and a line naming the problem's measures counts as measures.
+		expect(sectionRequest({ ...base, line: "二、存在的问题", heading: "二、存在的问题" })).toContain(
+			"清醒看到面临的困难和挑战",
+		);
+		expect(sectionRequest({ ...base, line: "三、问题的对策", heading: "三、问题的对策" })).toContain(
+			"优化提升传统产业",
+		);
+		// The opening without a heading, and a line naming no kind: the situation's.
+		expect(sectionRequest({ ...base, line: "引言", heading: "", previous: "" })).toContain("顶压前行");
+		expect(sectionRequest({ ...base, line: "二、欧洲车企的应对", heading: "二、欧洲车企的应对" })).toContain(
+			"顶压前行",
+		);
+		// A closing part: none.
+		expect(sectionRequest({ ...base, line: "结语", heading: "" })).not.toContain("范例");
+		// The kinds are picked by the exemplar function itself.
+		expect(exemplarsFor("四、对我国企业的启示", "四、对我国企业的启示", false).map((e) => e.kind)).toEqual([
+			"measure",
+			"measure",
+		]);
+		expect(exemplarsFor("参考文献", "", false)).toEqual([]);
+		expect(EXEMPLARS.every((e) => e.text.length <= 300)).toBe(true);
 	});
 });
 
