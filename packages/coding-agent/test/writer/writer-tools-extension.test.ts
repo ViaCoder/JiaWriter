@@ -533,6 +533,34 @@ describe("the automatic check of each draft", () => {
 		expect(wrote("稿2.md", VAGUE_REPORT, true)).toBeUndefined();
 	});
 
+	it("asks once to restate a reply that carries a hard mark of machine writing, and lets a clean one pass", async () => {
+		const { handlers, sent } = started();
+		const marked = [
+			{ role: "user", content: "总结一下" },
+			{ role: "assistant", content: [{ type: "text", text: "综上所述，三份材料都齐了。" }] },
+		];
+		await handlers.agent_end({ messages: marked }, { cwd });
+		expect(sent.length).toBe(1);
+		expect(sent[0].message).toMatchObject({ customType: "jiawriter-reply-style", display: true });
+		expect(sent[0].message.content).toContain("“综上所述”（第 1 行）");
+		expect(sent[0].options).toEqual({ deliverAs: "followUp", triggerTurn: true });
+		// The restated reply is not asked again in the same message, even when still marked.
+		await handlers.agent_end({ messages: marked }, { cwd });
+		expect(sent.length).toBe(1);
+		// A new message from the user starts again; a clean reply asks for nothing.
+		handlers.input({ text: "再来" }, { cwd });
+		await handlers.agent_end(
+			{
+				messages: [
+					{ role: "user", content: "再来" },
+					{ role: "assistant", content: "三份材料都齐了。" },
+				],
+			},
+			{ cwd },
+		);
+		expect(sent.length).toBe(1);
+	});
+
 	it("gives the length against the request and the sentence checks with each write", () => {
 		// 2026-11-09: a report run called word_count ten times and readability_check three times.
 		const { handlers, wrote } = started();

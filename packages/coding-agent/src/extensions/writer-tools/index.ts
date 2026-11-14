@@ -68,6 +68,8 @@ import {
 	rareChars,
 	readabilityCheck,
 } from "../../writer/readability.ts";
+// The model's own replies checked for the marks of machine writing.
+import { MAX_REPLY_ROUNDS, marksList, replyMarks, replyText } from "../../writer/reply-check.ts";
 // AI-style check.
 import { formatStyleReport, inferRegister, styleCheck, styleClean, styleMustFix } from "../../writer/style/check.ts";
 // The program's checks of a draft, as one table.
@@ -468,6 +470,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	let rounds = 0;
 	// Cut-off replies resumed since the user's last message.
 	let cutResumes = 0;
+	// Asks to restate a reply since the user's last message.
+	let replyRounds = 0;
 	// A new message from the user starts again.
 	// The length the user's message asked for, if it named one.
 	let target: number | undefined;
@@ -478,6 +482,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		before.clear();
 		rounds = 0;
 		cutResumes = 0;
+		replyRounds = 0;
 		target = requestedLength(event.text ?? "") ?? (documentOpen ? target : undefined);
 	});
 	// The draft before its first change in this message; the materials file is material_add's alone.
@@ -528,6 +533,24 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 				{ deliverAs: "followUp", triggerTurn: true },
 			);
 			return;
+		}
+		// The reply itself: a hard mark of machine writing is said again under the rules, once (the user, 2026-11-10:
+		// the standard "applies to everything, including intermediate outputs, summaries").
+		if (replyRounds < MAX_REPLY_ROUNDS) {
+			const reply = replyText(event?.messages);
+			const marks = replyMarks(reply);
+			if (marks.length > 0) {
+				replyRounds++;
+				pi.sendMessage(
+					{
+						customType: "jiawriter-reply-style",
+						content: t("style.replyMarks", { list: marksList(marks, reply) }),
+						display: true,
+					},
+					{ deliverAs: "followUp", triggerTurn: true },
+				);
+				return;
+			}
 		}
 		if (rounds >= MAX_ROUNDS || written.size === 0) return;
 		const ask = modelAsker(ctx, complete);

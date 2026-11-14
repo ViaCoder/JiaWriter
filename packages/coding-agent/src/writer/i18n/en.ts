@@ -107,6 +107,8 @@ export const en: Record<MessageKey, string> = {
 	"style.materials":
 		"Facts and cases in a revision come only from the materials at hand: the topic's 素材.md, 参考资料/.parsed/, and the results saved in 检索/ and 网页/, cited; nothing the materials lack is invented, and no placeholder is left. A check's finding is no reason to search: search only when the user asked, and where the materials and a finding disagree, the materials stand.",
 	// An automatic round of revision.
+	"style.replyMarks":
+		"The reply carries marks of machine writing: {list}. Say it again under the writing rules, without these frames and stock phrases and with the same content; leave the draft files alone.",
 	"style.cutResume":
 		"The last reply was cut off at the output limit before it finished. Go on with that step; do not repeat what is done.",
 	"style.round":
