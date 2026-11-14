@@ -68,6 +68,11 @@ function text(r: { content: { type: string; text?: string }[] }): string {
 }
 
 describe("parseExportArgs", () => {
+	it("reads the Office formats too", () => {
+		expect(parseExportArgs("稿件.md xlsx").format).toBe("xlsx");
+		expect(parseExportArgs("稿件.md --pptx --out=汇报.pptx")).toMatchObject({ format: "pptx", output: "汇报.pptx" });
+	});
+
 	it("parses /export-doc arguments", () => {
 		// Arguments.
 		expect(parseExportArgs(" 稿件.md md --profile=apa --out=x/y.md extra ")).toEqual({

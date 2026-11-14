@@ -65,10 +65,13 @@ JiaWriter 启动时把 `JW_KEY` 和 `ANYSEARCH_KEY` 读进内存，随即从自�
 | `word_count` | 分别统计汉字、英文词和数字，可按章节统计并与目标篇幅比对 |
 | `readability_check` | 列出《通用规范汉字表》一级字以外的字和过长的句子，英文给出 Flesch 易读度 |
 | `search_web`、`fetch_web` | 联网检索和读取网页正文 |
-| `import_document` | 导入参考资料：PDF、Word（.docx）、HTML、txt、md |
-| `export_document` | 把 Markdown 稿件导出为 docx 或 md |
+| `import_document` | 导入参考资料：PDF、Word（.docx）、Excel（.xlsx，每个工作表一页）、PowerPoint（.pptx，每页幻灯片一页）、HTML、txt、md |
+| `export_document` | 把 Markdown 稿件导出为 docx、xlsx（稿件里的表格，每张表一个工作表）、pptx（每个一级标题一页）或 md |
 | `topic_open`、`material_add` | 建立主题文件夹，记录带来源的案例和数据 |
 | `draft_restore` | 列出稿件保存过的版本，恢复其中一个 |
+| `todo_write` | 三步以上的工作记任务清单，常驻在输入框上方（Ctrl+T 隐藏） |
+| `schedule_task` | 定时任务：按“每天 08:00”“工作日 08:30”“每周一 09:00”“每月1日 09:00”或 cron 五段，到点在指定文件夹里运行一条请求；程序开着时每分钟检查，关着时由系统 cron 运行 `jiawriter schedule run` |
+| `delegate` | 把一个独立的子任务交给新开的 JiaWriter 进程在自己的上下文里完成，返回它的回复；可并行多个，子任务不能再派 |
 
 ## 命令
 
@@ -82,7 +85,8 @@ JiaWriter 启动时把 `JW_KEY` 和 `ANYSEARCH_KEY` 读进内存，随即从自�
 | `/skill-new` | 新建 skill：从当前会话生成、空白模板，或由模型按 skill-creator 编写 |
 | `/browser` | Chrome 扩展是否连接，以及安装步骤 |
 | `/import-doc [文件]` | 导入参考资料 |
-| `/export-doc <稿件.md> [md\|docx] [--profile=方案] [--out=路径]` | 导出稿件 |
+| `/export-doc <稿件.md> [md\|docx\|xlsx\|pptx] [--profile=方案] [--out=路径]` | 导出稿件 |
+| `/schedule` | 列出定时任务（命令行：`jiawriter schedule list`、`jiawriter schedule run`） |
 | `/sf status`、`/sf install` | 与 `/browser` 相同 |
 
 ## 写作流程

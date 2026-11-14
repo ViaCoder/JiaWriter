@@ -31,7 +31,7 @@ import { autoExportEnabled, editedDrafts, type RunMessage } from "../../writer/d
 // Import.
 import { formatImport, importFile, importSources, parsedFiles } from "../../writer/docs/import.ts";
 // Export.
-import { exportDraft, formatExport } from "../../writer/export/export.ts";
+import { type ExportFormat, exportDraft, formatExport } from "../../writer/export/export.ts";
 // Reference URLs opened in the session, and those still to test.
 import { openedUrls, unopenedUrls } from "../../writer/export/refs.ts";
 // Output messages.
@@ -101,7 +101,7 @@ export function freeName(folder: string, file: string): string {
 /** Arguments of /export-doc: [path] [md|docx] [--profile=name] [--out=path]. */
 export function parseExportArgs(args: string): {
 	path: string;
-	format?: "docx" | "md";
+	format?: ExportFormat;
 	profile?: string;
 	output?: string;
 } {
@@ -109,12 +109,14 @@ export function parseExportArgs(args: string): {
 	const words = args.trim().split(/\s+/).filter(Boolean);
 	// Options and the first plain word as the path.
 	let path = "";
-	let format: "docx" | "md" | undefined;
+	let format: ExportFormat | undefined;
 	let profile: string | undefined;
 	let output: string | undefined;
 	for (const w of words) {
 		if (w === "md" || w === "--md") format = "md";
 		else if (w === "docx" || w === "--docx") format = "docx";
+		else if (w === "xlsx" || w === "--xlsx") format = "xlsx";
+		else if (w === "pptx" || w === "--pptx") format = "pptx";
 		else if (w.startsWith("--profile=")) profile = w.slice(10);
 		else if (w.startsWith("--out=")) output = w.slice(6);
 		else if (!path) path = w;
@@ -207,9 +209,9 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	// /export-doc <draft.md> [md|docx] [--profile=name] [--out=path] (/export is the upstream session export).
+	// /export-doc <draft.md> [md|docx|xlsx|pptx] [--profile=name] [--out=path] (/export is the upstream session export).
 	pi.registerCommand("export-doc", {
-		description: "Export a Markdown draft: /export-doc <draft.md> [md|docx] [--profile=name] [--out=path]",
+		description: "Export a Markdown draft: /export-doc <draft.md> [md|docx|xlsx|pptx] [--profile=name] [--out=path]",
 		handler: async (args, ctx) => {
 			// Parse, export, show the report.
 			try {

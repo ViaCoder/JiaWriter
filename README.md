@@ -65,10 +65,13 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `word_count` | Chinese characters, English words and numbers, per section and against a target length |
 | `readability_check` | Characters outside level 1 of the General Standard Chinese Characters table, long sentences, Flesch reading ease for English |
 | `search_web`, `fetch_web` | Web search and page text |
-| `import_document` | Import reference files: PDF, Word (.docx), HTML, txt, md |
-| `export_document` | Export a Markdown draft to docx or md |
+| `import_document` | Import reference files: PDF, Word (.docx), Excel (.xlsx, a page per sheet), PowerPoint (.pptx, a page per slide), HTML, txt, md |
+| `export_document` | Export a Markdown draft to docx, xlsx (its tables, one sheet each), pptx (a slide per level-1 heading) or md |
 | `topic_open`, `material_add` | Open a topic folder; record cases and data with their sources |
 | `draft_restore` | List a draft's saved versions and bring one back |
+| `todo_write` | The task list of work with three or more steps, shown above the input (Ctrl+T hides it) |
+| `schedule_task` | Scheduled tasks: a request run in a folder at set times (每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields); checked every minute while the program is open, and run by `jiawriter schedule run` from the system's cron when it is closed |
+| `delegate` | Hand a self-contained subtask to a fresh JiaWriter process with its own context and get its reply back; several may run at once, and a subtask cannot delegate further |
 
 ## Commands
 
@@ -82,7 +85,8 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `/skill-new` | New skill: from this session, from a blank template, or written by the model with skill-creator |
 | `/browser` | Whether the Chrome extension is connected, and how to install it |
 | `/import-doc [file]` | Import reference files |
-| `/export-doc <draft.md> [md\|docx] [--profile=name] [--out=path]` | Export a draft |
+| `/export-doc <draft.md> [md\|docx\|xlsx\|pptx] [--profile=name] [--out=path]` | Export a draft |
+| `/schedule` | List the scheduled tasks (command line: `jiawriter schedule list`, `jiawriter schedule run`) |
 | `/sf status`, `/sf install` | The same as `/browser` |
 
 ## How writing works
