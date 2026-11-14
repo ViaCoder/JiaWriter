@@ -1,7 +1,7 @@
 import { stripVTControlCharacters } from "node:util";
 import type { AgentToolResult } from "@earendil-works/pi-agent-core";
 import type { Component, TUI } from "@earendil-works/pi-tui";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ToolRenderContext } from "../src/core/extensions/types.ts";
 import { codemodeRenderers } from "../src/extensions/codemode/renderer.ts";
 import type { CodemodeToolDetails } from "../src/extensions/codemode/tool.ts";
@@ -45,6 +45,8 @@ function render(
 
 describe("codemode renderer", () => {
 	beforeAll(() => initTheme("dark"));
+	// The English interface: the timing words under test are upstream's (the stub is undone after each test).
+	beforeEach(() => vi.stubEnv("JW_LANG", "en"));
 	afterEach(() => vi.useRealTimers());
 
 	it("hides the script header and shows the output", () => {

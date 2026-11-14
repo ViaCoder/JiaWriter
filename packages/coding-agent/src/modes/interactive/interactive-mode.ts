@@ -159,7 +159,7 @@ import { playArmin3d, playPiLogo3d } from "./components/easter-egg-3d.lazy.ts";
 import { ExtensionEditorComponent } from "./components/extension-editor.ts";
 import { ExtensionInputComponent } from "./components/extension-input.ts";
 import { ExtensionSelectorComponent } from "./components/extension-selector.ts";
-import { FooterComponent, formatTokens } from "./components/footer.ts";
+import { FooterComponent, formatCwdForFooter, formatTokens } from "./components/footer.ts";
 import { HistorySearchComponent } from "./components/history-search.ts";
 import { formatKeyText, keyDisplayText, keyHint, keyText, rawKeyHint } from "./components/keybinding-hints.ts";
 import { LoginDialogComponent } from "./components/login-dialog.ts";
@@ -1104,9 +1104,19 @@ export class InteractiveMode {
 					"dim",
 					uiText("Pi can explain its own features and look up its docs. Ask it how to use or extend Pi."),
 				);
+			// JiaWriter: the model and the folder, as Claude Code's welcome box shows them (2026-11-14: the screen showed
+			// neither until the first reply's footer).
+			const context = () =>
+				theme.fg(
+					"dim",
+					uiText("Model {model} · Folder {cwd}", {
+						model: this.session.model?.id ?? "-",
+						cwd: formatCwdForFooter(process.cwd(), os.homedir()),
+					}),
+				);
 			const header = new BuiltInHeader(
-				() => `${withLogo(compactInstructions())}\n${compactOnboarding()}\n\n${onboarding()}`,
-				() => `${withLogo(expandedInstructions())}\n\n${onboarding()}`,
+				() => `${withLogo(compactInstructions())}\n${context()}\n${compactOnboarding()}\n\n${onboarding()}`,
+				() => `${withLogo(expandedInstructions())}\n${context()}\n\n${onboarding()}`,
 				this.getStartupExpansionState(),
 				1,
 				0,
@@ -2406,7 +2416,7 @@ export class InteractiveMode {
 		this.showStatusIndicator(
 			new WorkingStatusIndicator(
 				this.ui,
-				this.workingMessage ?? this.defaultWorkingMessage,
+				this.workingMessage ?? uiText(this.defaultWorkingMessage),
 				this.workingIndicatorOptions,
 				colorFn,
 			),
@@ -2529,7 +2539,7 @@ export class InteractiveMode {
 		this.setWorkingIndicator();
 		if (this.activeStatusIndicator?.kind === "working") {
 			this.activeStatusIndicator.setMessage(
-				`${this.defaultWorkingMessage} (${keyText("app.interrupt")} to interrupt)`,
+				uiText(`${this.defaultWorkingMessage} ({key} to interrupt)`, { key: keyText("app.interrupt") }),
 			);
 		}
 		this.setHiddenThinkingLabel();
@@ -2695,7 +2705,7 @@ export class InteractiveMode {
 			setWorkingMessage: (message) => {
 				this.workingMessage = message;
 				if (this.activeStatusIndicator?.kind === "working") {
-					this.activeStatusIndicator.setMessage(message ?? this.defaultWorkingMessage);
+					this.activeStatusIndicator.setMessage(message ?? uiText(this.defaultWorkingMessage));
 				}
 			},
 			setWorkingVisible: (visible) => this.setWorkingVisible(visible),

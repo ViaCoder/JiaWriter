@@ -28,6 +28,16 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	// Collapsed lines of a skill, a compaction summary and a branch summary.
 	"[skill]": "[技能]",
 	"To resume this session:": "继续这次会话：",
+	// The working line and a tool row's timing (2026-11-14: the screen showed "Working · 5 秒" and "Took 0.0s").
+	Working: "处理中",
+	"Working ({key} to interrupt)": "处理中（{key} 中断）",
+	"Took {time}": "用时 {time}",
+	"Elapsed {time}": "已用 {time}",
+	// A bash row's folded head: the prefix and the closing bracket around the expand key.
+	"... ({count} earlier lines,": "……（前面 {count} 行已折叠，",
+	")": "）",
+	// The header's line on the model and the folder.
+	"Model {model} · Folder {cwd}": "模型 {model} · 文件夹 {cwd}",
 	"Compacted from {tokens} tokens": "上下文已压缩，原 {tokens} token",
 	"Branch summary": "分支摘要",
 	// Startup help, full form.
@@ -204,6 +214,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Search the input history (type to filter)": "搜索输入历史（输入文字筛选）",
 	"{seconds}s": "{seconds} 秒",
 	"{minutes}m {seconds}s": "{minutes} 分 {seconds} 秒",
+	"{hours}h {minutes}m {seconds}s": "{hours} 时 {minutes} 分 {seconds} 秒",
 	// Startup hints for the keys added on 2026-11-09.
 	"to cycle work mode": "切换工作模式（手动确认、自动、规划）",
 	"for the detailed view": "详细模式（完整的工具输出和思考过程）",

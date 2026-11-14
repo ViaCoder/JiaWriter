@@ -7,7 +7,7 @@ import type { Theme } from "../../modes/interactive/theme/theme.ts";
 import { stripAnsi } from "../../utils/ansi.ts";
 import { resolvePath } from "../../utils/paths.ts";
 import { sanitizeBinaryOutput } from "../../utils/shell.ts";
-import { toolLabel } from "../../writer/ui-text.ts";
+import { toolLabel, uiText } from "../../writer/ui-text.ts";
 import type { ToolRenderContext } from "../extensions/types.ts";
 
 export function shortenPath(path: unknown, cwd?: string): string {
@@ -125,14 +125,19 @@ export function formatToolCallWithArgs(title: string, args: unknown, theme: Them
 /** Duration as `4.2s` below a minute, then `1m 30s` and `2h 3m 4s`. */
 export function formatToolDuration(ms: number): string {
 	const seconds = ms / 1000;
-	if (seconds < 60) return `${seconds.toFixed(1)}s`;
+	// JiaWriter: the units in the interface language (用时 0.0 秒).
+	if (seconds < 60) return uiText("{seconds}s", { seconds: seconds.toFixed(1) });
 
 	const totalSeconds = Math.floor(seconds);
 	const minutes = Math.floor(totalSeconds / 60);
 	const remainder = totalSeconds % 60;
-	if (minutes < 60) return `${minutes}m ${remainder}s`;
+	if (minutes < 60) return uiText("{minutes}m {seconds}s", { minutes: String(minutes), seconds: String(remainder) });
 
-	return `${Math.floor(minutes / 60)}h ${minutes % 60}m ${remainder}s`;
+	return uiText("{hours}h {minutes}m {seconds}s", {
+		hours: String(Math.floor(minutes / 60)),
+		minutes: String(minutes % 60),
+		seconds: String(remainder),
+	});
 }
 
 /** Renderer state of {@link startToolTimer} and {@link toolTimerText}, kept in `ToolRenderContext.state`. */
@@ -170,10 +175,11 @@ export function toolTimerText(context: ToolRenderContext<ToolTimerState>, isPart
 	}
 	// A final result's recorded duration wins: it is monotonic and survives reloads. The renderer's own clock is the
 	// fallback for live progress and for results stored without one.
-	if (!isPartial && context.durationMs !== undefined) return `Took ${formatToolDuration(context.durationMs)}`;
+	if (!isPartial && context.durationMs !== undefined)
+		return uiText("Took {time}", { time: formatToolDuration(context.durationMs) });
 	if (state.startedAt === undefined) return undefined;
 	const endTime = state.endedAt ?? Date.now();
-	return `${isPartial ? "Elapsed" : "Took"} ${formatToolDuration(endTime - state.startedAt)}`;
+	return uiText(isPartial ? "Elapsed {time}" : "Took {time}", { time: formatToolDuration(endTime - state.startedAt) });
 }
 
 export function invalidArgText(theme: Theme): string {

@@ -76,8 +76,8 @@ function rebuildBashResultRenderComponent(
 					maxVisualLines: BASH_PREVIEW_LINES,
 					keep: "end",
 					formatHint: (hidden) =>
-						theme.fg("muted", `... (${hidden} earlier lines,`) +
-						` ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", ")")}`,
+						theme.fg("muted", uiText("... ({count} earlier lines,", { count: String(hidden) })) +
+						` ${keyHint("app.tools.expand", "to expand")}${theme.fg("muted", uiText(")"))}`,
 				}),
 			);
 		}
