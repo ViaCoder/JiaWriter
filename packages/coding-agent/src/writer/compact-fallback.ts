@@ -42,9 +42,11 @@ export function isWriterOverflow(message: { provider?: string; stopReason?: stri
  * errors the session retries). Such a request is retried like a dropped connection.
  */
 export function isInternalAbort(message: { stopReason?: string; errorMessage?: string }): boolean {
-	return (
-		message.stopReason === "error" && /^(?:The operation was|Request) aborted\.?$/i.test(message.errorMessage ?? "")
-	);
+	if (message.stopReason !== "error") return false;
+	const text = message.errorMessage ?? "";
+	// The gateway ending a reply mid-stream counts too (2026-11-14: "Provider finish_reason: error" after 11 minutes
+	// of generation ended a research run with no draft).
+	return /^(?:The operation was|Request) aborted\.?$/i.test(text) || /^Provider finish_reason: error$/i.test(text);
 }
 
 /** True for a refused key: the next request would fail the same way, so a local summary only loses detail. */

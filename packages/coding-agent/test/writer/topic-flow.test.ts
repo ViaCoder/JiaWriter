@@ -110,7 +110,8 @@ describe("a writing topic", () => {
 			call("material_add", { items: [{ ...material, url: "https://elsewhere.example/x" }] }),
 			// A search result is enough: the program extracts the facts from its entry; the same facts again are skipped.
 			call("material_add", { items: [material] }),
-			call("material_add", { items: [material] }),
+			// The items as JSON text, as GLM sends them at times (2026-11-14): read all the same.
+			call("material_add", { items: [JSON.stringify([material])] }),
 			call("fetch_web", { url: URL_A, method: "anysearch" }),
 			call("write", {
 				path: draft,

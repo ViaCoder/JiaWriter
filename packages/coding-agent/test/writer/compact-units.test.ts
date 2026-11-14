@@ -320,6 +320,7 @@ describe("isInternalAbort", () => {
 		// 2026-11-14: a research run got this after 314 s of upstream silence and ended with no draft.
 		expect(isInternalAbort({ stopReason: "error", errorMessage: "The operation was aborted" })).toBe(true);
 		expect(isInternalAbort({ stopReason: "error", errorMessage: "Request aborted." })).toBe(true);
+		expect(isInternalAbort({ stopReason: "error", errorMessage: "Provider finish_reason: error" })).toBe(true);
 		// The user's abort ends the message as aborted; other errors keep their own retry rule.
 		expect(isInternalAbort({ stopReason: "aborted", errorMessage: "The operation was aborted" })).toBe(false);
 		expect(isInternalAbort({ stopReason: "error", errorMessage: "aborted by policy: content" })).toBe(false);

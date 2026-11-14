@@ -53,6 +53,24 @@ interface SourceItem {
 	focus?: string;
 }
 
+/**
+ * The items as objects: an item given as JSON text is parsed (an array of them too), any other string is an address.
+ */
+export function sourceItems(given: readonly unknown[]): SourceItem[] {
+	return given.flatMap((item): SourceItem[] => {
+		if (typeof item !== "string") return item && typeof item === "object" ? [item as SourceItem] : [];
+		const text = item.trim();
+		if (/^[[{]/.test(text)) {
+			try {
+				return sourceItems([JSON.parse(text)].flat());
+			} catch {
+				return [];
+			}
+		}
+		return text ? [{ url: text }] : [];
+	});
+}
+
 /** Follow the session: the topic of the branch now shown. */
 function restore(ctx: ExtensionContext): void {
 	// None on a fresh branch.
@@ -107,23 +125,30 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 			"Records the facts of a source in 素材.md: you name the source and what you need from it; the program extracts the facts with a request of its own, checks their figures and names against the source, and files them with the source's outlet and date.\n\nUsage:\n - One item per source: url of a search result or fetched page of this topic, or file (and page) of an imported reference\n - section is the outline part the facts are for; focus says what to take when the source covers more than that (大众汽车在华销量和高管表态)\n - The reply lists the facts recorded: read them to see what the source gave and what is still missing",
 		// Argument schema.
 		parameters: Type.Object({
+			// A string too: GLM sends items as JSON text at times (2026-11-14: a run sent one string holding three items
+			// and was refused by the schema), or an address alone.
 			items: Type.Array(
-				Type.Object({
-					url: Type.Optional(
-						Type.String({ description: "Address of a search result or fetched page of this topic" }),
-					),
-					file: Type.Optional(Type.String({ description: "Imported reference file" })),
-					page: Type.Optional(Type.String({ description: "Its page, for a PDF or Word file" })),
-					section: Type.Optional(Type.String({ description: "Outline part" })),
-					focus: Type.Optional(Type.String({ description: "What to take from the source, when it covers more" })),
-				}),
+				Type.Union([
+					Type.Object({
+						url: Type.Optional(
+							Type.String({ description: "Address of a search result or fetched page of this topic" }),
+						),
+						file: Type.Optional(Type.String({ description: "Imported reference file" })),
+						page: Type.Optional(Type.String({ description: "Its page, for a PDF or Word file" })),
+						section: Type.Optional(Type.String({ description: "Outline part" })),
+						focus: Type.Optional(
+							Type.String({ description: "What to take from the source, when it covers more" }),
+						),
+					}),
+					Type.String(),
+				]),
 			),
 		}),
 		// Appends to one file; asks the model once per source.
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 		// Extract and record them.
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const items = params.items as SourceItem[];
+			const items = sourceItems(params.items);
 			// The first item says what the material is about, when no topic was opened.
 			const dir = ensureTopic(ctx.cwd, String(items[0]?.focus ?? items[0]?.section ?? ""));
 			const fail = (text: string) => ({
