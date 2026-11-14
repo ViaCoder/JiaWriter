@@ -9,7 +9,13 @@ import { describe, expect, it } from "vitest";
 // Upstream functions changed for JiaWriter.
 import type { CompactionPreparation } from "../../src/core/compaction/compaction.ts";
 import { serializeConversation } from "../../src/core/compaction/utils.ts";
-import { isAuthFailure, isWriterOverflow, localCompaction, localSummary } from "../../src/writer/compact-fallback.ts";
+import {
+	isAuthFailure,
+	isInternalAbort,
+	isWriterOverflow,
+	localCompaction,
+	localSummary,
+} from "../../src/writer/compact-fallback.ts";
 import { CLEAR_SHARE, clearOldResults, fitToolResults, KEEP_TURNS, resultCap } from "../../src/writer/context-fit.ts";
 import {
 	isSummaryOverflow,
@@ -306,6 +312,18 @@ describe("isWriterOverflow", () => {
 		expect(isWriterOverflow(failed("余额不足"))).toBe(false);
 		expect(isWriterOverflow(failed("请求内容超长", "anthropic"))).toBe(false);
 		expect(isWriterOverflow({ provider: "jw", stopReason: "stop", errorMessage: "超长" })).toBe(false);
+	});
+});
+
+describe("isInternalAbort", () => {
+	it("reads a failed request cut off by the program's own signal, not the user's abort", () => {
+		// 2026-11-14: a research run got this after 314 s of upstream silence and ended with no draft.
+		expect(isInternalAbort({ stopReason: "error", errorMessage: "The operation was aborted" })).toBe(true);
+		expect(isInternalAbort({ stopReason: "error", errorMessage: "Request aborted." })).toBe(true);
+		// The user's abort ends the message as aborted; other errors keep their own retry rule.
+		expect(isInternalAbort({ stopReason: "aborted", errorMessage: "The operation was aborted" })).toBe(false);
+		expect(isInternalAbort({ stopReason: "error", errorMessage: "aborted by policy: content" })).toBe(false);
+		expect(isInternalAbort({ stopReason: "error", errorMessage: "Headers Timeout Error" })).toBe(false);
 	});
 });
 

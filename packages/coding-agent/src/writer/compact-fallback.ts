@@ -35,6 +35,18 @@ export function isWriterOverflow(message: { provider?: string; stopReason?: stri
 	return WRITER_OVERFLOW.some((p) => p.test(message.errorMessage ?? ""));
 }
 
+/**
+ * True for a request the program's own signals cut off, not the user: the message failed (stopReason "error", not
+ * "aborted") with the abort wording and no reason (2026-11-14: a research run's request got "The operation was
+ * aborted" after 314 s of silence from the upstream, and the run ended with no draft because an abort is not among the
+ * errors the session retries). Such a request is retried like a dropped connection.
+ */
+export function isInternalAbort(message: { stopReason?: string; errorMessage?: string }): boolean {
+	return (
+		message.stopReason === "error" && /^(?:The operation was|Request) aborted\.?$/i.test(message.errorMessage ?? "")
+	);
+}
+
 /** True for a refused key: the next request would fail the same way, so a local summary only loses detail. */
 export function isAuthFailure(message: string): boolean {
 	// Status codes and the usual wording.

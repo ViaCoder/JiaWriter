@@ -67,7 +67,7 @@ import {
 	writingState,
 } from "../writer/compact/state.ts";
 // JiaWriter: compaction fallback, overflow errors and the provider name.
-import { isAuthFailure, isWriterOverflow, localCompaction } from "../writer/compact-fallback.ts";
+import { isAuthFailure, isInternalAbort, isWriterOverflow, localCompaction } from "../writer/compact-fallback.ts";
 import { JW_PROVIDER } from "../writer/env-config.ts";
 import { currentTopic } from "../writer/topic/current.ts";
 import { formatNoApiKeyFoundMessage, formatNoModelSelectedMessage } from "./auth-guidance.ts";
@@ -3804,7 +3804,9 @@ export class AgentSession {
 		if (isContextOverflow(message, (this._modelForMessage(message) ?? this.model)?.contextWindow ?? 0)) return false;
 		// JiaWriter: an overflow the Chinese patterns name goes to compaction, not to a retry at the same size.
 		if (isWriterOverflow(message)) return false;
-		return isRetryableAssistantError(message);
+		// JiaWriter: a request cut off by a signal of the program's own (not the user's abort) is retried like a dropped
+		// connection.
+		return isInternalAbort(message) || isRetryableAssistantError(message);
 	}
 
 	/**
