@@ -336,6 +336,8 @@ export const en: Record<MessageKey, string> = {
 	"draft.written": "Wrote “{heading}”: {chars} characters; {path} now holds {total}; the outline line is ticked.",
 	"draft.failed": "The section was not written: {reason}",
 	"draft.noModel": "No model is available to write the section",
+	"draft.budget":
+		"The document asks for about {target} characters; {remaining} sections are still open, with about {left} characters left for them.",
 	"rewind.pick": "Go back to before which message?",
 	"rewind.mode": "What goes back?",
 	"rewind.both": "Conversation and files ({count} files restored)",

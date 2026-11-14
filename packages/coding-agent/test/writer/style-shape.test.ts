@@ -11,19 +11,21 @@ describe("evidenceFirst", () => {
 	it("finds a paragraph that opens with figures, a dated event or a cited title", () => {
 		const text = [
 			"2020年，长江流域水质优良断面比例为96.7%。水环境质量持续改善。",
-			"2026年11月7日《路透社》报道，俄方代表团将参加谈判。谈判前景仍不明朗。",
+			"2026年11月7日《路透社》报道，俄罗斯代表团将参加谈判。谈判前景仍不明朗。",
 		].join("\n\n");
 		expect(evidenceFirst(text)).toEqual([
 			"2020年，长江流域水质优良断面比例为96.7%。",
-			"2026年11月7日《路透社》报道，俄方代表团将参加谈判。",
+			"2026年11月7日《路透社》报道，俄罗斯代表团将参加谈判。",
 		]);
 	});
-	it("leaves headings, lists, single statements and general prose alone", () => {
+	it("leaves headings, lists, single statements, general prose and a judgment with a bracketed citation alone", () => {
 		const text = [
 			"## 一、2020年主要成效",
 			"- 退捕渔船11万艘。",
 			"退捕渔船11万艘。",
 			"保护修复任重道远。水生态问题仍然是流域最主要的问题。",
+			// The citation in brackets is not the sentence's opening content.
+			"中国品牌的竞争范围在扩大，对豪华品牌形成进一步压力（2026年4月24日《路透社》报道）。奔驰首席执行官康林松表示不会卷入价格战。",
 		].join("\n\n");
 		expect(evidenceFirst(text)).toEqual([]);
 	});

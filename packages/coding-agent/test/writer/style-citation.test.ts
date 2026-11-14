@@ -10,13 +10,13 @@ import {
 
 describe("citationIssues", () => {
 	it("passes the forms the user asked for", () => {
-		expect(citationIssues("2026年11月7日《路透社》报道，俄方代表团将参加谈判。")).toEqual([]);
+		expect(citationIssues("2026年11月7日《路透社》报道，俄罗斯代表团将参加谈判。")).toEqual([]);
 		expect(
 			citationIssues("据2021年6月7日《国务院关于长江流域生态环境保护工作情况的报告》，退捕渔船11万艘。"),
 		).toEqual([]);
 	});
 	it("finds an outlet after a date without book-title marks, with or without the year", () => {
-		expect(citationIssues("11月7日，路透社称俄方将派员参加。")).toEqual([
+		expect(citationIssues("11月7日，路透社称俄罗斯将派员参加。")).toEqual([
 			{ quote: "11月7日，路透社", form: "YYYY年11月7日《路透社》报道" },
 		]);
 		expect(citationIssues("2026年10月31日新华网报道，……")).toEqual([

@@ -306,6 +306,7 @@ export const zh = {
 	"draft.written": "已写入“{heading}”，本节 {chars} 字，{path} 正文共 {total} 字；大纲里这一节已标记。",
 	"draft.failed": "这一节没有写成：{reason}",
 	"draft.noModel": "当前没有可用的模型，写不了这一节",
+	"draft.budget": "全文要求约 {target} 字，还有 {remaining} 节没写，共约 {left} 字可用。",
 	"rewind.pick": "回退到哪条消息之前？",
 	"rewind.mode": "退回什么？",
 	"rewind.both": "对话和文件一起退回（恢复 {count} 个文件）",

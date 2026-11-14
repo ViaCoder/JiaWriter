@@ -37,7 +37,6 @@ import writerToolsExtension, {
 	REVIEW_REASONING_TOKENS,
 	REVIEW_TIMEOUT_MS,
 	referenceTitles,
-	requestedLength,
 	reviewMaterialText,
 	shownRound,
 	touchesMaterials,
@@ -311,14 +310,6 @@ describe("finishedChecks", () => {
 		expect(finishedChecks("# 故乡\n\n他住在饕餮楼。")).toEqual([]);
 		// A short report is not told to reach a length.
 		expect(finishedChecks(FACT_REPORT)).toEqual([]);
-	});
-});
-
-describe("requestedLength", () => {
-	it("reads the length a message asks for", () => {
-		expect(requestedLength("写一篇约1500字的调研报告")).toBe(1500);
-		expect(requestedLength("3000字左右")).toBe(3000);
-		expect(requestedLength("写一篇调研报告")).toBeUndefined();
 	});
 });
 
@@ -889,10 +880,13 @@ describe("draft_section", () => {
 		const draft = readFileSync(join(cwd, path), "utf-8");
 		expect(draft).toBe("# 低空报告\n\n## 一、现状\n\n据中国民航局预测，2025年市场规模将达1.5万亿元。\n");
 		expect(readFileSync(join(cwd, "20261112-低空", "稿件", "大纲.md"), "utf-8")).toContain("- [x] 一、现状");
-		// The second section goes after it, with the first as its 前文.
+		// The first call named its length; the result says what the outline's 约600字 leaves for the one open section.
+		expect(result.content[0].text).toContain("全文要求约 600 字，还有 1 节没写");
+		// The second section goes after it, with the first as its 前文, and, no length given, its share of the target.
 		await run({ path, section: "二、问题" });
 		expect(asked[1].user).toContain("前文（已写好的部分");
 		expect(asked[1].user).toContain("1.5万亿元。");
+		expect(asked[1].user).toMatch(/本节篇幅：约 5[6-9]0 字/);
 		expect(readFileSync(join(cwd, path), "utf-8")).toContain("1.5万亿元。\n\n## 二、问题");
 	});
 

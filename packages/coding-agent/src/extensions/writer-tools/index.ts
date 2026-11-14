@@ -29,10 +29,13 @@ import {
 	cleanSectionText,
 	headingOf,
 	markOutline,
+	openTextLines,
 	outlinePart,
 	outlineTitle,
+	requestedLength,
 	SECTION_REASONING_TOKENS,
 	SECTION_TIMEOUT_MS,
+	sectionBudget,
 	sectionInstructions,
 	sectionMaterials,
 	sectionRequest,
@@ -341,12 +344,6 @@ export function citesMaterials(text: string, titles: readonly string[]): boolean
 	return titles.some((title) => title.length > 0 && text.includes(title));
 }
 
-/** The length the user asked for in a message (约1500字, 1500字左右), if any. */
-export function requestedLength(message: string): number | undefined {
-	const found = /约\s*(\d{3,6})\s*字|(\d{3,6})\s*字左右/.exec(message);
-	return found ? Number(found[1] ?? found[2]) : undefined;
-}
-
 /** Most a draft may be off its requested length before the round asks to fix it: the same as word_count's, so the two
  * never disagree (a 2026-11-08 run kept cutting a draft word_count called long while the round passed it). */
 export const LENGTH_TOLERANCE = DEFAULT_TOLERANCE;
@@ -628,6 +625,11 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 				const material = join(dir, MATERIAL_FILE);
 				return existsSync(material) ? sectionMaterials(readFileSync(material, "utf-8"), part.line) : [];
 			});
+			// The document's length: the outline's head, else the user's message; a section not given a length gets
+			// its share of what is left.
+			const documentTarget = requestedLength(outline) ?? target;
+			const written = countText(bodyBeforeReferences(previous)).total;
+			const chars = params.chars ?? sectionBudget(outline, part.line, written, documentTarget);
 			const request = sectionRequest({
 				brief: part.brief,
 				outline,
@@ -636,7 +638,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 				heading,
 				materials,
 				previous: bodyBeforeReferences(previous),
-				chars: params.chars,
+				chars,
 				notes: params.notes,
 			});
 			let reply: string;
@@ -650,17 +652,24 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			const draft = spliceSection(previous, heading, text, outlineTitle(outline));
 			mkdirSync(dirname(file), { recursive: true });
 			writeFileSync(file, draft);
-			writeFileSync(outlineFile, markOutline(outline, part.line));
-			const chars = countText(text).total;
+			const marked = markOutline(outline, part.line);
+			writeFileSync(outlineFile, marked);
+			const length = countText(text).total;
 			const total = countText(bodyBeforeReferences(draft)).total;
+			// What the target leaves for the sections still open, so the next call can size itself.
+			const remaining = openTextLines(marked);
+			const budget =
+				documentTarget && remaining > 0
+					? `\n${t("draft.budget", { target: documentTarget, remaining, left: Math.max(0, documentTarget - total) })}`
+					: "";
 			return {
 				content: [
 					{
 						type: "text",
-						text: t("draft.written", { heading: heading || part.line, chars, path: params.path, total }),
+						text: `${t("draft.written", { heading: heading || part.line, chars: length, path: params.path, total })}${budget}`,
 					},
 				],
-				details: { file, chars, total },
+				details: { file, chars: length, total },
 			};
 		},
 	});

@@ -11,9 +11,12 @@ import {
 	headingOf,
 	MAX_PREVIOUS,
 	markOutline,
+	openTextLines,
 	outlinePart,
 	outlineTitle,
+	requestedLength,
 	SECTION_REASONING_TOKENS,
+	sectionBudget,
 	sectionInstructions,
 	sectionMaterials,
 	sectionRequest,
@@ -125,7 +128,7 @@ describe("sectionInstructions / sectionRequest", () => {
 		expect(request).not.toContain("前文。");
 		expect(request.length).toBeLessThan(MAX_PREVIOUS + 2000);
 		// No heading, no materials, no text yet.
-		const bare = sectionRequest({
+		const bare_input = {
 			brief: "",
 			outline: OUTLINE,
 			line: "引言",
@@ -133,10 +136,17 @@ describe("sectionInstructions / sectionRequest", () => {
 			heading: "",
 			materials: [],
 			previous: "",
-		});
+		};
+		const bare = sectionRequest(bare_input);
 		expect(bare).toContain("本节不设标题");
 		expect(bare).toContain("（无）");
 		expect(bare).toContain("这是第一节");
+		// The opening is asked for judgments only, with no exemplar (exp-p24q5: its figures were used again below).
+		expect(bare).toContain("本节是开篇");
+		expect(bare).not.toContain("范例");
+		// A headingless part later in the document, and a headed first section, are not the opening.
+		expect(sectionRequest({ ...bare_input, previous: "前文。" })).not.toContain("本节是开篇");
+		expect(sectionRequest({ ...bare_input, heading: "一、现状", line: "一、现状" })).not.toContain("本节是开篇");
 	});
 
 	it("gives exemplar paragraphs of the section's kind, under their source, and the rule to take their shape only", () => {
@@ -155,20 +165,44 @@ describe("sectionInstructions / sectionRequest", () => {
 		expect(sectionRequest({ ...base, line: "三、问题的对策", heading: "三、问题的对策" })).toContain(
 			"优化提升传统产业",
 		);
-		// The opening without a heading, and a line naming no kind: the situation's.
-		expect(sectionRequest({ ...base, line: "引言", heading: "", previous: "" })).toContain("顶压前行");
+		// A line naming no kind: the situation's.
 		expect(sectionRequest({ ...base, line: "二、欧洲车企的应对", heading: "二、欧洲车企的应对" })).toContain(
 			"顶压前行",
 		);
-		// A closing part: none.
+		// The opening and a closing part: none.
+		expect(sectionRequest({ ...base, line: "引言", heading: "", previous: "" })).not.toContain("范例");
 		expect(sectionRequest({ ...base, line: "结语", heading: "" })).not.toContain("范例");
 		// The kinds are picked by the exemplar function itself.
-		expect(exemplarsFor("四、对我国企业的启示", "四、对我国企业的启示", false).map((e) => e.kind)).toEqual([
+		expect(exemplarsFor("四、对我国企业的启示", "四、对我国企业的启示").map((e) => e.kind)).toEqual([
 			"measure",
 			"measure",
 		]);
-		expect(exemplarsFor("参考文献", "", false)).toEqual([]);
+		expect(exemplarsFor("参考文献", "")).toEqual([]);
 		expect(EXEMPLARS.every((e) => e.text.length <= 300)).toBe(true);
+	});
+});
+
+describe("requestedLength / sectionBudget / openTextLines", () => {
+	it("reads the length asked for, in a message or an outline's head", () => {
+		expect(requestedLength("写一篇约1500字的调研报告")).toBe(1500);
+		expect(requestedLength("3000字左右")).toBe(3000);
+		expect(requestedLength("写一篇调研报告")).toBeUndefined();
+		expect(requestedLength(OUTLINE)).toBe(1500);
+	});
+
+	it("shares what the target leaves among the open lines that carry text, and keeps an opening short", () => {
+		// Two open text lines (参考文献 carries none), 200 written of 1500: 650 each.
+		const outline = `${OUTLINE}\n- [ ] 三、参考文献`;
+		expect(sectionBudget(outline, "一、发展现状：市场规模迈向1.5万亿元", 200, 1500)).toBe(650);
+		expect(openTextLines(outline)).toBe(2);
+		// An opening without a heading: a tenth of the target at most.
+		const withOpening = outline.replace("- [x] 引言", "- [ ] 引言");
+		expect(sectionBudget(withOpening, "引言：低空经济规模快速增长", 0, 1500)).toBe(150);
+		expect(openTextLines(withOpening)).toBe(3);
+		// Nearly spent: still a floor; no target, or a line already ticked: nothing.
+		expect(sectionBudget(outline, "二、突出问题：法规供给滞后", 1480, 1500)).toBe(100);
+		expect(sectionBudget(outline, "一、发展现状", 0, undefined)).toBeUndefined();
+		expect(sectionBudget(outline, "引言", 0, 1500)).toBeUndefined();
 	});
 });
 

@@ -55,16 +55,15 @@ const KIND_WORDS: Array<[ExemplarKind, RegExp]> = [
 const CLOSING = /^(结语|结尾|结束语|参考文献|附录|附件)/;
 
 /**
- * The exemplars for a section: those of the kind its outline line names; the situation's for an opening without a
- * heading (it states the subject and the first judgment) and for a line that names no kind; none for a closing part.
+ * The exemplars for a section: those of the kind its outline line names, the situation's for a line that names no
+ * kind; none for a closing part or a part without a heading (the opening is asked to leave figures to the sections).
  */
-export function exemplarsFor(line: string, heading: string, isFirst: boolean): Exemplar[] {
+export function exemplarsFor(line: string, heading: string): Exemplar[] {
 	const head = line
 		.split(/[：:]/)[0]
 		.replace(/^[一二三四五六七八九十\d]+[、.．]\s*/, "")
 		.trim();
-	if (CLOSING.test(head)) return [];
-	if (!heading && isFirst) return EXEMPLARS.filter((e) => e.kind === "situation");
+	if (CLOSING.test(head) || !heading) return [];
 	const kind = KIND_WORDS.find(([, re]) => re.test(line))?.[0] ?? "situation";
 	return EXEMPLARS.filter((e) => e.kind === kind);
 }

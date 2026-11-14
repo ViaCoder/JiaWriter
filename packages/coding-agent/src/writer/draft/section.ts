@@ -83,6 +83,51 @@ function compact(text: string): string {
 	return text.replace(/[\s\-*[\]xX：:，,。.、；;（）()《》“”"'【】]/g, "").toLowerCase();
 }
 
+/** The length a text asks for (约1500字, 1500字左右), if any: a user's message or an outline's head. */
+export function requestedLength(text: string): number | undefined {
+	const found = /约\s*(\d{3,6})\s*字|(\d{3,6})\s*字左右/.exec(text);
+	return found ? Number(found[1] ?? found[2]) : undefined;
+}
+
+/** Parts of an outline that carry no text of their own. */
+const NO_TEXT = /^(?:[一二三四五六七八九十\d]+[、.．]\s*)?(?:参考文献|附录|附件)/;
+
+/** Fewest characters a section is asked for when the budget is nearly spent. */
+const MIN_BUDGET = 100;
+
+/**
+ * About how long a section should be when the call names no length: what the document's target leaves after the
+ * text written so far, shared equally among the outline's open lines that carry text, rounded to tens; an opening or
+ * closing part without a heading gets at most a tenth of the target. Undefined without a target or for a line already
+ * written (a rewrite names its own length). exp-p24q5 (2026-11-14): three sections of 604, 654 and 490 characters for
+ * a 1,500-character report, then six edits to cut it.
+ */
+export function sectionBudget(
+	outline: string,
+	line: string,
+	written: number,
+	target: number | undefined,
+): number | undefined {
+	if (!target) return undefined;
+	const open = outline
+		.split("\n")
+		.filter((l) => /^\s*[-*]\s*\[ \]/.test(l))
+		.map((l) => l.replace(/^\s*[-*]\s*\[ \]\s*/, "").trim())
+		.filter((l) => !NO_TEXT.test(l));
+	if (!open.some((l) => compact(l) === compact(line))) return undefined;
+	const share = Math.max(MIN_BUDGET, Math.round(Math.max(0, target - written) / open.length / 10) * 10);
+	return headingOf(line) ? share : Math.min(share, Math.round(target / 10));
+}
+
+/** Open outline lines that still carry text to write, after this one. */
+export function openTextLines(outline: string): number {
+	return outline
+		.split("\n")
+		.filter((l) => /^\s*[-*]\s*\[ \]/.test(l))
+		.map((l) => l.replace(/^\s*[-*]\s*\[ \]\s*/, "").trim())
+		.filter((l) => !NO_TEXT.test(l)).length;
+}
+
 /** Parts that open or close a document without a heading of their own. */
 const NO_HEADING = new Set(["引言", "开篇", "前言", "导语", "开头", "结语", "结尾", "结束语", "参考文献"]);
 
@@ -142,6 +187,9 @@ export function sectionRequest(input: SectionInput): string {
 		`大纲：\n${input.outline.trim()}`,
 		`本节：${input.line}`,
 		input.heading ? `本节标题行：${input.heading}` : "本节不设标题",
+		// The opening (exp-p24q5, 2026-11-14): written first with the materials' figures, which the sections then used
+		// again; four edits removed them, and the opening ended as two sentences of judgment. So it is asked for that.
+		isOpening(input) ? "本节是开篇：用两三句写总体情况和判断，具体数字、案例和人名留给后面各节，这里不出现" : "",
 		input.items.length > 0 ? `本节要点：\n${input.items.map((i) => `- ${i}`).join("\n")}` : "",
 		exemplarText(input),
 		`本节素材（程序从来源提取的事实记录，事实和数字只从这里取）：\n${input.materials.length > 0 ? input.materials.join("\n") : "（无）"}`,
@@ -154,9 +202,18 @@ export function sectionRequest(input: SectionInput): string {
 	return parts.filter(Boolean).join("\n\n");
 }
 
-/** The 范例 part of a request: the exemplar paragraphs of the section's kind, each under its source; empty for none. */
+/** Whether the section is the document's opening: no heading, nothing written yet. */
+function isOpening(input: SectionInput): boolean {
+	return !input.heading && !input.previous.trim();
+}
+
+/**
+ * The 范例 part of a request: the exemplar paragraphs of the section's kind, each under its source; empty for none,
+ * and for the opening, whose exemplar would show figures the opening is asked to leave out.
+ */
 function exemplarText(input: SectionInput): string {
-	const found = exemplarsFor(input.line, input.heading, !input.previous.trim());
+	if (isOpening(input)) return "";
+	const found = exemplarsFor(input.line, input.heading);
 	if (found.length === 0) return "";
 	return `范例（公开文件的段落，学它的开头、句式和节奏，内容和用语不照搬）：\n${found
 		.map((e) => `【${e.source}】\n${e.text}`)

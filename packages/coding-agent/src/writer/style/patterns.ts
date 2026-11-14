@@ -46,6 +46,15 @@ function enp(id: string, zh: string, en: string, source: string): StylePattern {
 
 /** General Chinese pack: contrast frames and stock phrases that fit no register. */
 const CORE_ZH: readonly StylePattern[] = [
+	// A country as 俄方, 中方, 美方 (the user, 2026-11-14: avoid these terms "that include the character 方, any country
+	// inside"): the document names the country or its body in full. The look-around keeps 其中方案, 完美方案, 以方便,
+	// 道德方面 and the like out; 双方, 各方, 西方 and 官方 are not on the list.
+	zhp(
+		"zh-country-fang",
+		"国名简称＋方",
+		"country as X方",
+		"(?<![其之集完适])[中美俄日韩英法德欧印朝越菲乌伊巴以澳加意荷]方(?![面案向式法针位阵圆形程言便略寸剂药块糖])",
+	),
 	// "X is not Y": each one is looked at, whatever the density. 是不是 and 要不是 ask or suppose, and deny nothing.
 	// 不再是 ("no longer Y") is the same move; 0 times in 217,000 characters of human official documents (2026-11-08).
 	zhp(

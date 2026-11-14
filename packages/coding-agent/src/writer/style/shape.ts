@@ -24,7 +24,10 @@ export function evidenceFirst(text: string): string[] {
 				const sentences = block.match(/[^。！？!?]+[。！？!?]/g) ?? [];
 				if (sentences.length < MIN_SENTENCES) return [];
 				const first = (sentences[0] ?? "").trim();
-				return SPECIFIC.test(first) ? [first.length > 40 ? `${first.slice(0, 40)}…` : first] : [];
+				// A citation in brackets at the end of a judgment (……形成进一步压力（2026年4月24日《路透社》报道）。) is not
+				// the sentence's opening content (exp-p24q5, 2026-11-14: one such sentence was flagged nine times).
+				const spoken = first.replace(/[（(][^（）()]*[）)]/g, "");
+				return SPECIFIC.test(spoken) ? [first.length > 40 ? `${first.slice(0, 40)}…` : first] : [];
 			})
 	);
 }

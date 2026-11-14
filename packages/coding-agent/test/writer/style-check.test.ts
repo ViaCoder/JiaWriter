@@ -25,6 +25,7 @@ const HIT_EXAMPLES: Record<string, string> = {
 	"gw-casual": "成本已降到随手可承受的水平",
 	"en-denial": "This is not it",
 	// core-zh.
+	"zh-country-fang": "俄方代表团将参加谈判，中方表示欢迎。",
 	"zh-bushi-ershi": "这一举措不是为了短期收益，而是着眼长远布局。",
 	"zh-fou-ershi": "关键并非投入不足，而是机制不顺。",
 	"zh-bujin-gengshi": "这不仅是数量问题，更是质量问题。",
@@ -110,6 +111,8 @@ const GUARDS = [
 	"他说：“这不是终点，而是起点。”",
 	// 首先 without the comma.
 	"首先要明确目标。",
+	// 方 after a country's character in an ordinary word, and the sides that name no country.
+	"其中方案一最为完美，方便各方比较；道德方面以方便为先，打印方式照旧，双方和西方官方均无异议。",
 	// English: plain negation and plain role.
 	"He did not attend the meeting. He played a role in the film.",
 	// English: hyphenated terms, a numeric dash and inline code.
