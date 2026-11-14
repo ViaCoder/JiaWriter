@@ -176,8 +176,9 @@ describe("exportDraft with the Office formats", () => {
 	it("writes .xlsx and .pptx next to the draft and reports the format", async () => {
 		const draft = join(cwd, "报告.md");
 		writeFileSync(draft, DRAFT);
-		expect(defaultOutput("/w/稿.md", "xlsx")).toBe("/w/稿.xlsx");
-		expect(defaultOutput("/w/稿.md", "pptx")).toBe("/w/稿.pptx");
+		// The path as the platform writes it (\w\稿.xlsx on Windows: CI 43618094874, 2026-11-15).
+		expect(defaultOutput(join("/w", "稿.md"), "xlsx")).toBe(join("/w", "稿.xlsx"));
+		expect(defaultOutput(join("/w", "稿.md"), "pptx")).toBe(join("/w", "稿.pptx"));
 		const x = await exportDraft(draft, cwd, cwd, { format: "xlsx" });
 		expect([x.out, x.format]).toEqual(["报告.xlsx", "xlsx"]);
 		expect(xlsxToPages(new Uint8Array(readFileSync(join(cwd, x.out))))).toHaveLength(2);
