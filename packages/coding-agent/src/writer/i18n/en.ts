@@ -180,6 +180,9 @@ export const en: Record<MessageKey, string> = {
 	"guard.failed": "{tool} failed {count} times in a row with the same arguments",
 	"guard.repeated": "{tool} was called {count} times with the same arguments, and the result will not change",
 	"guard.failing": "{tool} failed {count} times in a row with changing arguments: stop and tell the user why it fails",
+	"guard.flood":
+		"The last reply went on to {count} tool calls and the program cut it after the {max}th: a reply calls at most {max} tools. Go on with the results at hand; pages still to read go in later turns",
+	"guard.floodCall": "this reply has more than {max} tool calls; the rest are not run",
 	"blocked.why": "Blocked: {why}. ",
 	"blocked.change":
 		"Next: change the arguments or the method, or go on with what you have; do not make the same call again.",

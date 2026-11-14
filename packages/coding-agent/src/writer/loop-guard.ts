@@ -17,6 +17,12 @@ export const MAX_BLOCKS = 3;
  */
 export const MAX_TOOL_FAILURES = 6;
 /**
+ * Most tool calls one reply may carry. Past it the reply is a loop of the model's own (2026-11-14: one reply held
+ * 1,598 fetch_web calls and took 21 minutes to generate; 16 ran, 6 hit a rate limit and 1,573 were blocked one by
+ * one), so the stream is cut there and the model is told to go on with what it has.
+ */
+export const MAX_CALLS_PER_REPLY = 20;
+/**
  * Tools that change files, the topic, a page or the desktop: after one of them works, an earlier call may answer
  * differently. browser and computer since 2026-11-09: reading a page again after a click is new information, and the
  * package check's fifth page read was blocked.

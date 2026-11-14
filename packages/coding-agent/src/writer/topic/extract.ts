@@ -30,7 +30,7 @@ export function extractInstructions(): string {
 		`Take only what the request asks for, at most ${MAX_FACTS} lines, the most specific facts first; return no line when the text holds nothing on it.`,
 		"A fact is one plain Chinese sentence of at most 80 characters stating what is, what happened or what was decided, with its figures, dates and names: no judgment, comment, connective, image or metaphor. A person quoted gives the fact, figure or decision they stated (大众汽车首席执行官布鲁默表示，2026年起在华产能减少两成); their wording, emphasis and figures of speech stay out.",
 		"Figures as the source gives them: every number from the text, none worked out, rounded or combined; a unit may be written in Chinese (2.6 million as 260万) when the number stays the same.",
-		"时间 as the text states it (2026年1月14日, 2025年, 2025年第三季度); the field stays empty when the text states none; never infer one.",
+		"时间 as the text states it (2026年1月14日, 2025年, 2025年第三季度); the field stays empty when the text states none or only a relative one (近期, 约五年前); never infer one.",
 		"A fact about what a named company, body or person did, decided or stated is a 案例 line with that name as 主体 (a company or body by its name; a person by name and post in the text's own language and spelling); a measurement with no actor is a 数据 line.",
 		"A text in another language gives facts in Chinese, with the names of people and companies as the text spells them. Nothing from outside the text.",
 	].join("\n");

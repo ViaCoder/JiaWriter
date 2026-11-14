@@ -9,6 +9,7 @@ import {
 	firecrawlPost,
 	firecrawlRange,
 	firecrawlSearch,
+	RATE_WAIT_MS,
 } from "../../src/writer/websearch/firecrawl.ts";
 
 beforeEach(() => vi.stubEnv("JW_LANG", "zh"));
@@ -52,6 +53,21 @@ describe("firecrawlPost", () => {
 		expect((f.calls[0].init.headers as Record<string, string>).authorization).toBe("Bearer fc-test-key");
 		const error = await firecrawlPost(cfg, "/v2/search", {}, undefined, f.fn).catch((e: Error) => e);
 		expect(String(error)).not.toContain("fc-test-key");
+	});
+	it("waits as told after a 429 and tries once more, then gives up", async () => {
+		const waits: number[] = [];
+		const sleep = async (ms: number) => void waits.push(ms);
+		const limited = new Response("{}", { status: 429, headers: { "retry-after": "2" } });
+		const f = fakeFetch(limited, json(200, { success: true, data: { ok: 1 } }));
+		expect(await firecrawlPost(cfg, "/v2/scrape", { url: "https://a.example/" }, undefined, f.fn, sleep)).toEqual({
+			ok: 1,
+		});
+		expect(waits).toEqual([2000]);
+		expect(f.calls).toHaveLength(2);
+		// No Retry-After: the limit; a second 429 is the failure.
+		const g = fakeFetch(json(429, {}), json(429, {}));
+		await expect(firecrawlPost(cfg, "/x", {}, undefined, g.fn, sleep)).rejects.toThrow("429");
+		expect(waits).toEqual([2000, RATE_WAIT_MS]);
 	});
 	it("needs a key, and reads a failed envelope or a network error as a failure", async () => {
 		await expect(firecrawlPost(keyless, "/v2/search", {}, undefined, fakeFetch().fn)).rejects.toThrow(

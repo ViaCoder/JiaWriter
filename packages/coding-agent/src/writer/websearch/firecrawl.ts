@@ -35,30 +35,47 @@ export function firecrawlError(status: number, url = ""): Error {
 	return new Error(t("firecrawl.http", { status }));
 }
 
-/** POST a JSON body to path and return `data` of a successful answer. */
+/** Longest wait (ms) after a 429 before the one second try; Firecrawl's Retry-After within it, else this. */
+export const RATE_WAIT_MS = 15_000;
+
+/**
+ * POST a JSON body to path and return `data` of a successful answer. A 429 is tried once more after the wait the
+ * answer names (2026-11-14: a run read 16 pages in a row, got six 429s, and the loop guard then blocked fetch_web for
+ * the rest of the run).
+ */
 export async function firecrawlPost(
 	cfg: SearchConfig,
 	path: string,
 	body: Record<string, unknown>,
 	signal?: AbortSignal,
 	fetchFn: FetchFn = fetch,
+	sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
 ): Promise<unknown> {
 	// Without a key there is no call.
 	if (!cfg.firecrawlKey) throw new Error(t("firecrawl.noKey"));
 	// Timeout combined with the caller's cancellation.
 	const timeout = AbortSignal.timeout(cfg.timeoutMs);
 	const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
-	// The request; network errors become a readable message.
-	let res: Response;
-	try {
-		res = await fetchFn(`${cfg.firecrawlUrl}${path}`, {
-			method: "POST",
-			headers: { "content-type": "application/json", authorization: `Bearer ${cfg.firecrawlKey}` },
-			body: JSON.stringify(body),
-			signal: combined,
-		});
-	} catch (e) {
-		throw new Error(t("firecrawl.network", { reason: e instanceof Error ? e.message : String(e) }));
+	/** The request; network errors become a readable message. */
+	const request = async (): Promise<Response> => {
+		try {
+			return await fetchFn(`${cfg.firecrawlUrl}${path}`, {
+				method: "POST",
+				headers: { "content-type": "application/json", authorization: `Bearer ${cfg.firecrawlKey}` },
+				body: JSON.stringify(body),
+				signal: combined,
+			});
+		} catch (e) {
+			throw new Error(t("firecrawl.network", { reason: e instanceof Error ? e.message : String(e) }));
+		}
+	};
+	let res = await request();
+	// Too many requests: wait as told, within the limit, and try once more.
+	if (res.status === 429 && !combined.aborted) {
+		const told = Number(res.headers.get("retry-after")) * 1000;
+		await res.body?.cancel();
+		await sleep(told > 0 ? Math.min(told, RATE_WAIT_MS) : RATE_WAIT_MS);
+		res = await request();
 	}
 	// Failure: the status says enough.
 	if (!res.ok) {

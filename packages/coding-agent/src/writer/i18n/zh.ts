@@ -158,6 +158,9 @@ export const zh = {
 	"guard.failed": "{tool} 用相同参数已连续失败 {count} 次",
 	"guard.repeated": "{tool} 用相同参数已调用 {count} 次，结果不会变",
 	"guard.failing": "{tool} 已连续失败 {count} 次，参数每次都不同：停下来，把失败的原因告诉用户",
+	"guard.flood":
+		"上一条回复连着发出 {count} 个工具调用，程序在第 {max} 个之后把它中断了：一条回复最多调用 {max} 个工具。先用已有的结果继续写，还要读的网页分几轮读",
+	"guard.floodCall": "这条回复的工具调用已超过 {max} 个，其余不再执行",
 	"blocked.why": "已拦下：{why}。",
 	"blocked.change": "下一步：换参数、换方法或用已有结果继续；同样的调用不要再试。",
 	"blocked.user": "下一步：问用户想怎么做；被拦下的这一步不要换工具、命令或路径再试。",

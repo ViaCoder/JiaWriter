@@ -6,6 +6,7 @@ import {
 	callKey,
 	checkCall,
 	MAX_BLOCKS,
+	MAX_CALLS_PER_REPLY,
 	MAX_SAME_CALLS,
 	MAX_SAME_FAILURES,
 	MAX_TOOL_FAILURES,
@@ -138,6 +139,58 @@ describe("writer-guard", () => {
 			expect(out?.terminate).toBe(block === MAX_BLOCKS);
 		}
 		expect(call(input)?.reason).toContain("本轮到此结束");
+	});
+
+	it("cuts a reply streaming more than MAX_CALLS_PER_REPLY tool calls, then tells the model once the run has ended", () => {
+		const handlers: Record<string, (event: unknown, ctx?: unknown) => unknown> = {};
+		const sent: { content: string; options: unknown }[] = [];
+		let aborted = 0;
+		writerGuardExtension({
+			on: (name: string, fn: (event: unknown, ctx?: unknown) => unknown) => {
+				handlers[name] = fn;
+			},
+			sendMessage: (message: { content: string }, options: unknown) =>
+				sent.push({ content: message.content, options }),
+		} as unknown as ExtensionAPI);
+		const ctx = { abort: () => aborted++ };
+		const reply = (calls: number) => ({
+			role: "assistant",
+			content: Array.from({ length: calls }, (_, i) => ({
+				type: "toolCall",
+				id: `c${i}`,
+				name: "fetch_web",
+				arguments: {},
+			})),
+		});
+		handlers.message_start({ message: reply(0) });
+		handlers.message_update({ message: reply(MAX_CALLS_PER_REPLY) }, ctx);
+		expect(aborted).toBe(0);
+		handlers.message_update({ message: reply(MAX_CALLS_PER_REPLY + 1) }, ctx);
+		handlers.message_update({ message: reply(MAX_CALLS_PER_REPLY + 5) }, ctx);
+		expect(aborted).toBe(1);
+		// The user's text and tool results are not replies.
+		handlers.message_update({ message: { role: "user", content: "x" } }, ctx);
+		expect(aborted).toBe(1);
+		// Told once the run has ended, with the count, as a follow-up that starts a turn.
+		handlers.agent_end({ messages: [] });
+		expect(sent).toHaveLength(1);
+		expect(sent[0].content).toContain(`${MAX_CALLS_PER_REPLY + 1} 个工具调用`);
+		expect(sent[0].options).toEqual({ deliverAs: "followUp", triggerTurn: true });
+		handlers.agent_end({ messages: [] });
+		expect(sent).toHaveLength(1);
+		// A reply that arrived whole: the calls past the limit are blocked, with the stop hint.
+		for (let i = 0; i < MAX_CALLS_PER_REPLY; i++)
+			expect(handlers.tool_call({ toolName: "read", input: { path: `f${i}` } })).toBeUndefined();
+		const out = handlers.tool_call({ toolName: "read", input: { path: "more" } }) as {
+			block: boolean;
+			terminate: boolean;
+			reason: string;
+		};
+		expect(out).toMatchObject({ block: true, terminate: true });
+		expect(out.reason).toContain(`超过 ${MAX_CALLS_PER_REPLY} 个`);
+		// The next reply starts the count again.
+		handlers.message_start({ message: reply(0) });
+		expect(handlers.tool_call({ toolName: "read", input: { path: "again" } })).toBeUndefined();
 	});
 
 	it("starts again with a new message of the user", () => {
