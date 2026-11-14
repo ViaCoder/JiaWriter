@@ -183,7 +183,7 @@ describe("exportDraft with the Office formats", () => {
 		expect([x.out, x.format]).toEqual(["报告.xlsx", "xlsx"]);
 		expect(xlsxToPages(new Uint8Array(readFileSync(join(cwd, x.out))))).toHaveLength(2);
 		const p = await exportDraft(draft, cwd, cwd, { format: "pptx", output: "out/汇报.pptx" });
-		expect([p.out, p.format]).toEqual(["out/汇报.pptx", "pptx"]);
+		expect([p.out, p.format]).toEqual([join("out", "汇报.pptx"), "pptx"]);
 		expect(pptxToPages(new Uint8Array(readFileSync(join(cwd, p.out))))[0]).toBe("## 老旧小区改造情况报告");
 	});
 });
