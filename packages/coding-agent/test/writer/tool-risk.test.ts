@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import writerPermissionExtension from "../../src/extensions/writer-permission/index.ts";
-import { bashRisk, insideDir, toolRequest } from "../../src/writer/tool-risk.ts";
+import { bashRisk, inDirCommand, insideDir, toolRequest } from "../../src/writer/tool-risk.ts";
 
 describe("bashRisk", () => {
 	it("lets reading commands read", () => {
@@ -76,6 +76,45 @@ describe("insideDir and toolRequest", () => {
 			title: "O",
 		});
 		expect(toolRequest("read", { path: "a.md" }, "/work", titles)).toBeUndefined();
+	});
+
+	it("inDirCommand: creating and copying files inside the folder counts as a write there, anything else does not", () => {
+		// exp-p24r1 F2 (2026-11-14): refused with nobody to ask, while a write of the same file would have gone on.
+		for (const ok of [
+			"mkdir -p 备份 && cp 说明.md 备份/说明.md && ls -l 备份/说明.md && ls",
+			"cp 说明.md ./备份/说明.md",
+			"touch 新文件.md",
+			"echo 内容 > 笔记.md",
+			"cat a.md b.md > 合并.md",
+			"mkdir 稿件; ls",
+		])
+			expect(inDirCommand(ok, "/work"), ok).toBe(true);
+		for (const no of [
+			"cp 说明.md ../说明.md",
+			"cp 说明.md /tmp/说明.md",
+			"mkdir ~/备份",
+			"cp *.md 备份/",
+			"echo x > /etc/motd",
+			"mkdir 备份 && rm -r 旧",
+			"python3 build.py",
+			"cp $HOME/a.md b.md",
+			"mkdir",
+		])
+			expect(inDirCommand(no, "/work"), no).toBe(false);
+		const titles = { command: "C", file: "F", outside: "O" };
+		expect(
+			toolRequest("bash", { command: "mkdir -p 备份 && cp 说明.md 备份/说明.md" }, "/work", titles),
+		).toMatchObject({
+			risk: "act",
+			inDirFile: true,
+		});
+		expect(toolRequest("bash", { command: "cp 说明.md ../说明.md" }, "/work", titles)).toMatchObject({
+			inDirFile: false,
+		});
+		expect(toolRequest("bash", { command: "rm 说明.md" }, "/work", titles)).toMatchObject({
+			risk: "high",
+			inDirFile: false,
+		});
 	});
 });
 

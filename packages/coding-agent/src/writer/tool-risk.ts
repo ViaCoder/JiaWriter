@@ -138,6 +138,40 @@ export function insideDir(path: string, cwd: string): boolean {
 	return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
 }
 
+/** Commands that create or copy files, and change nothing else, when every path they name is inside the folder. */
+const IN_DIR_COMMANDS = new Set(["mkdir", "cp", "touch"]);
+
+/**
+ * True when a shell command does to the working folder's files only what write does: its parts read, or create and
+ * copy files inside the folder (mkdir, cp, touch with paths inside it; output redirected into a file inside it), with
+ * no substitution. Such a command goes through as a write in the folder does (2026-11-14, exp-p24r1 F2: with nobody
+ * to ask, `mkdir -p 备份 && cp 说明.md 备份/说明.md` was refused while write of the same file would have gone on).
+ */
+export function inDirCommand(command: string, cwd: string): boolean {
+	// Substitution runs what the tables cannot see.
+	if (/\$\(|`/.test(command)) return false;
+	// Every redirection target inside the folder.
+	for (const m of command.matchAll(/(?:^|[^0-9&>])>{1,2}\s*([^\s&|;]+)/g))
+		if (m[1] !== "/dev/null" && (/^["']?[~$]/.test(m[1]) || !insideDir(m[1].replace(/^["']|["']$/g, ""), cwd)))
+			return false;
+	// Every part a reading command or an in-folder file command.
+	for (const raw of command.split(/;|&&|\|\||\||\n/)) {
+		const part = raw.replace(/(?:^|[^0-9&>])>{1,2}\s*[^\s&|;]+/g, " ");
+		if (partRisk(part) === "read") continue;
+		const words = part.trim().split(/\s+/).filter(Boolean);
+		while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) words.shift();
+		const name = (words[0]?.split(/[\\/]/).pop() ?? "").toLowerCase();
+		if (!IN_DIR_COMMANDS.has(name)) return false;
+		const paths = words.slice(1).filter((w) => !w.startsWith("-"));
+		if (paths.length === 0) return false;
+		for (const p of paths) {
+			const bare = p.replace(/^["']|["']$/g, "");
+			if (/^[~$]/.test(bare) || /[*?]/.test(bare) || !insideDir(bare, cwd)) return false;
+		}
+	}
+	return true;
+}
+
 /** What the gate needs for a call of bash, powershell, write or edit; undefined for any other tool. */
 export function toolRequest(
 	toolName: string,
@@ -147,12 +181,14 @@ export function toolRequest(
 ): (PermissionRequest & { inDirFile: boolean }) | undefined {
 	if (toolName === "bash" || toolName === "powershell") {
 		const command = String(input.command ?? "");
+		const risk = bashRisk(command);
 		return {
-			risk: bashRisk(command),
+			risk,
 			scope: `shell\n${resolve(cwd)}`,
 			title: titles.command,
 			detail: command,
-			inDirFile: false,
+			// An ordinary command that only creates or copies files inside the folder counts as a write there.
+			inDirFile: risk === "act" && inDirCommand(command, cwd),
 		};
 	}
 	// draft_section writes the draft at its path as write does.
