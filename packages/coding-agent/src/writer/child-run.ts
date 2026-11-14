@@ -8,6 +8,8 @@
 import { spawn } from "node:child_process";
 // Whether this is the compiled binary.
 import { isBunBinary } from "../config.ts";
+// The keys this process took out of its environment: the child is the same program and needs them.
+import { withSecrets } from "./secrets.ts";
 
 /** Most output kept from a child, in characters. */
 export const MAX_CHILD_OUTPUT = 200_000;
@@ -53,7 +55,8 @@ export function runChild(
 	return new Promise((resolve) => {
 		const child = spawn(cmd, [...head, "-p", prompt], {
 			cwd: folder,
-			env: { ...process.env, ...extraEnv },
+			// Keys go back in for the child (it takes them out of its own environment again at start).
+			env: withSecrets({ ...process.env, ...extraEnv }),
 			stdio: ["ignore", "pipe", "pipe"],
 		});
 		let stdout = "";
