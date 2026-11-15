@@ -1,7 +1,7 @@
 // The loop guard (src/writer/loop-guard.ts) and its extension (src/extensions/writer-guard/index.ts).
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
-import writerGuardExtension from "../../src/extensions/writer-guard/index.ts";
+import writerGuardExtension, { AFTER_STOP_CALLS } from "../../src/extensions/writer-guard/index.ts";
 import {
 	callKey,
 	checkCall,
@@ -138,10 +138,13 @@ describe("writer-guard", () => {
 			expect(out?.reason).toContain("style_check");
 			expect(out?.terminate).toBeUndefined();
 		}
-		// After the stop: one more call ends the run.
-		const after = call({ genre: "另一个" });
-		expect(after?.terminate).toBe(true);
-		expect(after?.reason).toContain("工具调用已停止");
+		// After the stop: calls are blocked, and the third ends the run.
+		for (let n = 1; n <= AFTER_STOP_CALLS; n++) {
+			const after = call({ genre: `另一个${n}` });
+			expect(after?.block).toBe(true);
+			expect(after?.reason).toContain("工具调用已停止");
+			expect(after?.terminate).toBe(n === AFTER_STOP_CALLS);
+		}
 	});
 
 	it("cuts a reply streaming more than MAX_CALLS_PER_REPLY tool calls, then tells the model once the run has ended", () => {

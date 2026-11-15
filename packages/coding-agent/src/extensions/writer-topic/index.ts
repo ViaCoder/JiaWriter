@@ -144,7 +144,10 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 				Type.Union([
 					Type.Object({
 						url: Type.Optional(
-							Type.String({ description: "Address of a search result or fetched page of this topic" }),
+							Type.String({
+								description:
+									"Address of a search result or fetched page of this topic; after search_web, copy it from the results (required unless a page was read with fetch_web)",
+							}),
 						),
 						file: Type.Optional(Type.String({ description: "Imported reference file" })),
 						page: Type.Optional(Type.String({ description: "Its page, for a PDF or Word file" })),
@@ -182,12 +185,10 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 				const named = given.url?.trim() || given.file?.trim() ? given : { ...given, url: lastPageUrl(dir) };
 				const item = asFileSource(named as Material);
 				const name = item.file?.trim() ? `《${item.file.trim()}》` : (item.url?.trim() ?? "");
-				// No source: the error names the addresses the topic's searches hold, so the next call can copy one.
-				const problem =
-					sourceProblem(item, archived) ||
-					(name
-						? ""
-						: [t("topic.missingSource"), candidatesText(candidateSources(dir))].filter(Boolean).join("\n"));
+				// No source: the error names the addresses the topic's searches hold, so the next call can copy one
+				// (2026-11-15: a run sent nine items without a url and was told only that one was missing).
+				let problem = sourceProblem(item, archived) || (name ? "" : t("topic.missingSource"));
+				if (problem && !name) problem = [problem, candidatesText(candidateSources(dir))].filter(Boolean).join("\n");
 				if (problem) {
 					lines.push(t("topic.itemProblem", { n: i + 1, problem }));
 					error = true;

@@ -24,6 +24,9 @@ import {
 	recordResult,
 } from "../../writer/loop-guard.ts";
 
+/** Blocked calls after the guard's stop before the run ends. */
+export const AFTER_STOP_CALLS = 3;
+
 /** Extension factory. */
 export default function writerGuardExtension(pi: ExtensionAPI): void {
 	// One guard per message of the user.
@@ -31,9 +34,12 @@ export default function writerGuardExtension(pi: ExtensionAPI): void {
 	// The guard said stop: the model gets one reply to the user; a tool call after that ends the run (2026-11-15: a
 	// run ended at the third block with no reply at all, and print mode wrote nothing).
 	let stopped = false;
+	// Calls blocked after the stop: the third ends the run (the model usually writes after a block or two).
+	let afterStop = 0;
 	pi.on("input", () => {
 		guard = newGuard();
 		stopped = false;
+		afterStop = 0;
 	});
 
 	// Tool calls of the reply now streaming, and the count at which a reply was cut (0: none was).
@@ -67,8 +73,14 @@ export default function writerGuardExtension(pi: ExtensionAPI): void {
 
 	// Before a call: the same call again, where it cannot help, is blocked.
 	pi.on("tool_call", (event) => {
-		if (stopped)
-			return { block: true, reason: blockedText({ why: t("guard.afterStop"), next: "stop" }), terminate: true };
+		if (stopped) {
+			afterStop++;
+			return {
+				block: true,
+				reason: blockedText({ why: t("guard.afterStop"), next: "stop" }),
+				terminate: afterStop >= AFTER_STOP_CALLS,
+			};
+		}
 		// A reply that arrived whole with too many calls: the ones past the limit are not run.
 		replyCalls++;
 		if (replyCalls > MAX_CALLS_PER_REPLY)
