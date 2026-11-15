@@ -211,7 +211,7 @@ export class AssistantMessageComponent extends Container {
 		if (message.stopReason === "length") {
 			this.contentContainer.addChild(new Spacer(1));
 			this.contentContainer.addChild(
-				new Text(theme.fg("error", "Response was truncated before completion."), this.outputPad, 0),
+				new Text(theme.fg("error", uiText("Response was truncated before completion.")), this.outputPad, 0),
 			);
 		} else if (!hasToolCalls) {
 			if (message.stopReason === "aborted") {
@@ -222,9 +222,11 @@ export class AssistantMessageComponent extends Container {
 				this.contentContainer.addChild(new Spacer(1));
 				this.contentContainer.addChild(new Text(theme.fg("error", abortMessage), this.outputPad, 0));
 			} else if (message.stopReason === "error") {
-				const errorMsg = message.errorMessage || "Unknown error";
+				const errorMsg = uiText(message.errorMessage || "Unknown error");
 				this.contentContainer.addChild(new Spacer(1));
-				this.contentContainer.addChild(new Text(theme.fg("error", `Error: ${errorMsg}`), this.outputPad, 0));
+				this.contentContainer.addChild(
+					new Text(theme.fg("error", uiText("Error: {message}", { message: errorMsg })), this.outputPad, 0),
+				);
 			}
 		}
 	}

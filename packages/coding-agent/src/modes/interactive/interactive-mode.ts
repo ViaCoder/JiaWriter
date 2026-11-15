@@ -3864,7 +3864,12 @@ export class InteractiveMode {
 				this.clearStatusIndicator("retry");
 				// Show error only on final failure (success shows normal response)
 				if (!event.success) {
-					this.showError(`Retry failed after ${event.attempt} attempts: ${event.finalError || "Unknown error"}`);
+					this.showError(
+						uiText("Retry failed after {attempts} attempts: {error}", {
+							attempts: String(event.attempt),
+							error: uiText(event.finalError || "Unknown error"),
+						}),
+					);
 				}
 				this.ui.requestRender();
 				break;

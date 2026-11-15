@@ -1,5 +1,5 @@
 import { type TUI, visibleWidth } from "@earendil-works/pi-tui";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import { CustomEditor } from "../src/modes/interactive/components/custom-editor.ts";
 import {
@@ -13,6 +13,8 @@ import { getEditorTheme, initTheme, theme } from "../src/modes/interactive/theme
 import { stripAnsi } from "../src/utils/ansi.ts";
 
 describe("status indicators", () => {
+	// JiaWriter: the indicators' texts follow the interface language; these checks read the English ones.
+	beforeEach(() => vi.stubEnv("JW_LANG", "en"));
 	afterEach(() => {
 		vi.useRealTimers();
 	});

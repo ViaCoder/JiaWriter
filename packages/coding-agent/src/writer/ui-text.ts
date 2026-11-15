@@ -116,6 +116,18 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Current Folder": "当前文件夹",
 	"Loading {progress}": "加载中 {progress}",
 	"Message {n} of {total}": "第 {n} 条，共 {total} 条",
+	// Failed requests, retries and the long-running states (2026-11-15: the screen showed "Error: Connection error." and "Retrying (3/3) in 3s...").
+	"Unknown error": "未知错误",
+	"Connection error.": "连接失败。",
+	"Response was truncated before completion.": "回复没写完就被截断了。",
+	"Retrying ({attempt}/{max}) in {seconds}s... ({key} to cancel)":
+		"第 {attempt}/{max} 次重试，{seconds} 秒后开始……（{key} 取消）",
+	"Compacting context... ({key} to cancel)": "正在压缩上下文……（{key} 取消）",
+	"Auto-compacting... ({key} to cancel)": "正在自动压缩上下文……（{key} 取消）",
+	"Context overflow detected, auto-compacting... ({key} to cancel)": "上下文已满，正在自动压缩……（{key} 取消）",
+	"Summarizing branch... ({key} to cancel)": "正在给分支写摘要……（{key} 取消）",
+	"Running... ({key} to cancel)": "运行中……（{key} 取消）",
+	"Retry failed after {attempts} attempts: {error}": "重试 {attempts} 次仍失败：{error}",
 	// The model and thinking selectors (2026-11-15: they were English in a Chinese interface).
 	"Refreshing model catalogs…": "正在刷新模型目录……",
 	"Only showing models from configured providers. Use /login to add providers.":
