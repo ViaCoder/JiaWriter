@@ -161,10 +161,17 @@ export function isSecretField(role: string, inputType: string, name = ""): boole
 	return inputType.toLowerCase() === "password" || /secure|password/i.test(role) || SECRET_NAME.test(name);
 }
 
+/** What auto mode's judge needs with a check: the user's latest words and the judge itself (permission-judge.ts). */
+export interface JudgeInput {
+	lastRequest: string;
+	judge: (request: PermissionRequest, lastRequest: string) => Promise<"allow" | "ask">;
+}
+
 /** The gate of one session. */
 export interface PermissionGate {
-	// Ask when the table says so; gives why the action must stop, or "".
-	check(ctx: PermissionUi, request: PermissionRequest): Promise<PermissionRefusal>;
+	// Ask when the table says so; gives why the action must stop, or "". In auto mode an ordinary action goes to the
+	// judge first when one is given: ALLOW lets it through and counts as the user's answer for its scope.
+	check(ctx: PermissionUi, request: PermissionRequest, judge?: JudgeInput): Promise<PermissionRefusal>;
 	// What the user said to do instead, with the last refusal; empty when nothing.
 	lastNote(): string;
 	// Forget this session's answers.
@@ -180,10 +187,19 @@ export function createPermissionGate(env: NodeJS.ProcessEnv = process.env): Perm
 	// What the user said to do instead, with the last refusal.
 	let note = "";
 	return {
-		async check(ctx, request) {
+		async check(ctx, request, judge) {
 			note = "";
 			const key = `${request.risk}\n${request.scope}`;
-			if (always.has(key) || !needsAsking(permissionMode(env), request.risk, allowed.has(key))) return "";
+			const mode = permissionMode(env);
+			if (always.has(key) || !needsAsking(mode, request.risk, allowed.has(key))) return "";
+			// Auto mode: the model judges an ordinary action against the user's words before anyone is asked
+			// (the user, 2026-11-15: "similar claude code which decide by model"). High risk never reaches the judge.
+			if (mode === "auto" && request.risk === "act" && judge) {
+				if ((await judge.judge(request, judge.lastRequest)) === "allow") {
+					allowed.add(key);
+					return "";
+				}
+			}
 			// Nobody to ask: a question becomes a refusal.
 			if (!ctx.hasUI) return "no-user";
 			// An interface with only yes or no.
