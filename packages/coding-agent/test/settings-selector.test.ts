@@ -1,5 +1,5 @@
 import { setKeybindings } from "@earendil-works/pi-tui";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import {
 	type SettingsCallbacks,
@@ -11,6 +11,8 @@ import { stripAnsi } from "../src/utils/ansi.ts";
 import { createHarness, type Harness } from "./suite/harness.ts";
 
 describe("SettingsSelectorComponent", () => {
+	// JiaWriter: the menu's texts follow the interface language; these checks read the English ones.
+	beforeEach(() => vi.stubEnv("JW_LANG", "en"));
 	let harness: Harness | undefined;
 	beforeAll(() => {
 		initTheme("dark");

@@ -26,6 +26,8 @@ import {
 	type WarningSettings,
 } from "../../../core/settings-manager.ts";
 import { brandText } from "../../../writer/brand.ts";
+// JiaWriter: text in the interface language.
+import { settingsHints, uiText } from "../../../writer/ui-text.ts";
 import {
 	getSettingsListTheme,
 	parseAutoThemeSetting,
@@ -160,8 +162,8 @@ class WarningSettingsSubmenu extends Container {
 		const items: SettingItem[] = [
 			{
 				id: "anthropic-extra-usage",
-				label: "Anthropic extra usage",
-				description: "Warn when Anthropic subscription auth may use paid extra usage",
+				label: uiText("Anthropic extra usage"),
+				description: uiText("Warn when Anthropic subscription auth may use paid extra usage"),
 				currentValue:
 					(this.state.anthropicExtraUsage ?? SETTINGS_DEFAULTS.warnings.anthropicExtraUsage) ? "true" : "false",
 				values: ["true", "false"],
@@ -181,6 +183,7 @@ class WarningSettingsSubmenu extends Container {
 				}
 			},
 			onCancel,
+			{ hints: settingsHints() },
 		);
 
 		this.addChild(this.settingsList);
@@ -215,7 +218,7 @@ function themeItems(availableThemes: string[], currentTheme: string): SelectItem
 	return availableThemes.map((name) => ({
 		value: name,
 		label: `${name === currentTheme ? "✓ " : "  "}${name}`,
-		...(name === SYSTEM_THEME_NAME ? { description: "Theme created from your terminal's colors" } : {}),
+		...(name === SYSTEM_THEME_NAME ? { description: uiText("Theme created from your terminal's colors") } : {}),
 	}));
 }
 
@@ -230,8 +233,8 @@ function singleModeThemeItems(availableThemes: string[], currentTheme: string): 
 		...system,
 		{
 			value: AUTOMATIC_THEME_VALUE,
-			label: "  automatic",
-			description: "Use separate themes for light and dark terminal appearance",
+			label: uiText("  automatic"),
+			description: uiText("Use separate themes for light and dark terminal appearance"),
 		},
 		...items,
 	];
@@ -347,8 +350,8 @@ class ThemeSubmenu extends Container {
 		const items: SettingItem[] = [
 			{
 				id: "light-theme",
-				label: "Light theme",
-				description: "Theme to use in automatic mode when the terminal is light",
+				label: uiText("Light theme"),
+				description: uiText("Theme to use in automatic mode when the terminal is light"),
 				currentValue: this.lightTheme,
 				submenu: (currentValue, done) =>
 					this.createThemeSelect(
@@ -365,8 +368,8 @@ class ThemeSubmenu extends Container {
 			},
 			{
 				id: "dark-theme",
-				label: "Dark theme",
-				description: "Theme to use in automatic mode when the terminal is dark",
+				label: uiText("Dark theme"),
+				description: uiText("Theme to use in automatic mode when the terminal is dark"),
 				currentValue: this.darkTheme,
 				submenu: (currentValue, done) =>
 					this.createThemeSelect(
@@ -383,15 +386,15 @@ class ThemeSubmenu extends Container {
 			},
 			{
 				id: "apply",
-				label: "Apply",
-				description: "Save and go back",
+				label: uiText("Apply"),
+				description: uiText("Save and go back"),
 				currentValue: "save and go back",
 				values: ["save and go back"],
 			},
 			{
 				id: "single-mode",
-				label: "Change mode",
-				description: "Switch to one theme for light and dark",
+				label: uiText("Change mode"),
+				description: uiText("Switch to one theme for light and dark"),
 				currentValue: "switch to single theme",
 				values: ["switch to single theme"],
 			},
@@ -415,6 +418,7 @@ class ThemeSubmenu extends Container {
 				}
 			},
 			() => this.cancel(),
+			{ hints: settingsHints() },
 		);
 		content.addChild(settingsList);
 		this.setContent(content, settingsList);
@@ -486,14 +490,14 @@ export class SettingsSelectorComponent extends Container {
 		const items: SettingItem[] = [
 			{
 				id: "autocompact",
-				label: "Auto-compact",
-				description: "Automatically compact context when it gets too large",
+				label: uiText("Auto-compact"),
+				description: uiText("Automatically compact context when it gets too large"),
 				currentValue: config.autoCompact ? "true" : "false",
 				values: ["true", "false"],
 			},
 			{
 				id: "steering-mode",
-				label: "Steering mode",
+				label: uiText("Steering mode"),
 				description:
 					"Enter while streaming queues steering messages. 'one-at-a-time': deliver one, wait for response. 'all': deliver all at once.",
 				currentValue: config.steeringMode,
@@ -501,21 +505,21 @@ export class SettingsSelectorComponent extends Container {
 			},
 			{
 				id: "follow-up-mode",
-				label: "Follow-up mode",
+				label: uiText("Follow-up mode"),
 				description: `${followUpKey} queues follow-up messages until agent stops. 'one-at-a-time': deliver one, wait for response. 'all': deliver all at once.`,
 				currentValue: config.followUpMode,
 				values: ["one-at-a-time", "all"],
 			},
 			{
 				id: "transport",
-				label: "Transport",
-				description: "Preferred transport for providers that support multiple transports",
+				label: uiText("Transport"),
+				description: uiText("Preferred transport for providers that support multiple transports"),
 				currentValue: config.transport,
 				values: ["sse", "websocket", "websocket-cached", "auto"],
 			},
 			{
 				id: "share-destination",
-				label: "Session share destination",
+				label: uiText("Session share destination"),
 				description:
 					"Where to upload sessions with /share (auto prefers Radius when authenticated, otherwise GitHub Gist)",
 				currentValue: config.sessionShareDestination,
@@ -523,7 +527,7 @@ export class SettingsSelectorComponent extends Container {
 			},
 			{
 				id: "http-idle-timeout",
-				label: "HTTP idle timeout",
+				label: uiText("HTTP idle timeout"),
 				description:
 					"Maximum idle gap while waiting for HTTP headers or body chunks. Disable for local models that pause longer than five minutes.",
 				currentValue: formatHttpIdleTimeoutMs(config.httpIdleTimeoutMs),
@@ -531,7 +535,7 @@ export class SettingsSelectorComponent extends Container {
 			},
 			{
 				id: "cache-warming-mode",
-				label: "Cache warming",
+				label: uiText("Cache warming"),
 				description:
 					"off; streaming while the agent runs; idle also between runs while continuation stays profitable",
 				currentValue: config.cacheWarmingMode,
@@ -539,71 +543,71 @@ export class SettingsSelectorComponent extends Container {
 			},
 			{
 				id: "hide-thinking",
-				label: "Hide thinking",
-				description: "Hide thinking blocks in assistant responses",
+				label: uiText("Hide thinking"),
+				description: uiText("Hide thinking blocks in assistant responses"),
 				currentValue: config.hideThinkingBlock ? "true" : "false",
 				values: ["true", "false"],
 			},
 			{
 				id: "mermaid-rendering",
-				label: "Mermaid diagrams",
-				description: "Render Mermaid code blocks as Unicode diagrams",
+				label: uiText("Mermaid diagrams"),
+				description: uiText("Render Mermaid code blocks as Unicode diagrams"),
 				currentValue: config.mermaidRenderingMode,
 				values: ["off", "final", "streaming"],
 			},
 			{
 				id: "cache-miss-notices",
-				label: "Cache miss notices",
-				description: "Show transcript notices for cache costs and provider recovery diagnostics",
+				label: uiText("Cache miss notices"),
+				description: uiText("Show transcript notices for cache costs and provider recovery diagnostics"),
 				currentValue: config.showCacheMissNotices ? "true" : "false",
 				values: ["true", "false"],
 			},
 			{
 				id: "collapse-changelog",
-				label: "Collapse changelog",
-				description: "Show condensed changelog after updates",
+				label: uiText("Collapse changelog"),
+				description: uiText("Show condensed changelog after updates"),
 				currentValue: config.collapseChangelog ? "true" : "false",
 				values: ["true", "false"],
 			},
 			{
 				id: "quiet-startup",
-				label: "Quiet startup",
-				description: "Disable verbose printing at startup (header: keep only the startup header)",
+				label: uiText("Quiet startup"),
+				description: uiText("Disable verbose printing at startup (header: keep only the startup header)"),
 				currentValue: String(config.quietStartup),
 				values: ["true", "header", "false"],
 			},
 			{
 				id: "install-telemetry",
-				label: "Install telemetry",
-				description: "Send an anonymous version/update ping after changelog-detected updates",
+				label: uiText("Install telemetry"),
+				description: uiText("Send an anonymous version/update ping after changelog-detected updates"),
 				currentValue: config.enableInstallTelemetry ? "true" : "false",
 				values: ["true", "false"],
 			},
 			{
 				id: "default-project-trust",
-				label: "Default project trust",
-				description: "Fallback behavior when no extension or saved trust decision decides project trust",
+				label: uiText("Default project trust"),
+				description: uiText("Fallback behavior when no extension or saved trust decision decides project trust"),
 				currentValue: DEFAULT_PROJECT_TRUST_LABELS[config.defaultProjectTrust],
 				values: Object.values(DEFAULT_PROJECT_TRUST_LABELS),
 			},
 			{
 				id: "double-escape-action",
-				label: "Double-escape action",
-				description: "Action when pressing Escape twice with empty editor",
+				label: uiText("Double-escape action"),
+				description: uiText("Action when pressing Escape twice with empty editor"),
 				currentValue: config.doubleEscapeAction,
 				values: ["tree", "fork", "none"],
 			},
 			{
 				id: "tree-filter-mode",
-				label: "Tree filter mode",
-				description: "Default filter when opening /tree",
+				label: uiText("Tree filter mode"),
+				description: uiText("Default filter when opening /tree"),
 				currentValue: config.treeFilterMode,
 				values: ["default", "no-tools", "user-only", "labeled-only", "all"],
 			},
 			{
 				id: "warnings",
-				label: "Warnings",
-				description: "Enable or disable individual warnings",
+				label: uiText("Warnings"),
+				description: uiText("Enable or disable individual warnings"),
 				currentValue: "configure",
 				submenu: (_currentValue, done) =>
 					new WarningSettingsSubmenu(
@@ -617,7 +621,7 @@ export class SettingsSelectorComponent extends Container {
 			},
 			{
 				id: "model-thinking",
-				label: "Default thinking level per model",
+				label: uiText("Default thinking level per model"),
 				description: `Override the default thinking level for specific models. ${cycleThinkingKey} cycles in-session.`,
 				currentValue: modelThinkingOverridesSummary(currentModelThinkingLevels),
 				submenu: (_currentValue, done) => {
@@ -625,7 +629,7 @@ export class SettingsSelectorComponent extends Container {
 						{
 							key: "model",
 							title: "Per-Model Thinking Level",
-							description: "Select a model to configure",
+							description: uiText("Select a model to configure"),
 							options: () => {
 								const sorted = [...config.availableDefaultModels].sort((a, b) => {
 									const aKey = modelSettingKey(a);
@@ -648,8 +652,8 @@ export class SettingsSelectorComponent extends Container {
 								if (items.length === 0) {
 									items.push({
 										value: "__none__",
-										label: "No models available",
-										description: "Log in to a provider or configure an API key first",
+										label: uiText("No models available"),
+										description: uiText("Log in to a provider or configure an API key first"),
 									});
 								}
 								return items;
@@ -664,7 +668,7 @@ export class SettingsSelectorComponent extends Container {
 								const m = defaultModelByValue.get(ctx.model);
 								return `Thinking Level for ${m ? modelDisplayLabel(m) : ctx.model}`;
 							},
-							description: "Select default thinking level for this model",
+							description: uiText("Select default thinking level for this model"),
 							options: (ctx) => {
 								const model = defaultModelByValue.get(ctx.model);
 								if (!model) return [];
@@ -680,7 +684,7 @@ export class SettingsSelectorComponent extends Container {
 								if (currentModelThinkingLevels[ctx.model] !== undefined) {
 									items.push({
 										value: CLEAR_OVERRIDE_VALUE,
-										label: "  (clear override)",
+										label: uiText("  (clear override)"),
 										description: `Revert to global default (${config.thinkingLevel})`,
 									});
 								}
@@ -718,35 +722,37 @@ export class SettingsSelectorComponent extends Container {
 			},
 			{
 				id: "tui-mode",
-				label: "TUI mode",
-				description: "Interface layout; regular mode uses the terminal's normal scrollback",
+				label: uiText("TUI mode"),
+				description: uiText("Interface layout; regular mode uses the terminal's normal scrollback"),
 				currentValue: config.tuiMode,
 				values: ["regular", "fullscreen"],
 			},
 			{
 				id: "fullscreen-exit-output",
-				label: "Fullscreen exit output",
-				description: "Print the transcript or only a session resume hint when exiting fullscreen mode",
+				label: uiText("Fullscreen exit output"),
+				description: uiText("Print the transcript or only a session resume hint when exiting fullscreen mode"),
 				currentValue: config.fullscreenExitOutput,
 				values: ["transcript", "resume-hint"],
 			},
 			{
 				id: "fullscreen-scrollbar",
-				label: "Fullscreen scrollbar",
-				description: "Scrollbar behavior in fullscreen mode; has no effect in regular mode",
+				label: uiText("Fullscreen scrollbar"),
+				description: uiText("Scrollbar behavior in fullscreen mode; has no effect in regular mode"),
 				currentValue: config.fullscreenScrollbar,
 				values: ["auto", "always", "hidden"],
 			},
 			{
 				id: "fullscreen-copy-on-select",
-				label: "Fullscreen copy on select",
-				description: "Automatically copy selected text in fullscreen mode; disable to copy selections with Ctrl+X",
+				label: uiText("Fullscreen copy on select"),
+				description: uiText(
+					"Automatically copy selected text in fullscreen mode; disable to copy selections with Ctrl+X",
+				),
 				currentValue: config.fullscreenCopyOnSelect ? "true" : "false",
 				values: ["true", "false"],
 			},
 			{
 				id: "fullscreen-wheel-scroll-lines",
-				label: "Fullscreen wheel scrolling",
+				label: uiText("Fullscreen wheel scrolling"),
 				description:
 					"Lines per mouse-wheel event in fullscreen mode; 'auto' speeds up fast wheel spins where the terminal does not",
 				currentValue: String(config.fullscreenWheelScrollLines),
@@ -760,8 +766,8 @@ export class SettingsSelectorComponent extends Container {
 			},
 			{
 				id: "theme",
-				label: "Theme",
-				description: "Color theme for the interface",
+				label: uiText("Theme"),
+				description: uiText("Color theme for the interface"),
 				currentValue: config.currentTheme,
 				submenu: (currentValue, done) =>
 					new ThemeSubmenu(currentValue, config.terminalTheme, config.availableThemes, callbacks, done),
@@ -773,15 +779,15 @@ export class SettingsSelectorComponent extends Container {
 			// Insert after autocompact
 			items.splice(1, 0, {
 				id: "show-images",
-				label: "Show images",
-				description: "Render images inline in terminal",
+				label: uiText("Show images"),
+				description: uiText("Render images inline in terminal"),
 				currentValue: config.showImages ? "true" : "false",
 				values: ["true", "false"],
 			});
 			items.splice(2, 0, {
 				id: "image-width-cells",
-				label: "Image width",
-				description: "Preferred inline image width in terminal cells",
+				label: uiText("Image width"),
+				description: uiText("Preferred inline image width in terminal cells"),
 				currentValue: String(config.imageWidthCells),
 				values: ["60", "80", "120"],
 			});
@@ -790,8 +796,8 @@ export class SettingsSelectorComponent extends Container {
 		// Image auto-resize toggle (always available, affects both attached and read images)
 		items.splice(supportsImages ? 3 : 1, 0, {
 			id: "auto-resize-images",
-			label: "Auto-resize images",
-			description: "Resize large images to 2000x2000 max for better model compatibility",
+			label: uiText("Auto-resize images"),
+			description: uiText("Resize large images to 2000x2000 max for better model compatibility"),
 			currentValue: config.autoResizeImages ? "true" : "false",
 			values: ["true", "false"],
 		});
@@ -800,8 +806,8 @@ export class SettingsSelectorComponent extends Container {
 		const autoResizeIndex = items.findIndex((item) => item.id === "auto-resize-images");
 		items.splice(autoResizeIndex + 1, 0, {
 			id: "block-images",
-			label: "Block images",
-			description: "Prevent images from being sent to LLM providers",
+			label: uiText("Block images"),
+			description: uiText("Prevent images from being sent to LLM providers"),
 			currentValue: config.blockImages ? "true" : "false",
 			values: ["true", "false"],
 		});
@@ -810,8 +816,8 @@ export class SettingsSelectorComponent extends Container {
 		const blockImagesIndex = items.findIndex((item) => item.id === "block-images");
 		items.splice(blockImagesIndex + 1, 0, {
 			id: "skill-commands",
-			label: "Skill commands",
-			description: "Register skills as /skill:name commands",
+			label: uiText("Skill commands"),
+			description: uiText("Register skills as /skill:name commands"),
 			currentValue: config.enableSkillCommands ? "true" : "false",
 			values: ["true", "false"],
 		});
@@ -820,7 +826,7 @@ export class SettingsSelectorComponent extends Container {
 		const skillCommandsIndex = items.findIndex((item) => item.id === "skill-commands");
 		items.splice(skillCommandsIndex + 1, 0, {
 			id: "show-hardware-cursor",
-			label: "Show hardware cursor",
+			label: uiText("Show hardware cursor"),
 			description: brandText("Use the terminal cursor instead of Pi's drawn cursor"),
 			currentValue: config.showHardwareCursor ? "true" : "false",
 			values: ["true", "false"],
@@ -830,8 +836,8 @@ export class SettingsSelectorComponent extends Container {
 		const hardwareCursorIndex = items.findIndex((item) => item.id === "show-hardware-cursor");
 		items.splice(hardwareCursorIndex + 1, 0, {
 			id: "editor-padding",
-			label: "Editor padding",
-			description: "Horizontal padding for input editor (0-3)",
+			label: uiText("Editor padding"),
+			description: uiText("Horizontal padding for input editor (0-3)"),
 			currentValue: String(config.editorPaddingX),
 			values: ["0", "1", "2", "3"],
 		});
@@ -840,8 +846,8 @@ export class SettingsSelectorComponent extends Container {
 		const editorPaddingIndex = items.findIndex((item) => item.id === "editor-padding");
 		items.splice(editorPaddingIndex + 1, 0, {
 			id: "output-padding",
-			label: "Output padding",
-			description: "Horizontal padding for messages, tool output, and command output",
+			label: uiText("Output padding"),
+			description: uiText("Horizontal padding for messages, tool output, and command output"),
 			currentValue: String(config.outputPad),
 			values: ["0", "1"],
 		});
@@ -850,8 +856,8 @@ export class SettingsSelectorComponent extends Container {
 		const outputPaddingIndex = items.findIndex((item) => item.id === "output-padding");
 		items.splice(outputPaddingIndex + 1, 0, {
 			id: "autocomplete-max-visible",
-			label: "Autocomplete max items",
-			description: "Max visible items in autocomplete dropdown (3-20)",
+			label: uiText("Autocomplete max items"),
+			description: uiText("Max visible items in autocomplete dropdown (3-20)"),
 			currentValue: String(config.autocompleteMaxVisible),
 			values: ["3", "5", "7", "10", "15", "20"],
 		});
@@ -860,8 +866,8 @@ export class SettingsSelectorComponent extends Container {
 		const autocompleteIndex = items.findIndex((item) => item.id === "autocomplete-max-visible");
 		items.splice(autocompleteIndex + 1, 0, {
 			id: "clear-on-shrink",
-			label: "Clear on shrink",
-			description: "Clear empty rows when content shrinks (may cause flicker)",
+			label: uiText("Clear on shrink"),
+			description: uiText("Clear empty rows when content shrinks (may cause flicker)"),
 			currentValue: config.clearOnShrink ? "true" : "false",
 			values: ["true", "false"],
 		});
@@ -870,8 +876,8 @@ export class SettingsSelectorComponent extends Container {
 		const clearOnShrinkIndex = items.findIndex((item) => item.id === "clear-on-shrink");
 		items.splice(clearOnShrinkIndex + 1, 0, {
 			id: "terminal-progress",
-			label: "Terminal progress",
-			description: "Show OSC 9;4 progress indicators in the terminal tab bar",
+			label: uiText("Terminal progress"),
+			description: uiText("Show OSC 9;4 progress indicators in the terminal tab bar"),
 			currentValue: config.showTerminalProgress ? "true" : "false",
 			values: ["true", "false"],
 		});
@@ -997,7 +1003,7 @@ export class SettingsSelectorComponent extends Container {
 				}
 			},
 			callbacks.onCancel,
-			{ enableSearch: true },
+			{ enableSearch: true, hints: settingsHints() },
 		);
 
 		this.addChild(this.settingsList);

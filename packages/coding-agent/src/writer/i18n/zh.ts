@@ -100,7 +100,8 @@ export const zh = {
 	"schedule.missing":
 		"add 需要 {field} 参数（收到的参数：{got}）。when 写规则，如 每天 08:00；task 写要做的事，一条完整的请求。",
 	"schedule.added": "已添加定时任务 {id}：{when}，下次 {next}，在 {folder} 运行。",
-	"schedule.cronHint": "程序开着时到点自动运行；关着时请把这一行加进系统的 crontab（crontab -e）：\n{line}",
+	"schedule.cronHint":
+		"请把下面这段原样告诉用户（两轮实测模型都把它略去了，2026-11-15）：程序开着时到点自动运行；关着时要把这一行加进系统的 crontab（crontab -e），否则到点不会运行：\n{line}",
 	"schedule.none": "没有定时任务。",
 	"schedule.line": "- {id}：{when}，下次 {next}{last}｜{task}｜{folder}",
 	"schedule.noSuch": "没有 id 为“{id}”的定时任务。",

@@ -30,7 +30,8 @@ export const SETTINGS_DEFAULTS = {
 	quietStartup: false,
 	defaultProjectTrust: "ask",
 	collapseChangelog: false,
-	enableInstallTelemetry: true,
+	// JiaWriter: no version ping to pi.dev from a fork (2026-11-15).
+	enableInstallTelemetry: false,
 	enableAnalytics: false,
 	enableSkillCommands: true,
 	terminal: {

@@ -115,7 +115,7 @@ export const en: Record<MessageKey, string> = {
 		"add needs the {field} parameter (received: {got}). when is the rule, such as 每天 08:00; task is the request to run, complete in itself.",
 	"schedule.added": "Scheduled task {id} added: {when}, next {next}, in {folder}.",
 	"schedule.cronHint":
-		"It runs on time while the program is open; for when it is closed, add this line to the system's crontab (crontab -e):\n{line}",
+		"Tell the user this, as it stands (two real-model runs left it out, 2026-11-15): while the program is open the job runs on time; when it is closed, this line must be in the system's crontab (crontab -e), or nothing runs:\n{line}",
 	"schedule.none": "No scheduled tasks.",
 	"schedule.line": "- {id}: {when}, next {next}{last} | {task} | {folder}",
 	"schedule.noSuch": "No scheduled task with id “{id}”.",
