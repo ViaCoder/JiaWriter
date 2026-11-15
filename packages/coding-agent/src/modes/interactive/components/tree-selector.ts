@@ -1184,7 +1184,9 @@ class TreeHelp implements Component {
 	invalidate(): void {}
 
 	render(width: number): string[] {
-		const items = TREE_HELP_ITEMS.map(({ keys, label, labelFirst }) => {
+		// JiaWriter: the labels in the interface language.
+		const items = TREE_HELP_ITEMS.map(({ keys, label: rawLabel, labelFirst }) => {
+			const label = uiText(rawLabel);
 			const text = formatHelpKeys(keys);
 			if (!text) return label;
 			return labelFirst ? `${label} ${text}` : `${text} ${label}`;
@@ -1379,7 +1381,7 @@ export class TreeSelectorComponent extends Container implements Focusable {
 
 		this.addChild(new Spacer(1));
 		this.addChild(new DynamicBorder());
-		this.addChild(new Text(theme.bold("  Session Tree"), 1, 0));
+		this.addChild(new Text(theme.bold(uiText("  Session Tree")), 1, 0));
 		this.addChild(new TreeHelp());
 		this.addChild(new SearchLine(this.treeList));
 		this.addChild(new DynamicBorder());

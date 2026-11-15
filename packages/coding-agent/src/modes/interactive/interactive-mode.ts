@@ -145,7 +145,14 @@ import { brandWordmarkLines, brandWordmarkText, jiaHeader, jiaWordmark, showsJia
 // The work mode Shift+Tab cycles.
 import { applyWorkMode, nextWorkMode, workMode } from "../../writer/permission.ts";
 import { emptyFailure } from "../../writer/retry-lines.ts";
-import { abortedText, compactionErrorText, MAC_OPTION_NOTE, uiText, workingText } from "../../writer/ui-text.ts";
+import {
+	abortedText,
+	cacheStatusText,
+	compactionErrorText,
+	MAC_OPTION_NOTE,
+	uiText,
+	workingText,
+} from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
 import { AssistantMessageComponent, setDetailedView } from "./components/assistant-message.ts";
@@ -6970,47 +6977,47 @@ export class InteractiveMode {
 		const model = this.session.model;
 		const selectedModelKey = `${model?.provider}/${model?.id}`;
 		const renderInfo = (): string => {
-			let info = `${theme.bold("Session Info")}\n\n`;
+			let info = `${theme.bold(uiText("Session Info"))}\n\n`;
 			if (sessionName) {
-				info += `${theme.fg("dim", "Name:")} ${sessionName}\n`;
+				info += `${theme.fg("dim", uiText("Name:"))} ${sessionName}\n`;
 			}
-			info += `${theme.fg("dim", "File:")} ${stats.sessionFile ?? "In-memory"}\n`;
-			info += `${theme.fg("dim", "ID:")} ${stats.sessionId}\n\n`;
-			info += `${theme.bold("Messages")}\n`;
-			info += `${theme.fg("dim", "Total:")} ${stats.totalMessages}\n`;
-			info += `${theme.fg("dim", "User:")} ${stats.userMessages}\n`;
-			info += `${theme.fg("dim", "Assistant:")} ${stats.assistantMessages}\n`;
-			info += `${theme.fg("dim", "Tools:")} ${stats.toolCalls} calls, ${stats.toolResults} results\n\n`;
-			info += `${theme.bold("Tokens")}\n`;
+			info += `${theme.fg("dim", uiText("File:"))} ${stats.sessionFile ?? uiText("In-memory")}\n`;
+			info += `${theme.fg("dim", uiText("ID:"))} ${stats.sessionId}\n\n`;
+			info += `${theme.bold(uiText("Messages"))}\n`;
+			info += `${theme.fg("dim", uiText("Total:"))} ${stats.totalMessages}\n`;
+			info += `${theme.fg("dim", uiText("User:"))} ${stats.userMessages}\n`;
+			info += `${theme.fg("dim", uiText("Assistant:"))} ${stats.assistantMessages}\n`;
+			info += `${theme.fg("dim", uiText("Tools:"))} ${uiText("{calls} calls, {results} results", { calls: String(stats.toolCalls), results: String(stats.toolResults) })}\n\n`;
+			info += `${theme.bold(uiText("Tokens"))}\n`;
 			// "Input" is the full prompt volume. With cache activity, split it into
 			// cached (served from cache) vs uncached (everything else) - the only
 			// provider-independent split. Cache writes, where reported, are a detail
 			// of the uncached portion.
 			const { input, cacheRead, cacheWrite } = stats.tokens;
 			const promptTokens = input + cacheRead + cacheWrite;
-			info += `${theme.fg("dim", "Input:")} ${promptTokens.toLocaleString()}\n`;
+			info += `${theme.fg("dim", uiText("Input:"))} ${promptTokens.toLocaleString()}\n`;
 			if (promptTokens > 0 && (cacheRead > 0 || cacheWrite > 0)) {
 				const hitRate = theme.fg("dim", `(${((cacheRead / promptTokens) * 100).toFixed(1)}%)`);
-				info += `  ${theme.fg("dim", "Cached:")} ${cacheRead.toLocaleString()} ${hitRate}\n`;
+				info += `  ${theme.fg("dim", uiText("Cached:"))} ${cacheRead.toLocaleString()} ${hitRate}\n`;
 				const written =
 					cacheWrite > 0 ? ` ${theme.fg("dim", `(${cacheWrite.toLocaleString()} written to cache)`)}` : "";
-				info += `  ${theme.fg("dim", "Uncached:")} ${(input + cacheWrite).toLocaleString()}${written}\n`;
+				info += `  ${theme.fg("dim", uiText("Uncached:"))} ${(input + cacheWrite).toLocaleString()}${written}\n`;
 			}
-			info += `${theme.fg("dim", "Output:")} ${stats.tokens.output.toLocaleString()}\n`;
-			info += `${theme.fg("dim", "Total:")} ${stats.tokens.total.toLocaleString()}\n`;
+			info += `${theme.fg("dim", uiText("Output:"))} ${stats.tokens.output.toLocaleString()}\n`;
+			info += `${theme.fg("dim", uiText("Total:"))} ${stats.tokens.total.toLocaleString()}\n`;
 
-			info += `\n${theme.bold("Cache Warming")}\n`;
-			info += `${theme.fg("dim", "Mode:")} ${cacheWarmingMode}\n`;
-			info += `${theme.fg("dim", "Status:")} ${cacheWarmingStatus ? formatCacheWarmingStatus(cacheWarmingStatus) : "Inactive (cache warming unavailable)"}\n`;
+			info += `\n${theme.bold(uiText("Cache Warming"))}\n`;
+			info += `${theme.fg("dim", uiText("Mode:"))} ${cacheWarmingMode}\n`;
+			info += `${theme.fg("dim", uiText("Status:"))} ${cacheWarmingStatus ? cacheStatusText(formatCacheWarmingStatus(cacheWarmingStatus)) : uiText("Inactive (cache warming unavailable)")}\n`;
 			const decision = cacheWarmingStatus?.decision;
 			if (decision?.economicsAvailable) {
-				info += `${theme.fg("dim", "Cache miss penalty:")} $${decision.missCost.toFixed(3)}\n`;
-				info += `${theme.fg("dim", "Refresh cost:")} $${decision.warmCost.toFixed(3)}\n`;
+				info += `${theme.fg("dim", uiText("Cache miss penalty:"))} $${decision.missCost.toFixed(3)}\n`;
+				info += `${theme.fg("dim", uiText("Refresh cost:"))} $${decision.warmCost.toFixed(3)}\n`;
 			}
 
 			if (stats.cost > 0 || cacheWaste.missedTokens > 0) {
-				info += `\n${theme.bold("Cost")}\n`;
-				info += `${theme.fg("dim", "Total:")} $${stats.cost.toFixed(3)}`;
+				info += `\n${theme.bold(uiText("Cost"))}\n`;
+				info += `${theme.fg("dim", uiText("Total:"))} $${stats.cost.toFixed(3)}`;
 				// A single entry repeats the total, unless it names a model other than the selected one.
 				if (usageBreakdown.length > 1 || usageBreakdown[0]?.key !== selectedModelKey) {
 					for (const entry of usageBreakdown) {
@@ -7022,8 +7029,8 @@ export class InteractiveMode {
 					const detail = `${cacheWaste.missedTokens.toLocaleString()} tokens, ${missLabel}`;
 					info +=
 						cacheWaste.missedCost >= 0.0001
-							? `\n${theme.fg("dim", "Cache Re-billed:")} $${cacheWaste.missedCost.toFixed(3)} ${theme.fg("dim", `(${detail})`)}`
-							: `\n${theme.fg("dim", "Cache Re-billed:")} ${detail}`;
+							? `\n${theme.fg("dim", uiText("Cache Re-billed:"))} $${cacheWaste.missedCost.toFixed(3)} ${theme.fg("dim", `(${detail})`)}`
+							: `\n${theme.fg("dim", uiText("Cache Re-billed:"))} ${detail}`;
 				}
 			}
 			return info;

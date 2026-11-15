@@ -205,7 +205,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Block images": "不发送图片",
 	"Prevent images from being sent to LLM providers": "不把图片发给模型服务商",
 	"Skill commands": "技能命令",
-	"Register skills as /skill:name commands": "把技能注册为 /skill:名称 命令",
+	"Register skills as /skill:name commands": "把技能注册为斜杠命令（/skill 加技能名）",
 	"Show hardware cursor": "显示硬件光标",
 	"Editor padding": "输入框边距",
 	"Horizontal padding for input editor (0-3)": "输入框左右边距（0–3）",
@@ -219,6 +219,41 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Show OSC 9;4 progress indicators in the terminal tab bar": "在终端标签栏显示 OSC 9;4 进度",
 	"Type to search · Enter/Space to change · Esc to cancel": "输入以搜索 · Enter/空格 修改 · Esc 取消",
 	"Enter/Space to change · Esc to cancel": "Enter/空格 修改 · Esc 取消",
+	// The /session information page and the /tree header (2026-11-15).
+	"Session Info": "会话信息",
+	Messages: "消息",
+	Tokens: "Token",
+	"Cache Warming": "缓存预热",
+	Cost: "费用",
+	"Name:": "名称：",
+	"File:": "文件：",
+	"ID:": "ID：",
+	"Total:": "合计：",
+	"User:": "用户：",
+	"Assistant:": "回复：",
+	"Tools:": "工具：",
+	"Input:": "输入：",
+	"Cached:": "命中缓存：",
+	"Uncached:": "未命中：",
+	"Output:": "输出：",
+	"Mode:": "方式：",
+	"Status:": "状态：",
+	"Cache miss penalty:": "缓存未命中代价：",
+	"Refresh cost:": "预热费用：",
+	"Cache Re-billed:": "缓存重计费：",
+	"In-memory": "仅在内存",
+	"Inactive (cache warming unavailable)": "未启用（此模型不支持缓存预热）",
+	"{calls} calls, {results} results": "调用 {calls} 次，结果 {results} 条",
+	"  Session Tree": "  会话树",
+	// The /tree key legend (2026-11-15).
+	move: "移动",
+	page: "翻页",
+	branch: "切分支",
+	copy: "复制",
+	label: "加标签",
+	"label time": "标签带时间",
+	filters: "筛选",
+	cycle: "循环",
 	// The model and thinking selectors (2026-11-15: they were English in a Chinese interface).
 	"Refreshing model catalogs…": "正在刷新模型目录……",
 	"Only showing models from configured providers. Use /login to add providers.":
@@ -582,4 +617,16 @@ export function settingsHints(): { search: string; plain: string } {
 		search: uiText("Type to search · Enter/Space to change · Esc to cancel"),
 		plain: uiText("Enter/Space to change · Esc to cancel"),
 	};
+}
+
+/** The cache-warming status of /session in the interface language: the state word and the common reason. */
+export function cacheStatusText(text: string): string {
+	if (currentLang() !== "zh") return text;
+	return text
+		.replace(/^Inactive \(/, "未启用（")
+		.replace(/^Stopped \(/, "已停止（")
+		.replace(/^Warming cache \(/, "正在预热（")
+		.replace(/\)$/, "）")
+		.replace("cache lifetime unavailable", "此模型不支持缓存预热")
+		.replace("unknown reason", "原因不明");
 }

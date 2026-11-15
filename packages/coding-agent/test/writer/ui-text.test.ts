@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Functions under test.
 import { currentLang, savedLang, setUiLang, t, uiSettingsPath } from "../../src/writer/i18n/index.ts";
-import { abortedText, UI_ZH, uiText } from "../../src/writer/ui-text.ts";
+import { abortedText, cacheStatusText, UI_ZH, uiText } from "../../src/writer/ui-text.ts";
 
 // Agent folder of each test.
 let agent = "";
@@ -93,5 +93,15 @@ describe("abortedText", () => {
 			"Aborted after 1 retry attempt",
 			"Aborted after 3 retry attempts",
 		]);
+	});
+});
+
+describe("cacheStatusText", () => {
+	it("translates the state word and the common reason in Chinese, and leaves English alone", () => {
+		vi.stubEnv("JW_LANG", "zh");
+		expect(cacheStatusText("Inactive (cache lifetime unavailable)")).toBe("未启用（此模型不支持缓存预热）");
+		expect(cacheStatusText("Warming cache (x -> warm)")).toBe("正在预热（x -> warm）");
+		vi.stubEnv("JW_LANG", "en");
+		expect(cacheStatusText("Inactive (cache lifetime unavailable)")).toBe("Inactive (cache lifetime unavailable)");
 	});
 });
