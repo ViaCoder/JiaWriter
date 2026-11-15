@@ -942,7 +942,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 
 	// /browser.
 	pi.registerCommand("browser", {
-		description: "Chrome extension of the browser search backend: connection state and install steps",
+		description: t("cmd.browser"),
 		handler: async (args, ctx) => {
 			if (args.trim()) {
 				ctx.ui.notify(t("browser.cmdUsage"), "error");
@@ -956,7 +956,7 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 
 	// /sf status|install: the same page (sf's pages go through the same extension and host).
 	pi.registerCommand("sf", {
-		description: "search_fetch uses the same Chrome extension: /sf status or /sf install shows /browser",
+		description: t("cmd.sf"),
 		getArgumentCompletions: (prefix) =>
 			["status", "install"].filter((a) => a.startsWith(prefix)).map((a) => ({ value: a, label: a })),
 		handler: async (args, ctx) => {

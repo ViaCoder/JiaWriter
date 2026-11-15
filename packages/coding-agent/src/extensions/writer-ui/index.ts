@@ -105,7 +105,7 @@ export async function setPermission(arg: string, ctx: ExtensionCommandContext): 
 export default function writerUiExtension(pi: ExtensionAPI): void {
 	// /lang.
 	pi.registerCommand("lang", {
-		description: "Switch the interface language: /lang zh or /lang en",
+		description: t("cmd.lang"),
 		getArgumentCompletions: (prefix) =>
 			["zh", "en"].filter((l) => l.startsWith(prefix)).map((l) => ({ value: l, label: l })),
 		handler: async (args, ctx) => {
@@ -129,7 +129,7 @@ export default function writerUiExtension(pi: ExtensionAPI): void {
 
 	// /effort: how hard the model thinks, the one setting worth changing during a conversation.
 	pi.registerCommand("effort", {
-		description: "Set the thinking intensity: /effort off, low, medium, high, xhigh or max",
+		description: t("cmd.effort"),
 		getArgumentCompletions: (prefix) =>
 			WRITER_REASONING_CHOICES.filter((l) => l.startsWith(prefix)).map((l) => ({ value: l, label: l })),
 		handler: async (args, ctx) => {
@@ -156,8 +156,7 @@ export default function writerUiExtension(pi: ExtensionAPI): void {
 
 	// /jw.
 	pi.registerCommand("jw", {
-		description:
-			"Show the JiaWriter configuration; /jw prompts shows the rules sent, /jw log the search log, /jw permission sets the mode, /jw computer sets up desktop control, /jw doctor checks everything",
+		description: t("cmd.jw"),
 		getArgumentCompletions: (prefix) => {
 			// The sub-pages that fit.
 			const fit = ["prompts", "log", "permission", "computer", "doctor"].filter((name) => name.startsWith(prefix));

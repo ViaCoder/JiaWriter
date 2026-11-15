@@ -142,7 +142,7 @@ export default function writerRewindExtension(pi: ExtensionAPI): void {
 
 	// /rewind.
 	pi.registerCommand("rewind", {
-		description: "Go back to an earlier message: the conversation, the files, or both",
+		description: t("cmd.rewind"),
 		handler: async (_args, ctx) => {
 			// Going back during a reply would race it.
 			if (!ctx.isIdle()) {

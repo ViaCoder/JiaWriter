@@ -631,4 +631,16 @@ export const en: Record<MessageKey, string> = {
 	"toolkit.cmd.search": "One search, sources and key points only: /search words",
 	"toolkit.cmd.computer": "Open the computer toolkit",
 	"toolkit.footer": "Toolkits: {names}",
+	// Command descriptions in the / menu.
+	"cmd.browser": "Chrome extension of the browser search backend: connection state and install steps",
+	"cmd.sf": "search_fetch uses the same Chrome extension: /sf status or /sf install shows /browser",
+	"cmd.skills": "Manage writing skills: turn on or off, edit, update from this session, delete",
+	"cmd.skillNew": "Create a writing skill from this session, a blank template, or with skill-creator",
+	"cmd.importDoc": "Import reference files (参考资料/ or one file) as Markdown with page markers",
+	"cmd.exportDoc": "Export a Markdown draft: /export-doc <draft.md> [md|docx|xlsx|pptx] [--profile=name] [--out=path]",
+	"cmd.rewind": "Go back to an earlier message: the conversation, the files, or both",
+	"cmd.lang": "Switch the interface language: /lang zh or /lang en",
+	"cmd.effort": "Set the thinking intensity: /effort off, low, medium, high, xhigh or max",
+	"cmd.jw":
+		"Show the JiaWriter configuration; /jw prompts shows the rules sent, /jw log the search log, /jw permission sets the mode, /jw computer sets up desktop control, /jw doctor checks everything",
 };

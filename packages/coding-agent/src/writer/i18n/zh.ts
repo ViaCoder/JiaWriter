@@ -580,6 +580,18 @@ export const zh = {
 	"toolkit.cmd.search": "检索一次，只列来源和要点：/search 关键词",
 	"toolkit.cmd.computer": "打开桌面操作工具",
 	"toolkit.footer": "工具：{names}",
+	// Command descriptions in the / menu (2026-11-15: the same language throughout the interface).
+	"cmd.browser": "Chrome 扩展：连接状态和安装步骤",
+	"cmd.sf": "search_fetch 用同一个 Chrome 扩展：/sf status 或 /sf install 显示 /browser 的页面",
+	"cmd.skills": "管理写作技能：启用、停用、编辑、用当前会话更新、删除",
+	"cmd.skillNew": "新建写作技能：从当前会话、空白模板，或由 skill-creator 编写",
+	"cmd.importDoc": "导入参考资料（参考资料/ 或指定文件）为带页码的 Markdown",
+	"cmd.exportDoc": "导出稿件：/export-doc <稿件.md> [md|docx|xlsx|pptx] [--profile=方案] [--out=路径]",
+	"cmd.rewind": "回退到某条消息之前：对话、文件，或两者",
+	"cmd.lang": "切换界面语言：/lang zh 或 /lang en",
+	"cmd.effort": "设置思考强度：/effort off、low、medium、high、xhigh 或 max",
+	"cmd.jw":
+		"JiaWriter 配置页；/jw prompts 看发给模型的规则，/jw log 看检索日志，/jw permission 设权限模式，/jw computer 装桌面控制，/jw doctor 全面体检",
 };
 
 /** Message keys shared by all languages. */

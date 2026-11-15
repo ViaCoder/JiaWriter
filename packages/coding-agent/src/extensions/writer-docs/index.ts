@@ -204,7 +204,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 
 	// /import-doc [file] (/import is the upstream session import).
 	pi.registerCommand("import-doc", {
-		description: "Import reference files (参考资料/ or one file) as Markdown with page markers",
+		description: t("cmd.importDoc"),
 		handler: async (args, ctx) => {
 			// The model gets the file tools too, for what the user asks next.
 			openToolkit(pi, "office", { hasUI: ctx.hasUI, skills: [] });
@@ -219,7 +219,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 
 	// /export-doc <draft.md> [md|docx|xlsx|pptx] [--profile=name] [--out=path] (/export is the upstream session export).
 	pi.registerCommand("export-doc", {
-		description: "Export a Markdown draft: /export-doc <draft.md> [md|docx|xlsx|pptx] [--profile=name] [--out=path]",
+		description: t("cmd.exportDoc"),
 		handler: async (args, ctx) => {
 			openToolkit(pi, "office", { hasUI: ctx.hasUI, skills: [] });
 			// Parse, export, show the report.

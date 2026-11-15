@@ -182,7 +182,7 @@ export default function writerSkillsExtension(pi: ExtensionAPI): void {
 
 	// /skills.
 	pi.registerCommand("skills", {
-		description: "Manage writing skills: turn on or off, edit, update from this session, delete",
+		description: t("cmd.skills"),
 		handler: async (_args, ctx) => {
 			// Until the user leaves the list.
 			const agentDir = getAgentDir();
@@ -254,7 +254,7 @@ export default function writerSkillsExtension(pi: ExtensionAPI): void {
 
 	// /skill-new.
 	pi.registerCommand("skill-new", {
-		description: "Create a writing skill from this session, a blank template, or with skill-creator",
+		description: t("cmd.skillNew"),
 		handler: async (_args, ctx) => newSkill(ctx),
 	});
 }
