@@ -643,4 +643,14 @@ export const en: Record<MessageKey, string> = {
 	"cmd.effort": "Set the thinking intensity: /effort off, low, medium, high, xhigh or max",
 	"cmd.jw":
 		"Show the JiaWriter configuration; /jw prompts shows the rules sent, /jw log the search log, /jw permission sets the mode, /jw computer sets up desktop control, /jw doctor checks everything",
+	// What the user asked to remember (2026-11-15).
+	"memory.description":
+		"Memory: list what you asked me to remember; /memory forget <n> removes one, /memory clear removes all",
+	"memory.saved": "Remembered; {count} entries now, read by every later session.",
+	"memory.notAdded": "Already remembered (or empty); nothing added.",
+	"memory.empty": 'Nothing remembered yet. Say "remember …" and it is kept; file: {path}',
+	"memory.title": "Remembered ({count} entries, file {path}):",
+	"memory.forgot": "Removed: {entry}",
+	"memory.badIndex": "The number must be between 1 and {count}.",
+	"memory.cleared": "Cleared {count} entries.",
 };

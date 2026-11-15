@@ -71,6 +71,7 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `topic_open`, `material_add` (writing and research toolkits) | Open a topic folder; record cases and data with their sources |
 | `draft_restore` (writing toolkit) | List a draft's saved versions and bring one back |
 | `todo_write` | The task list of work with three or more steps, shown above the input (Ctrl+T hides it) |
+| `remember` | Keeps a preference or standing instruction the user asked to remember in `memory.md`; every later session's prompt carries it; `/memory` lists or removes entries |
 | `schedule_add`, `schedule_list`, `schedule_remove` (schedule toolkit) | Scheduled tasks: a request run in a folder at set times (每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields); checked every minute while the program is open, and run by `jiawriter schedule run` from the system's cron when it is closed |
 | `delegate` | Hand a self-contained subtask to a fresh JiaWriter process with its own context and get its reply back; several may run at once, and a subtask cannot delegate further |
 
@@ -85,6 +86,7 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `/jw` | Read-only configuration page |
 | `/effort [level]` | Change the thinking intensity; without a level, pick from a list (`/thinking` and Shift+Tab also work) |
 | `/rewind` | Go back to before a message: conversation and files, conversation only, or files only |
+| `/memory` | List what you asked it to remember; `/memory forget <n>` removes one, `/memory clear` removes all |
 | `/lang zh`, `/lang en` | Interface language (`JW_LANG`, when set, takes precedence) |
 | `/skills` | Manage writing skills: turn on or off, edit, update from this session, delete (after a backup) |
 | `/skill-new` | New skill: from this session, from a blank template, or written by the model with skill-creator |

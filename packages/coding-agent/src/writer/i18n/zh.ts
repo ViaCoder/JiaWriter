@@ -592,6 +592,15 @@ export const zh = {
 	"cmd.effort": "设置思考强度：/effort off、low、medium、high、xhigh 或 max",
 	"cmd.jw":
 		"JiaWriter 配置页；/jw prompts 看发给模型的规则，/jw log 看检索日志，/jw permission 设权限模式，/jw computer 装桌面控制，/jw doctor 全面体检",
+	// What the user asked to remember (2026-11-15).
+	"memory.description": "记忆：列出让我记住的内容；/memory forget <序号> 删一条，/memory clear 全部清除",
+	"memory.saved": "已记住，共 {count} 条；以后每次会话都会读到。",
+	"memory.notAdded": "这条已经记过（或为空），没有重复记录。",
+	"memory.empty": "还没有记住的内容。对我说“记住……”即可；文件：{path}",
+	"memory.title": "记住的内容（{count} 条，文件 {path}）：",
+	"memory.forgot": "已删除：{entry}",
+	"memory.badIndex": "序号要在 1 到 {count} 之间。",
+	"memory.cleared": "已清除 {count} 条记忆。",
 };
 
 /** Message keys shared by all languages. */

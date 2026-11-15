@@ -75,8 +75,8 @@ describe("budgets", () => {
 		// the user's rule on verification checks.
 		// 1700 since 2026-11-10 for the user's rule that no reply reads as a machine's, with its one example pair.
 		expect(size(CORE_RULES)).toBeLessThanOrEqual(1700);
-		// 900 since 2026-11-15: Claude Code's phrasing spells the steps out.
-		expect(size(WORKING_RULES)).toBeLessThanOrEqual(900);
+		// 900 since 2026-11-15: Claude Code's phrasing spells the steps out; 950 the same day for the remember rule.
+		expect(size(WORKING_RULES)).toBeLessThanOrEqual(950);
 		// Raised from 1500 for the evidence rule (2026-11-08); the user: no "arbitrary or nonsensical limitations" of my own making.
 		// The analysis method moved here from the gongwen skill on 2026-11-08, so it is in one place for every document;
 		// the rest of the growth is the user's citation rule with its exception, the measured placement rule, and the name

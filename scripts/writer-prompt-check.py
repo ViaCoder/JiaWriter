@@ -159,7 +159,8 @@ def main():
     # 3000 / 7000 since 2026-11-15 (P25): the writing, research, Office, browser, desktop and schedule tools come with
     # their toolkits, and the skills list with the writing toolkit; a greeting carries 11 tools (measured 2690 / 6461).
     # 3300 since 2026-11-15 (P26): the system prompt is written as Claude Code's headed sections with two examples (3095).
-    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 3300 and tools <= 7000)
+    # 7500 since 2026-11-15 (P26c): remember (what the user asked to remember) joined the default tools.
+    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 3300 and tools <= 7500)
     check("闲聊时没有写作工具和技能列表", not any(w in json.dumps(first.get("tools", []), ensure_ascii=False) for w in ("draft_section", "search_web", "topic_open")) and "<available_skills>" not in system)
     check("闲聊时没有任何手册", not any(w in text_of(first) for w in ("Writing rules", "Research rules", "2026年10月31日")))
     said = json.dumps(first["messages"][1:], ensure_ascii=False)

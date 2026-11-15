@@ -369,6 +369,7 @@ describe("JW_* end to end", () => {
 			"grep",
 			"ls",
 			"read",
+			"remember",
 			"todo_write",
 			"toolkit",
 			"write",

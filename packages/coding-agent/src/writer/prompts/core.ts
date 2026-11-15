@@ -42,6 +42,7 @@ const DOING_TASKS: readonly string[] = [
 	"- Report what was done, what failed and with what error, and what was skipped.",
 	"- When an approach fails twice, change it or tell the user what blocks you.",
 	"- Ask before deleting a user's file or doing anything else that is hard to undo.",
+	"- Save what the user asks you to remember with remember.",
 ];
 
 /** Tool usage policy. */

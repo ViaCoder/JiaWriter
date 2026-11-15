@@ -15,9 +15,10 @@ import writerDocsExtension from "./writer-docs/index.ts";
 import writerEnvExtension from "./writer-env/index.ts";
 // JiaWriter: stops a call repeated where it cannot help.
 import writerGuardExtension from "./writer-guard/index.ts";
+// JiaWriter: /plan, read-only until the plan is approved.
+import writerMemoryExtension from "./writer-memory/index.ts";
 // JiaWriter: bash, write and edit under the permission modes.
 import writerPermissionExtension from "./writer-permission/index.ts";
-// JiaWriter: /plan, read-only until the plan is approved.
 import writerPlanExtension from "./writer-plan/index.ts";
 // JiaWriter: search_web and fetch_web (AnySearch or search_fetch in the user's Chrome).
 import writerPromptsExtension from "./writer-prompts/index.ts";
@@ -53,6 +54,8 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-delegate", factory: writerDelegateExtension, builtin: true },
 	{ name: "writer-ask", factory: writerAskExtension, builtin: true },
 	{ name: "writer-plan", factory: writerPlanExtension, builtin: true },
+	// JiaWriter: what the user asked to remember, carried in every session's prompt.
+	{ name: "writer-memory", factory: writerMemoryExtension, builtin: true },
 	// JiaWriter: registers the JW_* model and clamps its output limit.
 	{ name: "writer-env", factory: writerEnvExtension, builtin: true },
 	// JiaWriter: the writing checks.
