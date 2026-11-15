@@ -169,9 +169,9 @@ describe("a writing topic", () => {
 		// The extraction was asked with the search entry and what to take, nothing of the conversation.
 		expect(extractions).toHaveLength(3);
 		// The third extraction read the fetched page's text.
-		expect(extractions[2]).toContain("需要的内容：绿地面积");
-		expect(extractions[0]).toContain("需要的内容：巴黎新增绿地");
-		expect(extractions[0]).toContain("用于：现状");
+		expect(extractions[2]).toContain("Needed: 绿地面积");
+		expect(extractions[0]).toContain("Needed: 巴黎新增绿地");
+		expect(extractions[0]).toContain("For: 现状");
 		expect(extractions[0]).toContain(URL_A);
 		expect(extractions[0]).not.toContain("写巴黎绿化");
 		// The fact with the page's outlet and date, and the section.

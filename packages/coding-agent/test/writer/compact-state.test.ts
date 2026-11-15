@@ -104,10 +104,10 @@ describe("writingState", () => {
 			"时间",
 		);
 		const state = writingState([], dir);
-		expect(state).toContain(`主题文件夹：${dir}`);
+		expect(state).toContain(`Topic folder: ${dir}`);
 		expect(state.indexOf("大纲.md")).toBeLessThan(state.indexOf("初稿.md"));
-		expect(state).toContain("素材 2 条，检索 1 次，页面 1 个");
-		expect(state).toContain("先读大纲和当前稿件");
+		expect(state).toContain("Materials: 2 records, 1 searches, 1 pages archived");
+		expect(state).toContain("read the outline and the current draft");
 	});
 
 	it("keeps the user's words in order, newest first when too long", () => {
@@ -127,7 +127,7 @@ describe("writingState", () => {
 		const read = (path: string) =>
 			entry({ role: "assistant", content: [{ type: "toolCall", id: "r", name: "read", arguments: { path } }] });
 		const state = writingState([read("/s/gongwen-writing/SKILL.md"), read("/s/deep-research/SKILL.md")], undefined);
-		expect(state).toContain("文体：deep-research");
+		expect(state).toContain("Genre skill: deep-research");
 	});
 });
 
@@ -136,7 +136,7 @@ describe("repeated compaction", () => {
 		({ messagesToSummarize: [], turnPrefixMessages: [], previousSummary }) as unknown as CompactionPreparation;
 
 	it("hands the model only its own part of the last summary", () => {
-		const out = prepareForSummary(preparation("## 写作状态\n旧状态\n\n## Decisions\n定了"));
+		const out = prepareForSummary(preparation("## Writing state\n旧状态\n\n## Decisions\n定了"));
 		expect(out.previousSummary).toBe("## Decisions\n定了");
 		expect(prepareForSummary(preparation("其他摘要")).previousSummary).toBe("其他摘要");
 		expect(prepareForSummary(preparation()).previousSummary).toBeUndefined();
@@ -144,7 +144,9 @@ describe("repeated compaction", () => {
 
 	it("puts the state before the model's part, also on a local summary", () => {
 		const result = { summary: "## Decisions\n定了" } as CompactionResult;
-		expect(withWritingState(result, "## 写作状态\n新").summary).toBe("## 写作状态\n新\n\n## Decisions\n定了");
+		expect(withWritingState(result, "## Writing state\n新").summary).toBe(
+			"## Writing state\n新\n\n## Decisions\n定了",
+		);
 	});
 });
 

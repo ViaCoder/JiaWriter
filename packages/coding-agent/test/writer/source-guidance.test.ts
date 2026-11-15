@@ -13,19 +13,19 @@ describe("rules of a document", () => {
 		// The user, 2026-11-08: "xx年xx月xx日《xx》报道".
 		expect(writing).toContain("2026年10月31日《路透社》报道");
 		expect(writing).toContain("研究成果摘要");
-		expect(writing).toContain("no address");
-		expect(research).toContain("as 路透社 for reuters.com");
+		expect(writing).toContain("No address in the text");
+		expect(research).toContain("路透社 for reuters.com");
 	});
 
 	it("asks for cases from major outlets and official sources", () => {
 		expect(research).toMatch(/major outlets/);
 		expect(research).toMatch(/official sources/);
-		expect(research).toMatch(/reposts are only leads/);
-		expect(research).toMatch(/Read the whole list and choose/);
+		expect(research).toMatch(/reposts are leads, not sources/);
+		expect(research).toMatch(/Read the whole result list and choose/);
 	});
 
 	it("asks for specific cases, or authoritative data in their place", () => {
-		expect(writing).toMatch(/names the body or person, date, act and figures/);
+		expect(writing).toMatch(/names the body or person, the date, the act and the figures/);
 		expect(writing).toMatch(/official data with period, scope and value/);
 		expect(writing).toContain("某企业");
 		expect(writing).toMatch(/instead of arrows/);

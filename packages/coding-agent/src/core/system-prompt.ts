@@ -6,7 +6,7 @@ import { getSystemMessageText } from "@earendil-works/pi-ai";
 import { getDocsPath, getReadmePath } from "../config.ts";
 import { personaBlock, promptAddText } from "../writer/prompt-add.ts";
 import { WRITER_CHAT_RULE, WRITER_PREAMBLE, writerDocsSection, writerLanguageRule } from "../writer/prompt-text.ts";
-import { CORE_RULES, WORKING_RULES } from "../writer/prompts/core.ts";
+import { CORE_SECTIONS, sectionBody } from "../writer/prompts/core.ts";
 import { formatSkillsForPrompt, type Skill } from "./skills.ts";
 
 /** JiaWriter: built-in tools whose upstream guidelines are replaced by their descriptions and the stages. */
@@ -106,12 +106,8 @@ function buildRules(
 		rules.push(normalized);
 	};
 
-	// JiaWriter: the language first, then the rules of every request (writer/prompts/core.ts).
-	addRule(writerLanguageRule(process.env.JW_LANG));
-	addRule(WRITER_CHAT_RULE);
-	for (const rule of CORE_RULES) addRule(rule);
-	for (const rule of WORKING_RULES) addRule(rule);
-
+	// JiaWriter: the rules of every request are the headed sections of writer/prompts/core.ts (added in
+	// buildSystemPromptSections); here only what the tools and extensions add.
 	const hasBash = selectedTools.includes("bash");
 	const hasPowerShell = selectedTools.includes("powershell");
 	const hasGrep = selectedTools.includes("grep");
@@ -179,7 +175,11 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 		if (listed.length > 0)
 			promptSections.tools = listed.map((name) => ` - ${name}: ${toolSnippets[name]}`).join("\n");
 		else if (declaredTools.length === 0) promptSections.tools = "(none)";
-		promptSections.rules = buildRules(declaredTools, toolGuidelines, promptGuidelines);
+		// JiaWriter: the language, then the headed sections of stage 0, then whatever the tools add.
+		promptSections.language = ` - ${writerLanguageRule(process.env.JW_LANG)}\n - ${WRITER_CHAT_RULE}`;
+		for (const section of CORE_SECTIONS) promptSections[section.id] = sectionBody(section.lines);
+		const extra = buildRules(declaredTools, toolGuidelines, promptGuidelines);
+		if (extra.trim()) promptSections.rules = extra;
 		// JiaWriter: documentation pointers for JiaWriter itself.
 		promptSections.docs = writerDocsSection(getReadmePath(), getDocsPath());
 	}

@@ -911,7 +911,7 @@ describe("draft_section", () => {
 		expect(asked[0].system).toContain("A person quoted in the materials");
 		expect(asked[0].user).toContain("1.5万亿元");
 		expect(asked[0].user).not.toContain("空域规则");
-		expect(asked[0].user).toContain("约 300 字");
+		expect(asked[0].user).toContain("about 300 characters");
 		expect(asked[0].payload).toEqual({ reasoning: { max_tokens: SECTION_REASONING_TOKENS } });
 		// The draft, with the title, and the outline ticked.
 		const draft = readFileSync(join(cwd, path), "utf-8");
@@ -921,9 +921,9 @@ describe("draft_section", () => {
 		expect(result.content[0].text).toContain("全文要求约 600 字，还有 1 节没写");
 		// The second section goes after it, with the first as its 前文, and, no length given, its share of the target.
 		await run({ path, section: "二、问题" });
-		expect(asked[1].user).toContain("前文（已写好的部分");
+		expect(asked[1].user).toContain("Text so far (continue it");
 		expect(asked[1].user).toContain("1.5万亿元。");
-		expect(asked[1].user).toMatch(/本节篇幅：约 5[6-9]0 字/);
+		expect(asked[1].user).toMatch(/Length: about 5[6-9]0 characters/);
 		expect(readFileSync(join(cwd, path), "utf-8")).toContain("1.5万亿元。\n\n## 二、问题");
 	});
 

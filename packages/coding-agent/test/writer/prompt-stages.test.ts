@@ -75,7 +75,8 @@ describe("budgets", () => {
 		// the user's rule on verification checks.
 		// 1700 since 2026-11-10 for the user's rule that no reply reads as a machine's, with its one example pair.
 		expect(size(CORE_RULES)).toBeLessThanOrEqual(1700);
-		expect(size(WORKING_RULES)).toBeLessThanOrEqual(700);
+		// 900 since 2026-11-15: Claude Code's phrasing spells the steps out.
+		expect(size(WORKING_RULES)).toBeLessThanOrEqual(900);
 		// Raised from 1500 for the evidence rule (2026-11-08); the user: no "arbitrary or nonsensical limitations" of my own making.
 		// The analysis method moved here from the gongwen skill on 2026-11-08, so it is in one place for every document;
 		// the rest of the growth is the user's citation rule with its exception, the measured placement rule, and the name
@@ -84,8 +85,9 @@ describe("budgets", () => {
 		// turn with the user (the user's request), or in one run with nobody to answer.
 		// 3400 since 2026-11-10: the user's rule that wording comes first, in one general description at the top.
 		// 3600 since 2026-11-12: sections are written with draft_section, in a context of their own.
-		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(3600);
-		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(800);
+		// 3900 since 2026-11-15: Claude Code's phrasing (numbered order of work, full sentences).
+		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(3900);
+		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(900);
 		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
 		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);
 		// 400 since 2026-11-14: material_add extracts the facts of a source in a request of its own, and the manual says
@@ -133,9 +135,9 @@ describe("the user's requirements", () => {
 	it.each([
 		// Citations only where the type expects them, by kind of source (the user, 2026-11-08).
 		["citing only when expected", "Cite only where the type expects it"],
-		["the citation form", "reports as 2026年10月31日《路透社》报道"],
+		["the citation form", "Cite a report as 2026年10月31日《路透社》报道"],
 		["research summaries", "研究成果摘要"],
-		["reference files", "files as 2021年6月7日《文件名》第3页"],
+		["reference files", "Cite a published file as 2021年6月7日《文件名》第3页"],
 		["the reference list", "参考文献"],
 		["a list entry", "[page title, publisher, date](full URL)"],
 		// No search unless the user asks (the user, 2026-11-08).
@@ -172,7 +174,8 @@ describe("the user's requirements", () => {
 		["headings", "## 一、, ### （一）, two levels; no 一是 or 一要"],
 		["arrows", "instead of arrows"],
 	])("keeps %s", (_name, words) => {
-		expect(writing).toContain(words);
+		// Case apart: the rules are sentences now (Claude Code's phrasing, 2026-11-15).
+		expect(writing.toLowerCase()).toContain(words.toLowerCase());
 	});
 
 	it("keeps search on the user's request, one call at a time, with no default", () => {
@@ -183,7 +186,7 @@ describe("the user's requirements", () => {
 		expect(research).toContain("one search_web or fetch_web at a time");
 		expect(research).toContain("none is the default");
 		expect(research).toContain("only when the user's prompt says the upstream supports them");
-		expect(CORE_RULES.join("\n")).toContain("nothing more is started unasked");
+		expect(WORKING_RULES.join("\n")).toContain("Nothing more is started unasked");
 	});
 
 	it("tells the time filter of each engine apart, and what pages means", () => {
@@ -236,7 +239,7 @@ describe("denials", () => {
 		expect(core).toContain("State what is so");
 		expect(core).toContain("ask who claimed Y");
 		expect(core).toContain("if nobody did, drop the sentence");
-		const rules = CHECK_MANUALS.style_check.join("\n");
+		const rules = CHECK_MANUALS.style_check.join("\n").toLowerCase();
 		expect(rules).toContain("delete it if it denies what nobody claimed");
 		expect(rules).toContain("keep a denial that answers a real claim");
 		expect(rules).not.toContain("until it passes");
@@ -421,13 +424,22 @@ describe("methodStages", () => {
 });
 
 describe("working rules", () => {
-	it("reach the system prompt after the fixed rules, once each", () => {
+	it("reach the system prompt once each, under Doing tasks, between Tone and style and Tool usage policy", () => {
 		const prompt = buildSystemPrompt({ cwd: "/work", selectedTools: ["read", "write", "edit"], toolSnippets: {} });
-		const core = prompt.indexOf(CORE_RULES[CORE_RULES.length - 1]);
+		// Claude Code's headed sections (2026-11-15).
+		const tone = prompt.indexOf("# Tone and style");
+		const tasks = prompt.indexOf("# Doing tasks");
+		const tools = prompt.indexOf("# Tool usage policy");
+		expect(tone).toBeGreaterThan(0);
+		expect(tasks).toBeGreaterThan(tone);
+		expect(tools).toBeGreaterThan(tasks);
 		for (const rule of WORKING_RULES) {
 			expect(prompt.split(rule).length - 1).toBe(1);
-			expect(prompt.indexOf(rule)).toBeGreaterThan(core);
+			expect(prompt.indexOf(rule)).toBeGreaterThan(tasks);
+			expect(prompt.indexOf(rule)).toBeLessThan(tools);
 		}
+		// The toolkit rule is the last of the tool usage policy.
+		expect(prompt.indexOf(CORE_RULES[CORE_RULES.length - 1])).toBeGreaterThan(tools);
 	});
 });
 

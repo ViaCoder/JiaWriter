@@ -23,16 +23,21 @@ export const MAX_FACTS = 12;
 
 /** The instructions of an extraction request. */
 export function extractInstructions(): string {
+	// Claude Code's phrasing (the user, 2026-11-15). "You extract facts" is what the check scripts' mocks look for.
 	return [
-		"You extract facts from one source text for a Chinese official document. The program files them as material; another request writes the document from them. Return only fact lines, one fact a line, in one of these two forms and nothing else:",
+		"You extract facts from one source text for a Chinese official document. The program files them as materials; another request writes the document from them.",
+		"# Output format",
+		"Return fact lines only, one fact per line, in one of these two forms and nothing else:",
 		"案例｜时间：<time>｜主体：<company, body or person>｜事实：<what happened or was decided>",
 		"数据｜时间：<time>｜事实：<the indicator and its value>",
-		`Take only what the request asks for, at most ${MAX_FACTS} lines, the most specific facts first; return no line when the text holds nothing on it.`,
-		"A fact is one plain Chinese sentence of at most 80 characters stating what is, what happened or what was decided, with its figures, dates and names: no judgment, comment, connective, image or metaphor. A person quoted gives the fact, figure or decision they stated (大众汽车首席执行官布鲁默表示，2026年起在华产能减少两成); their wording, emphasis and figures of speech stay out.",
-		"Figures as the source gives them: every number from the text, none worked out, rounded or combined; a unit may be written in Chinese (2.6 million as 260万) when the number stays the same.",
-		"时间 as the text states it (2026年1月14日, 2025年, 2025年第三季度); the field stays empty when the text states none or only a relative one (近期, 约五年前); never infer one.",
-		"A fact about what a named company, body or person did, decided or stated is a 案例 line with that name as 主体 (a company or body by its name; a person by name and post in the text's own language and spelling); a measurement with no actor is a 数据 line.",
-		"A text in another language gives facts in Chinese, with the names of people and companies as the text spells them. Nothing from outside the text.",
+		`Take only what the request asks for, at most ${MAX_FACTS} lines, the most specific facts first. Return no line when the text holds nothing on it.`,
+		"# What a fact is",
+		"- One plain Chinese sentence of at most 80 characters stating what is, what happened or what was decided, with its figures, dates and names. No judgment, comment, connective, image or metaphor.",
+		"- A person quoted gives the fact, figure or decision they stated (大众汽车首席执行官布鲁默表示，2026年起在华产能减少两成). Their wording, emphasis and figures of speech stay out.",
+		"- Figures as the source gives them: every number from the text, none worked out, rounded or combined. A unit may be written in Chinese (2.6 million as 260万) when the number stays the same.",
+		"- 时间 as the text states it (2026年1月14日, 2025年, 2025年第三季度). Leave the field empty when the text states no time or only a relative one (近期, 约五年前). Never infer one.",
+		"- What a named company, body or person did, decided or stated is a 案例 line with that name as 主体 (a company or body by its name; a person by name and post in the text's own language and spelling). A measurement with no actor is a 数据 line.",
+		"- A text in another language gives facts in Chinese, with the names of people and companies as the text spells them. Nothing from outside the text.",
 	].join("\n");
 }
 
@@ -46,10 +51,11 @@ export function extractRequest(text: string, focus: string, section: string): st
 		.replace(/\n{3,}/g, "\n\n")
 		.trim();
 	const clipped = body.length > MAX_EXTRACT_CHARS ? `${body.slice(0, MAX_EXTRACT_CHARS)}\n（后文略）` : body;
+	// English labels (the user, 2026-11-15); the source and what is needed keep their language.
 	return [
-		`来源正文：\n${clipped}`,
-		`需要的内容：${focus.trim() || "与下面这一节有关的事实和数据"}`,
-		`用于：${section.trim() || "全文"}`,
+		`Source text:\n${clipped}`,
+		`Needed: ${focus.trim() || "the facts and data that bear on the part below"}`,
+		`For: ${section.trim() || "the whole document"}`,
 	].join("\n\n");
 }
 

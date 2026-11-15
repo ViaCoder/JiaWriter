@@ -9,6 +9,7 @@ import { EXEMPLARS, exemplarsFor } from "../../src/writer/draft/exemplars.ts";
 import {
 	cleanSectionText,
 	headingOf,
+	isClosingLine,
 	MAX_PREVIOUS,
 	markOutline,
 	openTextLines,
@@ -69,6 +70,12 @@ describe("outlinePart / headingOf / outlineTitle", () => {
 
 	it("headingOf: the line up to its colon, none for an opening or closing part, the model's without # marks; outlineTitle: the document's name", () => {
 		expect(headingOf("一、发展现状：市场规模迈向1.5万亿元")).toBe("一、发展现状");
+		// A label the model gives as the heading is dropped too (the user, 2026-11-15: the opening has no label).
+		expect(headingOf("引言：总体情况", "引言")).toBe("");
+		expect(headingOf("引言：总体情况", "## 引言")).toBe("");
+		expect(isClosingLine("三、结语：展望")).toBe(true);
+		expect(isClosingLine("## 结语")).toBe(true);
+		expect(isClosingLine("三、对策建议")).toBe(false);
 		expect(headingOf("引言：低空经济规模快速增长")).toBe("");
 		expect(headingOf("开篇")).toBe("");
 		expect(headingOf("五、参考文献")).toBe("");
@@ -97,7 +104,7 @@ describe("sectionInstructions / sectionRequest", () => {
 		expect(text).not.toContain("Order:");
 		expect(text).toContain("A person quoted in the materials");
 		expect(text).toContain("Return the section's text only");
-		expect(text).toContain("Paragraphs open differently");
+		expect(text).toContain("Open paragraphs differently");
 		expect(text).toContain("never a bare Latin surname");
 		expect(SECTION_REASONING_TOKENS).toBeLessThanOrEqual(2048);
 	});
@@ -115,12 +122,12 @@ describe("sectionInstructions / sectionRequest", () => {
 			notes: "每节开头一句话概括",
 		});
 		for (const part of [
-			"文件要求：\n报告对象：公开报道",
-			"本节：一、发展现状",
-			"本节标题行：一、发展现状",
+			"Brief:\n报告对象：公开报道",
+			"This section: 一、发展现状",
+			"Heading line: 一、发展现状",
 			"- 民航局预测",
 			"1.5万亿元",
-			"约 400 字",
+			"about 400 characters",
 			"每节开头一句话概括",
 		])
 			expect(request).toContain(part);
@@ -138,23 +145,25 @@ describe("sectionInstructions / sectionRequest", () => {
 			previous: "",
 		};
 		const bare = sectionRequest(bare_input);
-		expect(bare).toContain("本节不设标题");
-		expect(bare).toContain("（无）");
-		expect(bare).toContain("这是第一节");
+		expect(bare).toContain("No heading for this section");
+		expect(bare).toContain("(none)");
+		expect(bare).toContain("this is the first section");
 		// The opening is asked for judgments only, with no exemplar (exp-p24q5: its figures were used again below).
-		expect(bare).toContain("本节是开篇");
-		expect(bare).not.toContain("范例");
+		expect(bare).toContain("This is the opening");
+		expect(bare).not.toContain("Exemplars");
 		// A headingless part later in the document, and a headed first section, are not the opening.
-		expect(sectionRequest({ ...bare_input, previous: "前文。" })).not.toContain("本节是开篇");
-		expect(sectionRequest({ ...bare_input, heading: "一、现状", line: "一、现状" })).not.toContain("本节是开篇");
+		expect(sectionRequest({ ...bare_input, previous: "前文。" })).not.toContain("This is the opening");
+		expect(sectionRequest({ ...bare_input, heading: "一、现状", line: "一、现状" })).not.toContain(
+			"This is the opening",
+		);
 	});
 
 	it("gives exemplar paragraphs of the section's kind, under their source, and the rule to take their shape only", () => {
-		expect(sectionInstructions()).toContain("take no fact, phrase or subject from them");
+		expect(sectionInstructions()).toContain("Take no fact, phrase or subject from them");
 		const base = { brief: "", outline: OUTLINE, items: [], materials: [], previous: "前文。" };
 		// A measures section: the two measure exemplars, one naming who acts.
 		const measures = sectionRequest({ ...base, line: "三、对策建议", heading: "三、对策建议" });
-		expect(measures).toContain("范例（公开文件的段落");
+		expect(measures).toContain("Exemplars (paragraphs of published documents");
 		expect(measures).toContain("【《政府工作报告》，国务院，2026年3月】\n优化提升传统产业。");
 		expect(measures).toContain("国家知识产权局要加强统筹协调");
 		expect(measures).not.toContain("顶压前行");
@@ -170,8 +179,8 @@ describe("sectionInstructions / sectionRequest", () => {
 			"顶压前行",
 		);
 		// The opening and a closing part: none.
-		expect(sectionRequest({ ...base, line: "引言", heading: "", previous: "" })).not.toContain("范例");
-		expect(sectionRequest({ ...base, line: "结语", heading: "" })).not.toContain("范例");
+		expect(sectionRequest({ ...base, line: "引言", heading: "", previous: "" })).not.toContain("Exemplars");
+		expect(sectionRequest({ ...base, line: "结语", heading: "" })).not.toContain("Exemplars");
 		// The kinds are picked by the exemplar function itself.
 		expect(exemplarsFor("四、对我国企业的启示", "四、对我国企业的启示").map((e) => e.kind)).toEqual([
 			"measure",

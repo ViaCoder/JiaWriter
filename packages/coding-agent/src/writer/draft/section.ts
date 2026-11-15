@@ -137,9 +137,39 @@ const NO_HEADING = new Set(["引言", "开篇", "前言", "导语", "开头", "�
  * gives loses its # marks, which the program adds (the same run passed "## 一、发展现状" and got "## ## 一、发展现状").
  */
 export function headingOf(line: string, given?: string): string {
-	if (given !== undefined) return given.replace(/^#+\s*/, "").trim();
+	// A heading the model gives is used, unless it is one of the labels that never head a part (the user, 2026-11-15:
+	// the opening "need no label or title").
+	const bare = (text: string) =>
+		text
+			.replace(/^#+\s*/, "")
+			.replace(/^[一二三四五六七八九十\d]+[、.．]\s*/, "")
+			.trim();
+	if (given !== undefined) return NO_HEADING.has(bare(given)) ? "" : given.replace(/^#+\s*/, "").trim();
 	const head = line.split(/[：:]/)[0].trim();
-	return NO_HEADING.has(head.replace(/^[一二三四五六七八九十\d]+[、.．]\s*/, "")) ? "" : head;
+	return NO_HEADING.has(bare(head)) ? "" : head;
+}
+
+/** Labels of a closing part, which a document does not have (the user, 2026-11-15: "结语 is no need"). */
+export const CLOSING_LABELS: ReadonlySet<string> = new Set([
+	"结语",
+	"结尾",
+	"结束语",
+	"尾声",
+	"结束",
+	"小结",
+	"总结与展望",
+	"结论与展望",
+	"展望",
+]);
+
+/** Whether an outline line or a heading names a closing part. */
+export function isClosingLine(line: string): boolean {
+	const head = line
+		.replace(/^#+\s*/, "")
+		.split(/[：:]/)[0]
+		.replace(/^[一二三四五六七八九十\d]+[、.．]\s*/, "")
+		.trim();
+	return CLOSING_LABELS.has(head);
 }
 
 /**
@@ -162,42 +192,50 @@ export function sectionMaterials(materialText: string, section: string): string[
 export function sectionInstructions(): string {
 	// The "Order" item is for the main model, which runs the document; here the order is given.
 	const rules = WRITING_MANUAL.filter((r) => !r.startsWith("Order:"));
+	// Claude Code's phrasing (the user, 2026-11-15): headed sections, direct sentences, examples where words are vague.
 	return [
-		"You write one section of a Chinese official document for the program that assembles the document. The request gives the document's purpose, the outline, this section's judgments and its material (fact records the program extracted from the sources), and the text written so far. Write from those alone: every fact and figure from the records, none from memory, each record used at most once.",
-		...rules,
+		"You write one section of a Chinese official document. The program assembles the document; another request did the research. The request gives the document's purpose, the outline, this section's judgments, its materials (fact records the program extracted from the sources) and the text written so far.",
+		"# What to write from",
+		"- Every fact and figure comes from the material records, none from memory. Use each record at most once.",
 		// Quoted people (the user, 2026-11-12: material from international outlets "with quotes from individuals—particularly
 		// those containing metaphors or other vivid, expressive language" makes the output read as machine-written).
-		"A person quoted in the materials gives the document a fact, a figure or a decision, attributed to them in plain words (大众汽车首席执行官布鲁默表示，2025年在华销量下降10%); their images, metaphors, emphasis and rhetoric stay out, and so does any rhetoric of your own",
-		// What the first clean run still did (exp-p24t RD3, 2026-11-12): an opening that described the report itself, four
-		// paragraphs opening as 名词+副词+动词, and measures opening in turn with 针对…问题, 围绕…问题, 着眼…问题 and no actor.
-		"Paragraphs open differently from one another, with the judgment or the measure itself: never by restating the problem it answers (not 针对起降设施不足的问题，要增加设施 but 民航局会同地方政府按飞行需求增建起降点), never by describing what the document does (not 本报告梳理现状、分析问题 but the first fact or judgment), and a measure names who does it",
-		// 2026-11-12, exp-p24u RI1: 总裁Poetzl表示, 首席执行官Filosa表示, 主席Mueller称 beside Alexander Seitz in full.
-		"A foreign person is named as Chinese documents name them: the full name in Chinese transliteration (福特首席执行官吉姆·法利), never a bare Latin surname; a company or product keeps its usual name (Stellantis, eVTOL)",
+		"- A person quoted in the materials gives the document a fact, a figure or a decision, attributed in plain words (大众汽车首席执行官布鲁默表示，2025年在华销量下降10%). Leave out their images, metaphors, emphasis and rhetoric, and add none of your own.",
 		// Exemplars (the user, 2026-11-12: material that already reads as machine-written carries its register into the
 		// text; a paragraph of a published document in the request gives the model a register to match instead).
-		"The request may carry 范例: paragraphs of published official documents of this section's kind. Match their shape, the judgment or the measure first and the figures and parallel elements after it, sentences of their length, no commentary; take no fact, phrase or subject from them",
-		"Return the section's text only: its heading line when one is given, then its paragraphs, joined to the text written so far without repeating it; no notes, no preamble, no code fence, no reference list",
+		"- The request may carry exemplars: paragraphs of published official documents of this section's kind. Match their shape (the judgment or the measure first, the figures and parallel elements after), their sentence length and their lack of commentary. Take no fact, phrase or subject from them.",
+		"# How to write",
+		...rules.map((r) => `- ${r}`),
+		// What the first clean run still did (exp-p24t RD3, 2026-11-12): an opening that described the report itself, four
+		// paragraphs opening as 名词+副词+动词, and measures opening in turn with 针对…问题, 围绕…问题, 着眼…问题 and no actor.
+		"- Open paragraphs differently from one another, with the judgment or the measure itself. Never restate the problem a measure answers (not 针对起降设施不足的问题，要增加设施 but 民航局会同地方政府按飞行需求增建起降点). Never describe what the document does (not 本报告梳理现状、分析问题 but the first fact or judgment). A measure names who does it.",
+		// 2026-11-12, exp-p24u RI1: 总裁Poetzl表示, 首席执行官Filosa表示, 主席Mueller称 beside Alexander Seitz in full.
+		"- Name a foreign person as Chinese documents do: the full name in Chinese transliteration (福特首席执行官吉姆·法利), never a bare Latin surname. A company or product keeps its usual name (Stellantis, eVTOL).",
+		"# Output",
+		"Return the section's text only: its heading line when one is given, then its paragraphs, continuing the text written so far without repeating it. No notes, no preamble, no code fence, no reference list.",
 	].join("\n");
 }
 
 /** The request for one section, with everything it is written from. */
 export function sectionRequest(input: SectionInput): string {
+	// English labels (the user, 2026-11-15: only the necessary Chinese); the content is the document's.
 	const parts = [
-		`文件要求：\n${input.brief || "（见大纲）"}`,
-		`大纲：\n${input.outline.trim()}`,
-		`本节：${input.line}`,
-		input.heading ? `本节标题行：${input.heading}` : "本节不设标题",
+		`Brief:\n${input.brief || "(see the outline)"}`,
+		`Outline:\n${input.outline.trim()}`,
+		`This section: ${input.line}`,
+		input.heading ? `Heading line: ${input.heading}` : "No heading for this section",
 		// The opening (exp-p24q5, 2026-11-14): written first with the materials' figures, which the sections then used
 		// again; four edits removed them, and the opening ended as two sentences of judgment. So it is asked for that.
-		isOpening(input) ? "本节是开篇：用两三句写总体情况和判断，具体数字、案例和人名留给后面各节，这里不出现" : "",
-		input.items.length > 0 ? `本节要点：\n${input.items.map((i) => `- ${i}`).join("\n")}` : "",
+		isOpening(input)
+			? "This is the opening: two or three sentences on the overall situation and the judgment, with no heading and no label such as 引言. Figures, cases and names wait for the sections below; none here."
+			: "",
+		input.items.length > 0 ? `Points of this section:\n${input.items.map((i) => `- ${i}`).join("\n")}` : "",
 		exemplarText(input),
-		`本节素材（程序从来源提取的事实记录，事实和数字只从这里取）：\n${input.materials.length > 0 ? input.materials.join("\n") : "（无）"}`,
+		`Materials (fact records the program extracted from the sources; every fact and figure comes from here):\n${input.materials.length > 0 ? input.materials.join("\n") : "(none)"}`,
 		input.previous.trim()
-			? `前文（已写好的部分，接着写，不要重复）：\n${lastChars(input.previous, MAX_PREVIOUS)}`
-			: "前文：无，这是第一节",
-		input.chars ? `本节篇幅：约 ${input.chars} 字` : "",
-		input.notes?.trim() ? `补充要求：${input.notes.trim()}` : "",
+			? `Text so far (continue it, do not repeat it):\n${lastChars(input.previous, MAX_PREVIOUS)}`
+			: "Text so far: none, this is the first section",
+		input.chars ? `Length: about ${input.chars} characters` : "",
+		input.notes?.trim() ? `Further requirements: ${input.notes.trim()}` : "",
 	];
 	return parts.filter(Boolean).join("\n\n");
 }
@@ -215,7 +253,7 @@ function exemplarText(input: SectionInput): string {
 	if (isOpening(input)) return "";
 	const found = exemplarsFor(input.line, input.heading);
 	if (found.length === 0) return "";
-	return `范例（公开文件的段落，学它的开头、句式和节奏，内容和用语不照搬）：\n${found
+	return `Exemplars (paragraphs of published documents: match their openings, sentence forms and rhythm, not their content or wording):\n${found
 		.map((e) => `【${e.source}】\n${e.text}`)
 		.join("\n")}`;
 }

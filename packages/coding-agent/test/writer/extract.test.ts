@@ -21,7 +21,7 @@ describe("extractInstructions / extractRequest", () => {
 		const text = extractInstructions();
 		expect(text).toContain("案例｜时间：<time>｜主体：");
 		expect(text).toContain("数据｜时间：<time>｜事实：");
-		expect(text).toContain("never infer one");
+		expect(text).toContain("Never infer one");
 		expect(text).toContain(`at most ${MAX_FACTS} lines`);
 		expect(EXTRACT_REASONING_TOKENS).toBeLessThanOrEqual(1024);
 	});
@@ -33,10 +33,12 @@ describe("extractInstructions / extractRequest", () => {
 		expect(request).toContain("发布日期：2026-01-14");
 		expect(request).not.toContain("抓取时间");
 		expect(request).not.toContain("网址：");
-		expect(request).toContain("需要的内容：大众在华销量");
-		expect(request).toContain("用于：一、现状");
+		expect(request).toContain("Needed: 大众在华销量");
+		expect(request).toContain("For: 一、现状");
 		// Nothing asked: the section's facts; no section: the whole document.
-		expect(extractRequest("正文。", "", "")).toContain("需要的内容：与下面这一节有关的事实和数据\n\n用于：全文");
+		expect(extractRequest("正文。", "", "")).toContain(
+			"Needed: the facts and data that bear on the part below\n\nFor: the whole document",
+		);
 		// A long page is cut.
 		const long = extractRequest("字".repeat(MAX_EXTRACT_CHARS + 100), "", "");
 		expect(long).toContain("（后文略）");

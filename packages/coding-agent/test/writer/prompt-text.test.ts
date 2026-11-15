@@ -56,13 +56,15 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 	it("starts with the writing preamble and lists the writing rules first", () => {
 		// Build the prompt.
 		const prompt = defaultPrompt();
-		// Preamble first.
-		expect(prompt.startsWith(`<system_prompt>\n${WRITER_PREAMBLE}\n</system_prompt>\n\n# Rules`)).toBe(true);
-		// The language comes first, and the rules of every request follow.
+		// Preamble first, then the language (Claude Code's headed sections since 2026-11-15).
+		expect(prompt.startsWith(`<system_prompt>\n${WRITER_PREAMBLE}\n</system_prompt>\n\n# Language`)).toBe(true);
+		// The language comes first, and the rules of every request follow under their headings.
 		expect(prompt).toContain(
-			"# Rules\n - Write all text the user sees in Simplified Chinese, notes between tool calls included",
+			"# Language\n - Write all text the user sees in Simplified Chinese, notes between tool calls included",
 		);
-		for (const rule of CORE_RULES) expect(prompt).toContain(`- ${rule}`);
+		expect(prompt.indexOf("# Tone and style")).toBeLessThan(prompt.indexOf("# Doing tasks"));
+		expect(prompt.indexOf("# Doing tasks")).toBeLessThan(prompt.indexOf("# Tool usage policy"));
+		for (const rule of CORE_RULES) expect(prompt).toContain(rule);
 	});
 
 	it("leaves the tool list to the tool descriptions", () => {
@@ -87,11 +89,19 @@ describe("buildSystemPrompt with the JiaWriter texts", () => {
 		const prompt = defaultPrompt();
 		// Every opening tag in the prompt.
 		const tags = [...prompt.matchAll(/^<([a-z_]+)>$/gm)].map((m) => m[1]);
-		// Upstream section names and the persona tag the user asked for (2026-11-05).
+		// Upstream section names, the persona tag the user asked for (2026-11-05), and Claude Code's example tags.
 		for (const tag of tags)
-			expect(["system_prompt", "tools", "rules", "docs", "addendum", "project_context", "skills", "cwd"]).toContain(
-				tag,
-			);
+			expect([
+				"system_prompt",
+				"tools",
+				"rules",
+				"docs",
+				"addendum",
+				"project_context",
+				"skills",
+				"cwd",
+				"example",
+			]).toContain(tag);
 		// The upstream coding phrases are gone (file paths such as packages/coding-agent/README.md may remain).
 		expect(prompt).not.toMatch(/coding assistant|coding agent|editing code|executing commands/i);
 	});
@@ -107,16 +117,20 @@ describe("buildRules", () => {
 		return section.split("\n").map((line) => line.replace(/^ - /, ""));
 	}
 
-	it("puts the language first, then the chat rule and the core rules, then what the tools need", () => {
+	it("puts the language first, the core sections next, and what the tools need under Rules", () => {
 		vi.stubEnv("JW_LANG", "zh");
-		const listed = rules(
-			buildSystemPrompt({ selectedTools: ["bash"], contextFiles: [], skills: [], cwd: "/tmp/wa" }),
-		);
-		expect(listed[0]).toBe(writerLanguageRule("zh"));
-		expect(listed[1]).toBe(WRITER_CHAT_RULE);
-		expect(listed.slice(2, 2 + CORE_RULES.length)).toEqual([...CORE_RULES]);
+		const prompt = buildSystemPrompt({ selectedTools: ["bash"], contextFiles: [], skills: [], cwd: "/tmp/wa" });
+		const language = prompt
+			.split("# Language\n")[1]
+			?.split("\n\n")[0]
+			.split("\n")
+			.map((l) => l.replace(/^ - /, ""));
+		expect(language?.[0]).toBe(writerLanguageRule("zh"));
+		expect(language?.[1]).toBe(WRITER_CHAT_RULE);
+		expect(prompt.indexOf("# Language")).toBeLessThan(prompt.indexOf("# Tone and style"));
+		expect(prompt.indexOf("# Tool usage policy")).toBeLessThan(prompt.indexOf("# Rules"));
 		// Without its own file tools, the shell does the listing and searching.
-		expect(listed.slice(2 + CORE_RULES.length)).toContain("Use bash for file operations like ls, rg, find");
+		expect(rules(prompt)).toContain("Use bash for file operations like ls, rg, find");
 	});
 
 	it("keeps each rule once, also when an extension repeats one", () => {

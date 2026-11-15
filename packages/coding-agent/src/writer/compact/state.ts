@@ -136,13 +136,14 @@ function drafts(dir: string): string[] {
 		.sort((a, b) => Number(b === "大纲.md") - Number(a === "大纲.md"))
 		.map((name) => {
 			const path = join(folder, name);
-			return `${path}（${wordCount(readFileSync(path, "utf-8")).counts.total} 字）`;
+			return `${path} (${wordCount(readFileSync(path, "utf-8")).counts.total} characters)`;
 		});
 }
 
 /** The program's part of a summary, read fresh from disk every time. */
 export function writingState(entries: readonly SessionEntry[], dir: string | undefined): string {
-	const lines = ["## 写作状态"];
+	// English, as every built-in prompt (the user, 2026-11-15); the user's own words stay as written.
+	const lines = ["## Writing state"];
 	if (dir) {
 		// The archive counts.
 		const index = readIndex(dir);
@@ -155,16 +156,16 @@ export function writingState(entries: readonly SessionEntry[], dir: string | und
 			: 0;
 		const searches = index.filter((e) => e.kind === "search").length;
 		// Where the work is.
-		lines.push(`主题文件夹：${dir}`, ...drafts(dir).map((d) => `稿件：${d}`));
-		lines.push(`素材 ${records} 条，检索 ${searches} 次，页面 ${index.length - searches} 个`);
+		lines.push(`Topic folder: ${dir}`, ...drafts(dir).map((d) => `Draft: ${d}`));
+		lines.push(`Materials: ${records} records, ${searches} searches, ${index.length - searches} pages archived`);
 	}
 	const skill = genre(entries);
-	if (skill) lines.push(`文体：${skill}`);
+	if (skill) lines.push(`Genre skill: ${skill}`);
 	// A document under way is read from its files, not from this summary; research alone asks for nothing.
-	if (dir && drafts(dir).length > 0) lines.push("继续写稿之前先读大纲和当前稿件。");
+	if (dir && drafts(dir).length > 0) lines.push("Before writing on, read the outline and the current draft.");
 	// The user's words, as they were written.
 	const said = userWords(entries);
-	if (said.length > 0) lines.push("", "用户说过的话：", ...said.map((text) => `- ${text}`));
+	if (said.length > 0) lines.push("", "What the user said:", ...said.map((text) => `- ${text}`));
 	return lines.join("\n");
 }
 

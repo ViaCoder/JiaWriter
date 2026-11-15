@@ -158,7 +158,8 @@ def main():
     # 15500 since 2026-11-15: schedule_task and delegate joined (about 1,300 characters together).
     # 3000 / 7000 since 2026-11-15 (P25): the writing, research, Office, browser, desktop and schedule tools come with
     # their toolkits, and the skills list with the writing toolkit; a greeting carries 11 tools (measured 2690 / 6461).
-    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 3000 and tools <= 7000)
+    # 3300 since 2026-11-15 (P26): the system prompt is written as Claude Code's headed sections with two examples (3095).
+    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 3300 and tools <= 7000)
     check("闲聊时没有写作工具和技能列表", not any(w in json.dumps(first.get("tools", []), ensure_ascii=False) for w in ("draft_section", "search_web", "topic_open")) and "<available_skills>" not in system)
     check("闲聊时没有任何手册", not any(w in text_of(first) for w in ("Writing rules", "Research rules", "2026年10月31日")))
     said = json.dumps(first["messages"][1:], ensure_ascii=False)
@@ -199,9 +200,9 @@ def main():
     summary_in = full.summaries[0] if full.summaries else ""
     after = text_of(full.requests[-1])
     check("摘要请求里没有搜索全文", "页面正文内容" not in summary_in)
-    check("压缩后带写作状态和用户原话", "写作状态" in after and "查一下绿化的最新报道，要三条" in after)
+    check("压缩后带写作状态和用户原话", "Writing state" in after and "查一下绿化的最新报道，要三条" in after)
     check("压缩后保留模型写的决定", "定了三节" in after)
-    check("只有检索时压缩后不要求读稿件", "先读大纲和当前稿件" not in after)
+    check("只有检索时压缩后不要求读稿件", "read the outline and the current draft" not in after)
     check("只有检索时压缩后不发写作手册", "Writing rules:" not in after)
 
     # Compaction with a document under way.
@@ -209,7 +210,7 @@ def main():
     draft = Script([("toolkit", {"name": "research"}), ("topic_open", {"name": "绿化"}), ("write", {"path": f"{time.strftime('%Y%m%d')}-绿化/稿件/初稿.md", "content": "正文"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000)
     run(draft, ["写报告", "继续写"])
     after = text_of(draft.requests[-1])
-    check("写作中压缩后要求先读大纲和稿件", "先读大纲和当前稿件" in after)
+    check("写作中压缩后要求先读大纲和稿件", "read the outline and the current draft" in after)
     check("写作中压缩后重发写作手册", "Writing rules:" in after)
 
     # Research before the topic has a name. The result has no date, so the material has no time (2026-11-10: a time
@@ -225,7 +226,7 @@ def main():
     broken = Script([("topic_open", {"name": "绿化"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000, summary_fails=True)
     out = run(broken, ["查一下绿化的最新报道，要三条", "继续查"])
     after = text_of(broken.requests[-1])
-    check("摘要接口失败时状态和用户原话仍在", "写作状态" in after and "查一下绿化的最新报道，要三条" in after)
+    check("摘要接口失败时状态和用户原话仍在", "Writing state" in after and "查一下绿化的最新报道，要三条" in after)
     check("摘要失败后下一条消息正常", out.returncode == 0)
 
     for name, ok in results:
