@@ -140,7 +140,7 @@ import { backgroundAll } from "../../writer/background.ts";
 // JiaWriter: interface text in the chosen language.
 import { brandText } from "../../writer/brand.ts";
 // JiaWriter: the "Jia" logo for release packages.
-import { jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
+import { brandWordmarkLines, brandWordmarkText, jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
 // The work mode Shift+Tab cycles.
 import { applyWorkMode, nextWorkMode, workMode } from "../../writer/permission.ts";
 import { abortedText, compactionErrorText, MAC_OPTION_NOTE, uiText, workingText } from "../../writer/ui-text.ts";
@@ -1150,7 +1150,8 @@ export class InteractiveMode {
 			if (jia) {
 				this.headerContainer.addChild(
 					new WelcomeBox(() => ({
-						title: jiaWordmark() + theme.bold(" Writer"),
+						banner: showLogo ? brandWordmarkLines() : [brandWordmarkText()],
+						bannerText: brandWordmarkText(),
 						subtitle: `v${this.version}`,
 						rows: [
 							{ label: uiText("Model"), value: this.session.model?.id ?? "-" },
@@ -4681,8 +4682,9 @@ export class InteractiveMode {
 		if (this.isBashMode) {
 			this.editor.borderColor = theme.getBashModeBorderColor();
 		} else {
-			const level = this.session.thinkingLevel || "off";
-			this.editor.borderColor = theme.getThinkingBorderColor(level);
+			// JiaWriter (2026-11-15): the frame keeps the theme's border colour; the footer names the thinking level, so
+			// the frame no longer changes colour with it (the user: the box's colour and style needed refinement).
+			this.editor.borderColor = (text: string) => theme.fg("border", text);
 		}
 		this.activeStatusIndicator?.invalidate();
 		this.ui.requestRender();

@@ -121,12 +121,12 @@ export function guideHtml(platform) {
 <title>JiaWriter 使用说明（${esc(p.system)}）</title>
 <style>
 body { font: 16px/1.75 -apple-system, "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", sans-serif; max-width: 860px; margin: 32px auto; padding: 0 20px; color: #222; }
-h1 { font-size: 28px; } h2 { font-size: 21px; margin-top: 36px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+h1 { font-size: 34px; font-weight: 800; letter-spacing: 0.02em; color: #5e8cde; } h1 small { font-size: 18px; font-weight: 500; color: #666; margin-left: 12px; } h2 { font-size: 21px; margin-top: 36px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
 pre { background: #f4f4f4; border: 1px solid #ddd; border-radius: 6px; padding: 12px 14px; overflow-x: auto; font-size: 15px; }
 code { background: #f4f4f4; padding: 1px 5px; border-radius: 4px; }
 img { max-width: 100%; border: 1px solid #ccc; border-radius: 6px; margin: 8px 0 16px; }
 </style></head><body>
-<h1>JiaWriter 使用说明（${esc(p.system)}）</h1>
+<h1>JiaWriter <small>使用说明（${esc(p.system)}）</small></h1>
 <p>JiaWriter 是一个写作助手：读参考资料、上网检索、起草和修改稿件，最后导出 Word 文件。按下面的步骤做一次，以后直接运行即可。</p>
 ${body}
 </body></html>

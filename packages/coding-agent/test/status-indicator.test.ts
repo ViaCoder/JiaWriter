@@ -35,7 +35,8 @@ describe("status indicators", () => {
 		const indicator = new WorkingStatusIndicator(tui, "Working");
 		editor.setWorkingStatusIndicator(indicator);
 
-		expect(stripAnsi(editor.render(20)[0]!)).toBe("─".repeat(20));
+		// JiaWriter: the editor sits in a rounded frame (2026-11-15).
+		expect(stripAnsi(editor.render(20)[0]!)).toBe(`╭${"─".repeat(18)}╮`);
 		const standaloneLine = indicator.render(20)[1]!;
 		expect(standaloneLine).toContain(theme.getFgAnsi("accent"));
 		expect(standaloneLine).toContain(theme.getFgAnsi("muted"));
@@ -58,10 +59,11 @@ describe("status indicators", () => {
 
 		const topBorder = editor.render(20)[0]!;
 		// JiaWriter: the time since the work began follows the message (2026-11-09).
-		expect(stripAnsi(topBorder)).toMatch(/^── ⠋ Working · 0/);
+		expect(stripAnsi(topBorder)).toMatch(/^╭───── ⠋ Working/);
 		expect(visibleWidth(stripAnsi(topBorder))).toBe(20);
 		expect(visibleWidth(topBorder)).toBe(20);
-		expect(topBorder.split(theme.getFgAnsi("thinkingHigh"))).toHaveLength(5);
+		// The frame pieces and the status share the border colour (the frame adds two pieces, 2026-11-15).
+		expect(topBorder.split(theme.getFgAnsi("thinkingHigh"))).toHaveLength(7);
 		indicator.dispose();
 	});
 
@@ -91,7 +93,7 @@ describe("status indicators", () => {
 			vi.advanceTimersByTime(1000);
 			expect(stripAnsi(editor.render(120)[0]!)).toContain("Retrying (1/3) in 2s");
 			editor.setWorkingStatusIndicator(undefined);
-			expect(stripAnsi(editor.render(120)[0]!)).toBe("─".repeat(120));
+			expect(stripAnsi(editor.render(120)[0]!)).toBe(`╭${"─".repeat(118)}╮`);
 		} finally {
 			for (const indicator of indicators) indicator.dispose();
 		}

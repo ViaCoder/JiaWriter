@@ -83,3 +83,42 @@ export function jiaWordmark(): string {
 export function showsJiaLogo(name: string = APP_NAME): boolean {
 	return name !== "pi";
 }
+
+/**
+ * The brand wordmark (the user, 2026-11-15: "the text should simply be enlarged and set in a bolder weight; the color
+ * should be adjusted to something aesthetically pleasing and refined", the same on every platform): JIAWRITER in a
+ * 7-row pixel font drawn with half blocks (4 lines), in one colour. Terminals without half blocks get the bold text.
+ */
+// The wordmark's colour: a calm azure that reads on dark and light backgrounds.
+const BRAND = rgbColor(94, 140, 222);
+/** The letters of the wordmark, 7 rows of 5 pixels each. */
+const WORDMARK_FONT: Readonly<Record<string, string[]>> = {
+	J: ["#####", "...#.", "...#.", "...#.", "...#.", "#..#.", ".##.."],
+	I: ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "#####"],
+	A: [".###.", "#...#", "#...#", "#####", "#...#", "#...#", "#...#"],
+	W: ["#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#"],
+	R: ["####.", "#...#", "#...#", "####.", "#.#..", "#..#.", "#...#"],
+	T: ["#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#.."],
+	E: ["#####", "#....", "#....", "####.", "#....", "#....", "#####"],
+};
+/** The word drawn. */
+const WORDMARK_TEXT = "JIAWRITER";
+/** Columns the wordmark takes: five per letter and one between letters. */
+export const WORDMARK_WIDTH = WORDMARK_TEXT.length * 6 - 1;
+
+/** The wordmark as four lines of half blocks in the brand colour. */
+export function brandWordmarkLines(): string[] {
+	const color = foregroundAnsi(BRAND, theme.getColorMode());
+	// Eight pixel rows (the seventh row and a blank one make the last line), one column between letters.
+	const rows = Array.from({ length: 8 }, (_, r) =>
+		[...WORDMARK_TEXT].map((ch) => WORDMARK_FONT[ch]?.[r] ?? ".....").join("."),
+	);
+	const lines: string[] = [];
+	for (let r = 0; r < 8; r += 2) lines.push(`${color}${halfBlockLine(rows[r], rows[r + 1])}${RESET}`);
+	return lines;
+}
+
+/** The wordmark as bold text in the brand colour, for narrow terminals and those without half blocks. */
+export function brandWordmarkText(): string {
+	return `${foregroundAnsi(BRAND, theme.getColorMode())}\x1b[1mJiaWriter\x1b[22m${RESET}`;
+}

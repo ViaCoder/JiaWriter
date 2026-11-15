@@ -10,9 +10,12 @@ import { theme } from "../theme/theme.ts";
 
 /** What the box says; read at each render so it follows theme and model changes. */
 export interface WelcomeContent {
-	// The product name, already coloured.
-	title: string;
-	// Plain text after the title (the version).
+	// The wordmark, as lines already coloured (several for the big one, one for the text fallback); the widest line
+	// decides which is drawn: the big one when it fits, else the text.
+	banner: string[];
+	// The text fallback of the banner, already coloured.
+	bannerText: string;
+	// Plain text under the banner (the version).
 	subtitle: string;
 	// The rows below, each a label and a value.
 	rows: { label: string; value: string }[];
@@ -49,9 +52,12 @@ export class WelcomeBox implements Component {
 			return `${pad}${edge("│")} ${cut}${" ".repeat(Math.max(0, inner - visibleWidth(cut)))} ${edge("│")}`;
 		};
 		const labelWidth = Math.max(0, ...c.rows.map((r) => visibleWidth(r.label)));
+		// The big wordmark when every line of it fits, else its text.
+		const banner = c.banner.every((b) => visibleWidth(b) <= inner) ? c.banner : [c.bannerText];
 		const lines = [
 			`${pad}${edge(`╭${"─".repeat(outer - 2)}╮`)}`,
-			line(`${c.title} ${theme.fg("dim", c.subtitle)}`),
+			...banner.map(line),
+			line(theme.fg("dim", c.subtitle)),
 			line(""),
 			...c.rows.map((r) =>
 				line(`${theme.fg("muted", r.label)}${" ".repeat(labelWidth - visibleWidth(r.label))}  ${r.value}`),

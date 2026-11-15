@@ -1,5 +1,15 @@
-import { Editor, type EditorOptions, type EditorTheme, type TUI, visibleWidth } from "@earendil-works/pi-tui";
+import {
+	Editor,
+	type EditorOptions,
+	type EditorTheme,
+	type TUI,
+	type TuiMouseEvent,
+	type TuiMouseEventResult,
+	visibleWidth,
+} from "@earendil-works/pi-tui";
 import type { AppKeybinding, KeybindingsManager } from "../../../core/keybindings.ts";
+// JiaWriter: the prompt mark's colour.
+import { theme } from "../theme/theme.ts";
 import type { StatusIndicator } from "./status-indicator.ts";
 
 /** How long the second key of a chord is awaited (ms). */
@@ -33,6 +43,49 @@ export class CustomEditor extends Editor {
 	// The first key of a chord in progress, and the timer that gives it its own meaning.
 	private chordKey: string | undefined;
 	private chordTimer: ReturnType<typeof setTimeout> | undefined;
+	// The bottom border as last drawn: it marks where the autocomplete rows begin in the parent's output.
+	private lastBottomBorder = "";
+
+	/** The mark before the text: " >" with the editor's own padding after it, " > " without. */
+	private promptMark(): string {
+		return this.getPaddingX() > 0 ? " >" : " > ";
+	}
+
+	protected override renderBottomBorder(width: number, hiddenLineCount: number): string {
+		this.lastBottomBorder = super.renderBottomBorder(width, hiddenLineCount);
+		return this.lastBottomBorder;
+	}
+
+	/**
+	 * JiaWriter (2026-11-15, the user: the box's colour and style needed refinement): the editor in a rounded frame
+	 * with a prompt mark, as Claude Code draws it. The parent draws the box narrower; the frame and the mark go
+	 * around its lines, and the autocomplete rows below keep their place with the same indent.
+	 */
+	override render(width: number): string[] {
+		const mark = this.promptMark();
+		const markWidth = visibleWidth(mark);
+		if (width < markWidth + 8) return super.render(width);
+		const inner = super.render(width - 2 - markWidth);
+		const bottom = inner.lastIndexOf(this.lastBottomBorder);
+		if (bottom < 1) return inner;
+		const edge = this.borderColor;
+		// The frame: one column each side, the mark's width of dashes on the left (the lines inside are 2 + mark narrower).
+		const out = [edge(`╭${"─".repeat(markWidth)}`) + inner[0] + edge("╮")];
+		for (let i = 1; i < bottom; i++) {
+			const lead = i === 1 ? theme.fg("accent", mark) : " ".repeat(markWidth);
+			out.push(edge("│") + lead + inner[i] + edge("│"));
+		}
+		out.push(edge(`╰${"─".repeat(markWidth)}`) + inner[bottom] + edge("╯"));
+		for (let i = bottom + 1; i < inner.length; i++) out.push(`${" ".repeat(markWidth + 1)}${inner[i]}`);
+		return out;
+	}
+
+	override handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
+		// The frame and the mark stand before the parent's columns.
+		const markWidth = visibleWidth(this.promptMark());
+		if (event.width < markWidth + 8) return super.handleMouse(event);
+		return super.handleMouse({ ...event, x: event.x - 1 - markWidth, width: event.width - 2 - markWidth });
+	}
 
 	constructor(tui: TUI, theme: EditorTheme, keybindings: KeybindingsManager, options?: CustomEditorOptions) {
 		super(tui, theme, options);
