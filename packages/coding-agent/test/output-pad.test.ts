@@ -87,7 +87,8 @@ describe("outputPad", () => {
 	test.each(components)("$name renders at outputPad 0 and 1", ({ create }) => {
 		const component = create(0);
 		const lines = renderLines(component);
-		expect(lines.filter((line) => line.startsWith(" "))).toEqual([]);
+		// JiaWriter: a block starts at the padding with its mark; its other lines are indented under the mark.
+		expect(lines.find((line) => line.trim() !== "")?.startsWith(" ")).toBe(false);
 		component.setOutputPad(1);
 		expect(renderLines(component)).toEqual(lines.map((line) => ` ${line}`));
 	});

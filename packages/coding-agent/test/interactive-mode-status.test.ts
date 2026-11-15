@@ -816,8 +816,9 @@ describe("InteractiveMode.showLoadedResources", () => {
 		});
 
 		const output = renderAll(fakeThis.loadedResourcesContainer);
-		expect(output).toContain("技能：");
-		expect(output).toContain("commit");
+		// JiaWriter (2026-11-15): folded, the skills stay out (they come with the writing toolkit); Ctrl+O lists them.
+		expect(output).not.toContain("技能：");
+		expect(output).not.toContain("commit");
 		expect(output).not.toContain("resource-list");
 	});
 

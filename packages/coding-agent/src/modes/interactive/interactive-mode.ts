@@ -1891,8 +1891,9 @@ export class InteractiveMode {
 			color: ThemeColor = "mdHeading",
 		): void => {
 			const section = new ExpandableText(
-				// Collapsed: the label and the list on one line.
-				() => `${sectionHeader(name, color)}${collapsedBody().trim()}`,
+				// Collapsed: the label and the list on one line; a section with nothing to say when collapsed stays out
+				// (JiaWriter 2026-11-15: the skills wait for Ctrl+O, since they belong to the writing toolkit).
+				() => (collapsedBody().trim() ? `${sectionHeader(name, color)}${collapsedBody().trim()}` : ""),
 				() => `${sectionHeader(name, color)}\n${expandedBody()}`,
 				this.getStartupExpansionState(),
 				0,
@@ -1965,8 +1966,8 @@ export class InteractiveMode {
 						formatPath: (item) => this.formatDisplayPath(item.path),
 						formatPackagePath: (item) => this.getShortPath(item.path, item.sourceInfo),
 					});
-				const skillCompactList = () => formatCompactList(skills.map((skill) => skill.name));
-				addLoadedSection("Skills", skillCompactList, skillList);
+				// Folded, the skills stay out: they come with the writing toolkit, not with the agent (2026-11-15).
+				addLoadedSection("Skills", () => "", skillList);
 			}
 
 			const templates = this.session.promptTemplates;

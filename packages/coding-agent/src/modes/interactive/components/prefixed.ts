@@ -8,6 +8,13 @@
 // Component and width helpers of the terminal UI.
 import type { Component, TuiMouseEvent, TuiMouseEventResult } from "@earendil-works/pi-tui";
 import { visibleWidth } from "@earendil-works/pi-tui";
+// Styled lines carry escape codes even when blank: the words decide.
+import { stripAnsi } from "../../../utils/ansi.ts";
+
+/** Whether a rendered line shows any character. */
+function hasText(line: string): boolean {
+	return stripAnsi(line).trim() !== "";
+}
 
 /** A marker and how to colour it; the child is drawn `indent` columns in. */
 export interface PrefixOptions {
@@ -17,6 +24,8 @@ export interface PrefixOptions {
 	band?: (line: string) => string;
 	// Columns to indent by, when the marker's visible width is not the measure (a two-cell marker in a one-cell font).
 	indent?: number;
+	// Keep the child's leading empty lines (a band with a blank row above its text); dropped otherwise.
+	keepLeading?: boolean;
 }
 
 /** The child behind a marker. */
@@ -45,11 +54,13 @@ export class Prefixed implements Component {
 		const lines = this.child.render(Math.max(1, width - indent));
 		// The marker goes on the first line that says something.
 		let first = 0;
-		while (first < lines.length && lines[first].trim() === "") first++;
+		if (!this.options.keepLeading) while (first < lines.length && !hasText(lines[first])) first++;
 		const kept = lines.slice(first);
 		if (kept.length === 0) return [];
 		const band = this.options.band ?? ((line: string) => line);
-		return kept.map((line, i) => band(`${i === 0 ? marker : pad}${line}`));
+		// The marker goes on the first line with text; blank rows kept above it get the indent.
+		const at = Math.max(0, kept.findIndex(hasText));
+		return kept.map((line, i) => band(`${i === at ? marker : pad}${line}`));
 	}
 
 	handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {

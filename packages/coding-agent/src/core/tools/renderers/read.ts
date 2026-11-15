@@ -14,7 +14,7 @@ import { keyHint, keyText } from "../../../modes/interactive/components/keybindi
 import { getLanguageFromPath, highlightCode, type Theme } from "../../../modes/interactive/theme/theme.ts";
 import { formatPathRelativeToCwdOrAbsolute } from "../../../utils/paths.ts";
 // JiaWriter: tool names users read.
-import { toolLabel } from "../../../writer/ui-text.ts";
+import { toolLabel, uiText } from "../../../writer/ui-text.ts";
 import type { ToolDefinition, ToolRenderResultOptions } from "../../extensions/types.ts";
 import { resolveToCwd } from "../path-utils.ts";
 import type { ReadToolDetails } from "../read.ts";
@@ -117,12 +117,14 @@ function formatReadResult(
 	_cwd: string,
 	isError: boolean,
 ): string {
-	if (!options.expanded && !isError) {
-		return "";
-	}
-
 	const rawPath = str(args?.file_path ?? args?.path);
 	const output = getTextOutput(result, showImages);
+	// JiaWriter (2026-11-15): folded, one line says how much came, as Claude Code's "Read N lines".
+	if (!options.expanded && !isError) {
+		const count = result.details?.truncation?.totalLines ?? output.split("\n").filter((l) => l !== "").length;
+		return count > 0 ? `\n${theme.fg("muted", uiText("{count} lines", { count: String(count) }))}` : "";
+	}
+
 	const lang = !isError && rawPath ? getLanguageFromPath(rawPath) : undefined;
 	const renderedLines = lang ? highlightCode(replaceTabs(output), lang) : output.split("\n");
 	const lines = trimTrailingEmptyLines(renderedLines);

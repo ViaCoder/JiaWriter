@@ -48,7 +48,7 @@ export class UserMessageComponent extends Container {
 				new Markdown(
 					this.text,
 					0,
-					0,
+					1,
 					this.markdownTheme,
 					{
 						color: (content: string) => theme.fg("userMessageText", content),
@@ -64,6 +64,7 @@ export class UserMessageComponent extends Container {
 					marker: () => band(`${" ".repeat(this.outputPad)}${theme.fg("accent", theme.bold("> "))}`),
 					indent: this.outputPad + 2,
 					band: (line) => band(`${line}`),
+					keepLeading: true,
 				},
 			),
 		);

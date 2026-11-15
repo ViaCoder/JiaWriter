@@ -156,7 +156,8 @@ describe("AssistantMessageComponent", () => {
 
 		component.setOutputPad(0);
 		const updatedLines = component.render(80).map((line) => stripAnsi(line));
-		expect(updatedLines.some((line) => line.startsWith("hello"))).toBe(true);
+		// JiaWriter: a reply stands behind its mark, so the text follows "● " at the padding.
+		expect(updatedLines.some((line) => line.startsWith("● hello"))).toBe(true);
 		expect(updatedLines.some((line) => line.startsWith("reasoning"))).toBe(true);
 	});
 
@@ -216,10 +217,11 @@ describe("AssistantMessageComponent", () => {
 			],
 		);
 
-		expect(stripAnsi(component.render(80).join("\n"))).toContain("answer (78)");
+		// JiaWriter: the mark and its indent (outputPad + 2) come off the width the Markdown gets.
+		expect(stripAnsi(component.render(80).join("\n"))).toContain("answer (77)");
 		component.render(80);
-		expect(stripAnsi(component.render(60).join("\n"))).toContain("answer (58)");
-		expect(availableWidths).toEqual([78, 58]);
+		expect(stripAnsi(component.render(60).join("\n"))).toContain("answer (57)");
+		expect(availableWidths).toEqual([77, 57]);
 	});
 
 	test("continues the Markdown transformer chain when a transformer throws", () => {
@@ -277,10 +279,11 @@ describe("AssistantMessageComponent", () => {
 
 		const paddedComponent = new UserMessageComponent("hello", undefined, 1);
 		const paddedLines = paddedComponent.render(40).map((line) => stripAnsi(line));
-		expect(paddedLines.some((line) => line.startsWith(" hello"))).toBe(true);
+		// JiaWriter: the user's words stand behind "> " at the padding.
+		expect(paddedLines.some((line) => line.startsWith(" > hello"))).toBe(true);
 
 		const unpaddedComponent = new UserMessageComponent("hello", undefined, 0);
 		const unpaddedLines = unpaddedComponent.render(40).map((line) => stripAnsi(line));
-		expect(unpaddedLines.some((line) => line.startsWith("hello"))).toBe(true);
+		expect(unpaddedLines.some((line) => line.startsWith("> hello"))).toBe(true);
 	});
 });

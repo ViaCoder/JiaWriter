@@ -30,7 +30,8 @@ describe("UserMessageComponent", () => {
 		const component = new UserMessageComponent("The input is $x^2$.", undefined, 1, [
 			(markdown, context) => {
 				calls.push("formula");
-				expect(context).toEqual({ messageType: "user", isStreaming: false, availableWidth: 78 });
+				// JiaWriter: the mark "> " and the padding come off the width.
+				expect(context).toEqual({ messageType: "user", isStreaming: false, availableWidth: 77 });
 				return markdown.replace("$x^2$", "x²");
 			},
 			(markdown) => {

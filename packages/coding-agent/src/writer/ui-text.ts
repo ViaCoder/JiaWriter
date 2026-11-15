@@ -35,6 +35,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"write a document": "写文档",
 	"look into a question": "研究一个问题",
 	"all commands": "全部命令",
+	"{count} lines": "共 {count} 行",
 	Working: "处理中",
 	"Working ({key} to interrupt)": "处理中（{key} 中断）",
 	"Took {time}": "用时 {time}",

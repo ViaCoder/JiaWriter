@@ -135,7 +135,7 @@ export class ToolExecutionComponent extends Container {
 		return this.toolDefinition?.renderShell ?? "default";
 	}
 
-	private getRenderContext(lastComponent: Component | undefined): ToolRenderContext {
+	private getRenderContext(lastComponent: Component | undefined, outputPad = this.outputPad): ToolRenderContext {
 		return {
 			args: this.args,
 			toolCallId: this.toolCallId,
@@ -153,7 +153,7 @@ export class ToolExecutionComponent extends Container {
 			showImages: this.showImages,
 			isError: this.result?.isError ?? false,
 			durationMs: this.isPartial ? undefined : this.result?.durationMs,
-			outputPad: this.outputPad,
+			outputPad,
 		};
 	}
 
@@ -305,15 +305,25 @@ export class ToolExecutionComponent extends Container {
 			renderContainer.clear();
 
 			// JiaWriter: the call behind its state mark, the result behind ⎿, indented under the call.
-			const marked = (component: Component) => new Prefixed(component, { marker: () => callMark(state()) });
-			const under = (component: Component) => new Prefixed(component, { marker: resultMark });
+			// A self-framing renderer pads itself: the padding goes before the mark, and the renderer gets none.
+			const self = this.getRenderShell() === "self";
+			const pad = " ".repeat(self ? this.outputPad : 0);
+			const renderPad = self ? 0 : this.outputPad;
+			const marked = (component: Component) =>
+				new Prefixed(component, { marker: () => `${pad}${callMark(state())}`, indent: pad.length + 2 });
+			const under = (component: Component) =>
+				new Prefixed(component, { marker: () => `${pad}${resultMark()}`, indent: pad.length + 4 });
 			const callRenderer = this.getCallRenderer();
 			if (!callRenderer) {
 				renderContainer.addChild(this.createResultRegion(marked(this.createCallFallback())));
 				hasContent = true;
 			} else {
 				try {
-					const component = callRenderer(this.args, theme, this.getRenderContext(this.callRendererComponent));
+					const component = callRenderer(
+						this.args,
+						theme,
+						this.getRenderContext(this.callRendererComponent, renderPad),
+					);
 					this.callRendererComponent = component;
 					renderContainer.addChild(this.createResultRegion(marked(component)));
 					hasContent = true;
@@ -338,7 +348,7 @@ export class ToolExecutionComponent extends Container {
 							{ content: this.result.content as any, details: this.result.details },
 							{ expanded: this.expanded, isPartial: this.isPartial },
 							theme,
-							this.getRenderContext(this.resultRendererComponent),
+							this.getRenderContext(this.resultRendererComponent, renderPad),
 						);
 						this.resultRendererComponent = component;
 						renderContainer.addChild(this.createResultRegion(under(component)));
