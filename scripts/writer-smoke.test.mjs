@@ -12,7 +12,7 @@ import { join, resolve } from "node:path";
 // Test runner.
 import { after, before, test } from "node:test";
 // Functions under test.
-import { EXTENSION_ID, frame, frames, hostRound, onePagePdf, programPath, REPLY, run, SECRET, smoke, startMock, TOOLS } from "./writer-smoke.mjs";
+import { EXTENSION_ID, frame, frames, hostRound, onePagePdf, programPath, REPLY, run, SECRET, smoke, startMock, TOOLS, WRITING_TOOLS } from "./writer-smoke.mjs";
 
 // Folder of the fake programs.
 let dir = "";
@@ -52,7 +52,7 @@ function fake(leak, noisyHost = false) {
 if (a[0]?.startsWith("chrome-extension://")) {${HOST(noisyHost)}}
 else if (a[0] === "--version") console.log("1.4.0");
 else if (a[0] === "--help") console.log("jiawriter - AI writing assistant");
-else if (a[1] === "导入并导出") {
+else if (a[1] === "写一份报告：导入并导出") {
   const fs = await import("node:fs");
   fs.mkdirSync("参考资料/.parsed", { recursive: true });
   fs.writeFileSync("参考资料/.parsed/a.pdf.md", "Smoke reference text");
@@ -61,8 +61,8 @@ else if (a[1] === "导入并导出") {
   await fetch(process.env.JW_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.JW_KEY }, body: JSON.stringify({ max_tokens: 100, messages: [{ role: "tool", content: "逐处命中 1 处：- 第 3 行第 2 列〔对比框架 不是……而是〕不是简单的技术问题，而是" }] }) });
   console.log(${JSON.stringify(REPLY)});
 } else {
-  const body = { max_tokens: 100, messages: [{ role: "system", content: "You are JiaWriter, a general-purpose agent. <name>deep-research</name> <name>gongwen-writing</name>" }],
-    tools: ${JSON.stringify(TOOLS)}.map((name) => ({ type: "function", function: { name } })) };
+  const body = { max_tokens: 100, messages: [{ role: "system", content: "You are JiaWriter, a general-purpose agent." }, { role: "user", content: "Toolkit writing is open; - gongwen-writing: 公文 (/s/SKILL.md)" }],
+    tools: ${JSON.stringify([...TOOLS, ...WRITING_TOOLS])}.map((name) => ({ type: "function", function: { name } })) };
   const res = await fetch(process.env.JW_URL + "/v1/chat/completions", { method: "POST", headers: { authorization: "Bearer " + process.env.JW_KEY }, body: JSON.stringify(body) });
   const text = await res.text();
   console.log(text.includes(${JSON.stringify(REPLY)}) ? ${JSON.stringify(REPLY)} : "no reply");
@@ -104,7 +104,8 @@ test("smoke passes a well-behaved program and fails one that leaks the key", asy
 		["--version", true],
 		["--help", true],
 		["print reply", true],
-		["writing tools", true],
+		["general tools", true],
+		["writing toolkit", true],
 		["writing prompt", true],
 		["built-in skills", true],
 		["key hidden", true],

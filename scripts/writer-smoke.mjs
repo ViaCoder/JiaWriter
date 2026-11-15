@@ -130,7 +130,9 @@ export const REPLY = "冒烟测试回复";
 /** Dummy key; it must appear nowhere in the output. */
 export const SECRET = "sk-smoke-0000-dummy";
 /** Tools the writing agent must offer. */
-export const TOOLS = ["export_document", "import_document", "read", "style_check", "search_web", "write"];
+// The general tools of any request, and the writing toolkit's tools a document request brings (P25, 2026-11-15).
+export const TOOLS = ["read", "write", "edit", "bash", "todo_write", "toolkit"];
+export const WRITING_TOOLS = ["export_document", "import_document", "style_check", "draft_section"];
 
 /** A minimal one-page PDF with an ASCII text line (Helvetica). */
 export function onePagePdf(text) {
@@ -251,14 +253,17 @@ export async function smoke(command, args) {
 		const h = await run(cmd, [...args, "--help"], env);
 		rows.push(["--help", h.code === 0 && h.stdout.includes("writing assistant"), ""]);
 		// One print-mode run against the mock.
-		const p = await run(cmd, [...args, "-p", "写一句话"], { ...env, JW_URL: mock.url, JW_KEY: SECRET, JW_MODEL: "smoke-model" });
+		const p = await run(cmd, [...args, "-p", "写一份报告"], { ...env, JW_URL: mock.url, JW_KEY: SECRET, JW_MODEL: "smoke-model" });
 		rows.push(["print reply", p.code === 0 && p.stdout.includes(REPLY), p.code === 0 ? "" : p.stderr.trim().slice(-300)]);
 		const body = mock.requests.at(-1) ?? {};
 		const names = (body.tools ?? []).map((t) => t.function?.name ?? t.name);
-		rows.push(["writing tools", TOOLS.every((t) => names.includes(t)), names.join(",")]);
+		rows.push(["general tools", TOOLS.every((t) => names.includes(t)), names.join(",")]);
+			// The request names a document, so the writing toolkit is open (P25, 2026-11-15).
+			rows.push(["writing toolkit", WRITING_TOOLS.every((t) => names.includes(t)), names.join(",")]);
 		const system = JSON.stringify(body.messages?.[0] ?? "");
-		rows.push(["writing prompt", system.includes("general-purpose agent"), ""]);
-		rows.push(["built-in skills", system.includes("deep-research") && system.includes("gongwen-writing"), ""]);
+		rows.push(["writing prompt", system.includes("general-purpose agent") && !system.includes("gongwen-writing"), ""]);
+			const messages = JSON.stringify(body.messages ?? []);
+		rows.push(["built-in skills", messages.includes("Toolkit writing is open") && messages.includes("gongwen-writing"), ""]);
 		rows.push(["key hidden", !p.stdout.includes(SECRET) && !p.stderr.includes(SECRET) && !anyFileContains(home, SECRET), ""]);
 		// Import a PDF and export a .docx through tool calls (pdf.js, docx and fflate inside the build).
 		const work = join(home, "work");
@@ -276,7 +281,7 @@ export async function smoke(command, args) {
 			{ text: REPLY },
 		]);
 		try {
-			const t = await run(cmd, [...args, "-p", "导入并导出"], { ...env, JW_URL: tools.url, JW_KEY: SECRET, JW_MODEL: "smoke-model" }, 120_000, work);
+			const t = await run(cmd, [...args, "-p", "写一份报告：导入并导出"], { ...env, JW_URL: tools.url, JW_KEY: SECRET, JW_MODEL: "smoke-model" }, 120_000, work);
 			const parsed = join(work, "参考资料", ".parsed", "a.pdf.md");
 			rows.push(["import pdf", t.code === 0 && existsSync(parsed) && readFileSync(parsed, "utf-8").includes("Smoke reference text"), t.code === 0 ? "" : t.stderr.trim().slice(-300)]);
 			const docx = join(work, "d.docx");
