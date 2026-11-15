@@ -97,6 +97,8 @@ export const zh = {
 	"schedule.badWhen":
 		"看不懂时间“{when}”。可以写：每天 08:00、工作日 08:30、每周一 09:00、每月1日 09:00，或 cron 的五段（0 8 * * 1-5）。",
 	"schedule.noTask": "缺少 task：要做的事，写成用户会输入的完整请求。",
+	"schedule.missing":
+		"add 需要 {field} 参数（收到的参数：{got}）。when 写规则，如 每天 08:00；task 写要做的事，一条完整的请求。",
 	"schedule.added": "已添加定时任务 {id}：{when}，下次 {next}，在 {folder} 运行。",
 	"schedule.cronHint": "程序开着时到点自动运行；关着时请把这一行加进系统的 crontab（crontab -e）：\n{line}",
 	"schedule.none": "没有定时任务。",
@@ -323,6 +325,8 @@ export const zh = {
 	"topic.itemProblem": "第{n}条：{problem}",
 	"draft.noOutline": "{path} 旁边没有 大纲.md：先用 write 写大纲，再逐节调用 draft_section",
 	"draft.noSection": "大纲里没有“{section}”这一节：section 写大纲清单行里的文字",
+	"draft.noClosing": "文档不设结语：“{section}”这一节不写。把大纲里这一行删掉，全文到最后一个实质章节为止。",
+	"style.closingSection": "文档不设结语：删去“{heading}”这一节，正文到最后一个实质章节为止。",
 	"draft.written": "已写入“{heading}”，本节 {chars} 字，{path} 正文共 {total} 字；大纲里这一节已标记。",
 	"draft.failed": "这一节没有写成：{reason}",
 	"draft.noModel": "当前没有可用的模型，写不了这一节",

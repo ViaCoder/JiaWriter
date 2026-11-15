@@ -111,6 +111,8 @@ export const en: Record<MessageKey, string> = {
 	"schedule.badWhen":
 		"The time “{when}” is not understood. Write 每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields (0 8 * * 1-5).",
 	"schedule.noTask": "task is missing: the request, complete, as the user would type it.",
+	"schedule.missing":
+		"add needs the {field} parameter (received: {got}). when is the rule, such as 每天 08:00; task is the request to run, complete in itself.",
 	"schedule.added": "Scheduled task {id} added: {when}, next {next}, in {folder}.",
 	"schedule.cronHint":
 		"It runs on time while the program is open; for when it is closed, add this line to the system's crontab (crontab -e):\n{line}",
@@ -354,6 +356,10 @@ export const en: Record<MessageKey, string> = {
 	"draft.noOutline":
 		"no 大纲.md beside {path}: write the outline with write, then call draft_section for each section",
 	"draft.noSection": "the outline has no section “{section}”: give the words of its checklist line",
+	"draft.noClosing":
+		"A document has no closing section: “{section}” is not written. Remove that line from the outline; the document ends with its last substantive section.",
+	"style.closingSection":
+		"A document has no closing section: remove “{heading}”; the text ends with its last substantive section.",
 	"draft.written": "Wrote “{heading}”: {chars} characters; {path} now holds {total}; the outline line is ticked.",
 	"draft.failed": "The section was not written: {reason}",
 	"draft.noModel": "No model is available to write the section",

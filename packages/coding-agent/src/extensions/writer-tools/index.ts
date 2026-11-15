@@ -28,6 +28,7 @@ import { parsedFiles } from "../../writer/docs/import.ts";
 import {
 	cleanSectionText,
 	headingOf,
+	isClosingLine,
 	markOutline,
 	openTextLines,
 	outlinePart,
@@ -639,6 +640,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			const outline = readFileSync(outlineFile, "utf-8");
 			const part = outlinePart(outline, params.section);
 			if (!part) return fail(t("draft.noSection", { section: params.section }));
+			// A document ends with its last substantive section (the user, 2026-11-15).
+			if (isClosingLine(part.line)) return fail(t("draft.noClosing", { section: part.line }));
 			const ask = modelAsker(
 				ctx,
 				complete,

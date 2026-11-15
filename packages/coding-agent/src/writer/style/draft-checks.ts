@@ -4,6 +4,8 @@
  * check, so a new check is one entry here, not another block of string building.
  */
 
+// Closing parts, which a document does not have.
+import { isClosingLine } from "../draft/section.ts";
 // Output messages.
 import { t } from "../i18n/index.ts";
 // The body of a draft, without its reference list.
@@ -131,6 +133,19 @@ export const DRAFT_CHECKS: readonly DraftCheck[] = [
 		run: (text) => {
 			const found = listMarkers(text);
 			return found.length === 0 ? NONE : { fail: [t("style.listMarkers", { markers: found.join("、") })], note: [] };
+		},
+	},
+	{
+		// The user, 2026-11-15: "结语 is no need".
+		id: "closing-section",
+		when: DOCUMENTS,
+		run: (text) => {
+			const heading = bodyBeforeReferences(text)
+				.split("\n")
+				.find((line) => /^#{2,3}\s/.test(line) && isClosingLine(line));
+			return heading
+				? { fail: [t("style.closingSection", { heading: heading.replace(/^#+\s*/, "") })], note: [] }
+				: NONE;
 		},
 	},
 	{

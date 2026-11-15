@@ -32,6 +32,7 @@ describe("runDraftChecks", () => {
 			"citation",
 			"headings",
 			"list-markers",
+			"closing-section",
 			"placeholders",
 			"ascii-quotes",
 			"repeated",
@@ -46,6 +47,12 @@ describe("runDraftChecks", () => {
 		const text = "## 1、问题\n\n一是人手不足。二是经费短缺。";
 		expect(runDraftChecks(text, "general").fail).toEqual([]);
 		expect(runDraftChecks(text, "report").fail.length).toBe(2);
+		// A closing section is flagged in a document (the user, 2026-11-15: "结语 is no need"); a document that ends
+		// with its last substantive section is not.
+		const closed = "# 报告\n\n## 一、现状\n\n正文。\n\n## 三、结语\n\n总之。";
+		expect(runDraftChecks(closed, "report").fail.some((l) => l.includes("结语"))).toBe(true);
+		expect(runDraftChecks(closed, "general").fail).toEqual([]);
+		expect(runDraftChecks("# 报告\n\n## 一、现状\n\n正文。", "report").fail).toEqual([]);
 	});
 });
 
