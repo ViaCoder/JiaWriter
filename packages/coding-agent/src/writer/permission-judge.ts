@@ -15,7 +15,7 @@ import type { PermissionRequest } from "./permission.ts";
 /** What the judge answers. */
 export type Verdict = "allow" | "ask";
 /** A judge: the action and the user's latest words in, a verdict out. */
-export type Judge = (request: PermissionRequest, lastRequest: string) => Promise<Verdict>;
+export type Judge = (request: PermissionRequest, lastRequest: string, created?: readonly string[]) => Promise<Verdict>;
 
 /** Reasoning tokens the judge may use: a one-word answer. */
 export const JUDGE_REASONING_TOKENS = 512;
@@ -33,16 +33,24 @@ export const JUDGE_INSTRUCTIONS = `You are the permission judge of a writing ass
 
 Answer ALLOW only when both hold:
 - The action is plainly a step of carrying out the latest request (or of the work the request continues), not something the user did not ask for.
-- It cannot lose the user's work: it creates or changes the assistant's own output files (drafts, exports, notes, generated files), or runs a command whose effects stay inside the folder and are easy to undo.
+- It cannot lose the user's work: it creates or changes the assistant's own output files (drafts, exports, notes, generated files), changes a file of the user's in exactly the way the request asks, runs a script the assistant itself wrote for the request, or runs a command whose effects stay inside the folder and are easy to undo.
 
-Answer ASK when the action deletes, overwrites or moves files the user made, changes files unrelated to the request, installs software, changes system or account settings, sends anything out of the machine, or when you are unsure.
+Answer ASK when the action deletes, overwrites or moves files the user made beyond what the request asks, changes files unrelated to the request, installs software, changes system or account settings, sends anything out of the machine, or when you are unsure.
 
 Reply with one word: ALLOW or ASK.`;
 
 /** The text put to the judge. */
-export function judgeText(request: PermissionRequest, lastRequest: string, cwd: string): string {
+export function judgeText(
+	request: PermissionRequest,
+	lastRequest: string,
+	cwd: string,
+	created: readonly string[] = [],
+): string {
 	const kind = request.scope.startsWith("shell") ? "Shell command" : "File to write or edit";
-	return `Working folder: ${cwd}\n\nUser's latest request:\n${lastRequest.trim() || "(none recorded)"}\n\n${kind}:\n${request.detail}`;
+	// The files the assistant made this session, so a script it wrote is known as its own.
+	const made =
+		created.length > 0 ? `\n\nFiles the assistant created or changed in this session:\n${created.join("\n")}` : "";
+	return `Working folder: ${cwd}\n\nUser's latest request:\n${lastRequest.trim() || "(none recorded)"}${made}\n\n${kind}:\n${request.detail}`;
 }
 
 /** The verdict in a reply: ALLOW as its first word, else ask. */
@@ -67,9 +75,9 @@ export function lastUserText(branch: readonly SessionEntry[]): string {
 
 /** A judge over one way of asking the model (modelAsker); failures and timeouts mean ask. */
 export function makeJudge(ask: (instructions: string, text: string) => Promise<string>, cwd: string): Judge {
-	return async (request, lastRequest) => {
+	return async (request, lastRequest, created) => {
 		try {
-			return parseVerdict(await ask(JUDGE_INSTRUCTIONS, judgeText(request, lastRequest, cwd)));
+			return parseVerdict(await ask(JUDGE_INSTRUCTIONS, judgeText(request, lastRequest, cwd, created)));
 		} catch {
 			return "ask";
 		}

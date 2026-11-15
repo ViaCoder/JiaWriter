@@ -21,6 +21,9 @@ describe("the judge's text and verdicts", () => {
 		expect(text).toContain("写一份通知到 稿件/通知.md");
 		expect(text).toContain("File to write or edit:\n/w/稿件/通知.md");
 		expect(judgeText({ ...write, scope: "shell\n/w", detail: "ls" }, "", "/w")).toContain("Shell command:\nls");
+		expect(judgeText(write, "转成 json", "/w", ["/w/tojson.py"])).toContain(
+			"created or changed in this session:\n/w/tojson.py",
+		);
 		expect(JUDGE_INSTRUCTIONS).toContain("ALLOW or ASK");
 	});
 	it("reads ALLOW as its first word and anything else as ask", () => {

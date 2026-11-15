@@ -41,6 +41,8 @@ function noUser(what: string): string {
 export default function writerPermissionExtension(pi: ExtensionAPI, complete: Complete = completeSimple): void {
 	// Answers of this session, per risk and scope.
 	const gate = createPermissionGate();
+	// Files the assistant created or changed this session (write, edit, draft_section that went through).
+	const created: string[] = [];
 	pi.on("tool_call", async (event, ctx) => {
 		const titles = {
 			command: t("permission.askCommand"),
@@ -59,9 +61,12 @@ export default function writerPermissionExtension(pi: ExtensionAPI, complete: Co
 			? modelAsker(ctx, complete, { reasoningTokens: JUDGE_REASONING_TOKENS, timeoutMs: JUDGE_TIMEOUT_MS }, true)
 			: undefined;
 		const judge = ask
-			? { judge: makeJudge(ask, ctx.cwd), lastRequest: lastUserText(ctx.sessionManager.getBranch()) }
+			? { judge: makeJudge(ask, ctx.cwd), lastRequest: lastUserText(ctx.sessionManager.getBranch()), created }
 			: undefined;
 		const refusal = await gate.check(ctx, request, judge);
+		// A file change that goes through is remembered as the assistant's own.
+		if (refusal === "" && !request.scope.startsWith("shell") && !created.includes(request.detail))
+			created.push(request.detail);
 		if (refusal === "declined") {
 			// The user's own words on what to do instead go with the refusal, as Claude Code passes them on.
 			const note = gate.lastNote();
@@ -74,5 +79,8 @@ export default function writerPermissionExtension(pi: ExtensionAPI, complete: Co
 		return undefined;
 	});
 	// A new session starts with no answers.
-	pi.on("session_start", () => gate.reset());
+	pi.on("session_start", () => {
+		gate.reset();
+		created.length = 0;
+	});
 }

@@ -164,7 +164,9 @@ export function isSecretField(role: string, inputType: string, name = ""): boole
 /** What auto mode's judge needs with a check: the user's latest words and the judge itself (permission-judge.ts). */
 export interface JudgeInput {
 	lastRequest: string;
-	judge: (request: PermissionRequest, lastRequest: string) => Promise<"allow" | "ask">;
+	// Files the assistant created or changed this session, so the judge knows a script of its own.
+	created?: readonly string[];
+	judge: (request: PermissionRequest, lastRequest: string, created?: readonly string[]) => Promise<"allow" | "ask">;
 }
 
 /** The gate of one session. */
@@ -195,7 +197,7 @@ export function createPermissionGate(env: NodeJS.ProcessEnv = process.env): Perm
 			// Auto mode: the model judges an ordinary action against the user's words before anyone is asked
 			// (the user, 2026-11-15: "similar claude code which decide by model"). High risk never reaches the judge.
 			if (mode === "auto" && request.risk === "act" && judge) {
-				if ((await judge.judge(request, judge.lastRequest)) === "allow") {
+				if ((await judge.judge(request, judge.lastRequest, judge.created)) === "allow") {
 					allowed.add(key);
 					return "";
 				}
