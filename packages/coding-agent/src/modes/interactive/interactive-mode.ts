@@ -143,7 +143,7 @@ import { brandText } from "../../writer/brand.ts";
 import { jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
 // The work mode Shift+Tab cycles.
 import { applyWorkMode, nextWorkMode, workMode } from "../../writer/permission.ts";
-import { abortedText, compactionErrorText, MAC_OPTION_NOTE, uiText } from "../../writer/ui-text.ts";
+import { abortedText, compactionErrorText, MAC_OPTION_NOTE, uiText, workingText } from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
 import { AssistantMessageComponent, setDetailedView } from "./components/assistant-message.ts";
@@ -192,6 +192,8 @@ import { TreeSelectorComponent } from "./components/tree-selector.ts";
 import { TrustSelectorComponent } from "./components/trust-selector.ts";
 import { UserMessageComponent } from "./components/user-message.ts";
 import { UserMessageSelectorComponent } from "./components/user-message-selector.ts";
+// JiaWriter: the welcome box of a release package.
+import { WelcomeBox } from "./components/welcome-box.ts";
 import { editInExternalEditor } from "./external-editor.ts";
 import { refreshModelCatalogs } from "./model-catalog-refresh.ts";
 import { getModelSearchText } from "./model-search.ts";
@@ -1104,6 +1106,14 @@ export class InteractiveMode {
 					"dim",
 					uiText("Pi can explain its own features and look up its docs. Ask it how to use or extend Pi."),
 				);
+			// JiaWriter: the commands a new user needs, for the welcome box.
+			const welcomeHints = () =>
+				[
+					`${theme.fg("accent", "/write")} ${uiText("write a document")}`,
+					`${theme.fg("accent", "/research")} ${uiText("look into a question")}`,
+					`${theme.fg("accent", "/")} ${uiText("all commands")}`,
+					`${theme.fg("accent", "?")} ${uiText("shortcuts")}`,
+				].join(theme.fg("dim", "  ·  "));
 			// JiaWriter: the model and the folder, as Claude Code's welcome box shows them (2026-11-14: the screen showed
 			// neither until the first reply's footer).
 			const context = () =>
@@ -1114,19 +1124,43 @@ export class InteractiveMode {
 						cwd: formatCwdForFooter(process.cwd(), os.homedir()),
 					}),
 				);
-			const header = new BuiltInHeader(
-				() => `${withLogo(compactInstructions())}\n${context()}\n${compactOnboarding()}\n\n${onboarding()}`,
-				() => `${withLogo(expandedInstructions())}\n${context()}\n\n${onboarding()}`,
-				this.getStartupExpansionState(),
-				1,
-				0,
-			);
+			// JiaWriter (2026-11-15): a release package opens with a welcome box (name, model, folder, the first commands)
+			// instead of the pixel logo; the key hints stay below it, expanded with Ctrl+O. The source tree keeps pi's.
+			const header = jia
+				? new BuiltInHeader(
+						() => `${compactInstructions()}\n${compactOnboarding()}`,
+						() => `${expandedInstructions()}\n\n${onboarding()}`,
+						this.getStartupExpansionState(),
+						1,
+						0,
+					)
+				: new BuiltInHeader(
+						() => `${withLogo(compactInstructions())}\n${context()}\n${compactOnboarding()}\n\n${onboarding()}`,
+						() => `${withLogo(expandedInstructions())}\n${context()}\n\n${onboarding()}`,
+						this.getStartupExpansionState(),
+						1,
+						0,
+					);
 			// JiaWriter: the easter egg animates the pi logo, so the "Jia" logo has none.
 			if (showLogo && !jia) header.onLogoClick = (column, row) => playPiLogo3d(this.renderer, column, row);
 			this.builtInHeader = header;
 
 			// Setup UI layout
 			this.headerContainer.addChild(new Spacer(1));
+			if (jia) {
+				this.headerContainer.addChild(
+					new WelcomeBox(() => ({
+						title: jiaWordmark() + theme.bold(" Writer"),
+						subtitle: `v${this.version}`,
+						rows: [
+							{ label: uiText("Model"), value: this.session.model?.id ?? "-" },
+							{ label: uiText("Folder"), value: formatCwdForFooter(process.cwd(), os.homedir()) },
+						],
+						hints: welcomeHints(),
+					})),
+				);
+				this.headerContainer.addChild(new Spacer(1));
+			}
 			this.headerContainer.addChild(this.builtInHeader);
 			this.headerContainer.addChild(new Spacer(1));
 		} else {
@@ -3678,6 +3712,9 @@ export class InteractiveMode {
 					this.pendingTools.set(event.toolCallId, component);
 				}
 				component.markExecutionStarted();
+				// JiaWriter: the working line names the tool and its target while it runs; an extension's own message wins.
+				if (!this.workingMessage && this.activeStatusIndicator?.kind === "working")
+					this.activeStatusIndicator.setMessage(workingText(event.toolName, event.args));
 				this.ui.requestRender();
 				break;
 			}
@@ -3699,6 +3736,9 @@ export class InteractiveMode {
 					this.pendingTools.delete(event.toolCallId);
 					this.ui.requestRender();
 				}
+				// JiaWriter: back to the plain working line once no tool runs.
+				if (this.pendingTools.size === 0 && !this.workingMessage && this.activeStatusIndicator?.kind === "working")
+					this.activeStatusIndicator.setMessage(uiText(this.defaultWorkingMessage));
 				break;
 			}
 

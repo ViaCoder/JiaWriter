@@ -29,6 +29,12 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"[skill]": "[技能]",
 	"To resume this session:": "继续这次会话：",
 	// The working line and a tool row's timing (2026-11-14: the screen showed "Working · 5 秒" and "Took 0.0s").
+	// The welcome box (2026-11-15).
+	Model: "模型",
+	Folder: "文件夹",
+	"write a document": "写文档",
+	"look into a question": "研究一个问题",
+	"all commands": "全部命令",
 	Working: "处理中",
 	"Working ({key} to interrupt)": "处理中（{key} 中断）",
 	"Took {time}": "用时 {time}",
@@ -265,6 +271,68 @@ export const TOOL_LABELS_ZH: Readonly<Record<string, string>> = {
 	browser: "浏览器",
 	computer: "桌面操作",
 };
+
+/** What the working line says while a tool runs, by tool: a verb and, where it helps, the target. */
+const WORKING_ZH: Readonly<Record<string, string>> = {
+	read: "正在读取",
+	write: "正在写入",
+	edit: "正在修改",
+	bash: "正在运行命令",
+	powershell: "正在运行命令",
+	grep: "正在查找内容",
+	find: "正在查找文件",
+	ls: "正在列出文件",
+	search_web: "正在检索",
+	fetch_web: "正在打开网页",
+	material_add: "正在记录素材",
+	draft_section: "正在撰写章节",
+	word_count: "正在统计字数",
+	readability_check: "正在检查可读性",
+	style_check: "正在检查文风",
+	export_document: "正在导出文档",
+	import_document: "正在导入资料",
+	topic_open: "正在打开专题",
+	draft_restore: "正在恢复稿件",
+	todo_write: "正在更新任务清单",
+	ask_user: "等待你的回答",
+	browser: "正在操作浏览器",
+	computer: "正在操作桌面",
+	delegate: "子任务进行中",
+	schedule_task: "正在处理定时任务",
+	toolkit: "正在打开工具包",
+};
+const WORKING_EN: Readonly<Record<string, string>> = {
+	read: "Reading",
+	write: "Writing",
+	edit: "Editing",
+	bash: "Running a command",
+	powershell: "Running a command",
+	grep: "Searching text",
+	find: "Finding files",
+	ls: "Listing files",
+	search_web: "Searching the web",
+	fetch_web: "Opening a page",
+	material_add: "Recording materials",
+	draft_section: "Writing a section",
+	ask_user: "Waiting for your answer",
+	browser: "Acting in the browser",
+	computer: "Acting on the desktop",
+	delegate: "Subtask running",
+	toolkit: "Opening a toolkit",
+};
+
+/** The working line for a running tool: the verb, then the file or command it works on, cut short. */
+export function workingText(toolName: string, args: unknown): string {
+	const zh = currentLang() === "zh";
+	const verb = (zh ? WORKING_ZH[toolName] : WORKING_EN[toolName]) ?? (zh ? `正在${toolLabel(toolName)}` : toolName);
+	const a = (args ?? {}) as { path?: unknown; command?: unknown; query?: unknown; url?: unknown; name?: unknown };
+	const target = [a.path, a.command, a.query, a.url, a.name].find((v) => typeof v === "string" && v.trim()) as
+		| string
+		| undefined;
+	if (!target) return verb;
+	const short = target.replace(/\s+/g, " ").trim();
+	return `${verb} ${short.length > 40 ? `${short.slice(0, 40)}…` : short}`;
+}
 
 /** The name a tool is shown with. */
 export function toolLabel(name: string): string {

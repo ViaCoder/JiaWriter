@@ -4,6 +4,8 @@ import type { MarkdownTransformer } from "../../../core/extensions/types.ts";
 import { uiText } from "../../../writer/ui-text.ts";
 import { getMarkdownTheme, theme } from "../theme/theme.ts";
 import { createMarkdownTransform } from "./markdown-transform.ts";
+// JiaWriter: a reply behind its mark.
+import { Prefixed } from "./prefixed.ts";
 
 /**
  * JiaWriter: the detailed view (Ctrl+O), shared by every reply on screen: the thinking is shown, and each reply
@@ -130,10 +132,17 @@ export class AssistantMessageComponent extends Container {
 			if (content.type === "text" && content.text.trim()) {
 				// Assistant text messages with no background - trim the text
 				// Set paddingY=0 to avoid extra spacing before tool executions
+				// JiaWriter: each reply behind its mark, as Claude Code draws a reply (2026-11-15).
 				this.contentContainer.addChild(
-					new Markdown(content.text.trim(), this.outputPad, 0, this.markdownTheme, undefined, {
-						transform: createMarkdownTransform("assistant", this.isStreaming, this.markdownTransformers),
-					}),
+					new Prefixed(
+						new Markdown(content.text.trim(), 0, 0, this.markdownTheme, undefined, {
+							transform: createMarkdownTransform("assistant", this.isStreaming, this.markdownTransformers),
+						}),
+						{
+							marker: () => `${" ".repeat(this.outputPad)}${theme.fg("accent", "● ")}`,
+							indent: this.outputPad + 2,
+						},
+					),
 				);
 			} else if (content.type === "thinking") {
 				const thinkingBlocks: string[] = [];

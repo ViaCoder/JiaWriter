@@ -7,8 +7,12 @@ import type { ReadonlyFooterDataProvider } from "../../../core/footer-data-provi
 import { addUsageToTotals, createUsageTotals, type UsageTotals } from "../../../core/usage-totals.ts";
 // Commands running in the background.
 import { runningTasks } from "../../../writer/background.ts";
+// Output messages.
+import { t } from "../../../writer/i18n/index.ts";
 // The work mode the status line names.
 import { workMode } from "../../../writer/permission.ts";
+// The toolkits open in this session.
+import { openToolkits } from "../../../writer/toolkit/toolkits.ts";
 import { uiText } from "../../../writer/ui-text.ts";
 import { theme } from "../theme/theme.ts";
 import { keyText } from "./keybinding-hints.ts";
@@ -198,6 +202,14 @@ export class FooterComponent implements Component {
 		// Manual stays plain; the others stand out, as Claude Code colours its mode line.
 		const modeColor = ({ auto: "success", bypass: "error", plan: "accent" } as const)[current as "auto"];
 		statsParts.push(modeColor ? theme.fg(modeColor, modeText) : modeText);
+		// The toolkits open in this session (writer/toolkit), so the user sees what the model can reach.
+		const kits = openToolkits(this.session.getActiveToolNames());
+		if (kits.length > 0)
+			statsParts.push(
+				t("toolkit.footer", {
+					names: kits.map((id) => t(`toolkit.name.${id}` as "toolkit.name.writing")).join("、"),
+				}),
+			);
 		// Commands running in the background (Ctrl+B, /tasks).
 		const background = runningTasks().length;
 		if (background > 0)

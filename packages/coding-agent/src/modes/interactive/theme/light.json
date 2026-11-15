@@ -13,7 +13,7 @@
 		"blueBg": "okhsl(235 19% 91%)"
 	},
 	"colors": {
-		"accent": "violet",
+		"accent": "blue",
 		"border": "okhsl(231 67% 55%)",
 		"borderAccent": "okhsl(295 59% 55%)",
 		"borderMuted": "okhsl(235 7% 66%)",
@@ -33,7 +33,7 @@
 		"userMessageText": "text",
 		"customMessageBg": "okhsl(295 25% 91%)",
 		"customMessageText": "muted",
-		"customMessageLabel": "violet",
+		"customMessageLabel": "blue",
 		"toolPendingBg": "okhsl(248 3% 91%)",
 		"toolSuccessBg": "okhsl(156 21% 91%)",
 		"toolErrorBg": "okhsl(24 23% 91%)",
@@ -48,7 +48,7 @@
 		"mdQuote": "muted",
 		"mdQuoteBorder": "muted",
 		"mdHr": "muted",
-		"mdListBullet": "violet",
+		"mdListBullet": "blue",
 		"toolDiffAdded": "green",
 		"toolDiffRemoved": "red",
 		"toolDiffContext": "muted",

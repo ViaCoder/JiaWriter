@@ -21,6 +21,22 @@ import { formatToolCallWithArgs, getTextOutput as getRenderedTextOutput } from "
 import { ensurePngTranscoder } from "../../../utils/image-convert.ts";
 import { theme } from "../theme/theme.ts";
 import { keyHint } from "./keybinding-hints.ts";
+// JiaWriter: the call behind its state mark, the result behind ⎿ (2026-11-15, after Claude Code's layout).
+import { Prefixed } from "./prefixed.ts";
+
+/** The mark before a tool call: running, done, or failed. */
+export function callMark(state: "running" | "done" | "error"): string {
+	return state === "error"
+		? theme.fg("error", "● ")
+		: state === "done"
+			? theme.fg("success", "● ")
+			: theme.fg("accent", "● ");
+}
+
+/** The mark before a tool's result. */
+export function resultMark(): string {
+	return theme.fg("dim", "  ⎿ ");
+}
 
 const FALLBACK_PREVIEW_LINES = 10;
 
@@ -276,6 +292,8 @@ export class ToolExecutionComponent extends Container {
 
 		let hasContent = false;
 		this.hideComponent = false;
+		// JiaWriter: the state the mark before the call shows.
+		const state = () => (this.result && !this.isPartial ? (this.result.isError ? "error" : "done") : "running");
 		if (this.hasRendererDefinition()) {
 			const renderContainer = this.getRenderShell() === "self" ? this.selfRenderContainer : this.contentBox;
 			if (renderContainer instanceof Box) {
@@ -286,19 +304,22 @@ export class ToolExecutionComponent extends Container {
 			}
 			renderContainer.clear();
 
+			// JiaWriter: the call behind its state mark, the result behind ⎿, indented under the call.
+			const marked = (component: Component) => new Prefixed(component, { marker: () => callMark(state()) });
+			const under = (component: Component) => new Prefixed(component, { marker: resultMark });
 			const callRenderer = this.getCallRenderer();
 			if (!callRenderer) {
-				renderContainer.addChild(this.createResultRegion(this.createCallFallback()));
+				renderContainer.addChild(this.createResultRegion(marked(this.createCallFallback())));
 				hasContent = true;
 			} else {
 				try {
 					const component = callRenderer(this.args, theme, this.getRenderContext(this.callRendererComponent));
 					this.callRendererComponent = component;
-					renderContainer.addChild(this.createResultRegion(component));
+					renderContainer.addChild(this.createResultRegion(marked(component)));
 					hasContent = true;
 				} catch {
 					this.callRendererComponent = undefined;
-					renderContainer.addChild(this.createResultRegion(this.createCallFallback()));
+					renderContainer.addChild(this.createResultRegion(marked(this.createCallFallback())));
 					hasContent = true;
 				}
 			}
@@ -308,7 +329,7 @@ export class ToolExecutionComponent extends Container {
 				if (!resultRenderer) {
 					const component = this.createResultFallback();
 					if (component) {
-						renderContainer.addChild(this.createResultRegion(component));
+						renderContainer.addChild(this.createResultRegion(under(component)));
 						hasContent = true;
 					}
 				} else {
@@ -320,13 +341,13 @@ export class ToolExecutionComponent extends Container {
 							this.getRenderContext(this.resultRendererComponent),
 						);
 						this.resultRendererComponent = component;
-						renderContainer.addChild(this.createResultRegion(component));
+						renderContainer.addChild(this.createResultRegion(under(component)));
 						hasContent = true;
 					} catch {
 						this.resultRendererComponent = undefined;
 						const component = this.createResultFallback();
 						if (component) {
-							renderContainer.addChild(this.createResultRegion(component));
+							renderContainer.addChild(this.createResultRegion(under(component)));
 							hasContent = true;
 						}
 					}
@@ -335,7 +356,8 @@ export class ToolExecutionComponent extends Container {
 		} else {
 			this.contentText.setCustomBgFn(bgFn);
 			this.contentText.setPaddingX(this.outputPad);
-			this.contentText.setText(this.formatToolExecution());
+			// JiaWriter: the generic row carries its mark in the text itself.
+			this.contentText.setText(`${callMark(state())}${this.formatToolExecution()}`);
 			hasContent = true;
 		}
 
