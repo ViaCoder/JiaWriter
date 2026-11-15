@@ -38,6 +38,25 @@ import { openToolkit } from "../../writer/toolkit/open.ts";
 /** How often the open program looks for due jobs. */
 export const CHECK_EVERY_MS = 60_000;
 
+/** Other names a model gives the fields (2026-11-15, eval G10: GLM sent add calls three times without when or task). */
+const WHEN_ALIASES = ["when", "time", "schedule", "cron", "at", "rule", "frequency", "interval", "every"];
+const TASK_ALIASES = ["task", "prompt", "request", "content", "command", "job", "description", "what"];
+
+/** The arguments with the fields under their own names, whatever the model called them. */
+export function prepareScheduleArguments(args: unknown): Record<string, unknown> {
+	const given = (args && typeof args === "object" ? { ...(args as Record<string, unknown>) } : {}) as Record<
+		string,
+		unknown
+	>;
+	const pick = (names: readonly string[]) =>
+		names.map((n) => given[n]).find((v) => typeof v === "string" && v.trim() !== "") as string | undefined;
+	const when = pick(WHEN_ALIASES);
+	const task = pick(TASK_ALIASES);
+	if (when !== undefined) given.when = when;
+	if (task !== undefined) given.task = task;
+	return given;
+}
+
 /** The cron line that runs due jobs when the program is closed. */
 export function cronLine(): string {
 	return `*/5 * * * * ${brandText("jiawriter")} schedule run >> ~/.jiawriter/schedule.log 2>&1`;
@@ -64,11 +83,19 @@ export default function writerScheduleExtension(pi: ExtensionAPI, agentDir = get
 			" - folder: where it runs (default the working folder)",
 		parameters: Type.Object({
 			action: StringEnum(["add", "list", "remove"] as const),
-			when: Type.Optional(Type.String()),
-			task: Type.Optional(Type.String()),
+			when: Type.Optional(Type.String({ description: "add: the rule, 每天 08:00 or five cron fields" })),
+			task: Type.Optional(Type.String({ description: "add: the request to run, complete in itself" })),
 			folder: Type.Optional(Type.String()),
-			id: Type.Optional(Type.String()),
+			id: Type.Optional(Type.String({ description: "remove: the task's id" })),
 		}),
+		prepareArguments: (args) =>
+			prepareScheduleArguments(args) as {
+				action: "add" | "list" | "remove";
+				when?: string;
+				task?: string;
+				folder?: string;
+				id?: string;
+			},
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const fail = (text: string) => ({ content: [{ type: "text" as const, text }], details: {}, isError: true });
@@ -87,10 +114,13 @@ export default function writerScheduleExtension(pi: ExtensionAPI, agentDir = get
 					details: { id: gone.id },
 				};
 			}
-			const rule = parseWhen(params.when ?? "");
-			if (!rule) return fail(t("schedule.badWhen", { when: params.when ?? "" }));
+			// A missing rule is named apart from one that cannot be read, with the fields that did arrive.
+			if (!params.when?.trim())
+				return fail(t("schedule.missing", { field: "when", got: Object.keys(params).join(", ") }));
+			const rule = parseWhen(params.when);
+			if (!rule) return fail(t("schedule.badWhen", { when: params.when }));
 			const task = (params.task ?? "").trim();
-			if (!task) return fail(t("schedule.noTask"));
+			if (!task) return fail(t("schedule.missing", { field: "task", got: Object.keys(params).join(", ") }));
 			const job: Job = {
 				id: newJobId(jobs),
 				when: params.when?.trim() ?? "",

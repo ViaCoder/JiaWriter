@@ -48,6 +48,9 @@ describe("replyMarks / marksList", () => {
 		const dressed = "**国家层面**\n\n## 要点\n- 第一条\n1. 民航法修订，2026年7月1日施行。";
 		expect(replyMarks(dressed).map((m) => m.id)).toEqual(["md-bold", "md-heading", "md-list"]);
 		expect(replyMarks("1. 民航法修订。\n2. 低空保险意见。")).toEqual([]);
+		// An account of checks passed is a mark too.
+		expect(replyMarks("写好了，AI 腔和篇幅检查均通过。").map((m) => m.id)).toEqual(["checks-passed"]);
+		expect(replyMarks("写好了，在 稿件/通知.md，255 字。")).toEqual([]);
 		expect(marksList(replyMarks(dressed), dressed)).toContain("“**国家层面**”（第 1 行）");
 	});
 });

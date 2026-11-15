@@ -18,6 +18,13 @@ export const REPLY_FORMAT_MARKS: readonly StylePattern[] = [
 	{ id: "md-bold", re: /\*\*[^*\n]{1,60}\*\*/g, zh: "加粗", en: "bold" },
 	{ id: "md-heading", re: /^#{1,6}\s+\S[^\n]*/gm, zh: "标题", en: "heading" },
 	{ id: "md-list", re: /^[ \t]*[-*•]\s+\S[^\n]*/gm, zh: "列表", en: "bullet list" },
+	// An account of the checks passed (2026-11-15: "AI 腔和篇幅检查均通过" in a reply, against the tone rule).
+	{
+		id: "checks-passed",
+		re: /(?:检查|校验|核对)[^。\n]{0,8}?(?:均|都|已)?通过/g,
+		zh: "汇报检查通过",
+		en: "checks passed",
+	},
 ];
 
 /** Most asks to restate a reply after one message of the user: one, so a reply that cannot be cleaned does not loop. */

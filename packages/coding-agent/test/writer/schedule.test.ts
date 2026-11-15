@@ -12,7 +12,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Extension API types.
 import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../src/core/extensions/types.ts";
 // The extension.
-import writerScheduleExtension, { cronLine } from "../../src/extensions/writer-schedule/index.ts";
+import writerScheduleExtension, {
+	cronLine,
+	prepareScheduleArguments,
+} from "../../src/extensions/writer-schedule/index.ts";
 // Functions under test.
 import { jobLines, runDue, runScheduleCommand, SCHEDULE_ENV } from "../../src/writer/schedule/run.ts";
 import {
@@ -224,11 +227,33 @@ describe("schedule_task tool", () => {
 		expect(loadJobs(agentDir)).toHaveLength(1);
 		expect((await run({ action: "remove", id: "zzz" })).isError).toBe(true);
 		expect((await run({ action: "add", when: "明天", task: "x" })).content[0].text).toContain("看不懂时间");
-		expect((await run({ action: "add", when: "每天 08:00", task: " " })).content[0].text).toContain("缺少 task");
+		expect((await run({ action: "add", when: "每天 08:00", task: " " })).content[0].text).toContain(
+			"add 需要 task 参数",
+		);
 		// The command lists through the interface.
 		const shown: string[] = [];
 		await commands.get("schedule")?.handler("", { ui: { notify: (text: string) => shown.push(text) } });
 		expect(shown[0]).toContain("周报");
 		expect(existsSync(join(agentDir, "schedules.json"))).toBe(true);
+	});
+});
+
+describe("prepareScheduleArguments", () => {
+	it("takes the rule and the task under the names a model gives them, and leaves the rest as it is", () => {
+		// eval G10 (2026-11-15): GLM sent add calls without when or task, three times.
+		expect(prepareScheduleArguments({ action: "add", time: "每天 08:00", prompt: "统计日志", id: "x" })).toEqual({
+			action: "add",
+			time: "每天 08:00",
+			prompt: "统计日志",
+			id: "x",
+			when: "每天 08:00",
+			task: "统计日志",
+		});
+		expect(prepareScheduleArguments({ action: "add", when: "0 8 * * *", task: "t" })).toEqual({
+			action: "add",
+			when: "0 8 * * *",
+			task: "t",
+		});
+		expect(prepareScheduleArguments("x")).toEqual({});
 	});
 });
