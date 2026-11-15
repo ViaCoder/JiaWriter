@@ -128,6 +128,10 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Summarizing branch... ({key} to cancel)": "正在给分支写摘要……（{key} 取消）",
 	"Running... ({key} to cancel)": "运行中……（{key} 取消）",
 	"Retry failed after {attempts} attempts: {error}": "重试 {attempts} 次仍失败：{error}",
+	// The llama.cpp and MCP commands of upstream extensions (2026-11-15: the / menu showed them in English).
+	"Manage llama.cpp router models": "管理 llama.cpp 路由的模型",
+	"Manage MCP servers: sign in, reconnect, enable or disable, and change exposure":
+		"管理 MCP 服务器：登录、重连、启用或停用、调整工具的暴露方式",
 	// The model and thinking selectors (2026-11-15: they were English in a Chinese interface).
 	"Refreshing model catalogs…": "正在刷新模型目录……",
 	"Only showing models from configured providers. Use /login to add providers.":
