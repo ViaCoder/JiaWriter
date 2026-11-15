@@ -1899,8 +1899,14 @@ export class InteractiveMode {
 				0,
 				0,
 			);
-			this.loadedResourcesContainer.addChild(section);
-			this.loadedResourcesContainer.addChild(new Spacer(1));
+			// The section with its blank line after it, or nothing at all when it has nothing to show.
+			this.loadedResourcesContainer.addChild({
+				render: (width: number) => {
+					const lines = section.render(width);
+					return lines.some((line) => line.trim() !== "") ? [...lines, ""] : [];
+				},
+				invalidate: () => section.invalidate(),
+			});
 		};
 
 		const skillsResult = this.session.resourceLoader.getSkills();

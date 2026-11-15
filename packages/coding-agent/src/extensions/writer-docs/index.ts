@@ -308,7 +308,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		for (const d of drafts) {
 			try {
 				const result = await exportDraft(d, ctx.cwd, getAgentDir(), { opened });
-				lines.push(formatExport(result));
+				lines.push(formatExport(result, undefined, { brief: true }));
 				for (const u of unopenedUrls(result.refs)) if (!asked.has(u) && !untested.includes(u)) untested.push(u);
 			} catch (e) {
 				failed = true;

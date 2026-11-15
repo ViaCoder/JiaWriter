@@ -62,6 +62,14 @@ describe("exportDraft / formatExport", () => {
 			"空格：只保留英文单词之间的空格，汉字与英文、数字之间不留空格；不合规的空格 0 处。",
 			"稿件中有 1 处“待核实”，成稿里应删去或补上来源。",
 		]);
+		// The brief form (the automatic export after a run, 2026-11-15): only what needs attention, so the clean font
+		// check and the clean spaces line stay out while the unpaired quote and the 待核实 mark stay in.
+		expect(formatExport(r, undefined, { brief: true }).split("\n")).toEqual([
+			"已导出：稿件.docx（docx，排版方案 default-zh）",
+			"标点：已统一为中文标点；紧邻汉字的英文标点 0 处，引号未配对的段落 1 个。",
+			"- 引号未配对：他说“开始……",
+			"稿件中有 1 处“待核实”，成稿里应删去或补上来源。",
+		]);
 	});
 	it("writes Markdown with Chinese punctuation to a chosen path, and can skip the pass", async () => {
 		// Markdown export to out/定稿.md.

@@ -162,11 +162,14 @@ function blockSpaces(b: Block): number {
 }
 
 /** Report of an export. */
-export function formatExport(r: ExportResult, lang?: WriterLang): string {
+export function formatExport(r: ExportResult, lang?: WriterLang, options: { brief?: boolean } = {}): string {
 	// Heading.
 	const lines = [t("export.done", { out: r.out, format: r.format, profile: r.profile }, lang)];
+	// Brief (the automatic export shown after a run, 2026-11-15): only what needs attention, no account of checks
+	// that found nothing (the user's rule for every reply).
+	const brief = options.brief === true;
 	// The .docx check.
-	if (r.audit) {
+	if (r.audit && !(brief && r.audit.missingHint === 0 && r.audit.missingEastAsia === 0)) {
 		const a = r.audit;
 		lines.push(
 			t(
@@ -183,12 +186,13 @@ export function formatExport(r: ExportResult, lang?: WriterLang): string {
 		);
 	}
 	// Punctuation.
-	lines.push(
-		t(r.punct ? "export.punct" : "export.punctOff", { ascii: r.asciiNextToHan, quotes: r.unpaired.length }, lang),
-	);
+	if (!(brief && r.asciiNextToHan === 0 && r.unpaired.length === 0))
+		lines.push(
+			t(r.punct ? "export.punct" : "export.punctOff", { ascii: r.asciiNextToHan, quotes: r.unpaired.length }, lang),
+		);
 	for (const u of r.unpaired.slice(0, 5)) lines.push(t("export.unpaired", { start: u }, lang));
 	// Spaces and symbols.
-	lines.push(t("export.spaces", { count: r.looseSpaces }, lang));
+	if (!(brief && r.looseSpaces === 0)) lines.push(t("export.spaces", { count: r.looseSpaces }, lang));
 	if (r.symbols > 0) lines.push(t("export.symbols", { count: r.symbols }, lang));
 	if (r.unknownSymbols.length > 0)
 		lines.push(
