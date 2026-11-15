@@ -1,6 +1,6 @@
 import { stripVTControlCharacters } from "node:util";
 import { setKeybindings, visibleWidth } from "@earendil-works/pi-tui";
-import { beforeAll, beforeEach, describe, expect, test } from "vitest";
+import { beforeAll, beforeEach, describe, expect, test, vi } from "vitest";
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import type {
 	ModelChangeEntry,
@@ -126,6 +126,8 @@ function buildTree(entries: Array<SessionEntry>): SessionTreeNode[] {
 }
 
 describe("TreeSelectorComponent", () => {
+	// JiaWriter: the help labels follow the interface language; these checks read the English ones.
+	beforeEach(() => vi.stubEnv("JW_LANG", "en"));
 	describe("initial selection with metadata entries", () => {
 		test("focuses nearest visible ancestor when currentLeafId is a model_change with sibling branch", () => {
 			// Tree structure:

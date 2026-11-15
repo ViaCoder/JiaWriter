@@ -266,7 +266,7 @@
     "enableInstallTelemetry": {
       "type": "boolean",
       "description": "Send an anonymous version and update ping after changelog-detected updates.",
-      "default": true
+      "default": false
     },
     "enableAnalytics": {
       "type": "boolean",

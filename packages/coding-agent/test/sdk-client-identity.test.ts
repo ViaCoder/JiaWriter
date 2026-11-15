@@ -93,8 +93,9 @@ describe("createAgentSession client identity", () => {
 		} = {},
 	): Promise<SimpleStreamOptions | undefined> {
 		const settingsManager = SettingsManager.create(cwd, agentDir);
-		if (options.telemetryEnabled === false) {
-			settingsManager.setEnableInstallTelemetry(false);
+		// JiaWriter: install telemetry is off by default, so a test that wants attribution turns it on.
+		if (options.telemetryEnabled !== undefined) {
+			settingsManager.setEnableInstallTelemetry(options.telemetryEnabled);
 		}
 
 		const authStorage = AuthStorage.inMemory({
@@ -141,7 +142,7 @@ describe("createAgentSession client identity", () => {
 
 	it("identifies pi with a detailed User-Agent and attribution as a CLI agent", async () => {
 		const model = createModel("openrouter", "https://openrouter.ai/api/v1");
-		const options = await captureOptions(model);
+		const options = await captureOptions(model, { telemetryEnabled: true });
 
 		expect(options?.identity).toEqual({
 			userAgent: "detailed",
