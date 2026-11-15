@@ -84,7 +84,8 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `/search words` | One search: sources and key points only |
 | `/computer` | Open the computer toolkit |
 | `/jw` | Read-only configuration page |
-| `/effort [level]` | Change the thinking intensity; without a level, pick from a list (`/thinking` and Shift+Tab also work) |
+| `/effort [level]` | Change the thinking intensity; without a level, pick from a list (`/thinking` and Alt+T also work) |
+| Shift+Tab | Cycle the work mode: manual (ask every time) → auto (ask once per folder before the first write) → bypass (never ask) → plan (look but change nothing, give a plan); `/plan` toggles plan mode on its own |
 | `/rewind` | Go back to before a message: conversation and files, conversation only, or files only |
 | `/memory` | List what you asked it to remember; `/memory forget <n>` removes one, `/memory clear` removes all |
 | `/lang zh`, `/lang en` | Interface language (`JW_LANG`, when set, takes precedence) |

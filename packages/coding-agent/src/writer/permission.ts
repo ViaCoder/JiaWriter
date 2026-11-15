@@ -105,13 +105,12 @@ export function workMode(env: NodeJS.ProcessEnv = process.env): WorkMode {
 }
 
 /**
- * The mode after this one for Shift+Tab: manual → auto → plan → manual, as Claude Code cycles default, accept
- * edits and plan. bypass joins the cycle only when it is the mode set outside the session (as Claude Code shows its
- * bypass mode only when started with it).
+ * The mode after this one for Shift+Tab: manual → auto → bypass → plan → manual (the user, 2026-11-15: "also add a
+ * bypass permissions on when using shift+tab"; before that, bypass joined the cycle only when set outside the
+ * session, as Claude Code shows it only when started with it).
  */
-export function nextWorkMode(current: WorkMode, env: NodeJS.ProcessEnv = process.env): WorkMode {
-	const outside = parsePermissionMode(env.JW_PERMISSION) ?? savedPermissionMode();
-	const cycle: WorkMode[] = outside === "bypass" ? ["manual", "auto", "bypass", "plan"] : ["manual", "auto", "plan"];
+export function nextWorkMode(current: WorkMode): WorkMode {
+	const cycle: WorkMode[] = ["manual", "auto", "bypass", "plan"];
 	const at = cycle.indexOf(current);
 	return cycle[(at + 1) % cycle.length];
 }

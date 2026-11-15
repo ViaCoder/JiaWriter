@@ -242,15 +242,8 @@ describe("work mode", () => {
 		expect(workMode({ JW_PERMISSION: "manual" })).toBe("plan");
 	});
 
-	it("nextWorkMode: manual, auto, plan and round; bypass only when set outside the session", () => {
-		const env = {};
-		expect(["manual", "auto", "plan"].map((m) => nextWorkMode(m as "manual", env))).toEqual([
-			"auto",
-			"plan",
-			"manual",
-		]);
-		const bypass = { JW_PERMISSION: "bypass" };
-		expect(["manual", "auto", "bypass", "plan"].map((m) => nextWorkMode(m as "manual", bypass))).toEqual([
+	it("nextWorkMode: manual, auto, bypass, plan and round (the user, 2026-11-15: bypass in the Shift+Tab cycle)", () => {
+		expect(["manual", "auto", "bypass", "plan"].map((m) => nextWorkMode(m as "manual"))).toEqual([
 			"auto",
 			"bypass",
 			"plan",

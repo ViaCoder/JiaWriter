@@ -399,7 +399,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"Clear the input, or rewind when it is empty": "清空输入；输入为空时回退到之前的消息",
 	"Interrupt, or clear the input; twice to exit": "中断，或清空输入；连按两次退出",
 	"Exit (input empty)": "退出（输入为空时）",
-	"Cycle work mode: manual, auto, plan": "切换工作模式：手动确认、自动、规划",
+	"Cycle work mode: manual, auto, bypass, plan": "切换工作模式：手动确认、自动、全部放行、规划",
 	"Detailed view: tool output, thinking, time and model": "详细模式：完整的工具输出、思考过程、时间和模型",
 	"Show or hide the task list": "显示或隐藏任务清单",
 	"Switch model": "切换模型",
@@ -458,7 +458,7 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"{minutes}m {seconds}s": "{minutes} 分 {seconds} 秒",
 	"{hours}h {minutes}m {seconds}s": "{hours} 时 {minutes} 分 {seconds} 秒",
 	// Startup hints for the keys added on 2026-11-09.
-	"to cycle work mode": "切换工作模式（手动确认、自动、规划）",
+	"to cycle work mode": "切换工作模式（手动确认、自动、全部放行、规划）",
 	"for the detailed view": "详细模式（完整的工具输出和思考过程）",
 	"to show or hide the task list": "显示或隐藏任务清单",
 	"to search the input history": "搜索输入历史",

@@ -7136,7 +7136,7 @@ export class InteractiveMode {
 					row(`${interrupt} ${interrupt}`, "Clear the input, or rewind when it is empty") +
 					row(clear, "Interrupt, or clear the input; twice to exit") +
 					row(exit, "Exit (input empty)") +
-					row(app("app.mode.cycle"), "Cycle work mode: manual, auto, plan") +
+					row(app("app.mode.cycle"), "Cycle work mode: manual, auto, bypass, plan") +
 					row(expandTools, "Detailed view: tool output, thinking, time and model") +
 					row(app("app.todo.toggle"), "Show or hide the task list") +
 					row(selectModel, "Switch model") +
