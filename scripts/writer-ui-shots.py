@@ -28,7 +28,9 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # ANSI escape sequences, for looking at the text of what arrived.
 ANSI = re.compile(r"\x1b\[[0-9;?<>=]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]")
 # Terminal size.
-COLS, ROWS = 120, 40
+# The terminal's size and theme, from the environment for the narrow and light variants (P26 interface set).
+COLS, ROWS = int(os.environ.get("JW_SHOT_COLS", 120)), int(os.environ.get("JW_SHOT_ROWS", 40))
+THEME = os.environ.get("JW_SHOT_THEME", "dark")
 
 # The reply the mock gives after reading the folder: a heading, a list and a table, as a real reply has.
 REPLY = (
@@ -166,7 +168,7 @@ def picture(raw, out, name):
     lines = json.loads(cells.stdout)["lines"]
     with open(f"{base}.txt", "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
-    subprocess.run(["python3", "-I", os.path.join(ROOT, "scripts", "screen-png.py"), f"{base}.json", f"{base}.png", "dark"],
+    subprocess.run(["python3", "-I", os.path.join(ROOT, "scripts", "screen-png.py"), f"{base}.json", f"{base}.png", THEME],
                    check=True, timeout=120)
     os.remove(f"{base}.bin")
     return lines
@@ -189,7 +191,7 @@ def main():
     # never gives, and would stay grey.
     os.makedirs(os.path.join(tmp, "agent"))
     with open(os.path.join(tmp, "agent", "settings.json"), "w", encoding="utf-8") as f:
-        json.dump({"theme": "dark"}, f)
+        json.dump({"theme": THEME}, f)
     env = {k: v for k, v in os.environ.items() if not k.startswith(("JW_", "PI_", "SF_", "PROMPT_ADD"))}
     env.update(
         HOME=tmp, JW_DIR=os.path.join(tmp, "agent"), TERM="xterm-256color", COLORTERM="truecolor", COLUMNS=str(COLS), LINES=str(ROWS),
