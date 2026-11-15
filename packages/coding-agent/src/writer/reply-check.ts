@@ -8,7 +8,17 @@
 
 // The hits and the patterns.
 import { findHits, type StyleHit } from "./style/check.ts";
-import { DEFAULT_PACKS, DENSITY_ONLY, STYLE_PACKS } from "./style/patterns.ts";
+import { DEFAULT_PACKS, DENSITY_ONLY, STYLE_PACKS, type StylePattern } from "./style/patterns.ts";
+
+/**
+ * Markdown dress a reply must not wear (the core rule: no bold, headings or bullet lists in a reply; 2026-11-15: a
+ * research reply came with **国家层面** headings). Numbered items are left alone: a list of sources is one.
+ */
+export const REPLY_FORMAT_MARKS: readonly StylePattern[] = [
+	{ id: "md-bold", re: /\*\*[^*\n]{1,60}\*\*/g, zh: "加粗", en: "bold" },
+	{ id: "md-heading", re: /^#{1,6}\s+\S[^\n]*/gm, zh: "标题", en: "heading" },
+	{ id: "md-list", re: /^[ \t]*[-*•]\s+\S[^\n]*/gm, zh: "列表", en: "bullet list" },
+];
 
 /** Most asks to restate a reply after one message of the user: one, so a reply that cannot be cleaned does not loop. */
 export const MAX_REPLY_ROUNDS = 1;
@@ -45,7 +55,7 @@ export function replyText(messages: readonly unknown[] | undefined): string {
 /** The marks in a text: hits of the default packs, except the denials judged by density. */
 export function replyMarks(text: string): StyleHit[] {
 	if (!text.trim()) return [];
-	const patterns = DEFAULT_PACKS.flatMap((p) => STYLE_PACKS[p]);
+	const patterns = [...DEFAULT_PACKS.flatMap((p) => STYLE_PACKS[p]), ...REPLY_FORMAT_MARKS];
 	return findHits(text, patterns).filter((hit) => !DENSITY_ONLY.has(hit.id));
 }
 

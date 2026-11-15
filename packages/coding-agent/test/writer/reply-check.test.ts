@@ -43,4 +43,11 @@ describe("replyMarks / marksList", () => {
 		expect(marksList(replyMarks(many), many)).toBe("“由此可见”（第 1 行）");
 		expect(MAX_REPLY_ROUNDS).toBe(1);
 	});
+
+	it("counts Markdown bold, headings and bullet lists as marks, and leaves numbered items alone (2026-11-15)", () => {
+		const dressed = "**国家层面**\n\n## 要点\n- 第一条\n1. 民航法修订，2026年7月1日施行。";
+		expect(replyMarks(dressed).map((m) => m.id)).toEqual(["md-bold", "md-heading", "md-list"]);
+		expect(replyMarks("1. 民航法修订。\n2. 低空保险意见。")).toEqual([]);
+		expect(marksList(replyMarks(dressed), dressed)).toContain("“**国家层面**”（第 1 行）");
+	});
 });
