@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { candidatesText } from "../../src/extensions/writer-topic/index.ts";
+import { candidatesText, salvageSource, sourceItems } from "../../src/extensions/writer-topic/index.ts";
 import { candidateSources } from "../../src/writer/topic/topic.ts";
 
 let dir: string;
@@ -45,5 +45,29 @@ describe("candidateSources", () => {
 		const text = candidatesText([{ url: "https://b.example/9", title: "云南红河配送", date: "2026-11-01" }]);
 		expect(text.startsWith("可选来源")).toBe(true);
 		expect(text).toContain("- https://b.example/9 云南红河配送（2026-11-01）");
+	});
+});
+
+describe("salvageSource", () => {
+	it("takes the address from an alias key or out of the focus text, and leaves a sourced item alone", () => {
+		expect(salvageSource({ url: "https://a.example/1", focus: "x" })).toEqual({
+			url: "https://a.example/1",
+			focus: "x",
+		});
+		expect(salvageSource({ file: "报告.pdf", page: "3" })).toEqual({ file: "报告.pdf", page: "3" });
+		expect(salvageSource({ link: "https://a.example/2", focus: "x" } as never)).toMatchObject({
+			url: "https://a.example/2",
+		});
+		expect(salvageSource({ 来源: " https://a.example/3 " } as never)).toMatchObject({ url: "https://a.example/3" });
+		expect(salvageSource({ section: "现状", focus: "民航法修订，见 https://a.example/4）：施行日期" })).toEqual({
+			section: "现状",
+			url: "https://a.example/4",
+			focus: "民航法修订，见 ）：施行日期",
+		});
+		expect(salvageSource({ focus: "没有地址" })).toEqual({ focus: "没有地址" });
+		expect(sourceItems([{ focus: "见 https://a.example/5" }, "https://a.example/6"])).toEqual([
+			{ url: "https://a.example/5", focus: "见" },
+			{ url: "https://a.example/6" },
+		]);
 	});
 });

@@ -60,7 +60,7 @@ interface SourceItem {
  */
 export function sourceItems(given: readonly unknown[]): SourceItem[] {
 	return given.flatMap((item): SourceItem[] => {
-		if (typeof item !== "string") return item && typeof item === "object" ? [item as SourceItem] : [];
+		if (typeof item !== "string") return item && typeof item === "object" ? [salvageSource(item as SourceItem)] : [];
 		const text = item.trim();
 		if (/^[[{]/.test(text)) {
 			try {
@@ -71,6 +71,35 @@ export function sourceItems(given: readonly unknown[]): SourceItem[] {
 		}
 		return text ? [{ url: text }] : [];
 	});
+}
+
+/** Names a model gives the address under, besides url (2026-11-15: GLM wrote it inside focus nine times in a run). */
+const URL_ALIASES = ["link", "source", "address", "href", "来源", "网址", "链接"] as const;
+/** An address inside a text. */
+const URL_IN_TEXT = /https?:\/\/[^\s"'）)，。；,;]+/;
+
+/** An item with its address where the program reads it: from an alias key, or lifted out of focus or section. */
+export function salvageSource(item: SourceItem): SourceItem {
+	if (item.url?.trim() || item.file?.trim()) return item;
+	const extra = item as SourceItem & Record<string, unknown>;
+	for (const key of URL_ALIASES) {
+		const v = extra[key];
+		if (typeof v === "string" && v.trim()) return { ...item, url: v.trim() };
+	}
+	for (const key of ["focus", "section"] as const) {
+		const text = item[key];
+		const m = text ? URL_IN_TEXT.exec(text) : null;
+		if (m)
+			return {
+				...item,
+				url: m[0],
+				[key]: text
+					?.replace(m[0], "")
+					.replace(/\s{2,}/g, " ")
+					.trim(),
+			};
+	}
+	return item;
 }
 
 /** Follow the session: the topic of the branch now shown. */
