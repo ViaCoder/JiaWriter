@@ -301,8 +301,9 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 		if (drafts.length === 0) return;
 		// URLs this session opened, including this run's.
 		const opened = sessionOpened(ctx, event.messages as unknown[]);
-		// Export each; one failure does not stop the others.
-		const lines = [t("export.autoTitle")];
+		// Export each; one failure does not stop the others. One draft is one line; several get a title line
+		// (2026-11-15: the screen showed a title and one line for one draft).
+		const lines = drafts.length > 1 ? [t("export.autoTitle")] : [];
 		let failed = false;
 		const untested: string[] = [];
 		for (const d of drafts) {

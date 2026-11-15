@@ -202,10 +202,7 @@ describe("automatic import before each run and export after it", () => {
 			{ role: "toolResult", toolCallId: "3", isError: true },
 		];
 		await handlers.get("agent_end")?.({ type: "agent_end", messages }, ctx(notes));
-		expect(notes[1].split("\n").slice(0, 2)).toEqual([
-			"本轮修改的稿件已自动导出：",
-			"已导出：稿件.docx（docx，排版方案 default-zh）",
-		]);
+		expect(notes[1].split("\n").slice(0, 2)).toEqual(["已导出：稿件.docx（docx，排版方案 default-zh）"]);
 		expect(existsSync(join(cwd, "稿件.docx"))).toBe(true);
 		expect(existsSync(join(cwd, "素材笔记.docx"))).toBe(false);
 		expect(existsSync(join(cwd, "坏.docx"))).toBe(false);
