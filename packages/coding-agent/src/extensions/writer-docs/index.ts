@@ -36,6 +36,8 @@ import { type ExportFormat, exportDraft, formatExport } from "../../writer/expor
 import { openedUrls, unopenedUrls } from "../../writer/export/refs.ts";
 // Output messages.
 import { t } from "../../writer/i18n/index.ts";
+// The office toolkit, opened by the commands.
+import { openToolkit, writingOpen } from "../../writer/toolkit/open.ts";
 // The topic folder.
 import { currentTopic } from "../../writer/topic/current.ts";
 import { archivedUrls, TOPIC_DIRS } from "../../writer/topic/topic.ts";
@@ -148,6 +150,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 	pi.registerTool({
 		// Name the model calls.
 		name: "import_document",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Import document",
 		// Full description sent to the model.
@@ -171,6 +175,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 	pi.registerTool({
 		// Name the model calls.
 		name: "export_document",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Export document",
 		// Full description sent to the model.
@@ -200,6 +206,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 	pi.registerCommand("import-doc", {
 		description: "Import reference files (参考资料/ or one file) as Markdown with page markers",
 		handler: async (args, ctx) => {
+			// The model gets the file tools too, for what the user asks next.
+			openToolkit(pi, "office", { hasUI: ctx.hasUI, skills: [] });
 			// Import and show the report.
 			try {
 				ctx.ui.notify(formatImport(await runImport(args, ctx.cwd)), "info");
@@ -213,6 +221,7 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 	pi.registerCommand("export-doc", {
 		description: "Export a Markdown draft: /export-doc <draft.md> [md|docx|xlsx|pptx] [--profile=name] [--out=path]",
 		handler: async (args, ctx) => {
+			openToolkit(pi, "office", { hasUI: ctx.hasUI, skills: [] });
 			// Parse, export, show the report.
 			try {
 				const a = parseExportArgs(args);
@@ -286,7 +295,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 
 	// After every run: the drafts written or edited in it become .docx files.
 	pi.on("agent_end", async (event, ctx) => {
-		if (!autoExportEnabled(process.env)) return;
+		// A file written outside the writing toolkit is a file, not a draft: no export.
+		if (!autoExportEnabled(process.env) || !writingOpen(pi)) return;
 		const drafts = editedDrafts(event.messages as unknown as RunMessage[], ctx.cwd);
 		if (drafts.length === 0) return;
 		// URLs this session opened, including this run's.

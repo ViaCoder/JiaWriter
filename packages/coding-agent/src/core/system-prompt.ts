@@ -6,7 +6,7 @@ import { getSystemMessageText } from "@earendil-works/pi-ai";
 import { getDocsPath, getReadmePath } from "../config.ts";
 import { personaBlock, promptAddText } from "../writer/prompt-add.ts";
 import { WRITER_CHAT_RULE, WRITER_PREAMBLE, writerDocsSection, writerLanguageRule } from "../writer/prompt-text.ts";
-import { CORE_RULES, defaultSkillRule, WORKING_RULES } from "../writer/prompts/core.ts";
+import { CORE_RULES, WORKING_RULES } from "../writer/prompts/core.ts";
 import { formatSkillsForPrompt, type Skill } from "./skills.ts";
 
 /** JiaWriter: built-in tools whose upstream guidelines are replaced by their descriptions and the stages. */
@@ -179,11 +179,7 @@ export function buildSystemPromptSections(input: BuildSystemPromptOptions): Syst
 		if (listed.length > 0)
 			promptSections.tools = listed.map((name) => ` - ${name}: ${toolSnippets[name]}`).join("\n");
 		else if (declaredTools.length === 0) promptSections.tools = "(none)";
-		// JiaWriter: the default genre's rule follows the skill's on/off state.
-		promptSections.rules = buildRules(declaredTools, toolGuidelines, [
-			...promptGuidelines,
-			...defaultSkillRule(skills),
-		]);
+		promptSections.rules = buildRules(declaredTools, toolGuidelines, promptGuidelines);
 		// JiaWriter: documentation pointers for JiaWriter itself.
 		promptSections.docs = writerDocsSection(getReadmePath(), getDocsPath());
 	}

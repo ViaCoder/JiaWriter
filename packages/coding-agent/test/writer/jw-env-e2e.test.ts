@@ -355,32 +355,22 @@ describe("JW_* end to end", () => {
 		expect(JSON.stringify(realRequest()?.body.messages)).toMatch(/\[Date: \d{4}-\d{2}-\d{2} \w+, /);
 		// The request carries the writing system prompt.
 		expect(JSON.stringify(realRequest()?.body.system)).toContain("general-purpose agent");
-		// The built-in writing skills are offered, with their descriptions.
-		expect(JSON.stringify(realRequest()?.body.system)).toContain("<name>deep-research</name>");
-		expect(JSON.stringify(realRequest()?.body.system)).toContain("Researches a question across many sources");
-		// The default writing tools, bash (under the permission modes), the four checks, web search, import and export.
+		// The toolkits are named at stage 0; the built-in writing skills come with their toolkit (2026-11-15), not here.
+		expect(JSON.stringify(realRequest()?.body.system)).toContain("come in toolkits");
+		expect(JSON.stringify(realRequest()?.body.system)).not.toContain("<name>deep-research</name>");
+		// The general tools and the toolkit tool: the writing, research, Office, browser, desktop and schedule tools
+		// are declared only when their toolkit is open.
 		expect(((realRequest()?.body.tools as { name: string }[]) ?? []).map((t) => t.name).sort()).toEqual([
 			"ask_user",
 			"bash",
 			"delegate",
-			"draft_restore",
-			"draft_section",
 			"edit",
-			"export_document",
-			"fetch_web",
 			"find",
 			"grep",
-			"import_document",
 			"ls",
-			"material_add",
 			"read",
-			"readability_check",
-			"schedule_task",
-			"search_web",
-			"style_check",
 			"todo_write",
-			"topic_open",
-			"word_count",
+			"toolkit",
 			"write",
 		]);
 		// The key appears nowhere.

@@ -182,8 +182,14 @@ describe("schedule_task tool", () => {
 	function tool() {
 		const tools = new Map<string, ToolDefinition>();
 		const commands = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
+		let active: string[] = ["read"];
 		const pi = {
 			registerTool: (t: ToolDefinition) => tools.set(t.name, t),
+			// /schedule opens the schedule toolkit: an active tool set to add to.
+			getActiveTools: () => active,
+			setActiveTools: (names: string[]) => {
+				active = names;
+			},
 			registerCommand: (name: string, c: { handler: (args: string, ctx: unknown) => Promise<void> }) =>
 				commands.set(name, c),
 			on: () => undefined,

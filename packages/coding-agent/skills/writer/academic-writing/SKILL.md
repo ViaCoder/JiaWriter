@@ -1,6 +1,7 @@
 ---
 name: academic-writing
 description: Papers, literature reviews, proposals and abstracts.
+disable-model-invocation: true
 metadata:
   title: Academic writing（学术写作）
   style_packs: core-zh,core-en

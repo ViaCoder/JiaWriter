@@ -68,6 +68,8 @@ import { currentLang, t } from "../../writer/i18n/index.ts";
 import { redactSecrets } from "../../writer/redact.ts";
 // The AnySearch key held in memory.
 import { withSecrets } from "../../writer/secrets.ts";
+// The browser toolkit, opened by /browser.
+import { openToolkit } from "../../writer/toolkit/open.ts";
 // The research archive.
 import { ensureTopic } from "../../writer/topic/current.ts";
 import { archivedUrls, archiveFiltered, archivePage, archiveSearch } from "../../writer/topic/topic.ts";
@@ -673,6 +675,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	pi.registerTool({
 		// Name the model calls.
 		name: "search_web",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Web search",
 		// Full description sent to the model.
@@ -824,6 +828,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 	pi.registerTool({
 		// Name the model calls.
 		name: "fetch_web",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Web fetch",
 		// Full description sent to the model.
@@ -943,6 +949,8 @@ export default function writerSearchExtension(pi: ExtensionAPI): void {
 				return;
 			}
 			await showBrowser(ctx);
+			// The user asked for the browser: its tool joins the conversation too.
+			openToolkit(pi, "browser", { hasUI: ctx.hasUI, skills: [] });
 		},
 	});
 

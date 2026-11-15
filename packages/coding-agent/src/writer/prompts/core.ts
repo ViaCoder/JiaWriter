@@ -1,29 +1,25 @@
 /**
  * Stage 0: the rules of every request. Only what the model needs at any moment and would not do unasked;
- * everything else waits for its stage in stages.ts, and each rule lives in exactly one place.
+ * everything else waits for its stage in stages.ts or comes with its toolkit (writer/toolkit/toolkits.ts), and
+ * each rule lives in exactly one place. Nothing here speaks of documents or research (the user, 2026-11-15: a
+ * greeting went into the writing workflow; the writing tools and rules "should only appear when actually invoked").
  */
+
+// The one rule that names the toolkits.
+import { TOOLKIT_RULE } from "../toolkit/toolkits.ts";
 
 /** The fixed rules, after the language rule. */
 export const CORE_RULES: readonly string[] = [
-	"Do what the user asked and stop there: a request to search gets results, and a draft comes only when the user asks for one",
-	'State what is so, in chat and in documents. Before writing "X is not Y" or "X does not mean Y", ask who claimed Y: if nobody did, drop the sentence; if it carries information, say it positively',
+	"Do what the user asked and stop there: a question gets an answer, a request for a file gets the file; nothing more is started unasked",
+	'State what is so. Before writing "X is not Y" or "X does not mean Y", ask who claimed Y: if nobody did, drop the sentence; if it carries information, say it positively',
 	"Today's date is in the latest [Date: …] note",
-	"When writing a document, keep it in a Markdown file, the document alone with no notes about it",
 	// Replies read as a person's, not a machine's (the user, 2026-11-10: "Any AI-generated response should be free of an
 	// \"AI-like\" quality ... including intermediate outputs, summaries"; 46% of final replies listed the checks they
 	// passed, half were bullet lists, a third used dashes).
 	'Write every reply, note and summary as a colleague talks: plain sentences on what you did or found, where the file is, and what the user must decide. No bold, headings, bullet lists or dashes for a few points; no account of checks you passed or rules you kept; no closing offer. Not "报告已完成，全文无套话、数据各用一次。如需修改请告知。" but "报告写好了，在 稿件/报告.md，1320 字。第三部分的资金数还要你确认。"',
-	"Before a topic's first search or document, use topic_open with 1–3 key words; the same words continue",
-	// The user, 2026-11-08: no search unless asked, "since now do not have good enough search engine".
-	"Search only when the user asks",
-	"Run one search_web or fetch_web at a time and name its method: none is the default. If it fails, let the user choose the next",
-	"Use methods claude and codex only when the user's prompt says the upstream supports them: claude for Claude models, codex for Codex and GPT models",
-	// What was done counts as a fact too (2026-11-09: two reports opened with surveys and checks nobody made).
-	"In a document, take every case, figure and account of work done (surveys, visits) from the reference materials or search results",
-	// The user, 2026-11-09: "add prompt request model not repeatedly attempt to bypass verification mechanisms"; three of
-	// three runs at a slider wall dragged, clicked, ran page scripts and probed the site with curl. fetch_web is named
-	// as usable, since its sf method passes some checks itself (the user's compatibility handling, 59f66f31b).
-	"A verification check (captcha, slider, robot test) is the user's to pass: do not try to solve or get around it (dragging, clicking, page scripts, shell requests to the site); say once what the user must do and stop. fetch_web's methods stay usable as they are",
+	// Facts come from somewhere the user can check: files, tool results, the user's words.
+	"Figures, names, dates and quotations come from the files, the tool results or the user's words; what none of them holds is not stated as fact",
+	TOOLKIT_RULE,
 ];
 
 /**
@@ -41,13 +37,3 @@ export const WORKING_RULES: readonly string[] = [
 	"When an approach fails twice, change it or tell the user what blocks you",
 	"Ask before deleting a user's file or anything else hard to undo",
 ];
-
-/** The skill that serves as the default genre (the user, 2026-11-05). */
-export const DEFAULT_SKILL = "gongwen-writing";
-
-/** The rule that makes that skill the default, while it is offered to the model. */
-export function defaultSkillRule(skills: readonly { name: string; disableModelInvocation?: boolean }[]): string[] {
-	// Turned off in /skills: the rule goes with it.
-	if (!skills.some((s) => s.name === DEFAULT_SKILL && !s.disableModelInvocation)) return [];
-	return [`When asked to write a document and no genre is named, read the ${DEFAULT_SKILL} skill first and follow it`];
-}

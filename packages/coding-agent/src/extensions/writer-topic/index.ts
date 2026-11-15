@@ -88,6 +88,8 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 	pi.registerTool({
 		// Name the model calls.
 		name: "topic_open",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Open topic",
 		// Full description sent to the model.
@@ -119,6 +121,8 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 	pi.registerTool({
 		// Name the model calls.
 		name: "material_add",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Add material",
 		// Full description sent to the model.

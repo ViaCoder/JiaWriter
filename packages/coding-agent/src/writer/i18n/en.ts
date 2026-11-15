@@ -602,4 +602,27 @@ export const en: Record<MessageKey, string> = {
 	// Automatic export.
 	"export.autoTitle": "Drafts changed in this run were exported:",
 	"export.autoFailed": "Automatic export of {path} failed: {reason}",
+	// Toolkits (2026-11-15).
+	"toolkit.name.writing": "writing",
+	"toolkit.name.research": "research",
+	"toolkit.name.office": "office",
+	"toolkit.name.browser": "browser",
+	"toolkit.name.computer": "computer",
+	"toolkit.name.schedule": "schedule",
+	"toolkit.opened": "The {name} toolkit is open.",
+	"toolkit.already": "Toolkit {name} was already open.",
+	"toolkit.hint.writing":
+		"The writing toolkit is open. Say what to write: the kind of document, its purpose, readers and length.",
+	"toolkit.hint.research": "The research toolkit is open. Say what question to look into.",
+	"toolkit.hint.office":
+		"The office toolkit is open: import PDF, Word, Excel or PowerPoint files as references, or export a draft to those formats.",
+	"toolkit.hint.browser": "The browser toolkit is open. Say what to do on which page.",
+	"toolkit.hint.computer": "The computer toolkit is open. Say what to do in which application.",
+	"toolkit.hint.schedule": "The schedule toolkit is open. Say when, in which folder, and what to do.",
+	"toolkit.searchPrompt": "Search: {words}. List sources and key points only, no document.",
+	"toolkit.cmd.write": "Open the writing toolkit and start a document: /write brief",
+	"toolkit.cmd.research": "Open the research toolkit and look into a question: /research question",
+	"toolkit.cmd.search": "One search, sources and key points only: /search words",
+	"toolkit.cmd.computer": "Open the computer toolkit",
+	"toolkit.footer": "Toolkits: {names}",
 };

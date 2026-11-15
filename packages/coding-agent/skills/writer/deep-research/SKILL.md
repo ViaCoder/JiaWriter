@@ -1,6 +1,7 @@
 ---
 name: deep-research
 description: Researches a question across many sources and writes a sourced report, briefing or news round-up. Use when the user asks to research, investigate or compile news on a topic.
+disable-model-invocation: true
 metadata:
   title: Deep research（深度研究）
   style_packs: core-zh,core-en

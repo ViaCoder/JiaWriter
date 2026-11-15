@@ -81,17 +81,19 @@ describe("resultContent", () => {
 
 // settleTool (src/extensions/writer-browser/index.ts), through session_start: whether a conversation has the tool,
 // settled once and kept, so the tool set never changes inside a conversation.
-describe("settleTool", () => {
+describe("the tool and its toolkit", () => {
 	afterEach(() => vi.unstubAllEnvs());
 
-	/** The extension with a given tool set and session entries; what it sets and records is kept. */
+	/** The extension on a stand-in pi: what it registers, sets and records. */
 	function started(active: string[], entries: unknown[]) {
 		const handlers: Record<string, (event: unknown, ctx: unknown) => unknown> = {};
 		const set: string[][] = [];
+		const tools: { name: string; exposure?: string }[] = [];
 		const named: Record<string, unknown> = {
 			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
 				handlers[name] = fn;
 			},
+			registerTool: (t: { name: string; exposure?: string }) => tools.push(t),
 			getActiveTools: () => active,
 			setActiveTools: (names: string[]) => set.push(names),
 			appendEntry: (customType: string, data: unknown) => entries.push({ type: "custom", customType, data }),
@@ -100,39 +102,15 @@ describe("settleTool", () => {
 		const pi = new Proxy(named, { get: (target, key: string) => target[key] ?? (() => undefined) });
 		writerBrowserExtension(pi as unknown as ExtensionAPI);
 		const ctx = { hasUI: false, sessionManager: { getEntries: () => entries } };
-		return { start: () => handlers.session_start({}, ctx) as Promise<void>, set, entries };
+		return { start: () => handlers.session_start({}, ctx) as Promise<void>, set, entries, tools };
 	}
 
-	it("joins a new conversation when asked to, and records the choice", async () => {
+	// Since 2026-11-15 the tool is deferred and joins with the browser toolkit (writer/toolkit); a session start
+	// activates nothing and records nothing, whatever JW_BROWSER says.
+	it("is deferred, and a session start leaves the active tools alone", async () => {
 		vi.stubEnv("JW_BROWSER", "on");
-		const { start, set, entries } = started(["read", "search_web"], []);
-		await start();
-		expect(set).toEqual([["read", "search_web", "browser"]]);
-		expect(entries).toEqual([{ type: "custom", customType: "jiawriter-browser-tool", data: true }]);
-	});
-
-	it("stays out when turned off", async () => {
-		vi.stubEnv("JW_BROWSER", "off");
-		const { start, set, entries } = started(["search_web"], []);
-		await start();
-		expect(set).toEqual([]);
-		expect(entries).toEqual([{ type: "custom", customType: "jiawriter-browser-tool", data: false }]);
-	});
-
-	it("keeps what a resumed conversation chose, whatever the setting is now", async () => {
-		vi.stubEnv("JW_BROWSER", "on");
-		const { start, set, entries } = started(
-			["search_web"],
-			[{ type: "custom", customType: "jiawriter-browser-tool", data: false }],
-		);
-		await start();
-		expect(set).toEqual([]);
-		expect(entries.length).toBe(1);
-	});
-
-	it("leaves an allowlist alone", async () => {
-		vi.stubEnv("JW_BROWSER", "on");
-		const { start, set, entries } = started(["read"], []);
+		const { start, set, entries, tools } = started(["read", "search_web"], []);
+		expect(tools.find((t) => t.name === "browser")?.exposure).toBe("deferred");
 		await start();
 		expect([set, entries]).toEqual([[], []]);
 	});

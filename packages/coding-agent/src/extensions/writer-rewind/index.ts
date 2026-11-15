@@ -107,6 +107,8 @@ export default function writerRewindExtension(pi: ExtensionAPI): void {
 	pi.registerTool({
 		// Name the model calls.
 		name: "draft_restore",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Restore draft",
 		// Full description sent to the model.

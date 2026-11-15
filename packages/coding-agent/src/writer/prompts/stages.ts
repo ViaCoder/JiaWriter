@@ -79,12 +79,13 @@ function methodStages(tool: string, methods: Readonly<Record<string, readonly st
 
 /** Every stage, in the order they are added to one result. */
 export const PROMPT_STAGES: readonly PromptStage[] = [
-	// Searching is not writing: these rules wait until a document is really started.
+	// Searching is not writing, and a file is not a document: these rules come with the writing toolkit
+	// (writer/toolkit), with a section written, or with a skill read; a plain write brings none of them.
 	{
 		id: WRITING_STAGE,
 		title: "Writing rules",
 		rules: WRITING_MANUAL,
-		tools: ["write", "edit", "draft_section"],
+		tools: ["draft_section"],
 		onSkill: true,
 	},
 	{ id: "research", title: "Research rules", rules: RESEARCH_MANUAL, tools: ["search_web", "fetch_web"] },

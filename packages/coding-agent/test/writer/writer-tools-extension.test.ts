@@ -46,6 +46,7 @@ import writerToolsExtension, {
 // The semantic review line the automatic check ends with.
 import { SECTION_REASONING_TOKENS } from "../../src/writer/draft/section.ts";
 import { STYLE_REVIEW } from "../../src/writer/prompts/manuals.ts";
+import { TOOLKITS } from "../../src/writer/toolkit/toolkits.ts";
 
 // Working directory of each test.
 let cwd = "";
@@ -64,6 +65,9 @@ afterEach(() => {
 	vi.unstubAllEnvs();
 });
 
+// The writing toolkit open: the checks of a draft apply only then (2026-11-15).
+const WRITING_ACTIVE = ["read", "write", "edit", ...TOOLKITS.writing.tools];
+
 /** Tools registered by the extension, by name. */
 function registeredTools(): Map<string, ToolDefinition> {
 	// Collected tools.
@@ -72,6 +76,7 @@ function registeredTools(): Map<string, ToolDefinition> {
 	const pi = {
 		registerTool: (tool: ToolDefinition) => tools.set(tool.name, tool),
 		registerMessageRenderer: () => undefined,
+		getActiveTools: () => WRITING_ACTIVE,
 		on: () => undefined,
 	} as unknown as ExtensionAPI;
 	// Run the factory.
@@ -506,6 +511,7 @@ describe("the automatic check of each draft", () => {
 		const pi = {
 			registerTool: () => undefined,
 			registerMessageRenderer: () => undefined,
+			getActiveTools: () => WRITING_ACTIVE,
 			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
 				handlers[name] = fn;
 			},
@@ -753,6 +759,7 @@ describe("shownRound", () => {
 			| undefined;
 		const pi = {
 			registerTool: () => undefined,
+			getActiveTools: () => WRITING_ACTIVE,
 			registerMessageRenderer: (_type: string, fn: typeof render) => {
 				render = fn;
 			},
@@ -794,6 +801,7 @@ describe("cutOffWithoutCalls", () => {
 		const pi = {
 			registerTool: () => undefined,
 			registerMessageRenderer: () => undefined,
+			getActiveTools: () => WRITING_ACTIVE,
 			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
 				handlers[name] = fn;
 			},
@@ -824,6 +832,7 @@ describe("touchesMaterials", () => {
 		writerToolsExtension({
 			registerTool: () => undefined,
 			registerMessageRenderer: () => undefined,
+			getActiveTools: () => WRITING_ACTIVE,
 			on: (name: string, fn: (event: unknown, ctx: unknown) => unknown) => {
 				handlers[name] = fn;
 			},

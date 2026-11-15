@@ -32,6 +32,8 @@ import writerSkillsExtension from "./writer-skills/index.ts";
 import writerTasksExtension from "./writer-tasks/index.ts";
 // JiaWriter: the task list above the editor.
 import writerTodoExtension from "./writer-todo/index.ts";
+// JiaWriter: the toolkits, opened by the model, a command or the request.
+import writerToolkitExtension from "./writer-toolkit/index.ts";
 import writerToolsExtension from "./writer-tools/index.ts";
 // JiaWriter: topic folders, research archive and materials.
 import writerTopicExtension from "./writer-topic/index.ts";
@@ -55,7 +57,8 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-env", factory: writerEnvExtension, builtin: true },
 	// JiaWriter: the writing checks.
 	{ name: "writer-tools", factory: writerToolsExtension, builtin: true },
-	// JiaWriter: web search.
+	// JiaWriter: the toolkits open before the prompts extension sees the run.
+	{ name: "writer-toolkit", factory: writerToolkitExtension, builtin: true },
 	{ name: "writer-prompts", factory: writerPromptsExtension, builtin: true },
 	{ name: "writer-search", factory: writerSearchExtension, builtin: true },
 	// JiaWriter: acting on pages in the dedicated Chrome window.

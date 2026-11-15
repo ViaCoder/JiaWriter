@@ -555,6 +555,27 @@ export const zh = {
 	// Automatic export.
 	"export.autoTitle": "本轮修改的稿件已自动导出：",
 	"export.autoFailed": "自动导出 {path} 失败：{reason}",
+	// Toolkits (2026-11-15): opened by the model, a command, or the request.
+	"toolkit.name.writing": "写作",
+	"toolkit.name.research": "检索",
+	"toolkit.name.office": "文档",
+	"toolkit.name.browser": "浏览器",
+	"toolkit.name.computer": "桌面",
+	"toolkit.name.schedule": "定时",
+	"toolkit.opened": "已打开{name}工具。",
+	"toolkit.already": "{name} 工具包本来就开着。",
+	"toolkit.hint.writing": "写作工具已打开。说说要写什么：文种、用途、读者和篇幅。",
+	"toolkit.hint.research": "检索工具已打开。说说要查什么问题。",
+	"toolkit.hint.office": "文档工具已打开：可以导入 PDF、Word、Excel、PPT 做参考资料，或把稿件导出成这些格式。",
+	"toolkit.hint.browser": "浏览器工具已打开。说说要在哪个网页上做什么。",
+	"toolkit.hint.computer": "桌面操作工具已打开。说说要在哪个应用里做什么。",
+	"toolkit.hint.schedule": "定时任务工具已打开。说说什么时候、在哪个文件夹、做什么。",
+	"toolkit.searchPrompt": "检索：{words}。只列来源和要点，不写成文。",
+	"toolkit.cmd.write": "打开写作工具，开始写一篇文档：/write 要求",
+	"toolkit.cmd.research": "打开检索工具，研究一个问题：/research 问题",
+	"toolkit.cmd.search": "检索一次，只列来源和要点：/search 关键词",
+	"toolkit.cmd.computer": "打开桌面操作工具",
+	"toolkit.footer": "工具：{names}",
 };
 
 /** Message keys shared by all languages. */

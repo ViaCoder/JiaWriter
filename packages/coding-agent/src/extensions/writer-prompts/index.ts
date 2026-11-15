@@ -1,7 +1,9 @@
 /**
  * Built-in JiaWriter extension: the one place that gives the model the rules of a stage (writer/prompts/stages.ts).
  * Text is only appended, to a tool result or as a message, so the system prompt and the history never change
- * and the provider's cache stays valid. Each stage is given once, and again after compaction.
+ * and the provider's cache stays valid. Each stage is given once, and again after compaction. The writing and
+ * research rules come with their toolkits (extensions/writer-toolkit); this extension carries the stages a tool's
+ * first success brings (methods, checks, export, browser, computer) and the notes of a run.
  */
 
 // Message types.
@@ -17,20 +19,14 @@ import {
 	STEPS_FOR_TODO,
 	stageText,
 	stepsNote,
-	WRITING_STAGE,
 } from "../../writer/prompts/stages.ts";
 
-/** Told once to a session nobody can answer (print mode): a run on 2026-11-08 stopped at its outline, asking. */
-export const NO_USER_NOTE =
-	"Nobody can answer in this session: do not ask; settle open points from the materials and the document's usual form, finish, and state your assumptions at the end";
-
 /**
- * With a user who answers between turns (2026-11-09: the rule reached a run only with its first write, after it had
- * written the whole report in the turn meant for the outline). Short documents are written at once (2026-11-09: a
- * notice of a few hundred characters came as its opening only, and the user's later changes went to the outline).
+ * Told once to a session nobody can answer (print mode): a run on 2026-11-08 stopped at its outline, asking. Worded
+ * for any task since 2026-11-15 (it spoke of materials and documents, and so did the model, to a greeting).
  */
-export const USER_TURNS_NOTE =
-	"The user answers between turns. Write a long document (a report of some thousands of characters) over turns, unless they ask for it at once: show the outline and stop for their word; then one section per turn, ending with one line on what it covered and what comes next, and stop: their reply decides whether to revise it or go on. A short one (a notice, a letter, a brief) is written whole in one turn";
+export const NO_USER_NOTE =
+	"Nobody can answer in this session: do not ask; settle open points the usual way, finish, and state your assumptions at the end";
 
 /** The key of a tool result's details that names the stages it brought. */
 export const STAGES_KEY = "jwStages";
@@ -51,29 +47,14 @@ export function withStageTexts(messages: AgentMessage[]): AgentMessage[] {
 
 /** Extension factory. */
 export default function writerPromptsExtension(pi: ExtensionAPI): void {
-	// A document was under way when compaction cleared the record.
-	let writing = false;
 	/** Forget what was given: a shorter or another history may have lost it. */
-	const forget = () => {
-		const given = givenStages();
-		// Only writing that had started goes on after this.
-		writing = given.has(WRITING_STAGE);
-		given.clear();
-	};
-	pi.on("session_compact", () => {
-		forget();
-		// The summary may have dropped the note: it comes again with the next request.
-		toldTurns = false;
-	});
+	const forget = () => givenStages().clear();
+	pi.on("session_compact", forget);
 	pi.on("session_tree", forget);
-	// Whether this session was told that nobody answers, or that the user answers between turns.
+	// Whether this session was told that nobody answers.
 	let toldNoUser = false;
-	let toldTurns = false;
-	// A new session has written nothing yet.
 	pi.on("session_start", () => {
-		writing = false;
 		toldNoUser = false;
-		toldTurns = false;
 		givenStages().clear();
 	});
 
@@ -103,12 +84,11 @@ export default function writerPromptsExtension(pi: ExtensionAPI): void {
 	// Every request: each result's stages after its own text.
 	pi.on("context", (event) => ({ messages: withStageTexts(event.messages) }));
 
-	// Without an interface there is nobody to answer a question: said once, before the first run. After compaction a
-	// document under way needs its rules back; a topic alone asks for nothing.
+	// Without an interface there is nobody to answer a question: said once, before the first run. A request that
+	// lists several items gets the task-list note, now that it applies.
 	pi.on("before_agent_start", (event, ctx) => {
-		// One message holds whatever is due, so a note never pushes the writing rules out (after a compaction both are).
+		// One message holds whatever is due.
 		const parts: { type: string; text: string }[] = [];
-		// A request that lists several items: the task list, now that it applies.
 		if (event.messageType === "user") {
 			const steps = listedSteps(event.prompt);
 			if (steps >= STEPS_FOR_TODO) parts.push({ type: "jiawriter-steps", text: stepsNote(steps) });
@@ -116,16 +96,6 @@ export default function writerPromptsExtension(pi: ExtensionAPI): void {
 		if (!ctx.hasUI && !toldNoUser) {
 			toldNoUser = true;
 			parts.push({ type: "jiawriter-no-user", text: NO_USER_NOTE });
-		}
-		if (ctx.hasUI && !toldTurns) {
-			toldTurns = true;
-			parts.push({ type: "jiawriter-user-turns", text: USER_TURNS_NOTE });
-		}
-		const given = givenStages();
-		const stage = PROMPT_STAGES.find((s) => s.id === WRITING_STAGE);
-		if (writing && stage && !given.has(WRITING_STAGE)) {
-			given.add(stage.id);
-			parts.push({ type: "jiawriter-rules", text: stageText(stage) });
 		}
 		if (parts.length === 0) return;
 		// The model reads it; the conversation on screen stays as it was.

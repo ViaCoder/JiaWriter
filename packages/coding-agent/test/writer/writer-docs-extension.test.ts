@@ -15,6 +15,7 @@ import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../s
 import writerDocsExtension, { parseExportArgs, sessionWrote } from "../../src/extensions/writer-docs/index.ts";
 // Automatic export helpers.
 import { autoExportEnabled, editedDrafts, isDraftPath } from "../../src/writer/docs/auto.ts";
+import { TOOLKITS } from "../../src/writer/toolkit/toolkits.ts";
 // Fixtures.
 import { makePdf } from "./doc-fixtures.ts";
 
@@ -40,6 +41,9 @@ function load() {
 	const sent: { message: { content: string }; options: unknown }[] = [];
 	// Fake API with the methods the extension uses.
 	const pi = {
+		// The commands open a toolkit: an active tool set to add to.
+		getActiveTools: () => ["read", "write", ...TOOLKITS.writing.tools],
+		setActiveTools: () => undefined,
 		registerTool: (t: ToolDefinition) => tools.set(t.name, t),
 		registerCommand: (name: string, o: { handler: (args: string, ctx: unknown) => Promise<void> }) =>
 			commands.set(name, o),

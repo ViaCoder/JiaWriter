@@ -32,6 +32,8 @@ import {
 	parseWhen,
 	saveJobs,
 } from "../../writer/schedule/schedule.ts";
+// The schedule toolkit, opened by /schedule.
+import { openToolkit } from "../../writer/toolkit/open.ts";
 
 /** How often the open program looks for due jobs. */
 export const CHECK_EVERY_MS = 60_000;
@@ -51,6 +53,8 @@ export default function writerScheduleExtension(pi: ExtensionAPI, agentDir = get
 
 	pi.registerTool({
 		name: "schedule_task",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		label: "Schedule",
 		description:
 			"Adds, lists or removes scheduled tasks: a prompt run in a folder at the times a rule names.\n\nUsage:\n" +
@@ -116,6 +120,8 @@ export default function writerScheduleExtension(pi: ExtensionAPI, agentDir = get
 	pi.registerCommand("schedule", {
 		description: t("schedule.command"),
 		handler: async (_args, ctx) => {
+			// The model gets schedule_task too, so the user can add or remove tasks in words.
+			openToolkit(pi, "schedule", { hasUI: ctx.hasUI, skills: [] });
 			const jobs = loadJobs(agentDir);
 			ctx.ui.notify(jobs.length === 0 ? t("schedule.none") : jobLines(jobs).join("\n"), "info");
 		},

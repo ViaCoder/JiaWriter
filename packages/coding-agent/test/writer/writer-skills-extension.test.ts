@@ -23,6 +23,8 @@ import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
 import writerSkillsExtension, { skillLabel } from "../../src/extensions/writer-skills/index.ts";
 // Style check for the shipped texts.
 import { styleCheck } from "../../src/writer/style/check.ts";
+// The writing toolkit names the skills.
+import { toolkitText } from "../../src/writer/toolkit/toolkits.ts";
 
 // Agent folder of each test.
 let agent = "";
@@ -127,8 +129,12 @@ describe("skills load only when needed", () => {
 			toolSnippets: { read: "x" },
 			skills,
 		});
-		// The index names the skill; its body stays in its file.
-		expect(prompt).toContain("gongwen-writing");
+		// Since 2026-11-15 the writing skills stay out of stage 0 (disable-model-invocation) and come with the writing
+		// toolkit, named with their file; their bodies stay in their files.
+		expect(prompt).not.toContain("gongwen-writing");
+		const offered = skills.map((s) => ({ name: s.name, description: s.description, path: s.filePath }));
+		expect(toolkitText("writing", { skills: offered, hasUI: false })).toContain("gongwen-writing");
+		expect(toolkitText("writing", { skills: offered, hasUI: false })).toContain(skills[0].filePath);
 		expect(prompt).not.toContain(readFileSync(skills[0].filePath, "utf-8").split("\n---\n")[1].slice(0, 200));
 		expect(prompt).not.toContain("公文写作 DNA");
 	});
@@ -141,11 +147,14 @@ describe("skills load only when needed", () => {
 
 	it("makes the gongwen skill the default genre while it is on", () => {
 		const rule = "read the gongwen-writing skill first";
-		const build = (skills: ReturnType<typeof shipped>) =>
-			buildSystemPrompt({ cwd: "/work", selectedTools: ["read"], toolSnippets: { read: "x" }, skills });
-		expect(build(shipped())).toContain(rule);
+		const text = (skills: ReturnType<typeof shipped>) =>
+			toolkitText("writing", {
+				skills: skills.map((s) => ({ name: s.name, description: s.description, path: s.filePath })),
+				hasUI: false,
+			});
+		expect(text(shipped())).toContain(rule);
 		// Turned off in /skills: it is no longer among the skills, and the rule goes with it.
-		expect(build(shipped().filter((s) => s.name !== "gongwen-writing"))).not.toContain(rule);
+		expect(text(shipped().filter((s) => s.name !== "gongwen-writing"))).not.toContain(rule);
 	});
 });
 

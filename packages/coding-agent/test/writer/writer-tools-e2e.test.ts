@@ -126,11 +126,15 @@ function runCli(dir: string, env: Record<string, string>): Promise<{ code: numbe
 	// Wrap the child process.
 	return new Promise((done, reject) => {
 		// Print mode.
-		const child = spawn(process.execPath, ["--import", sourceResolverUrl, cliPath, "-p", "检查草稿"], {
-			cwd: dir,
-			env: childEnv,
-			stdio: ["ignore", "pipe", "pipe"],
-		});
+		const child = spawn(
+			process.execPath,
+			["--import", sourceResolverUrl, cliPath, "-p", "写一份报告之前先检查草稿"],
+			{
+				cwd: dir,
+				env: childEnv,
+				stdio: ["ignore", "pipe", "pipe"],
+			},
+		);
 		// Collected stdout.
 		let stdout = "";
 		// Capture it.

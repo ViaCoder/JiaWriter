@@ -18,11 +18,14 @@ import { SessionManager } from "../../src/core/session-manager.ts";
 import writerDocsExtension from "../../src/extensions/writer-docs/index.ts";
 import writerRewindExtension from "../../src/extensions/writer-rewind/index.ts";
 import writerSearchExtension from "../../src/extensions/writer-search/index.ts";
+import writerToolsExtension from "../../src/extensions/writer-tools/index.ts";
 import writerTopicExtension from "../../src/extensions/writer-topic/index.ts";
 // The extraction's model stand-in.
 import type { Complete } from "../../src/writer/model-ask.ts";
 // Snapshots.
 import { readSnapshots, storeDir } from "../../src/writer/rewind/rewind.ts";
+// The writing toolkit: its tools active make the draft a document (checked and exported).
+import { TOOLKITS } from "../../src/writer/toolkit/toolkits.ts";
 // The current topic.
 import { currentTopic, setCurrentTopic } from "../../src/writer/topic/current.ts";
 import { topicPath } from "../../src/writer/topic/topic.ts";
@@ -31,15 +34,18 @@ import { createHarness, getToolResult, type Harness } from "../suite/harness.ts"
 
 const URL_A = "https://a.example/news";
 const TOOLS = [
-	"draft_restore",
-	"topic_open",
-	"search_web",
-	"fetch_web",
-	"material_add",
-	"write",
-	"edit",
-	"read",
-	"import_document",
+	...new Set([
+		"draft_restore",
+		"topic_open",
+		"search_web",
+		"fetch_web",
+		"material_add",
+		"write",
+		"edit",
+		"read",
+		"import_document",
+		...TOOLKITS.writing.tools,
+	]),
 ];
 
 describe("a writing topic", () => {
@@ -80,13 +86,27 @@ describe("a writing topic", () => {
 		return { role: "assistant", content: [{ type: "text", text: factLines }], stopReason: "stop" };
 	}) as unknown as Complete;
 	const topicExtension = (pi: ExtensionAPI) => writerTopicExtension(pi, complete);
+	// The writing tools, whose registration makes the writing toolkit whole (its checks and the export apply only
+	// then, 2026-11-15); their review answers nothing.
+	const quiet = (async () => ({
+		role: "assistant",
+		content: [{ type: "text", text: "" }],
+		stopReason: "stop",
+	})) as unknown as Complete;
+	const toolsExtension = (pi: ExtensionAPI) => writerToolsExtension(pi, quiet);
 
 	/** A harness with the three extensions. */
 	async function setup(sessionManager?: SessionManager): Promise<Harness> {
 		extractions.length = 0;
 		factLines = CASE_LINE;
 		return createHarness({
-			extensionFactories: [topicExtension, writerSearchExtension, writerDocsExtension, writerRewindExtension],
+			extensionFactories: [
+				topicExtension,
+				writerSearchExtension,
+				writerDocsExtension,
+				writerRewindExtension,
+				toolsExtension,
+			],
 			initialActiveToolNames: TOOLS,
 			sessionManager,
 		});

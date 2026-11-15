@@ -156,7 +156,10 @@ def main():
     # took dates (about 500); still a guard against descriptions that grow.
     # 14000 since 2026-11-12: draft_section (a section written in a clean context) joined the tools.
     # 15500 since 2026-11-15: schedule_task and delegate joined (about 1,300 characters together).
-    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 5000 and tools <= 15500)
+    # 3000 / 7000 since 2026-11-15 (P25): the writing, research, Office, browser, desktop and schedule tools come with
+    # their toolkits, and the skills list with the writing toolkit; a greeting carries 11 tools (measured 2690 / 6461).
+    check(f"闲聊只有核心内容：系统提示 {len(system)} 字符，工具说明 {tools} 字符", len(system) <= 3000 and tools <= 7000)
+    check("闲聊时没有写作工具和技能列表", not any(w in json.dumps(first.get("tools", []), ensure_ascii=False) for w in ("draft_section", "search_web", "topic_open")) and "<available_skills>" not in system)
     check("闲聊时没有任何手册", not any(w in text_of(first) for w in ("Writing rules", "Research rules", "2026年10月31日")))
     said = json.dumps(first["messages"][1:], ensure_ascii=False)
     check("日期只有一个 [Date: …]，没有其他时间", said.count("[Date: ") == 1 and "[Sent" not in said)
@@ -168,11 +171,13 @@ def main():
         ("search_web", {"query": "乙", "method": "claude", "engines": None, "pages": "x"}),
         ("topic_open", {"name": "绿化"}),
     ])
-    run(topic, ["写一份报告"])
+    # The request opens the research toolkit (P25): search_web is declared, the writing toolkit stays closed.
+    run(topic, ["查一下绿化的最新报道"])
     last = text_of(topic.requests[-1])
+    check("只检索时打开了检索工具包", "Toolkit research is open" in last and len([t for t in topic.requests[-1].get("tools", []) if t["function"]["name"] == "search_web"]) == 1)
     check("只搜索时没有写作手册", "Writing rules:" not in last)
     check("工具结果不提稿件", "稿件放在" not in last)
-    check("第一次搜索出现检索手册和该方式规则，各一次", last.count("Research rules:") == 1 and last.count("Method claude of search_web:") == 1)
+    check("检索手册随工具包来一次，该方式规则随第一次搜索来一次", last.count("Research rules:") == 1 and last.count("Method claude of search_web:") == 1)
     check("错误参数被清理，搜索照常完成", last.count("检索结果（claude") == 2)
     check("没有生效的参数告诉模型", "它们没有生效：pages" in last)
     check("工具结果不含时间", "检索时间" not in last)
@@ -181,22 +186,27 @@ def main():
     # A draft without a topic.
     bare = Script([("write", {"path": "稿.md", "content": "正文"}), ("write", {"path": "稿二.md", "content": "正文"})])
     run(bare, ["写一段"])
-    check("开始写时收到写作手册，只有一次", text_of(bare.requests[-1]).count("Writing rules:") == 1)
+    check("开始写时收到写作手册，只有一次（随写作工具包）", text_of(bare.requests[-1]).count("Writing rules:") == 1)
+    # A plain file write with no document asked for: no writing rules at all (P25).
+    plain = Script([("write", {"path": "说明.md", "content": "正文"})])
+    run(plain, ["看看这个文件夹，然后把一句说明写进 说明.md"])
+    check("普通写文件不带写作手册", "Writing rules:" not in text_of(plain.requests[-1]) and "Toolkit writing" not in text_of(plain.requests[-1]))
 
     # Compaction with a working summary.
     full = Script([("topic_open", {"name": "绿化"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000)
-    run(full, ["写报告，要三节", "继续写"])
+    run(full, ["查一下绿化的最新报道，要三条", "继续查"])
     check("用量到 80% 时压缩", len(full.summaries) >= 1)
     summary_in = full.summaries[0] if full.summaries else ""
     after = text_of(full.requests[-1])
     check("摘要请求里没有搜索全文", "页面正文内容" not in summary_in)
-    check("压缩后带写作状态和用户原话", "写作状态" in after and "写报告，要三节" in after)
+    check("压缩后带写作状态和用户原话", "写作状态" in after and "查一下绿化的最新报道，要三条" in after)
     check("压缩后保留模型写的决定", "定了三节" in after)
     check("只有检索时压缩后不要求读稿件", "先读大纲和当前稿件" not in after)
     check("只有检索时压缩后不发写作手册", "Writing rules:" not in after)
 
     # Compaction with a document under way.
-    draft = Script([("topic_open", {"name": "绿化"}), ("write", {"path": f"{time.strftime('%Y%m%d')}-绿化/稿件/初稿.md", "content": "正文"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000)
+    # The request opens writing; the model opens research itself before it searches (P25).
+    draft = Script([("toolkit", {"name": "research"}), ("topic_open", {"name": "绿化"}), ("write", {"path": f"{time.strftime('%Y%m%d')}-绿化/稿件/初稿.md", "content": "正文"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000)
     run(draft, ["写报告", "继续写"])
     after = text_of(draft.requests[-1])
     check("写作中压缩后要求先读大纲和稿件", "先读大纲和当前稿件" in after)
@@ -204,16 +214,18 @@ def main():
 
     # Research before the topic has a name. The result has no date, so the material has no time (2026-11-10: a time
     # the source does not give is sent back).
-    late = Script([("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"url": "https://news.example.com/a", "section": "现状"}]})])
+    # The words name no toolkit: the model opens research itself with the toolkit tool (P25).
+    late = Script([("toolkit", {"name": "research"}), ("search_web", {"query": "甲", "method": "claude"}), ("topic_open", {"name": "绿化"}), ("material_add", {"items": [{"url": "https://news.example.com/a", "section": "现状"}]})])
     run(late, ["查一下再写"])
     last = text_of(late.requests[-1])
+    check("模型自己打开检索工具包后，工具立即可用", "Toolkit research is open" in last and last.count("Research rules:") == 1)
     check("先搜索后开主题，资料并入主题", "已建立主题文件夹" in last and f"{time.strftime('%Y%m%d')}-绿化" in last and "记下 1 条" in last)
 
     # Compaction when the summary fails.
     broken = Script([("topic_open", {"name": "绿化"}), ("search_web", {"query": "甲", "method": "claude"}), ("search_web", {"query": "乙", "method": "claude"})], tokens=110_000, summary_fails=True)
-    out = run(broken, ["写报告，要三节", "继续写"])
+    out = run(broken, ["查一下绿化的最新报道，要三条", "继续查"])
     after = text_of(broken.requests[-1])
-    check("摘要接口失败时状态和用户原话仍在", "写作状态" in after and "写报告，要三节" in after)
+    check("摘要接口失败时状态和用户原话仍在", "写作状态" in after and "查一下绿化的最新报道，要三条" in after)
     check("摘要失败后下一条消息正常", out.returncode == 0)
 
     for name, ok in results:

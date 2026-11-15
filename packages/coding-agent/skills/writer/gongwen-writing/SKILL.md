@@ -1,6 +1,7 @@
 ---
 name: gongwen-writing
 description: "公文, research and survey reports first; speeches, plans, notices and other genres in their usual form."
+disable-model-invocation: true
 metadata:
   title: 公文写作（gongwen-writing）
   style_packs: core-zh,gongwen-zh

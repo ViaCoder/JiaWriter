@@ -107,6 +107,9 @@ function sfCommand(name = "sf"): (args: string, ctx: unknown) => Promise<void> {
 	const cmds = new Map<string, (args: string, ctx: unknown) => Promise<void>>();
 	writerSearchExtension({
 		registerTool: () => undefined,
+		// /browser opens the browser toolkit: an active tool set to add to.
+		getActiveTools: () => ["read"],
+		setActiveTools: () => undefined,
 		registerCommand: (name: string, o: { handler: (args: string, ctx: unknown) => Promise<void> }) =>
 			cmds.set(name, o.handler),
 		on: () => () => undefined,

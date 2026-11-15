@@ -82,6 +82,8 @@ import { formatReview, keepAnswerable, type ReviewIssue, reviewDraft } from "../
 import { bodyBeforeReferences, countText, REFERENCES_HEADING } from "../../writer/text-stats.ts";
 // Shared input loading.
 import { loadToolText, setLastDraft } from "../../writer/tool-input.ts";
+// Whether the writing toolkit is open.
+import { writingOpen } from "../../writer/toolkit/open.ts";
 // The materials folders and file of a topic.
 import { MATERIAL_FILE, misattributedFigures, TOPIC_DIRS } from "../../writer/topic/topic.ts";
 // Length check.
@@ -501,7 +503,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	});
 	// After each write or edit of a draft, the program checks it: the model never has to remember to.
 	pi.on("tool_result", (event, ctx) => {
-		if (event.isError || !DRAFT_TOOLS.has(event.toolName)) return;
+		// A file written outside the writing toolkit is a file, not a draft (2026-11-15).
+		if (event.isError || !DRAFT_TOOLS.has(event.toolName) || !writingOpen(pi)) return;
 		const path = (event.input as { path?: unknown }).path;
 		const file = typeof path === "string" ? resolveToCwd(path, ctx.cwd) : "";
 		if (!file || !isDraftPath(file, ctx.cwd) || !existsSync(file)) return;
@@ -606,6 +609,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	pi.registerTool({
 		// Name the model calls.
 		name: "draft_section",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Draft section",
 		// Full description sent to the model.
@@ -701,6 +706,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	pi.registerTool({
 		// Name the model calls.
 		name: "style_check",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Style check",
 		// Full description sent to the model.
@@ -742,6 +749,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	pi.registerTool({
 		// Name the model calls.
 		name: "word_count",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Word count",
 		// Full description sent to the model.
@@ -782,6 +791,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	pi.registerTool({
 		// Name the model calls.
 		name: "readability_check",
+		// Declared only while its toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		// Name shown in the interface.
 		label: "Readability check",
 		// Full description sent to the model.

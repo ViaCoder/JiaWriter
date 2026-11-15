@@ -3,15 +3,11 @@ import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import { buildSystemPrompt } from "../../src/core/system-prompt.ts";
-import writerPromptsExtension, {
-	NO_USER_NOTE,
-	USER_TURNS_NOTE,
-	withStageTexts,
-} from "../../src/extensions/writer-prompts/index.ts";
+import writerPromptsExtension, { NO_USER_NOTE, withStageTexts } from "../../src/extensions/writer-prompts/index.ts";
 import { t } from "../../src/writer/i18n/index.ts";
 import { WRITER_PREAMBLE } from "../../src/writer/prompt-text.ts";
 import { SUMMARY_PROMPT, SUMMARY_TURN_PROMPT, SUMMARY_UPDATE_PROMPT } from "../../src/writer/prompts/compact.ts";
-import { CORE_RULES, DEFAULT_SKILL, defaultSkillRule, WORKING_RULES } from "../../src/writer/prompts/core.ts";
+import { CORE_RULES, WORKING_RULES } from "../../src/writer/prompts/core.ts";
 import {
 	BROWSER_MANUAL,
 	CHECK_MANUALS,
@@ -30,11 +26,17 @@ import {
 	PROMPT_STAGES,
 	STEPS_FOR_TODO,
 	stageLines,
-	stageText,
 	stepsNote,
 	WRITING_STAGE,
 } from "../../src/writer/prompts/stages.ts";
 import { styleCheck, styleClean } from "../../src/writer/style/check.ts";
+import {
+	DEFAULT_SKILL,
+	defaultSkillRule,
+	TOOLKIT_RULE,
+	TOOLKITS,
+	USER_TURNS_NOTE,
+} from "../../src/writer/toolkit/toolkits.ts";
 import { setCurrentTopic } from "../../src/writer/topic/current.ts";
 
 /** Total characters of some rules. */
@@ -98,9 +100,10 @@ describe("budgets", () => {
 	});
 
 	it("keeps the short skills short", () => {
-		// English rules since 2026-11-08; the gongwen skill is longer because it carries the genre's method.
+		// English rules since 2026-11-08; the gongwen skill is longer because it carries the genre's method. 2050 since
+		// 2026-11-15: the disable-model-invocation line keeps them out of stage 0 (they come with their toolkit).
 		for (const name of ["academic-writing", "deep-research"]) {
-			expect(readFileSync(`skills/writer/${name}/SKILL.md`, "utf-8").length).toBeLessThanOrEqual(2000);
+			expect(readFileSync(`skills/writer/${name}/SKILL.md`, "utf-8").length).toBeLessThanOrEqual(2050);
 		}
 		expect(readFileSync("skills/writer/gongwen-writing/SKILL.md", "utf-8").length).toBeLessThanOrEqual(6000);
 	});
@@ -125,7 +128,7 @@ describe("one place for each rule", () => {
 
 describe("the user's requirements", () => {
 	// Each requirement lives in one place: the rules of every request or the writing manual.
-	const writing = [...CORE_RULES, ...WRITING_MANUAL].join("\n");
+	const writing = [...CORE_RULES, ...TOOLKITS.writing.rules, ...WRITING_MANUAL].join("\n");
 
 	it.each([
 		// Citations only where the type expects them, by kind of source (the user, 2026-11-08).
@@ -173,12 +176,14 @@ describe("the user's requirements", () => {
 	});
 
 	it("keeps search on the user's request, one call at a time, with no default", () => {
-		const core = CORE_RULES.join("\n");
-		expect(core).toContain("Search only when the user asks");
-		expect(core).toContain("a draft comes only when the user asks for one");
-		expect(core).toContain("one search_web or fetch_web at a time");
-		expect(core).toContain("none is the default");
-		expect(core).toContain("only when the user's prompt says the upstream supports them");
+		// Since 2026-11-15 these come with the research toolkit, not with every request.
+		const research = TOOLKITS.research.rules.join("\n");
+		expect(research).toContain("Search for what the user asked and stop there");
+		expect(research).toContain("a document comes only when they ask for one");
+		expect(research).toContain("one search_web or fetch_web at a time");
+		expect(research).toContain("none is the default");
+		expect(research).toContain("only when the user's prompt says the upstream supports them");
+		expect(CORE_RULES.join("\n")).toContain("nothing more is started unasked");
 	});
 
 	it("tells the time filter of each engine apart, and what pages means", () => {
@@ -189,7 +194,7 @@ describe("the user's requirements", () => {
 
 	it("makes the gongwen skill the default while it is on", () => {
 		expect(defaultSkillRule([{ name: DEFAULT_SKILL }])[0]).toContain(DEFAULT_SKILL);
-		expect(defaultSkillRule([{ name: DEFAULT_SKILL, disableModelInvocation: true }])).toEqual([]);
+		expect(defaultSkillRule([{ name: "academic-writing" }])).toEqual([]);
 		expect(defaultSkillRule([])).toEqual([]);
 	});
 });
@@ -228,7 +233,7 @@ describe("denials", () => {
 
 	it("asks the same question in chat and in documents", () => {
 		const core = CORE_RULES.join("\n");
-		expect(core).toContain("in chat and in documents");
+		expect(core).toContain("State what is so");
 		expect(core).toContain("ask who claimed Y");
 		expect(core).toContain("if nobody did, drop the sentence");
 		const rules = CHECK_MANUALS.style_check.join("\n");
@@ -255,8 +260,11 @@ describe("a general-purpose agent", () => {
 	it("says so, and limits the document rules to documents", () => {
 		expect(WRITER_PREAMBLE).toContain("general-purpose agent");
 		expect(WRITER_PREAMBLE).not.toMatch(/writing|research/i);
-		expect(CORE_RULES.join("\n")).toContain("In a document, take every case");
-		expect(CORE_RULES.join("\n")).toContain("When writing a document, keep it");
+		// The document rules come with the writing toolkit (2026-11-15), not with every request; the toolkit rule
+		// only names the toolkits.
+		expect(CORE_RULES.filter((r) => r !== TOOLKIT_RULE).join("\n")).not.toMatch(/document|draft|材料|topic_open/);
+		expect(TOOLKITS.writing.rules.join("\n")).toContain("In a document, take every case");
+		expect(TOOLKITS.writing.rules.join("\n")).toContain("Keep a document in a Markdown file");
 	});
 });
 
@@ -277,15 +285,17 @@ describe("dueStages", () => {
 		expect(ids("fetch_web", { method: "sf" })).not.toContain(WRITING_STAGE);
 		expect(ids("read", { path: "notes.md" })).toEqual([]);
 		expect(ids("read", { path: "/skills/report-analysis/SKILL.md" })).toEqual([WRITING_STAGE]);
-		expect(ids("write", { path: "稿.md" })).toEqual([WRITING_STAGE]);
-		expect(ids("edit", { path: "稿.md" })).toEqual([WRITING_STAGE]);
+		expect(ids("draft_section", { path: "稿.md" })).toEqual([WRITING_STAGE]);
+		// A plain write is a file, not a document: the rules come with the writing toolkit (2026-11-15).
+		expect(ids("write", { path: "稿.md" })).toEqual([]);
+		expect(ids("edit", { path: "稿.md" })).toEqual([]);
 	});
 
 	it("shows the table with what was given", () => {
 		givenStages().add(WRITING_STAGE);
 		const lines = stageLines();
 		expect(lines).toHaveLength(PROMPT_STAGES.length);
-		expect(lines[0]).toMatch(/^✓ Writing rules: write, edit, draft_section, SKILL\.md, \d+ chars$/);
+		expect(lines[0]).toMatch(/^✓ Writing rules: draft_section, SKILL\.md, \d+ chars$/);
 		expect(lines[1]).toMatch(/^· Research rules/);
 	});
 });
@@ -308,13 +318,13 @@ function staged(out: unknown): { content: { text: string }[] } {
 describe("the extension", () => {
 	it("adds a stage to the first success only, after the tool's own text, in the request and not on screen", () => {
 		const on = handlers().get("tool_result");
-		const out = on?.(result("write")) as { content: { text: string }[] };
+		const out = on?.(result("draft_section")) as { content: { text: string }[] };
 		// The result as stored and shown keeps only the tool's text.
 		expect(out.content.map((c) => c.text)).toEqual(["结果"]);
 		const first = staged(out);
 		expect(first.content[0].text).toBe("结果");
 		expect(first.content[1].text).toContain("Writing rules:");
-		expect(on?.(result("write"))).toBeUndefined();
+		expect(on?.(result("draft_section"))).toBeUndefined();
 	});
 
 	it("adds nothing to opening a topic", () => {
@@ -323,12 +333,14 @@ describe("the extension", () => {
 
 	it("gives nothing for a failed call", () => {
 		const on = handlers().get("tool_result");
-		expect(on?.({ ...result("write"), isError: true })).toBeUndefined();
+		expect(on?.({ ...result("draft_section"), isError: true })).toBeUndefined();
 		expect(givenStages().size).toBe(0);
 	});
 
-	it("gives the writing rules to a draft written without a topic", () => {
-		const out = staged(handlers().get("tool_result")?.(result("write")));
+	it("gives a plain write no writing rules, and a section written its rules", () => {
+		const on = handlers().get("tool_result");
+		expect(on?.(result("write"))).toBeUndefined();
+		const out = staged(on?.(result("draft_section")));
 		expect(out.content[1].text).toContain("Writing rules:");
 	});
 
@@ -345,10 +357,10 @@ describe("the extension", () => {
 
 	it("forgets what was given after compaction", () => {
 		const map = handlers();
-		map.get("tool_result")?.(result("write"));
+		map.get("tool_result")?.(result("draft_section"));
 		map.get("session_compact")?.();
 		expect(givenStages().size).toBe(0);
-		expect(map.get("tool_result")?.(result("write"))).toBeDefined();
+		expect(map.get("tool_result")?.(result("draft_section"))).toBeDefined();
 	});
 
 	it("gives the task-list note with a request that lists three items or more, every such request", () => {
@@ -357,11 +369,10 @@ describe("the extension", () => {
 			map.get("before_agent_start")?.({ messageType: "user", prompt }, UI) as
 				| { message: { content: string } }
 				| undefined;
-		// The interactive note comes with the first run; the steps note is in the same message.
 		const first = start("请完成三件事：1. 整理目录；2. 汇总要点；3. 加一行。");
-		expect(first?.message.content).toContain(USER_TURNS_NOTE);
 		expect(first?.message.content).toContain("lists 3 items");
-		// A request without a list: nothing; a later list: the note again.
+		// A request without a list: nothing (the turns note comes with the writing toolkit since 2026-11-15); a later
+		// list: the note again.
 		expect(start("写一份通知")).toBeUndefined();
 		expect(start("①检索 ②记素材 ③写大纲 ④写稿")?.message.content).toContain("lists 4 items");
 	});
@@ -370,40 +381,24 @@ describe("the extension", () => {
 		const map = handlers();
 		setCurrentTopic("/tmp/主题");
 		map.get("tool_result")?.(result("search_web", "codex"));
-		// The interactive note, then nothing; after compaction the note again, and no writing rules.
-		expect(map.get("before_agent_start")?.({}, UI)).toBeDefined();
 		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
 		map.get("session_compact")?.();
-		const again = map.get("before_agent_start")?.({}, UI) as { message: { content: string } };
-		expect(again.message.content).toBe(USER_TURNS_NOTE);
+		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
 	});
 
-	it("tells a session without an interface once that nobody answers, and an interactive one that the user answers", () => {
+	it("tells a session without an interface once that nobody answers, and an interactive one nothing", () => {
 		const map = handlers();
 		const out = map.get("before_agent_start")?.({}, { hasUI: false }) as {
 			message: { content: string; customType: string };
 		};
 		expect(out.message).toMatchObject({ customType: "jiawriter-no-user", content: NO_USER_NOTE });
+		// Worded for any task: no materials or documents (2026-11-15).
+		expect(NO_USER_NOTE).not.toMatch(/material|document/);
 		expect(map.get("before_agent_start")?.({}, { hasUI: false })).toBeUndefined();
-		// A new session is told again; an interactive one hears of the turns instead (2026-11-09).
+		// A new session is told again; an interactive one hears nothing (the turns note comes with the writing toolkit).
 		map.get("session_start")?.();
 		expect(map.get("before_agent_start")?.({}, { hasUI: false })).toBeDefined();
-		const ui = handlers();
-		expect(ui.get("before_agent_start")?.({}, UI)).toMatchObject({
-			message: { customType: "jiawriter-user-turns", content: USER_TURNS_NOTE },
-		});
-		expect(ui.get("before_agent_start")?.({}, UI)).toBeUndefined();
-	});
-
-	it("gives the writing rules back after compaction when a document is under way, once", () => {
-		const map = handlers();
-		map.get("tool_result")?.(result("write"));
-		map.get("session_compact")?.();
-		const out = map.get("before_agent_start")?.({}, UI) as { message: { content: string; display: boolean } };
-		// Both are due: the turns note and the writing rules, in one message.
-		expect(out.message.content).toBe(`${USER_TURNS_NOTE}\n\n${stageText(PROMPT_STAGES[0])}`);
-		expect(out.message.display).toBe(false);
-		expect(map.get("before_agent_start")?.({}, UI)).toBeUndefined();
+		expect(handlers().get("before_agent_start")?.({}, UI)).toBeUndefined();
 	});
 });
 

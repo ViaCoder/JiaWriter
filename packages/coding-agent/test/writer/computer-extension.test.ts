@@ -92,29 +92,15 @@ describe("writerComputerExtension", () => {
 		return { handlers, tools, set, entries, ctx };
 	}
 
-	it("keeps its description short, and costs nothing unless installed", () => {
+	// Since 2026-11-15 the tool is deferred and joins with the computer toolkit (/computer); a session start activates
+	// nothing, installed or not.
+	it("keeps its description short, is deferred, and a session start leaves the active tools alone", () => {
+		process.env.JW_COMPUTER_DRIVER = process.execPath;
 		const { tools, handlers, set, ctx, entries } = loaded(["search_web"]);
 		expect(tools[0].description.length).toBeLessThanOrEqual(500);
-		expect(tools[0].defaultActive).toBe(false);
+		expect((tools[0] as { exposure?: string }).exposure).toBe("deferred");
 		handlers.session_start({}, ctx);
-		expect(set.length).toBe(0);
-		expect(entries).toEqual([{ type: "custom", customType: "jiawriter-computer-tool", data: false }]);
-	});
-
-	it("joins a conversation when installed, and a resumed one keeps its choice", () => {
-		process.env.JW_COMPUTER_DRIVER = process.execPath;
-		const { handlers, set, ctx } = loaded(["search_web"]);
-		handlers.session_start({}, ctx);
-		expect(set[0]).toContain("computer");
 		delete process.env.JW_COMPUTER_DRIVER;
-		handlers.session_start({}, ctx);
-		expect(set.length).toBe(2);
-	});
-
-	it("respects an allowlist", () => {
-		process.env.JW_COMPUTER_DRIVER = process.execPath;
-		const { handlers, set, ctx } = loaded(["read"]);
-		handlers.session_start({}, ctx);
-		expect(set.length).toBe(0);
+		expect([set, entries]).toEqual([[], []]);
 	});
 });

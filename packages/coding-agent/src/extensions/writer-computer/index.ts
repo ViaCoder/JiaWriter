@@ -14,7 +14,7 @@ import { Type } from "typebox";
 // Where things live.
 import { getAgentDir } from "../../config.ts";
 // Extension API types.
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "../../core/extensions/types.ts";
+import type { ExtensionAPI, ExtensionCommandContext } from "../../core/extensions/types.ts";
 // The extension's bridge.
 import { bridgeAddress, bridgeCall, bridgePresent, EXTENSION_VERSION } from "../../writer/browser/bridge.ts";
 // The driver.
@@ -36,12 +36,10 @@ import { provenId } from "../../writer/websearch/main-search.ts";
 // The configured model.
 import { getWriterModel } from "../../writer/writer-model.ts";
 // A conversation's choice, and results as the model reads them.
-import { knownChoice, resultContent } from "../writer-browser/index.ts";
+import { resultContent } from "../writer-browser/index.ts";
 // Looking at a window.
 import { sessionVision, supportFile } from "../writer-vision/index.ts";
 
-/** Session entry saying whether a conversation has the tool. */
-const TOOL_ENTRY = "jiawriter-computer-tool";
 /** What the program tells the user by itself. */
 const NOT_INSTALLED = "not-installed";
 /** Longest a setup command may take (ms): a permission dialog waits for a person. */
@@ -149,7 +147,8 @@ export default function writerComputerExtension(pi: ExtensionAPI): void {
 			" - windows lists windows; read takes a pid and window and numbers the controls as [2]; ref is that number\n" +
 			" - Each result is JSON: `next` says who goes on; stop when it is user\n" +
 			" - look is a last resort and needs a reason",
-		defaultActive: false,
+		// Declared only while the computer toolkit is open (writer/toolkit).
+		exposure: "deferred",
 		parameters: Type.Object({
 			action: StringEnum(COMPUTER_ACTIONS),
 			pid: Type.Optional(Type.Number()),
@@ -178,20 +177,9 @@ export default function writerComputerExtension(pi: ExtensionAPI): void {
 		},
 	});
 
-	/** Settle whether this conversation has the tool, once. */
-	function settleTool(ctx: ExtensionContext): void {
-		if (!pi.getActiveTools().includes("search_web")) return;
-		const known = knownChoice(ctx.sessionManager.getEntries(), TOOL_ENTRY);
-		const wanted =
-			known ?? (process.env.JW_COMPUTER !== "off" && existsSync(driverPath(getAgentDir(), process.platform)));
-		if (known === undefined) pi.appendEntry(TOOL_ENTRY, wanted);
-		if (wanted) pi.setActiveTools([...pi.getActiveTools(), "computer"]);
-	}
-
-	pi.on("session_start", (_event, ctx) => {
-		gate.reset();
-		settleTool(ctx);
-	});
+	// The tool joins the conversation with the computer toolkit (writer/toolkit, /computer); before 2026-11-15 it was
+	// activated at session start whenever the driver was installed.
+	pi.on("session_start", () => gate.reset());
 	pi.on("before_agent_start", () => breaker.reset());
 	pi.on("session_shutdown", () => client?.close());
 }
