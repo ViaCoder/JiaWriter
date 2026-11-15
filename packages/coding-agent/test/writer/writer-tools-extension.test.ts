@@ -760,8 +760,9 @@ describe("shownRound", () => {
 		const pi = {
 			registerTool: () => undefined,
 			getActiveTools: () => WRITING_ACTIVE,
-			registerMessageRenderer: (_type: string, fn: typeof render) => {
-				render = fn;
+			// The extension registers two renderers; this check reads the automatic round's.
+			registerMessageRenderer: (type: string, fn: typeof render) => {
+				if (type === "jiawriter-style-round") render = fn;
 			},
 			on: () => undefined,
 		} as unknown as ExtensionAPI;
