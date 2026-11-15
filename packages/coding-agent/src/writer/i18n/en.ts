@@ -107,23 +107,7 @@ export const en: Record<MessageKey, string> = {
 	"style.materials":
 		"Facts and cases in a revision come only from the materials at hand: the topic's 素材.md, 参考资料/.parsed/, and the results saved in 检索/ and 网页/, cited; nothing the materials lack is invented, and no placeholder is left. A check's finding is no reason to search: search only when the user asked, and where the materials and a finding disagree, the materials stand.",
 	// An automatic round of revision.
-	// Scheduled tasks and delegated subtasks (2026-11-15).
-	"schedule.badWhen":
-		"The time “{when}” is not understood. Write 每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields (0 8 * * 1-5).",
-	"schedule.noTask": "task is missing: the request, complete, as the user would type it.",
-	"schedule.missing":
-		"add needs the {field} parameter (received: {got}). when is the rule, such as 每天 08:00; task is the request to run, complete in itself.",
-	"schedule.added": "Scheduled task {id} added: {when}, next {next}, in {folder}.",
-	"schedule.cronHint":
-		"Tell the user this, as it stands (two real-model runs left it out, 2026-11-15): while the program is open the job runs on time; when it is closed, this line must be in the system's crontab (crontab -e), or nothing runs:\n{line}",
-	"schedule.none": "No scheduled tasks.",
-	"schedule.line": "- {id}: {when}, next {next}{last} | {task} | {folder}",
-	"schedule.noSuch": "No scheduled task with id “{id}”.",
-	"schedule.removed": "Scheduled task removed: {task}",
-	"schedule.ran": "Scheduled task “{task}” ran: {status}, log {log}",
-	"schedule.nothingDue": "No scheduled task is due.",
-	"schedule.usage": "Usage: jiawriter schedule run (run the due tasks) | jiawriter schedule list",
-	"schedule.command": "List the scheduled tasks",
+	// Delegated subtasks (2026-11-15).
 	"delegate.depth": "A subtask cannot delegate further: do it directly.",
 	"delegate.noTask": "task is missing: the whole request, as the user would type it.",
 	"delegate.timeout": "The subtask was stopped after {minutes} minutes; its reply so far:\n{reply}",
@@ -614,7 +598,6 @@ export const en: Record<MessageKey, string> = {
 	"toolkit.name.office": "office",
 	"toolkit.name.browser": "browser",
 	"toolkit.name.computer": "computer",
-	"toolkit.name.schedule": "schedule",
 	"toolkit.opened": "The {name} toolkit is open.",
 	"toolkit.already": "Toolkit {name} was already open.",
 	"toolkit.hint.writing":
@@ -624,7 +607,6 @@ export const en: Record<MessageKey, string> = {
 		"The office toolkit is open: import PDF, Word, Excel or PowerPoint files as references, or export a draft to those formats.",
 	"toolkit.hint.browser": "The browser toolkit is open. Say what to do on which page.",
 	"toolkit.hint.computer": "The computer toolkit is open. Say what to do in which application.",
-	"toolkit.hint.schedule": "The schedule toolkit is open. Say when, in which folder, and what to do.",
 	"toolkit.searchPrompt": "Search: {words}. List sources and key points only, no document.",
 	"toolkit.cmd.write": "Open the writing toolkit and start a document: /write brief",
 	"toolkit.cmd.research": "Open the research toolkit and look into a question: /research question",

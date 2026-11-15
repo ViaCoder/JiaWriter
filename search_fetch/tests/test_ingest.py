@@ -105,7 +105,7 @@ def run():
     with open(os.path.join(mats, "访谈.txt"), "w", encoding="utf-8") as f:
         f.write("全市完成政策处理面积120万平方米。")
     with open(os.path.join(mats, "子目录", "笔记.md"), "wb") as f:
-        f.write("温州安置房舆情".encode("gbk"))
+        f.write("温州安置房建设".encode("gbk"))
     with open(os.path.join(mats, ".隐藏.txt"), "w") as f:
         f.write("must not appear")
     with open(os.path.join(mats, "录音.mp3"), "wb") as f:
@@ -142,7 +142,7 @@ def run():
     check("corpus has per-file 来源 markers",
           "##### 来源：参考资料/访谈.txt" in rep["corpus"]
           and "##### 来源：参考资料/子目录/笔记.md" in rep["corpus"])
-    check("gbk text decoded into corpus", "温州安置房舆情" in rep["corpus"])
+    check("gbk text decoded into corpus", "温州安置房建设" in rep["corpus"])
     check("unsupported/hidden not in corpus", "must not appear" not in rep["corpus"]
           and "ID3" not in rep["corpus"])
     res_dir = os.path.join(workdir, ".search_fetchres")

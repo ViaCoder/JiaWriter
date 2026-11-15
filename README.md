@@ -61,7 +61,7 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | Tool | Purpose |
 |---|---|
 | `read`, `write`, `edit`, `ls`, `find`, `grep` | Read, write and find files (`bash` is off by default and can be turned on in the settings) |
-| `toolkit` | Opens a toolkit: writing, research, office, browser, computer or schedule. Tools marked "toolkit" below are not in the conversation until their toolkit is open: the model opens it with `toolkit`, the user with `/write`, `/research`, `/search`, `/computer`, `/browser`, `/schedule`, `/import-doc` or `/export-doc`, and the program opens it when the request plainly asks for that work. Chat, questions and plain file work carry none of the writing rules |
+| `toolkit` | Opens a toolkit: writing, research, office, browser, or computer. Tools marked "toolkit" below are not in the conversation until their toolkit is open: the model opens it with `toolkit`, the user with `/write`, `/research`, `/search`, `/computer`, `/browser`, `/schedule`, `/import-doc` or `/export-doc`, and the program opens it when the request plainly asks for that work. Chat, questions and plain file work carry none of the writing rules |
 | `style_check` (writing toolkit) | AI-style writing: contrast frames such as "not just X but Y", stock phrases, negation density, list and bold usage |
 | `word_count` (writing toolkit) | Chinese characters, English words and numbers, per section and against a target length |
 | `readability_check` (writing toolkit) | Characters outside level 1 of the General Standard Chinese Characters table, long sentences, Flesch reading ease for English |
@@ -72,7 +72,6 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `draft_restore` (writing toolkit) | List a draft's saved versions and bring one back |
 | `todo_write` | The task list of work with three or more steps, shown above the input (Ctrl+T hides it) |
 | `remember` | Keeps a preference or standing instruction the user asked to remember in `memory.md`; every later session's prompt carries it; `/memory` lists or removes entries |
-| `schedule_add`, `schedule_list`, `schedule_remove` (schedule toolkit) | Scheduled tasks: a request run in a folder at set times (每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields); checked every minute while the program is open, and run by `jiawriter schedule run` from the system's cron when it is closed |
 | `delegate` | Hand a self-contained subtask to a fresh JiaWriter process with its own context and get its reply back; several may run at once, and a subtask cannot delegate further |
 
 ## Commands
@@ -94,7 +93,6 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `/browser` | Whether the Chrome extension is connected, and how to install it |
 | `/import-doc [file]` | Import reference files |
 | `/export-doc <draft.md> [md\|docx\|xlsx\|pptx] [--profile=name] [--out=path]` | Export a draft |
-| `/schedule` | List the scheduled tasks (command line: `jiawriter schedule list`, `jiawriter schedule run`) |
 | `/sf status`, `/sf install` | The same as `/browser` |
 
 ## How writing works

@@ -358,7 +358,7 @@ describe("JW_* end to end", () => {
 		// The toolkits are named at stage 0; the built-in writing skills come with their toolkit (2026-11-15), not here.
 		expect(JSON.stringify(realRequest()?.body.system)).toContain("come in toolkits");
 		expect(JSON.stringify(realRequest()?.body.system)).not.toContain("<name>deep-research</name>");
-		// The general tools and the toolkit tool: the writing, research, Office, browser, desktop and schedule tools
+		// The general tools and the toolkit tool: the writing, research, Office, browser and desktop tools
 		// are declared only when their toolkit is open.
 		expect(((realRequest()?.body.tools as { name: string }[]) ?? []).map((t) => t.name).sort()).toEqual([
 			"ask_user",

@@ -1,7 +1,7 @@
 /**
  * Opening a toolkit: its tools join the active set (pi records the set in the transcript and restores it with the
  * session), the stages its text carries count as given, and the text the model reads comes back. Shared by the
- * toolkit tool, the commands (/write, /research, /search, /computer, /schedule, /import-doc, /export-doc) and the
+ * toolkit tool, the commands (/write, /research, /search, /computer, /import-doc, /export-doc) and the
  * program's own detection.
  */
 

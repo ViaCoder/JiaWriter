@@ -51,8 +51,8 @@ afterEach(() => {
 });
 
 describe("the table", () => {
-	it("names six toolkits, each with tools, and the core rule names each of them", () => {
-		expect(TOOLKIT_IDS).toEqual(["writing", "research", "office", "browser", "computer", "schedule"]);
+	it("names five toolkits, each with tools, and the core rule names each of them", () => {
+		expect(TOOLKIT_IDS).toEqual(["writing", "research", "office", "browser", "computer"]);
 		for (const id of TOOLKIT_IDS) {
 			expect(TOOLKITS[id].tools.length).toBeGreaterThan(0);
 			expect(TOOLKIT_RULE).toContain(`(${id})`);
@@ -87,7 +87,6 @@ describe("detectToolkits", () => {
 		["搜索最近关于芯片出口的报道", ["research"]],
 		["深度研究一下氢能产业", ["research"]],
 		["把 报告.md 导出成 docx", ["office"]],
-		["每天 08:00 整理一下这个文件夹", ["schedule"]],
 		["打开公司官网看看最新公告", ["browser"]],
 		["打开记事本应用输入一行字", ["computer"]],
 		["查一下最新报道再写一份简报", ["writing", "research"]],
@@ -208,16 +207,16 @@ describe("the extension", () => {
 	});
 
 	it("gives a toolkit's text once even when an allowlist keeps one of its tools out", () => {
-		// A pi that registers no schedule_remove: the schedule toolkit can never be open by its tools alone.
+		// A pi that registers no style_check: the writing toolkit can never have every tool of its active.
 		const { pi, handlers } = load(["read"]);
 		const setAll = pi.setActiveTools;
-		pi.setActiveTools = (names: string[]) => setAll(names.filter((n) => n !== "schedule_remove"));
+		pi.setActiveTools = (names: string[]) => setAll(names.filter((n) => n !== "style_check"));
 		const start = () =>
-			handlers.get("before_agent_start")?.({ messageType: "user", prompt: "每天 08:00 整理一下日志" }, ctx) as
+			handlers.get("before_agent_start")?.({ messageType: "user", prompt: "写一份通知" }, ctx) as
 				| { message: { content: string } }
 				| undefined;
-		expect(start()?.message.content).toContain("Toolkit schedule is open");
-		expect(pi.active).toContain("schedule_add");
+		expect(start()?.message.content).toContain("Toolkit writing is open");
+		expect(pi.active).toContain("draft_section");
 		expect(start()).toBeUndefined();
 	});
 

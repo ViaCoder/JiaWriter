@@ -1,6 +1,6 @@
 /**
  * A run of this program as a child process, in non-interactive mode, for work that needs a context of its own: a
- * delegated subtask (the delegate tool) or a scheduled task (schedule). The child inherits the environment, so it
+ * delegated subtask (the delegate tool). The child inherits the environment, so it
  * uses the same model and keys; its final reply is what print mode writes to stdout.
  */
 

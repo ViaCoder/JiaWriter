@@ -25,7 +25,6 @@ import writerPromptsExtension from "./writer-prompts/index.ts";
 // JiaWriter: read-only writing checks (style_check, word_count, readability_check).
 // JiaWriter: going back in the conversation and the files.
 import writerRewindExtension from "./writer-rewind/index.ts";
-import writerScheduleExtension from "./writer-schedule/index.ts";
 import writerSearchExtension from "./writer-search/index.ts";
 // JiaWriter: built-in writing skills, /skills and /skill-new.
 import writerSkillsExtension from "./writer-skills/index.ts";
@@ -49,8 +48,7 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-permission", factory: writerPermissionExtension, builtin: true },
 	{ name: "writer-todo", factory: writerTodoExtension, builtin: true },
 	{ name: "writer-tasks", factory: writerTasksExtension, builtin: true },
-	// JiaWriter: scheduled tasks and delegated subtasks, each a child run of the program.
-	{ name: "writer-schedule", factory: writerScheduleExtension, builtin: true },
+	// JiaWriter: delegated subtasks, each a child run of the program.
 	{ name: "writer-delegate", factory: writerDelegateExtension, builtin: true },
 	{ name: "writer-ask", factory: writerAskExtension, builtin: true },
 	{ name: "writer-plan", factory: writerPlanExtension, builtin: true },

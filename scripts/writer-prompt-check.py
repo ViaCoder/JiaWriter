@@ -156,7 +156,7 @@ def main():
     # took dates (about 500); still a guard against descriptions that grow.
     # 14000 since 2026-11-12: draft_section (a section written in a clean context) joined the tools.
     # 15500 since 2026-11-15: schedule_task and delegate joined (about 1,300 characters together).
-    # 3000 / 7000 since 2026-11-15 (P25): the writing, research, Office, browser, desktop and schedule tools come with
+    # 3000 / 7000 since 2026-11-15 (P25): the writing, research, Office, browser and desktop tools come with
     # their toolkits, and the skills list with the writing toolkit; a greeting carries 11 tools (measured 2690 / 6461).
     # 3300 since 2026-11-15 (P26): the system prompt is written as Claude Code's headed sections with two examples (3095).
     # 7500 since 2026-11-15 (P26c): remember (what the user asked to remember) joined the default tools.

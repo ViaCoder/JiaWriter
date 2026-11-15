@@ -61,7 +61,7 @@ JiaWriter 启动时把 `JW_KEY` 和 `ANYSEARCH_KEY` 读进内存，随即从自�
 | 工具 | 作用 |
 |---|---|
 | `read`、`write`、`edit`、`ls`、`find`、`grep`、`bash` | 读写和查找文件、运行命令（受权限模式约束） |
-| `toolkit` | 打开一个工具包：writing（写作）、research（检索）、office（文档）、browser（浏览器）、computer（桌面）、schedule（定时）。下表里标“工具包”的工具平时不在对话里，模型按需用 `toolkit` 打开，用户也可以用 `/write`、`/research`、`/search`、`/computer`、`/browser`、`/schedule`、`/import-doc`、`/export-doc` 打开；请求里明确写了“写一份通知”“查一下最新报道”这类话时，程序直接打开。闲聊、提问和普通文件操作不带任何写作内容 |
+| `toolkit` | 打开一个工具包：writing（写作）、research（检索）、office（文档）、browser（浏览器）、computer（桌面）。下表里标“工具包”的工具平时不在对话里，模型按需用 `toolkit` 打开，用户也可以用 `/write`、`/research`、`/search`、`/computer`、`/browser`、`/schedule`、`/import-doc`、`/export-doc` 打开；请求里明确写了“写一份通知”“查一下最新报道”这类话时，程序直接打开。闲聊、提问和普通文件操作不带任何写作内容 |
 | `style_check`（写作工具包） | 检查 AI 腔：对比框架（如“不是……而是”）、套话、否定式密度、列表和加粗的用量 |
 | `word_count`（写作工具包） | 分别统计汉字、英文词和数字，可按章节统计并与目标篇幅比对 |
 | `readability_check`（写作工具包） | 列出《通用规范汉字表》一级字以外的字和过长的句子，英文给出 Flesch 易读度 |
@@ -72,7 +72,6 @@ JiaWriter 启动时把 `JW_KEY` 和 `ANYSEARCH_KEY` 读进内存，随即从自�
 | `draft_restore`（写作工具包） | 列出稿件保存过的版本，恢复其中一个 |
 | `todo_write` | 三步以上的工作记任务清单，常驻在输入框上方（Ctrl+T 隐藏） |
 | `remember` | 记住用户让记住的偏好或要求，写入 `memory.md`，以后每次会话的提示里都带着；`/memory` 查看、删除 |
-| `schedule_add`、`schedule_list`、`schedule_remove`（定时工具包） | 定时任务：按“每天 08:00”“工作日 08:30”“每周一 09:00”“每月1日 09:00”或 cron 五段，到点在指定文件夹里运行一条请求；程序开着时每分钟检查，关着时由系统 cron 运行 `jiawriter schedule run` |
 | `delegate` | 把一个独立的子任务交给新开的 JiaWriter 进程在自己的上下文里完成，返回它的回复；可并行多个，子任务不能再派 |
 
 ## 命令
@@ -94,7 +93,6 @@ JiaWriter 启动时把 `JW_KEY` 和 `ANYSEARCH_KEY` 读进内存，随即从自�
 | `/browser` | Chrome 扩展是否连接，以及安装步骤 |
 | `/import-doc [文件]` | 导入参考资料 |
 | `/export-doc <稿件.md> [md\|docx\|xlsx\|pptx] [--profile=方案] [--out=路径]` | 导出稿件 |
-| `/schedule` | 列出定时任务（命令行：`jiawriter schedule list`、`jiawriter schedule run`） |
 | `/sf status`、`/sf install` | 与 `/browser` 相同 |
 
 ## 写作流程

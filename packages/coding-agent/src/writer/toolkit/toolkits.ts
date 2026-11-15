@@ -2,7 +2,7 @@
  * Toolkits (2026-11-15, the user: writing tasks and their tools "should not clutter the initial context—they should
  * only appear when actually invoked", with "/xxx" commands where detection is unsure). The general tools (read,
  * write, edit, bash, grep, find, ls, todo_write, ask_user, delegate) are always there. The tools of writing, web
- * research, Office files, the browser, the desktop and scheduled tasks are registered deferred and reach the model
+ * research, Office files, the browser and the desktop are registered deferred and reach the model
  * only when their toolkit is opened: by the model with the `toolkit` tool, by the user with a command, or by the
  * program when the request names the work plainly (detectToolkits). A toolkit brings its rules once, with the
  * opening; stage 0 (prompts/core.ts) carries none of them.
@@ -12,7 +12,7 @@
 import { PROMPT_STAGES, stageText } from "../prompts/stages.ts";
 
 /** The toolkits, in the order the model is told of them. */
-export const TOOLKIT_IDS = ["writing", "research", "office", "browser", "computer", "schedule"] as const;
+export const TOOLKIT_IDS = ["writing", "research", "office", "browser", "computer"] as const;
 export type ToolkitId = (typeof TOOLKIT_IDS)[number];
 
 /** One toolkit. */
@@ -108,18 +108,11 @@ export const TOOLKITS: Readonly<Record<ToolkitId, Toolkit>> = {
 		skills: [],
 	},
 	computer: { id: "computer", tools: ["computer"], stages: [], rules: [], skills: [] },
-	schedule: {
-		id: "schedule",
-		tools: ["schedule_add", "schedule_list", "schedule_remove"],
-		stages: [],
-		rules: [],
-		skills: [],
-	},
 };
 
 /** The core rule that tells the model of the toolkits (stage 0). */
 export const TOOLKIT_RULE =
-	"Tools for documents (writing), web research (research), Word, Excel, PowerPoint and PDF files (office), web pages in Chrome (browser), desktop applications (computer) and tasks run at set times (schedule) come in toolkits: open the one the request needs with the toolkit tool before the first such step; chat, questions and file work need none";
+	"Tools for documents (writing), web research (research), Word, Excel, PowerPoint and PDF files (office), web pages in Chrome (browser) and desktop applications (computer) come in toolkits: open the one the request needs with the toolkit tool before the first such step; chat, questions and file work need none";
 
 /** Every tool some toolkit declares. */
 export function toolkitTools(): string[] {
@@ -133,7 +126,6 @@ export const TOOLKIT_MARKS: Readonly<Record<ToolkitId, string>> = {
 	office: "export_document",
 	browser: "browser",
 	computer: "computer",
-	schedule: "schedule_add",
 };
 
 /**
@@ -190,7 +182,7 @@ const GENRES =
 /**
  * The toolkits a request plainly asks for, by its words alone, in priority order: writing when it asks to write a
  * named kind of document; research when it asks to search or look something up; office for a named file format;
- * schedule for a repeated time; browser and computer for a page or an application to act on. Unsure wording opens
+ * browser and computer for a page or an application to act on. Unsure wording opens
  * nothing: the model's toolkit call and the user's commands cover it (the user, 2026-11-15).
  */
 export function detectToolkits(prompt: string): ToolkitId[] {
@@ -218,12 +210,6 @@ export function detectToolkits(prompt: string): ToolkitId[] {
 		/(导入|读取|解析|打开|看看|提取)[^。！？\n]{0,12}(pdf|docx|word|excel|xlsx|pptx|ppt)/i.test(text)
 	)
 		found.push("office");
-	if (
-		/(每天|每日|每周|每月|工作日|定时|定期|到点|每隔|每小时)[^。！？\n]{0,16}(运行|执行|提醒|跑|做|生成|发|整理|检查|汇总|更新)|定时任务/.test(
-			text,
-		)
-	)
-		found.push("schedule");
 	if (/(打开|登录|访问|浏览|进入)[^。！？\n]{0,14}(网站|网页|页面|后台|官网|系统)|用浏览器|在浏览器里/.test(text))
 		found.push("browser");
 	if (/(打开|操作|控制|点击)[^。！？\n]{0,10}(应用|软件|窗口|桌面|程序)|桌面应用|桌面软件/.test(text))

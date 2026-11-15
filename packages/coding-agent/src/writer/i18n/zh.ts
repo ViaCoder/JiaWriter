@@ -93,23 +93,7 @@ export const zh = {
 	"style.materials":
 		"修改用到的事实和案例只取自已有材料：话题的素材.md、参考资料/.parsed/、检索/ 和 网页/ 里保存的结果，并注明出处；材料里没有的不编造，也不留待补标记。检查意见不是检索的理由：用户没有要求检索就不检索，材料与意见不符时以材料为准。",
 	// An automatic round of revision.
-	// Scheduled tasks and delegated subtasks (2026-11-15).
-	"schedule.badWhen":
-		"看不懂时间“{when}”。可以写：每天 08:00、工作日 08:30、每周一 09:00、每月1日 09:00，或 cron 的五段（0 8 * * 1-5）。",
-	"schedule.noTask": "缺少 task：要做的事，写成用户会输入的完整请求。",
-	"schedule.missing":
-		"add 需要 {field} 参数（收到的参数：{got}）。when 写规则，如 每天 08:00；task 写要做的事，一条完整的请求。",
-	"schedule.added": "已添加定时任务 {id}：{when}，下次 {next}，在 {folder} 运行。",
-	"schedule.cronHint":
-		"请把下面这段原样告诉用户（两轮实测模型都把它略去了，2026-11-15）：程序开着时到点自动运行；关着时要把这一行加进系统的 crontab（crontab -e），否则到点不会运行：\n{line}",
-	"schedule.none": "没有定时任务。",
-	"schedule.line": "- {id}：{when}，下次 {next}{last}｜{task}｜{folder}",
-	"schedule.noSuch": "没有 id 为“{id}”的定时任务。",
-	"schedule.removed": "已删除定时任务：{task}",
-	"schedule.ran": "定时任务「{task}」已运行：{status}，日志 {log}",
-	"schedule.nothingDue": "没有到点的定时任务。",
-	"schedule.usage": "用法：jiawriter schedule run（运行到点的任务）| jiawriter schedule list（列出任务）",
-	"schedule.command": "列出定时任务",
+	// Delegated subtasks (2026-11-15).
 	"delegate.depth": "子任务里不能再派子任务：直接做。",
 	"delegate.noTask": "缺少 task：写成用户会输入的完整请求。",
 	"delegate.timeout": "子任务超过 {minutes} 分钟被停止，已有的回复：\n{reply}",
@@ -566,7 +550,6 @@ export const zh = {
 	"toolkit.name.office": "文档",
 	"toolkit.name.browser": "浏览器",
 	"toolkit.name.computer": "桌面",
-	"toolkit.name.schedule": "定时",
 	"toolkit.opened": "已打开{name}工具。",
 	"toolkit.already": "{name} 工具包本来就开着。",
 	"toolkit.hint.writing": "写作工具已打开。说说要写什么：文种、用途、读者和篇幅。",
@@ -574,7 +557,6 @@ export const zh = {
 	"toolkit.hint.office": "文档工具已打开：可以导入 PDF、Word、Excel、PPT 做参考资料，或把稿件导出成这些格式。",
 	"toolkit.hint.browser": "浏览器工具已打开。说说要在哪个网页上做什么。",
 	"toolkit.hint.computer": "桌面操作工具已打开。说说要在哪个应用里做什么。",
-	"toolkit.hint.schedule": "定时任务工具已打开。说说什么时候、在哪个文件夹、做什么。",
 	"toolkit.searchPrompt": "检索：{words}。只列来源和要点，不写成文。",
 	"toolkit.cmd.write": "打开写作工具，开始写一篇文档：/write 要求",
 	"toolkit.cmd.research": "打开检索工具，研究一个问题：/research 问题",

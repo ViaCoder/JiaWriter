@@ -84,8 +84,6 @@ import {
 } from "./package-manager-cli.ts";
 import { isLocalPath, normalizePath, resolvePath } from "./utils/paths.ts";
 import { cleanupWindowsSelfUpdateQuarantine } from "./utils/windows-self-update.ts";
-// JiaWriter: scheduled tasks from the command line.
-import { runScheduleCommand } from "./writer/schedule/run.ts";
 // JiaWriter: the environment with the keys held in memory.
 import { withSecrets } from "./writer/secrets.ts";
 // JiaWriter: the "jw" model from JW_* environment variables.
@@ -645,12 +643,6 @@ export async function main(args: string[], options?: MainOptions) {
 	if (args[0] === "mcp") {
 		const { runMcpCommand } = await loadMcpCommand();
 		process.exitCode = await runMcpCommand(args.slice(1), { cwd, agentDir });
-		return;
-	}
-
-	// JiaWriter: `schedule run` for the system's cron, `schedule list` for a look.
-	if (args[0] === "schedule") {
-		process.exitCode = await runScheduleCommand(args.slice(1), { agentDir });
 		return;
 	}
 

@@ -12,7 +12,6 @@ export const LEADING_COMMANDS: readonly string[] = [
 	"export-doc",
 	"memory",
 	"plan",
-	"schedule",
 	"tasks",
 	"browser",
 	"computer",

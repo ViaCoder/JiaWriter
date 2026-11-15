@@ -56,7 +56,7 @@ export default function writerToolkitExtension(pi: ExtensionAPI): void {
 		name: "toolkit",
 		label: "Toolkit",
 		description:
-			"Opens a toolkit, whose tools and rules then join this conversation. Toolkits: writing (documents, 公文, reports, articles: topic, materials, outline, sections, checks, export), research (web search and pages, with sources recorded), office (import or export Word, Excel, PowerPoint, PDF), browser (web pages in the user's Chrome), computer (desktop applications), schedule (tasks run at set times). Open one before the first step that needs it; it stays open",
+			"Opens a toolkit, whose tools and rules then join this conversation. Toolkits: writing (documents, 公文, reports, articles: topic, materials, outline, sections, checks, export), research (web search and pages, with sources recorded), office (import or export Word, Excel, PowerPoint, PDF), browser (web pages in the user's Chrome) and computer (desktop applications). Open one before the first step that needs it; it stays open",
 		parameters: Type.Object({ name: StringEnum(TOOLKIT_IDS) }),
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 		async execute(_id, params, _signal, _onUpdate, ctx) {
