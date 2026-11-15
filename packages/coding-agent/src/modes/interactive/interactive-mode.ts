@@ -144,6 +144,7 @@ import { orderCommands } from "../../writer/command-order.ts";
 import { brandWordmarkLines, brandWordmarkText, jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
 // The work mode Shift+Tab cycles.
 import { applyWorkMode, nextWorkMode, workMode } from "../../writer/permission.ts";
+import { emptyFailure } from "../../writer/retry-lines.ts";
 import { abortedText, compactionErrorText, MAC_OPTION_NOTE, uiText, workingText } from "../../writer/ui-text.ts";
 import { createChatViewport } from "./chat-viewport.ts";
 import { ArminComponent } from "./components/armin.ts";
@@ -523,6 +524,8 @@ export class InteractiveMode {
 	private streamingComponent: AssistantMessageComponent | undefined = undefined;
 	private readonly entriesRenderedByBoundaryCompaction = new Set<string>();
 	private streamingMessage: AssistantMessage | undefined = undefined;
+	// JiaWriter: the component of an attempt that failed with nothing to show, taken off the screen by the retry.
+	private failedAttempt: AssistantMessageComponent | undefined = undefined;
 
 	// Tool execution tracking: toolCallId -> component
 	private pendingTools = new Map<string, ToolExecutionComponent>();
@@ -3669,6 +3672,8 @@ export class InteractiveMode {
 					this.streamingComponent.updateContent(this.streamingMessage, false);
 
 					if (this.streamingMessage.stopReason === "aborted" || this.streamingMessage.stopReason === "error") {
+						// JiaWriter: an empty failed attempt is remembered, so a retry can take its line away.
+						this.failedAttempt = emptyFailure(this.streamingMessage) ? this.streamingComponent : undefined;
 						if (!errorMessage) {
 							errorMessage = this.streamingMessage.errorMessage || "Error";
 						}
@@ -3845,6 +3850,8 @@ export class InteractiveMode {
 			}
 
 			case "auto_retry_start": {
+				// JiaWriter: the failed attempt's line goes; the retry status stands in for it.
+				this.removeFailedAttempt();
 				// Set up escape to abort retry
 				this.retryEscapeHandler = this.defaultEditor.onEscape;
 				this.defaultEditor.onEscape = () => {
@@ -3866,6 +3873,8 @@ export class InteractiveMode {
 				this.clearStatusIndicator("retry");
 				// Show error only on final failure (success shows normal response)
 				if (!event.success) {
+					// JiaWriter: one line for the final failure, not the last attempt's line and a summary.
+					this.removeFailedAttempt();
 					this.showError(
 						uiText("Retry failed after {attempts} attempts: {error}", {
 							attempts: String(event.attempt),
@@ -3941,6 +3950,14 @@ export class InteractiveMode {
 	 * If multiple status messages are emitted back-to-back (without anything else being added to the chat),
 	 * we update the previous status line instead of appending new ones to avoid log spam.
 	 */
+	/** Take the last empty failed attempt off the screen (JiaWriter). */
+	private removeFailedAttempt(): void {
+		if (!this.failedAttempt) return;
+		const at = this.chatContainer.children.indexOf(this.failedAttempt);
+		if (at >= 0) this.chatContainer.children.splice(at, 1);
+		this.failedAttempt = undefined;
+	}
+
 	private showStatus(rawMessage: string): void {
 		// JiaWriter: a known text in the interface language (unknown texts stay as they are).
 		const message = uiText(rawMessage);
