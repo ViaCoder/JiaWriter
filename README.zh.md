@@ -60,23 +60,28 @@ JiaWriter 启动时把 `JW_KEY` 和 `ANYSEARCH_KEY` 读进内存，随即从自�
 
 | 工具 | 作用 |
 |---|---|
-| `read`、`write`、`edit`、`ls`、`find`、`grep` | 读写和查找文件（`bash` 默认关闭，可在设置中开启） |
-| `style_check` | 检查 AI 腔：对比框架（如“不是……而是”）、套话、否定式密度、列表和加粗的用量 |
-| `word_count` | 分别统计汉字、英文词和数字，可按章节统计并与目标篇幅比对 |
-| `readability_check` | 列出《通用规范汉字表》一级字以外的字和过长的句子，英文给出 Flesch 易读度 |
-| `search_web`、`fetch_web` | 联网检索和读取网页正文 |
-| `import_document` | 导入参考资料：PDF、Word（.docx）、Excel（.xlsx，每个工作表一页）、PowerPoint（.pptx，每页幻灯片一页）、HTML、txt、md |
-| `export_document` | 把 Markdown 稿件导出为 docx、xlsx（稿件里的表格，每张表一个工作表）、pptx（每个一级标题一页）或 md |
-| `topic_open`、`material_add` | 建立主题文件夹，记录带来源的案例和数据 |
-| `draft_restore` | 列出稿件保存过的版本，恢复其中一个 |
+| `read`、`write`、`edit`、`ls`、`find`、`grep`、`bash` | 读写和查找文件、运行命令（受权限模式约束） |
+| `toolkit` | 打开一个工具包：writing（写作）、research（检索）、office（文档）、browser（浏览器）、computer（桌面）、schedule（定时）。下表里标“工具包”的工具平时不在对话里，模型按需用 `toolkit` 打开，用户也可以用 `/write`、`/research`、`/search`、`/computer`、`/browser`、`/schedule`、`/import-doc`、`/export-doc` 打开；请求里明确写了“写一份通知”“查一下最新报道”这类话时，程序直接打开。闲聊、提问和普通文件操作不带任何写作内容 |
+| `style_check`（写作工具包） | 检查 AI 腔：对比框架（如“不是……而是”）、套话、否定式密度、列表和加粗的用量 |
+| `word_count`（写作工具包） | 分别统计汉字、英文词和数字，可按章节统计并与目标篇幅比对 |
+| `readability_check`（写作工具包） | 列出《通用规范汉字表》一级字以外的字和过长的句子，英文给出 Flesch 易读度 |
+| `search_web`、`fetch_web`（检索工具包） | 联网检索和读取网页正文 |
+| `import_document`（写作、文档工具包） | 导入参考资料：PDF、Word（.docx）、Excel（.xlsx，每个工作表一页）、PowerPoint（.pptx，每页幻灯片一页）、HTML、txt、md |
+| `export_document`（写作、文档工具包） | 把 Markdown 稿件导出为 docx、xlsx（稿件里的表格，每张表一个工作表）、pptx（每个一级标题一页）或 md |
+| `topic_open`、`material_add`（写作、检索工具包） | 建立主题文件夹，记录带来源的案例和数据 |
+| `draft_restore`（写作工具包） | 列出稿件保存过的版本，恢复其中一个 |
 | `todo_write` | 三步以上的工作记任务清单，常驻在输入框上方（Ctrl+T 隐藏） |
-| `schedule_task` | 定时任务：按“每天 08:00”“工作日 08:30”“每周一 09:00”“每月1日 09:00”或 cron 五段，到点在指定文件夹里运行一条请求；程序开着时每分钟检查，关着时由系统 cron 运行 `jiawriter schedule run` |
+| `schedule_task`（定时工具包） | 定时任务：按“每天 08:00”“工作日 08:30”“每周一 09:00”“每月1日 09:00”或 cron 五段，到点在指定文件夹里运行一条请求；程序开着时每分钟检查，关着时由系统 cron 运行 `jiawriter schedule run` |
 | `delegate` | 把一个独立的子任务交给新开的 JiaWriter 进程在自己的上下文里完成，返回它的回复；可并行多个，子任务不能再派 |
 
 ## 命令
 
 | 命令 | 作用 |
 |---|---|
+| `/write [要求]` | 打开写作工具包，有要求时直接开始写 |
+| `/research [问题]` | 打开检索工具包，有问题时直接开始研究 |
+| `/search 关键词` | 检索一次，只列来源和要点 |
+| `/computer` | 打开桌面操作工具包 |
 | `/jw` | 只读的配置页 |
 | `/effort [档位]` | 调整思考强度，不带参数时弹出选择（`/thinking`、Shift+Tab 也可以） |
 | `/rewind` | 回退到某条消息之前：对话和文件一起退回、只退回对话，或只退回文件 |

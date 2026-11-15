@@ -98,7 +98,7 @@ export function guideHtml(platform) {
 		],
 		[
 			"开始写作",
-			`<p>直接用中文说出要求，例如“写一篇 2000 字的调研报告，主题是……”。</p>
+			`<p>直接用中文说出要求，例如“写一篇 2000 字的调研报告，主题是……”。平时聊天、提问、整理文件时它就是一个通用助手，只有要写文档时才会拿出写作的那套工具和规矩；要明确进入写作，可以输入 <code>/write 要求</code>，要查资料输入 <code>/research 问题</code> 或 <code>/search 关键词</code>。</p>
 <p>参考资料放进解压文件夹里的“参考资料”文件夹，支持 PDF、Word、Excel、PowerPoint、网页和文本文件。每次提问前程序都会自动导入新放进去的资料。</p>
 <p>每一轮写完或改完的稿件会自动导出成同名的 Word 文件（.docx），和稿件放在一起。要 Excel 或 PPT 时直接说，或者输入 <code>/export-doc 稿件.md xlsx</code>、<code>/export-doc 稿件.md pptx</code>：Excel 把稿件里的每张表做成一个工作表，PPT 把每个一级标题做成一页。</p>
 <p>三步以上的工作会在输入框上方显示任务清单，做完一项勾一项（按 Ctrl+T 可以隐藏）。</p>`,

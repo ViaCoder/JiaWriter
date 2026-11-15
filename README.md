@@ -61,22 +61,27 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | Tool | Purpose |
 |---|---|
 | `read`, `write`, `edit`, `ls`, `find`, `grep` | Read, write and find files (`bash` is off by default and can be turned on in the settings) |
-| `style_check` | AI-style writing: contrast frames such as "not just X but Y", stock phrases, negation density, list and bold usage |
-| `word_count` | Chinese characters, English words and numbers, per section and against a target length |
-| `readability_check` | Characters outside level 1 of the General Standard Chinese Characters table, long sentences, Flesch reading ease for English |
-| `search_web`, `fetch_web` | Web search and page text |
-| `import_document` | Import reference files: PDF, Word (.docx), Excel (.xlsx, a page per sheet), PowerPoint (.pptx, a page per slide), HTML, txt, md |
-| `export_document` | Export a Markdown draft to docx, xlsx (its tables, one sheet each), pptx (a slide per level-1 heading) or md |
-| `topic_open`, `material_add` | Open a topic folder; record cases and data with their sources |
-| `draft_restore` | List a draft's saved versions and bring one back |
+| `toolkit` | Opens a toolkit: writing, research, office, browser, computer or schedule. Tools marked "toolkit" below are not in the conversation until their toolkit is open: the model opens it with `toolkit`, the user with `/write`, `/research`, `/search`, `/computer`, `/browser`, `/schedule`, `/import-doc` or `/export-doc`, and the program opens it when the request plainly asks for that work. Chat, questions and plain file work carry none of the writing rules |
+| `style_check` (writing toolkit) | AI-style writing: contrast frames such as "not just X but Y", stock phrases, negation density, list and bold usage |
+| `word_count` (writing toolkit) | Chinese characters, English words and numbers, per section and against a target length |
+| `readability_check` (writing toolkit) | Characters outside level 1 of the General Standard Chinese Characters table, long sentences, Flesch reading ease for English |
+| `search_web`, `fetch_web` (research toolkit) | Web search and page text |
+| `import_document` (writing and office toolkits) | Import reference files: PDF, Word (.docx), Excel (.xlsx, a page per sheet), PowerPoint (.pptx, a page per slide), HTML, txt, md |
+| `export_document` (writing and office toolkits) | Export a Markdown draft to docx, xlsx (its tables, one sheet each), pptx (a slide per level-1 heading) or md |
+| `topic_open`, `material_add` (writing and research toolkits) | Open a topic folder; record cases and data with their sources |
+| `draft_restore` (writing toolkit) | List a draft's saved versions and bring one back |
 | `todo_write` | The task list of work with three or more steps, shown above the input (Ctrl+T hides it) |
-| `schedule_task` | Scheduled tasks: a request run in a folder at set times (每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields); checked every minute while the program is open, and run by `jiawriter schedule run` from the system's cron when it is closed |
+| `schedule_task` (schedule toolkit) | Scheduled tasks: a request run in a folder at set times (每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields); checked every minute while the program is open, and run by `jiawriter schedule run` from the system's cron when it is closed |
 | `delegate` | Hand a self-contained subtask to a fresh JiaWriter process with its own context and get its reply back; several may run at once, and a subtask cannot delegate further |
 
 ## Commands
 
 | Command | Purpose |
 |---|---|
+| `/write [brief]` | Open the writing toolkit and, with a brief, start the document |
+| `/research [question]` | Open the research toolkit and, with a question, start looking into it |
+| `/search words` | One search: sources and key points only |
+| `/computer` | Open the computer toolkit |
 | `/jw` | Read-only configuration page |
 | `/effort [level]` | Change the thinking intensity; without a level, pick from a list (`/thinking` and Shift+Tab also work) |
 | `/rewind` | Go back to before a message: conversation and files, conversation only, or files only |
