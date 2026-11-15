@@ -14,6 +14,8 @@ describe("issue #7829 invalid settings warning", () => {
 
 	it("renders startup diagnostics inside the transcript", async () => {
 		const harness = await createHarness();
+		// JiaWriter: showWarning writes in the interface language; this check reads the English label (set after the harness, which replaces the environment).
+		vi.stubEnv("JW_LANG", "en");
 		const previousOffline = process.env.PI_OFFLINE;
 		process.env.PI_OFFLINE = "1";
 		try {

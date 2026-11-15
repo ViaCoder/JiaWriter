@@ -14,6 +14,8 @@ import {
 } from "@earendil-works/pi-tui";
 import type { SessionTreeNode } from "../../../core/session-manager.ts";
 import { formatReadLineRange } from "../../../core/tools/render-utils.ts";
+// JiaWriter: text in the interface language.
+import { uiText } from "../../../writer/ui-text.ts";
 import { theme } from "../theme/theme.ts";
 import { DynamicBorder } from "./dynamic-border.ts";
 import { formatKeyText, keyHint } from "./keybinding-hints.ts";
@@ -1167,9 +1169,11 @@ class SearchLine implements Component {
 	render(width: number): string[] {
 		const query = this.treeList.getSearchQuery();
 		if (query) {
-			return [truncateToWidth(`  ${theme.fg("muted", "Type to search:")} ${theme.fg("accent", query)}`, width)];
+			return [
+				truncateToWidth(`  ${theme.fg("muted", uiText("Type to search:"))} ${theme.fg("accent", query)}`, width),
+			];
 		}
-		return [truncateToWidth(`  ${theme.fg("muted", "Type to search:")}`, width)];
+		return [truncateToWidth(`  ${theme.fg("muted", uiText("Type to search:"))}`, width)];
 	}
 
 	handleInput(_keyData: string): void {}
@@ -1299,7 +1303,7 @@ class LabelInput implements Component, Focusable {
 		const lines: string[] = [];
 		const indent = "  ";
 		const availableWidth = width - indent.length;
-		lines.push(truncateToWidth(`${indent}${theme.fg("muted", "Label (empty to remove):")}`, width));
+		lines.push(truncateToWidth(`${indent}${theme.fg("muted", uiText("Label (empty to remove):"))}`, width));
 		lines.push(...this.input.render(availableWidth).map((line) => truncateToWidth(`${indent}${line}`, width)));
 		lines.push(
 			truncateToWidth(

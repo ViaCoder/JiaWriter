@@ -3934,7 +3934,9 @@ export class InteractiveMode {
 	 * If multiple status messages are emitted back-to-back (without anything else being added to the chat),
 	 * we update the previous status line instead of appending new ones to avoid log spam.
 	 */
-	private showStatus(message: string): void {
+	private showStatus(rawMessage: string): void {
+		// JiaWriter: a known text in the interface language (unknown texts stay as they are).
+		const message = uiText(rawMessage);
 		const children = this.chatContainer.children;
 		const last = children.length > 0 ? children[children.length - 1] : undefined;
 		const secondLast = children.length > 1 ? children[children.length - 2] : undefined;
@@ -4327,7 +4329,7 @@ export class InteractiveMode {
 		const compactionCount = allEntries.filter((e) => e.type === "compaction").length;
 		if (compactionCount > 0) {
 			const times = compactionCount === 1 ? "1 time" : `${compactionCount} times`;
-			this.showStatus(`Session compacted ${times}`);
+			this.showStatus(uiText("Session compacted {times}", { times }));
 		}
 	}
 
@@ -4697,7 +4699,7 @@ export class InteractiveMode {
 		} else {
 			this.footer.invalidate();
 			this.updateEditorBorderColor();
-			this.showStatus(`Thinking level: ${newLevel}`);
+			this.showStatus(uiText("Thinking level: {level}", { level: newLevel }));
 		}
 	}
 
@@ -4712,7 +4714,12 @@ export class InteractiveMode {
 				this.updateEditorBorderColor();
 				const thinkingStr =
 					result.model.reasoning && result.thinkingLevel !== "off" ? ` (thinking: ${result.thinkingLevel})` : "";
-				this.showStatus(`Switched to ${result.model.name || result.model.id}${thinkingStr}`);
+				this.showStatus(
+					uiText("Switched to {model}{thinking}", {
+						model: result.model.name || result.model.id,
+						thinking: thinkingStr,
+					}),
+				);
 				void this.maybeWarnAboutAnthropicSubscriptionAuth(result.model);
 			}
 		} catch (error) {
@@ -4849,13 +4856,27 @@ export class InteractiveMode {
 
 	showError(errorMessage: string): void {
 		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new ThemedText(() => theme.fg("error", `Error: ${errorMessage}`), this.outputPad, 0));
+		// JiaWriter: the label and a known text in the interface language.
+		this.chatContainer.addChild(
+			new ThemedText(
+				() => theme.fg("error", uiText("Error: {message}", { message: uiText(errorMessage) })),
+				this.outputPad,
+				0,
+			),
+		);
 		this.ui.requestRender();
 	}
 
 	showWarning(warningMessage: string): void {
 		this.chatContainer.addChild(new Spacer(1));
-		this.chatContainer.addChild(new ThemedText(() => theme.fg("warning", `Warning: ${warningMessage}`), 1, 0));
+		// JiaWriter: the label and a known text in the interface language.
+		this.chatContainer.addChild(
+			new ThemedText(
+				() => theme.fg("warning", uiText("Warning: {message}", { message: uiText(warningMessage) })),
+				1,
+				0,
+			),
+		);
 		this.ui.requestRender();
 	}
 
@@ -5437,7 +5458,7 @@ export class InteractiveMode {
 				await this.session.setModel(model, { persist: false });
 				this.footer.invalidate();
 				this.updateEditorBorderColor();
-				this.showStatus(`Model: ${model.id}`);
+				this.showStatus(uiText("Model: {model}", { model: model.id }));
 				void this.maybeWarnAboutAnthropicSubscriptionAuth(model);
 			} catch (error) {
 				this.showError(error instanceof Error ? error.message : String(error));

@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setKeybindings } from "@earendil-works/pi-tui";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { KeybindingsManager } from "../src/core/keybindings.ts";
 import type { SessionInfo } from "../src/core/session-manager.ts";
 import { SessionSelectorComponent } from "../src/modes/interactive/components/session-selector.ts";
@@ -97,6 +97,8 @@ describe("session selector path/delete interactions", () => {
 	});
 
 	beforeEach(() => {
+		// JiaWriter: the selector's texts follow the interface language; these checks read the English ones.
+		vi.stubEnv("JW_LANG", "en");
 		// Ensure test isolation: keybindings are a global singleton
 		setKeybindings(new KeybindingsManager());
 	});

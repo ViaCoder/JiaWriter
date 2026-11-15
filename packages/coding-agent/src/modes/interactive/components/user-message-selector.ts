@@ -1,4 +1,6 @@
 import { type Component, Container, getKeybindings, Spacer, Text, truncateToWidth } from "@earendil-works/pi-tui";
+// JiaWriter: text in the interface language.
+import { uiText } from "../../../writer/ui-text.ts";
 import { theme } from "../theme/theme.ts";
 import { DynamicBorder } from "./dynamic-border.ts";
 
@@ -63,7 +65,7 @@ class UserMessageList implements Component {
 
 			// Second line: metadata (position in history)
 			const position = i + 1;
-			const metadata = `  Message ${position} of ${this.messages.length}`;
+			const metadata = `  ${uiText("Message {n} of {total}", { n: String(position), total: String(this.messages.length) })}`;
 			const metadataLine = theme.fg("muted", metadata);
 			lines.push(metadataLine);
 			lines.push(""); // Blank line between messages
@@ -120,10 +122,13 @@ export class UserMessageSelectorComponent extends Container {
 
 		// Add header
 		this.addChild(new Spacer(1));
-		this.addChild(new Text(theme.bold("Fork from Message"), 1, 0));
+		this.addChild(new Text(theme.bold(uiText("Fork from Message")), 1, 0));
 		this.addChild(
 			new Text(
-				theme.fg("muted", "Select a user message to copy the active path up to that point into a new session"),
+				theme.fg(
+					"muted",
+					uiText("Select a user message to copy the active path up to that point into a new session"),
+				),
 				1,
 				0,
 			),
