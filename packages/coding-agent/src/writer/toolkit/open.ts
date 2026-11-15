@@ -15,7 +15,7 @@ import type { ExtensionAPI } from "../../core/extensions/types.ts";
 import { givenStages } from "../prompts/stages.ts";
 // Skill files.
 import { listSkills } from "../skills/manage.ts";
-import { type OfferedSkill, TOOLKITS, type ToolkitId, toolkitText } from "./toolkits.ts";
+import { type OfferedSkill, TOOLKIT_MARKS, TOOLKITS, type ToolkitId, toolkitText } from "./toolkits.ts";
 
 /** What opening gave: whether the toolkit was closed before, and the text for the model. */
 export interface OpenOutcome {
@@ -37,7 +37,7 @@ export function offeredSkills(agentDir = getAgentDir(), builtinDir = getWriterSk
 /** Whether the writing toolkit is open: the program's document checks and exports apply only then (2026-11-15: a
  * plain note written to 说明.md was checked for 公文 habits and exported to Word). */
 export function writingOpen(pi: Pick<ExtensionAPI, "getActiveTools">): boolean {
-	return TOOLKITS.writing.tools.every((tool) => pi.getActiveTools().includes(tool));
+	return pi.getActiveTools().includes(TOOLKIT_MARKS.writing);
 }
 
 /** Open a toolkit for this session. */

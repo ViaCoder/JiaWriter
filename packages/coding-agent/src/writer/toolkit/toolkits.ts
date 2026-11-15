@@ -126,9 +126,23 @@ export function toolkitTools(): string[] {
 	return [...new Set(TOOLKIT_IDS.flatMap((id) => TOOLKITS[id].tools))];
 }
 
-/** The toolkits whose tools are all active: what is open, derived from the active tool set pi keeps and restores. */
+/** The tool that tells each toolkit apart: active only when that toolkit was opened. */
+export const TOOLKIT_MARKS: Readonly<Record<ToolkitId, string>> = {
+	writing: "draft_section",
+	research: "search_web",
+	office: "export_document",
+	browser: "browser",
+	computer: "computer",
+	schedule: "schedule_add",
+};
+
+/**
+ * The toolkits that are open, derived from the active tool set pi keeps and restores: each by its own mark, so a
+ * toolkit counts as open even when an allowlist keeps another of its tools out (2026-11-15). The office toolkit's mark
+ * is in the writing toolkit too, so opening writing opens office.
+ */
 export function openToolkits(active: readonly string[]): ToolkitId[] {
-	return TOOLKIT_IDS.filter((id) => TOOLKITS[id].tools.every((tool) => active.includes(tool)));
+	return TOOLKIT_IDS.filter((id) => active.includes(TOOLKIT_MARKS[id]));
 }
 
 /** The toolkits as lines for /jw prompts: open or not, the tools, the size of the text each brings. */
