@@ -11,6 +11,8 @@ import {
 	Spacer,
 	Text,
 } from "@earendil-works/pi-tui";
+// JiaWriter: text in the interface language.
+import { uiText } from "../../../writer/ui-text.ts";
 import { getSelectListTheme, theme } from "../theme/theme.ts";
 import { DynamicBorder } from "./dynamic-border.ts";
 import { keyDisplayText } from "./keybinding-hints.ts";
@@ -94,7 +96,7 @@ export class ThinkingSelectorComponent extends Container implements Focusable {
 			new Text(
 				theme.fg(
 					"dim",
-					`  ${keyDisplayText("tui.select.confirm")} to select · ${keyDisplayText("app.thinking.save")} to set as default · ${keyDisplayText("tui.select.cancel")} to cancel`,
+					`  ${uiText("{confirm} to select · {save} to set as default · {cancel} to cancel", { confirm: keyDisplayText("tui.select.confirm"), save: keyDisplayText("app.thinking.save"), cancel: keyDisplayText("tui.select.cancel") })}`,
 				),
 				0,
 				0,

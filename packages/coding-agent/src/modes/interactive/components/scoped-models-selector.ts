@@ -10,6 +10,8 @@ import {
 	Spacer,
 	Text,
 } from "@earendil-works/pi-tui";
+// JiaWriter: text in the interface language.
+import { uiText } from "../../../writer/ui-text.ts";
 import { getModelSearchText } from "../model-search.ts";
 import { theme } from "../theme/theme.ts";
 import { DynamicBorder } from "./dynamic-border.ts";
@@ -269,7 +271,10 @@ export class ScopedModelsSelectorComponent extends Container implements Focusabl
 			this.listContainer.addChild(new Spacer(1));
 			this.listContainer.addChild(
 				new Text(
-					theme.fg("muted", `  ${selected.model ? `Model Name: ${selected.model.name}` : "Model unavailable"}`),
+					theme.fg(
+						"muted",
+						`  ${selected.model ? uiText("Model Name: {name}", { name: selected.model.name }) : uiText("Model unavailable")}`,
+					),
 					0,
 					0,
 				),

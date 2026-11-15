@@ -27,6 +27,8 @@ describe("model selector filter resets selection to top", () => {
 	});
 
 	beforeEach(() => {
+		// JiaWriter: the selectors' texts follow the interface language; these checks read the English ones.
+		vi.stubEnv("JW_LANG", "en");
 		setKeybindings(new KeybindingsManager());
 	});
 

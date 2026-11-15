@@ -29,6 +29,16 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	"[skill]": "[技能]",
 	"To resume this session:": "继续这次会话：",
 	// The working line and a tool row's timing (2026-11-14: the screen showed "Working · 5 秒" and "Took 0.0s").
+	// The model and thinking selectors (2026-11-15: they were English in a Chinese interface).
+	"Refreshing model catalogs…": "正在刷新模型目录……",
+	"Only showing models from configured providers. Use /login to add providers.":
+		"只显示已配置服务商的模型；用 /login 添加服务商。",
+	"Model refresh timed out; showing cached models.": "刷新模型目录超时，显示缓存的列表。",
+	"Model catalogs refreshed.": "模型目录已刷新。",
+	"Model Name: {name}": "模型名：{name}",
+	"Model unavailable": "模型不可用",
+	"{confirm} to select · {save} to set as default · {cancel} to cancel":
+		"{confirm} 选择 · {save} 设为默认 · {cancel} 取消",
 	// The welcome box (2026-11-15).
 	Model: "模型",
 	Folder: "文件夹",

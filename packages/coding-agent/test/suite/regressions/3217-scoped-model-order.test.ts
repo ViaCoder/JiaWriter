@@ -21,6 +21,8 @@ describe("issue #3217 scoped model ordering", () => {
 	});
 
 	beforeEach(() => {
+		// JiaWriter: the selectors' texts follow the interface language; these checks read the English ones.
+		vi.stubEnv("JW_LANG", "en");
 		// Ensure test isolation: keybindings are a global singleton
 		setKeybindings(new KeybindingsManager());
 	});

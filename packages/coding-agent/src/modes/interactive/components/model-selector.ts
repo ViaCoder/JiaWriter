@@ -10,6 +10,8 @@ import {
 	type TUI,
 } from "@earendil-works/pi-tui";
 import type { ModelRuntime } from "../../../core/model-runtime.ts";
+// JiaWriter: text in the interface language.
+import { uiText } from "../../../writer/ui-text.ts";
 import { refreshModelCatalogs } from "../model-catalog-refresh.ts";
 import { getModelSelectorSearchText } from "../model-search.ts";
 import { theme } from "../theme/theme.ts";
@@ -61,7 +63,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 	private onSelectAsDefaultCallback?: (model: Model<any>) => void;
 	private onCancelCallback: () => void;
 	private errorMessage?: string;
-	private refreshStatusMessage = "Refreshing model catalogs…";
+	private refreshStatusMessage = uiText("Refreshing model catalogs…");
 	private refreshStatusSuccess = false;
 	private tui: TUI;
 	private scopedModels: ReadonlyArray<ScopedModelItem>;
@@ -107,7 +109,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			this.scopeHintText = new Text(this.getScopeHintText(), 0, 0);
 			this.addChild(this.scopeHintText);
 		} else {
-			const hintText = "Only showing models from configured providers. Use /login to add providers.";
+			const hintText = uiText("Only showing models from configured providers. Use /login to add providers.");
 			this.addChild(new Text(theme.fg("warning", hintText), 0, 0));
 		}
 		this.addChild(new Spacer(1));
@@ -139,7 +141,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 				new Text(
 					theme.fg(
 						"dim",
-						`  ${keyDisplayText("tui.select.confirm")} to select · ${keyDisplayText("app.models.save")} to set as default · ${keyDisplayText("tui.select.cancel")} to cancel`,
+						`  ${uiText("{confirm} to select · {save} to set as default · {cancel} to cancel", { confirm: keyDisplayText("tui.select.confirm"), save: keyDisplayText("app.models.save"), cancel: keyDisplayText("tui.select.cancel") })}`,
 					),
 					0,
 					0,
@@ -193,7 +195,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			if (this.closed) return;
 			this.refreshStatusMessage = "";
 			if (result.aborted && timedOut) {
-				this.errorMessage = "Model refresh timed out; showing cached models.";
+				this.errorMessage = uiText("Model refresh timed out; showing cached models.");
 			} else if (result.errors.size === 1) {
 				this.errorMessage = `Could not refresh ${result.errors.keys().next().value}; showing cached models.`;
 			} else if (result.errors.size > 1) {
@@ -201,7 +203,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			} else {
 				this.errorMessage = this.modelRuntime.getError();
 				if (!this.errorMessage) {
-					this.refreshStatusMessage = "Model catalogs refreshed.";
+					this.refreshStatusMessage = uiText("Model catalogs refreshed.");
 					this.refreshStatusSuccess = true;
 				}
 			}
@@ -212,7 +214,7 @@ export class ModelSelectorComponent extends Container implements Focusable {
 			if (this.closed) return;
 			this.refreshStatusMessage = "";
 			this.errorMessage = timedOut
-				? "Model refresh timed out; showing cached models."
+				? uiText("Model refresh timed out; showing cached models.")
 				: `Could not refresh model catalogs: ${error instanceof Error ? error.message : String(error)}`;
 			this.updateList();
 			this.tui.requestRender();
@@ -349,7 +351,9 @@ export class ModelSelectorComponent extends Container implements Focusable {
 		} else {
 			const selected = this.filteredModels[this.selectedIndex];
 			this.listContainer.addChild(new Spacer(1));
-			this.listContainer.addChild(new Text(theme.fg("muted", `  Model Name: ${selected.model.name}`), 0, 0));
+			this.listContainer.addChild(
+				new Text(theme.fg("muted", `  ${uiText("Model Name: {name}", { name: selected.model.name })}`), 0, 0),
+			);
 		}
 		if (this.refreshStatusMessage) {
 			this.listContainer.addChild(new Spacer(1));

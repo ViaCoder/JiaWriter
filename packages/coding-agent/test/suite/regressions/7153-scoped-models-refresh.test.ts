@@ -66,7 +66,11 @@ describe("issue #7153 scoped models refresh", () => {
 	let harness: Harness | undefined;
 
 	beforeAll(() => initTheme("dark"));
-	beforeEach(() => setKeybindings(new KeybindingsManager()));
+	beforeEach(() => {
+		// JiaWriter: the selectors' texts follow the interface language; these checks read the English ones.
+		vi.stubEnv("JW_LANG", "en");
+		setKeybindings(new KeybindingsManager());
+	});
 	afterEach(() => {
 		harness?.cleanup();
 		harness = undefined;
