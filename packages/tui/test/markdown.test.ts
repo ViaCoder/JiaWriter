@@ -1697,7 +1697,12 @@ bar`,
 
 		it("stops a bare URL at full-width punctuation, leaving the Chinese after it as text (JiaWriter)", () => {
 			setCapabilities({ images: null, trueColor: false, hyperlinks: false });
-			const markdown = new Markdown("见（https://a.example/x/1.html）：坚持原则，培育场景。", 0, 0, defaultMarkdownTheme);
+			const markdown = new Markdown(
+				"见（https://a.example/x/1.html）：坚持原则，培育场景。",
+				0,
+				0,
+				defaultMarkdownTheme,
+			);
 			const joined = markdown.render(120).join("\n");
 			const underlined = /\x1b\[4m(.*?)\x1b\[24m/.exec(joined);
 			assert.ok(underlined, "the URL is underlined");
