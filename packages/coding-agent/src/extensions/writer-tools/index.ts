@@ -464,6 +464,15 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			theme.bg("customMessageBg", line),
 		);
 	});
+	// The note that sends a reply back for its wording is shown as a note, not with its type in brackets
+	// (2026-11-15: the screen showed "[jiawriter-reply-style]" above it).
+	pi.registerMessageRenderer("jiawriter-reply-style", (message, { outputPad }, theme) => {
+		const text =
+			typeof message.content === "string"
+				? message.content
+				: message.content.map((c) => (c.type === "text" ? c.text : "")).join("\n");
+		return new Text(theme.fg("customMessageText", text), outputPad, 1, (line) => theme.bg("customMessageBg", line));
+	});
 	// Drafts written since the user's last message, and the automatic rounds they have had.
 	const written = new Set<string>();
 	// Each draft as it was before this message changed it ("" for a new one): a revision is checked for what it
