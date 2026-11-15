@@ -139,7 +139,8 @@ export function insideDir(path: string, cwd: string): boolean {
 }
 
 /** Commands that create or copy files, and change nothing else, when every path they name is inside the folder. */
-const IN_DIR_COMMANDS = new Set(["mkdir", "cp", "touch"]);
+// mv joined on 2026-11-15: a run with nobody to ask could not sort files into subfolders (baseline P25 files).
+const IN_DIR_COMMANDS = new Set(["mkdir", "cp", "touch", "mv"]);
 
 /**
  * True when a shell command does to the working folder's files only what write does: its parts read, or create and
@@ -188,7 +189,9 @@ export function toolRequest(
 			title: titles.command,
 			detail: command,
 			// An ordinary command that only creates or copies files inside the folder counts as a write there.
-			inDirFile: risk === "act" && inDirCommand(command, cwd),
+			// An ordinary or moving command that only creates, copies or moves files inside the folder counts as a write
+			// there (mv is high on its own, since it can move files out).
+			inDirFile: risk !== "read" && inDirCommand(command, cwd),
 		};
 	}
 	// draft_section writes the draft at its path as write does.

@@ -87,9 +87,12 @@ describe("insideDir and toolRequest", () => {
 			"echo 内容 > 笔记.md",
 			"cat a.md b.md > 合并.md",
 			"mkdir 稿件; ls",
+			// Moving inside the folder (2026-11-15, baseline P25: sorting files into subfolders was refused with nobody to ask).
+			"mkdir -p 图片 文档 && mv c.png d.jpg 图片/ && mv a.txt b.md 文档/ && ls -R",
 		])
 			expect(inDirCommand(ok, "/work"), ok).toBe(true);
 		for (const no of [
+			"mv 说明.md ../说明.md",
 			"cp 说明.md ../说明.md",
 			"cp 说明.md /tmp/说明.md",
 			"mkdir ~/备份",
@@ -110,6 +113,11 @@ describe("insideDir and toolRequest", () => {
 		});
 		expect(toolRequest("bash", { command: "cp 说明.md ../说明.md" }, "/work", titles)).toMatchObject({
 			inDirFile: false,
+		});
+		// mv stays high on its own, but inside the folder it goes through as a write there.
+		expect(toolRequest("bash", { command: "mv a.txt 文档/" }, "/work", titles)).toMatchObject({
+			risk: "high",
+			inDirFile: true,
 		});
 		expect(toolRequest("bash", { command: "rm 说明.md" }, "/work", titles)).toMatchObject({
 			risk: "high",
