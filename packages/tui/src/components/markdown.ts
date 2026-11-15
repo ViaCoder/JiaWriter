@@ -719,6 +719,17 @@ export class Markdown implements Component {
 					break;
 
 				case "link": {
+					// JiaWriter: a bare URL that the autolink ran into Chinese punctuation stops at the first full-width mark
+					// (2026-11-15: "（https://…）：坚持……" was underlined to the end of the paragraph); the rest is text.
+					const cut =
+						token.text === token.href ? token.href.search(/[\u3000-\u303f\uff00-\uffef\u2018-\u201d]/) : -1;
+					if (cut > 0) {
+						const url = token.href.slice(0, cut);
+						const styledUrl = this.theme.link(this.theme.underline(url));
+						result += (getCapabilities().hyperlinks ? hyperlink(styledUrl, url) : styledUrl) + stylePrefix;
+						result += token.href.slice(cut);
+						break;
+					}
 					const linkText = this.renderInlineTokens(token.tokens || [], resolvedStyleContext);
 					const styledLink = this.theme.link(this.theme.underline(linkText));
 					if (getCapabilities().hyperlinks) {

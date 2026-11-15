@@ -1695,6 +1695,17 @@ bar`,
 			assert.ok(!joinedPlain.includes("mailto:"), "Should not show mailto: prefix for autolinked emails");
 		});
 
+		it("stops a bare URL at full-width punctuation, leaving the Chinese after it as text (JiaWriter)", () => {
+			setCapabilities({ images: null, trueColor: false, hyperlinks: false });
+			const markdown = new Markdown("见（https://a.example/x/1.html）：坚持原则，培育场景。", 0, 0, defaultMarkdownTheme);
+			const joined = markdown.render(120).join("\n");
+			const underlined = /\x1b\[4m(.*?)\x1b\[24m/.exec(joined);
+			assert.ok(underlined, "the URL is underlined");
+			assert.strictEqual(underlined[1].replace(/\x1b\[[0-9;]*m/g, ""), "https://a.example/x/1.html");
+			const plain = joined.replace(/\x1b\[[0-9;]*m/g, "");
+			assert.ok(plain.includes("）：坚持原则，培育场景。"), "the text after the URL stays");
+		});
+
 		it("should not duplicate URL for bare URLs", () => {
 			setCapabilities({ images: null, trueColor: false, hyperlinks: false });
 			const markdown = new Markdown("Visit https://example.com for more", 0, 0, defaultMarkdownTheme);
