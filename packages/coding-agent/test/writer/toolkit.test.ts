@@ -20,6 +20,7 @@ import {
 	TOOLKIT_IDS,
 	TOOLKIT_RULE,
 	TOOLKITS,
+	toolkitLines,
 	toolkitText,
 	toolkitTools,
 	USER_TURNS_NOTE,
@@ -60,6 +61,13 @@ describe("the table", () => {
 		const core = CORE_RULES.filter((r) => r !== TOOLKIT_RULE).join("\n");
 		for (const tool of toolkitTools()) expect(core).not.toContain(tool);
 		expect(CORE_RULES).toContain(TOOLKIT_RULE);
+	});
+
+	it("lists the toolkits for /jw prompts with their state and size", () => {
+		const lines = toolkitLines(["read", ...TOOLKITS.research.tools]);
+		expect(lines).toHaveLength(TOOLKIT_IDS.length);
+		expect(lines[0]).toMatch(/^· Toolkit writing: topic_open, .*, \d+ chars$/);
+		expect(lines[1]).toMatch(/^✓ Toolkit research: search_web, fetch_web, topic_open, material_add, \d+ chars$/);
 	});
 
 	it("knows which toolkits are open from the active tools", () => {

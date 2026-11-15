@@ -131,6 +131,16 @@ export function openToolkits(active: readonly string[]): ToolkitId[] {
 	return TOOLKIT_IDS.filter((id) => TOOLKITS[id].tools.every((tool) => active.includes(tool)));
 }
 
+/** The toolkits as lines for /jw prompts: open or not, the tools, the size of the text each brings. */
+export function toolkitLines(active: readonly string[], skills: readonly OfferedSkill[] = []): string[] {
+	const open = new Set(openToolkits(active));
+	return TOOLKIT_IDS.map((id) => {
+		const kit = TOOLKITS[id];
+		const size = toolkitText(id, { skills, hasUI: true }).length;
+		return `${open.has(id) ? "✓" : "·"} Toolkit ${id}: ${kit.tools.join(", ")}, ${size} chars`;
+	});
+}
+
 /** A built-in skill as the toolkit text offers it. */
 export interface OfferedSkill {
 	name: string;

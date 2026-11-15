@@ -26,6 +26,9 @@ import {
 import { stageLines } from "../../writer/prompts/stages.ts";
 // The keys held in memory (shown only as set or unset).
 import { withSecrets } from "../../writer/secrets.ts";
+// The toolkits, open or not.
+import { offeredSkills } from "../../writer/toolkit/open.ts";
+import { toolkitLines } from "../../writer/toolkit/toolkits.ts";
 // Where the search log is.
 import { fileSize, searchLogPath } from "../../writer/websearch/log.ts";
 // Main-model state after startup.
@@ -176,7 +179,7 @@ export default function writerUiExtension(pi: ExtensionAPI): void {
 			// The stage table, the search log, or the page from the environment and the startup state.
 			const lines =
 				page === "prompts"
-					? stageLines()
+					? [...toolkitLines(pi.getActiveTools(), offeredSkills()), "", ...stageLines()]
 					: page === "log"
 						? logLines()
 						: page === "doctor"
