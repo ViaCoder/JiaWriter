@@ -184,6 +184,8 @@ export const en: Record<MessageKey, string> = {
 	// URL not allowed.
 	"fetch.badUrl": "Only http(s) URLs can be fetched: {url}",
 	// AnySearch quota exhausted (402 body discarded).
+	"guard.afterStop":
+		"Tool calls are stopped: tell the user what was done and where it stuck; no more tool calls this turn",
 	"guard.failed": "{tool} failed {count} times in a row with the same arguments",
 	"guard.repeated": "{tool} was called {count} times with the same arguments, and the result will not change",
 	"guard.failing": "{tool} failed {count} times in a row with changing arguments: stop and tell the user why it fails",
@@ -319,6 +321,7 @@ export const en: Record<MessageKey, string> = {
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
 	"topic.missingFields": "missing {fields}",
 	"topic.missingPage": "no page for {file}",
+	"topic.candidates": "Addresses to choose from (copy one as the url):\n{list}",
 	"topic.missingSource":
 		"no source: give each item a url (a search result or page of this topic, as the results write it), or file and page; no page has been read in this topic yet, so it cannot be left out",
 	"topic.materialByTool":

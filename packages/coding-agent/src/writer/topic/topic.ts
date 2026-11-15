@@ -319,6 +319,47 @@ export function materialUrls(dir: string): string[] {
 	return [...archivedUrls(dir), ...readIndex(dir).flatMap((e) => (e.urls ?? []).map(materialKey))];
 }
 
+/** One address a material may cite, with the title and date the search results gave it. */
+export interface CandidateSource {
+	url: string;
+	title: string;
+	date: string;
+}
+
+/**
+ * Addresses from the topic's search results, newest search first, for a material_add item that named no source
+ * (2026-11-15: a run searched five times, then called material_add without a url nine times and never got a hint of
+ * what to write). Titles and dates come from the search files ("1. title" then "   url（date）").
+ */
+export function candidateSources(dir: string, limit = 8): CandidateSource[] {
+	const searches = readIndex(dir).filter((e) => e.kind === "search");
+	// The titles and dates by address, from every search file (an address can turn up in several searches).
+	const byUrl = new Map<string, { title: string; date: string }>();
+	for (const entry of searches) {
+		try {
+			const lines = readFileSync(join(dir, entry.file), "utf-8").split("\n");
+			for (let i = 0; i + 1 < lines.length; i++) {
+				const title = /^\d+\.\s+(.*\S)\s*$/.exec(lines[i]);
+				const where = /^\s+(\S+?)(?:（(\d{4}-\d{2}-\d{2})?）)?\s*$/.exec(lines[i + 1]);
+				if (title && where && !byUrl.has(where[1])) byUrl.set(where[1], { title: title[1], date: where[2] ?? "" });
+			}
+		} catch {
+			// A missing file: addresses alone.
+		}
+	}
+	const out: CandidateSource[] = [];
+	const seen = new Set<string>();
+	for (const entry of [...searches].reverse()) {
+		for (const url of entry.urls ?? []) {
+			if (seen.has(url)) continue;
+			seen.add(url);
+			out.push({ url, title: byUrl.get(url)?.title ?? "", date: byUrl.get(url)?.date ?? "" });
+			if (out.length >= limit) return out;
+		}
+	}
+	return out;
+}
+
 /** Fields a material must have, by kind. */
 const REQUIRED: Readonly<Record<Material["kind"], readonly (keyof Material)[]>> = {
 	// The acting subject and the fact; the reporter too when the case is from the web (below). The time only when the

@@ -125,7 +125,7 @@ describe("writer-guard", () => {
 		return { handlers, call, fail };
 	}
 
-	it("lets a call fail twice, blocks the third with a reason, and ends the run at the third block", () => {
+	it("lets a call fail twice, blocks the third with a reason, asks for a reply at the third block, and ends the run at a call after that", () => {
 		const { call, fail } = load();
 		const input = { genre: "调研报告" };
 		for (let i = 0; i < MAX_SAME_FAILURES; i++) {
@@ -136,9 +136,12 @@ describe("writer-guard", () => {
 			const out = call(input);
 			expect(out?.block).toBe(true);
 			expect(out?.reason).toContain("style_check");
-			expect(out?.terminate).toBe(block === MAX_BLOCKS);
+			expect(out?.terminate).toBeUndefined();
 		}
-		expect(call(input)?.reason).toContain("本轮到此结束");
+		// After the stop: one more call ends the run.
+		const after = call({ genre: "另一个" });
+		expect(after?.terminate).toBe(true);
+		expect(after?.reason).toContain("工具调用已停止");
 	});
 
 	it("cuts a reply streaming more than MAX_CALLS_PER_REPLY tool calls, then tells the model once the run has ended", () => {

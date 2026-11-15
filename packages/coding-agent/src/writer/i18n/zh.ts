@@ -162,6 +162,7 @@ export const zh = {
 	// URL not allowed.
 	"fetch.badUrl": "只能抓取 http(s) 网址：{url}",
 	// The loop guard.
+	"guard.afterStop": "工具调用已停止：先把做到了哪里、卡在哪里告诉用户，这一轮不再调用工具",
 	"guard.failed": "{tool} 用相同参数已连续失败 {count} 次",
 	"guard.repeated": "{tool} 用相同参数已调用 {count} 次，结果不会变",
 	"guard.failing": "{tool} 已连续失败 {count} 次，参数每次都不同：停下来，把失败的原因告诉用户",
@@ -293,6 +294,7 @@ export const zh = {
 	"topic.archiveFailed": "归档失败（{reason}），本次结果没有保存到主题文件夹。",
 	"topic.missingFields": "缺少 {fields}",
 	"topic.missingPage": "《{file}》缺少页码",
+	"topic.candidates": "可选来源（照抄其中一个 url）：\n{list}",
 	"topic.missingSource":
 		"缺少来源：每条写 url（本主题检索结果或已读网页的地址，照结果里的写），或 file 加 page；本主题还没读过网页，不能省略",
 	"topic.materialByTool": "素材.md 只由 material_add 写入，不能用 {tool} 改：事实由程序从来源提取并核对",

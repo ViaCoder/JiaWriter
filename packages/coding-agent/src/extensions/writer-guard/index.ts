@@ -1,6 +1,7 @@
 /**
  * Built-in JiaWriter extension: the loop guard (writer/loop-guard.ts) for every tool. A call that keeps failing, or is
- * made too often, with the same arguments is blocked with a reason; the third block ends the run. A reply that goes on
+ * made too often, with the same arguments is blocked with a reason; at the third block the model is told to reply to the
+ * user, and a tool call after that ends the run. A reply that goes on
  * calling tools past MAX_CALLS_PER_REPLY is cut while it streams, and the model is told to go on with what it has.
  */
 
@@ -27,8 +28,12 @@ import {
 export default function writerGuardExtension(pi: ExtensionAPI): void {
 	// One guard per message of the user.
 	let guard = newGuard();
+	// The guard said stop: the model gets one reply to the user; a tool call after that ends the run (2026-11-15: a
+	// run ended at the third block with no reply at all, and print mode wrote nothing).
+	let stopped = false;
 	pi.on("input", () => {
 		guard = newGuard();
+		stopped = false;
 	});
 
 	// Tool calls of the reply now streaming, and the count at which a reply was cut (0: none was).
@@ -62,6 +67,8 @@ export default function writerGuardExtension(pi: ExtensionAPI): void {
 
 	// Before a call: the same call again, where it cannot help, is blocked.
 	pi.on("tool_call", (event) => {
+		if (stopped)
+			return { block: true, reason: blockedText({ why: t("guard.afterStop"), next: "stop" }), terminate: true };
 		// A reply that arrived whole with too many calls: the ones past the limit are not run.
 		replyCalls++;
 		if (replyCalls > MAX_CALLS_PER_REPLY)
@@ -80,7 +87,8 @@ export default function writerGuardExtension(pi: ExtensionAPI): void {
 				: verdict === "failing"
 					? t("guard.failing", { tool: event.toolName, count: MAX_TOOL_FAILURES })
 					: t("guard.repeated", { tool: event.toolName, count: MAX_SAME_CALLS });
-		return { block: true, reason: blockedText({ why, next: stop ? "stop" : "change" }), terminate: stop };
+		if (stop) stopped = true;
+		return { block: true, reason: blockedText({ why, next: stop ? "stop" : "change" }) };
 	});
 
 	// After a call: its outcome counts.

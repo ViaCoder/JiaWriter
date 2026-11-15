@@ -32,6 +32,7 @@ import {
 	addMaterials,
 	adoptUnnamedTopic,
 	asFileSource,
+	candidateSources,
 	isUnnamedTopic,
 	lastPageUrl,
 	MATERIAL_FILE,
@@ -76,6 +77,13 @@ export function sourceItems(given: readonly unknown[]): SourceItem[] {
 function restore(ctx: ExtensionContext): void {
 	// None on a fresh branch.
 	setCurrentTopic(topicFromEntries(ctx.sessionManager.getBranch()));
+}
+
+/** The candidate addresses as lines for the model: url, then title and date when known. */
+export function candidatesText(list: readonly { url: string; title: string; date: string }[]): string {
+	if (list.length === 0) return "";
+	const lines = list.map((c) => `- ${c.url}${c.title ? ` ${c.title}` : ""}${c.date ? `（${c.date}）` : ""}`);
+	return t("topic.candidates", { list: lines.join("\n") });
 }
 
 /** Extension factory; `complete` reaches the model for the extraction (tests pass a stand-in). */
@@ -127,7 +135,7 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 		label: "Add material",
 		// Full description sent to the model.
 		description:
-			"Records the facts of a source in 素材.md: you name the source and what you need from it; the program extracts the facts with a request of its own, checks their figures and names against the source, and files them with the source's outlet and date.\n\nUsage:\n - One item per source: url of a search result or fetched page of this topic, or file (and page) of an imported reference; an item with neither takes the page last read with fetch_web\n - section is the outline part the facts are for; focus says what to take when the source covers more than that (大众汽车在华销量和高管表态)\n - The reply lists the facts recorded: read them to see what the source gave and what is still missing",
+			"Records the facts of a source in 素材.md: you name the source and what you need from it; the program extracts the facts with a request of its own, checks their figures and names against the source, and files them with the source's outlet and date.\n\nUsage:\n - One item per source: url of a search result or fetched page of this topic, or file (and page) of an imported reference; after search_web alone, copy the url from the results; an item with neither takes the page last read with fetch_web\n - section is the outline part the facts are for; focus says what to take when the source covers more than that (大众汽车在华销量和高管表态)\n - The reply lists the facts recorded: read them to see what the source gave and what is still missing",
 		// Argument schema.
 		parameters: Type.Object({
 			// A string too: GLM sends items as JSON text at times (2026-11-14: a run sent one string holding three items
@@ -174,7 +182,12 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 				const named = given.url?.trim() || given.file?.trim() ? given : { ...given, url: lastPageUrl(dir) };
 				const item = asFileSource(named as Material);
 				const name = item.file?.trim() ? `《${item.file.trim()}》` : (item.url?.trim() ?? "");
-				const problem = sourceProblem(item, archived) || (name ? "" : t("topic.missingSource"));
+				// No source: the error names the addresses the topic's searches hold, so the next call can copy one.
+				const problem =
+					sourceProblem(item, archived) ||
+					(name
+						? ""
+						: [t("topic.missingSource"), candidatesText(candidateSources(dir))].filter(Boolean).join("\n"));
 				if (problem) {
 					lines.push(t("topic.itemProblem", { n: i + 1, problem }));
 					error = true;
