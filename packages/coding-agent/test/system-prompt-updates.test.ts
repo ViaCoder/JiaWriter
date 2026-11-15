@@ -45,7 +45,18 @@ describe("system prompt updates", () => {
 			const head = harness.session.messages[0];
 			if (head?.role !== "system") throw new Error("expected system message");
 			expect(head.content).toBe("");
-			expect(Object.keys(head.sections ?? {})).toEqual(["preamble", "tools", "rules", "docs", "cwd"]);
+			// JiaWriter: the headed sections of stage 0 (2026-11-15) between the tools and the tools' own rules.
+			expect(Object.keys(head.sections ?? {})).toEqual([
+				"preamble",
+				"tools",
+				"language",
+				"tone_and_style",
+				"doing_tasks",
+				"tool_usage_policy",
+				"rules",
+				"docs",
+				"cwd",
+			]);
 			expect(head.toolsAdded?.map((tool) => tool.name)).toEqual(["read", "bash", "edit", "write"]);
 			expect(getSystemMessageText(head)).toBe(harness.session.systemPrompt);
 		} finally {

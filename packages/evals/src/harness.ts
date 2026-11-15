@@ -259,7 +259,8 @@ export function verifySystemPrompt(
 	options: Pick<PiCodingAgentHarnessOptions, "name" | "expectedPiDocumentation">,
 ): string {
 	if (options.expectedPiDocumentation === undefined) return systemPrompt;
-	if (!systemPrompt.includes("\n# Rules\n")) {
+	// JiaWriter: the rules of every request are the headed sections of stage 0; Tone and style is the first.
+	if (!systemPrompt.includes("\n# Tone and style\n")) {
 		throw new Error(`Pi system prompt lost its rules in the ${options.name} eval variant.`);
 	}
 	// JiaWriter: the docs section text changed; its heading still marks it.

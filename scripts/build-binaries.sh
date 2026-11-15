@@ -185,6 +185,9 @@ for platform in "${PLATFORMS[@]}"; do
     # JiaWriter: the Chrome extension (loaded once in chrome://extensions), the Chinese guide with
     # screenshots for this system, and an empty reference folder.
     cp -R ../../search_fetch/src/search_fetch/extension "$OUTPUT_DIR/$platform/chrome-extension"
+    # JiaWriter: the extension carries the release version (the user, 2026-11-15: the Chrome extension's version stays
+    # synchronized with the main application's).
+    node ../../scripts/writer-extension-version.mjs "$OUTPUT_DIR/$platform/chrome-extension/manifest.json"
     node ../../scripts/writer-guide.mjs "$platform" "$OUTPUT_DIR/$platform/使用说明.html"
     # JiaWriter: reading words from a picture on this machine, where the system offers it.
     # The macOS helper is compiled on a Mac by the build-sf job and arrives beside sf.

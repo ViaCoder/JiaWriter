@@ -76,11 +76,11 @@ describe("documentation variant", () => {
 		});
 		// JiaWriter: the docs section points at JiaWriter's documentation.
 		expect(prompt).toContain("\n# Docs\nWhen the user asks about JiaWriter");
-		expect(prompt).toContain("\n# Rules\n");
+		expect(prompt).toContain("\n# Tone and style\n");
 		expect(prompt).toContain("\n# Environment\n - Primary working directory: /workspace");
 
 		const stripped = excludePiDocumentation(prompt);
-		expect(stripped).toContain("\n# Rules\n");
+		expect(stripped).toContain("\n# Tone and style\n");
 		expect(stripped).toContain("\n# Environment\n - Primary working directory: /workspace");
 		expect(stripped).not.toContain("# Docs");
 		expect(stripped).not.toContain("When the user asks about JiaWriter");

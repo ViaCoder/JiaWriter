@@ -20,11 +20,14 @@ import { createConnection, createServer, type Server, type Socket } from "node:n
 import { dirname, join } from "node:path";
 // Stream types of stdin and stdout.
 import type { Readable, Writable } from "node:stream";
+// The program's own version, which the extension's must match.
+import { VERSION } from "../../config.ts";
 
 /** Native messaging host name (the extension's background.js connects to it). */
 export const HOST_NAME = "com.jiawriter.browser";
-/** The extension this program goes with: anything older lacks operations it uses. */
-export const EXTENSION_VERSION = "2.5.0";
+/** The extension this program goes with: the one of its own version (the user, 2026-11-15: the extension's version
+ * stays synchronized with the main application's; the build stamps the manifest from scripts/writer-version.txt). */
+export const EXTENSION_VERSION = VERSION;
 /** Chrome's id of the JiaWriter extension (fixed by the key in its manifest.json). */
 export const EXTENSION_ID = "mnoicnfoocibanokjfbpmbgpamlmdgje";
 /** Largest message the host may send to Chrome (Chrome's limit is 1 MB). */
