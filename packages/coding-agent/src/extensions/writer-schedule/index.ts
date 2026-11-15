@@ -1,14 +1,12 @@
 /**
  * Built-in JiaWriter extension: scheduled tasks (2026-11-15). The model adds, lists and removes jobs with
- * schedule_task; /schedule lists them. While the interface is open, a timer runs the due jobs every minute, each in a
+ * schedule_add, schedule_list and schedule_remove; /schedule lists them. While the interface is open, a timer runs the due jobs every minute, each in a
  * child run of its own, and says what it did; when it is closed, `jiawriter schedule run` from the system's cron
  * does the same, and the tool tells the user the one line to install.
  */
 
 // Paths.
 import { resolve } from "node:path";
-// Schema helpers.
-import { StringEnum } from "@earendil-works/pi-ai/utils/typebox-helpers";
 // Schemas.
 import { Type } from "typebox";
 // The agent folder.
@@ -70,51 +68,29 @@ export default function writerScheduleExtension(pi: ExtensionAPI, agentDir = get
 	let running = false;
 	let timer: ReturnType<typeof setInterval> | undefined;
 
+	/** A failed call. */
+	const fail = (text: string) => ({ content: [{ type: "text" as const, text }], details: {}, isError: true });
+	// Three tools with their own required fields (2026-11-15, eval G10: with one tool and an action field, GLM sent
+	// add calls without when or task seven times running; a required field is never left out).
 	pi.registerTool({
-		name: "schedule_task",
+		name: "schedule_add",
 		// Declared only while its toolkit is open (writer/toolkit).
 		exposure: "deferred",
 		label: "Schedule",
 		description:
-			"Adds, lists or removes scheduled tasks: a prompt run in a folder at the times a rule names.\n\nUsage:\n" +
-			" - action: add (when, task, folder), list, remove (id)\n" +
+			"Adds a scheduled task: a request run in a folder at the times a rule names.\n\nUsage:\n" +
 			" - when: 每天 08:00 | 工作日 08:30 | 每周一 09:00 | 每月1日 09:00 | five cron fields (0 8 * * 1-5)\n" +
 			" - task: the request as the user would type it, complete in itself (the run has no other context)\n" +
 			" - folder: where it runs (default the working folder)",
 		parameters: Type.Object({
-			action: StringEnum(["add", "list", "remove"] as const),
-			when: Type.Optional(Type.String({ description: "add: the rule, 每天 08:00 or five cron fields" })),
-			task: Type.Optional(Type.String({ description: "add: the request to run, complete in itself" })),
+			when: Type.String({ description: "The rule: 每天 08:00, or five cron fields" }),
+			task: Type.String({ description: "The request to run, complete in itself" }),
 			folder: Type.Optional(Type.String()),
-			id: Type.Optional(Type.String({ description: "remove: the task's id" })),
 		}),
-		prepareArguments: (args) =>
-			prepareScheduleArguments(args) as {
-				action: "add" | "list" | "remove";
-				when?: string;
-				task?: string;
-				folder?: string;
-				id?: string;
-			},
+		prepareArguments: (args) => prepareScheduleArguments(args) as { when: string; task: string; folder?: string },
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const fail = (text: string) => ({ content: [{ type: "text" as const, text }], details: {}, isError: true });
 			const jobs = loadJobs(agentDir);
-			if (params.action === "list") {
-				const text = jobs.length === 0 ? t("schedule.none") : jobLines(jobs).join("\n");
-				return { content: [{ type: "text", text }], details: { count: jobs.length } };
-			}
-			if (params.action === "remove") {
-				const at = jobs.findIndex((j) => j.id === (params.id ?? "").trim());
-				if (at < 0) return fail(t("schedule.noSuch", { id: params.id ?? "" }));
-				const [gone] = jobs.splice(at, 1);
-				saveJobs(agentDir, jobs);
-				return {
-					content: [{ type: "text", text: t("schedule.removed", { task: gone.task }) }],
-					details: { id: gone.id },
-				};
-			}
-			// A missing rule is named apart from one that cannot be read, with the fields that did arrive.
 			if (!params.when?.trim())
 				return fail(t("schedule.missing", { field: "when", got: Object.keys(params).join(", ") }));
 			const rule = parseWhen(params.when);
@@ -123,7 +99,7 @@ export default function writerScheduleExtension(pi: ExtensionAPI, agentDir = get
 			if (!task) return fail(t("schedule.missing", { field: "task", got: Object.keys(params).join(", ") }));
 			const job: Job = {
 				id: newJobId(jobs),
-				when: params.when?.trim() ?? "",
+				when: params.when.trim(),
 				task,
 				folder: resolve(ctx.cwd, params.folder ?? "."),
 				created: new Date().toISOString(),
@@ -147,10 +123,44 @@ export default function writerScheduleExtension(pi: ExtensionAPI, agentDir = get
 		},
 	});
 
+	pi.registerTool({
+		name: "schedule_list",
+		exposure: "deferred",
+		label: "Schedule",
+		description: "Lists the scheduled tasks with their ids, rules, next times and folders",
+		parameters: Type.Object({}),
+		annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+		async execute() {
+			const jobs = loadJobs(agentDir);
+			const text = jobs.length === 0 ? t("schedule.none") : jobLines(jobs).join("\n");
+			return { content: [{ type: "text", text }], details: { count: jobs.length } };
+		},
+	});
+
+	pi.registerTool({
+		name: "schedule_remove",
+		exposure: "deferred",
+		label: "Schedule",
+		description: "Removes a scheduled task by the id schedule_list shows",
+		parameters: Type.Object({ id: Type.String({ description: "The task's id" }) }),
+		annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+		async execute(_id, params) {
+			const jobs = loadJobs(agentDir);
+			const at = jobs.findIndex((j) => j.id === (params.id ?? "").trim());
+			if (at < 0) return fail(t("schedule.noSuch", { id: params.id ?? "" }));
+			const [gone] = jobs.splice(at, 1);
+			saveJobs(agentDir, jobs);
+			return {
+				content: [{ type: "text", text: t("schedule.removed", { task: gone.task }) }],
+				details: { id: gone.id },
+			};
+		},
+	});
+
 	pi.registerCommand("schedule", {
 		description: t("schedule.command"),
 		handler: async (_args, ctx) => {
-			// The model gets schedule_task too, so the user can add or remove tasks in words.
+			// The model gets the schedule tools too, so the user can add or remove tasks in words.
 			openToolkit(pi, "schedule", { hasUI: ctx.hasUI, skills: [] });
 			const jobs = loadJobs(agentDir);
 			ctx.ui.notify(jobs.length === 0 ? t("schedule.none") : jobLines(jobs).join("\n"), "info");

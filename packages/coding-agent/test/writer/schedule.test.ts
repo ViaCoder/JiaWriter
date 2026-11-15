@@ -180,8 +180,8 @@ describe("jobs file / runDue / command line", () => {
 	});
 });
 
-describe("schedule_task tool", () => {
-	/** The tool and the commands, registered on a stand-in API. */
+describe("schedule tools", () => {
+	/** The three tools and the command, registered on a stand-in API. */
 	function tool() {
 		const tools = new Map<string, ToolDefinition>();
 		const commands = new Map<string, { handler: (args: string, ctx: unknown) => Promise<void> }>();
@@ -200,36 +200,42 @@ describe("schedule_task tool", () => {
 		} as unknown as ExtensionAPI;
 		writerScheduleExtension(pi, agentDir);
 		const ctx = { cwd: agentDir } as unknown as ExtensionToolContext;
-		const run = (params: Record<string, unknown>) =>
-			tools.get("schedule_task")?.execute("c", params, undefined, undefined, ctx) as Promise<{
+		const call = (name: string) => (params: Record<string, unknown>) =>
+			tools.get(name)?.execute("c", params, undefined, undefined, ctx) as Promise<{
 				content: { text: string }[];
 				isError?: boolean;
 				details?: Record<string, unknown>;
 			}>;
-		return { run, commands };
+		return {
+			add: call("schedule_add"),
+			list: call("schedule_list"),
+			remove: call("schedule_remove"),
+			commands,
+			tools,
+		};
 	}
 
 	it("adds with the cron hint once, lists, removes, and refuses a time it cannot read", async () => {
-		const { run, commands } = tool();
-		const added = await run({ action: "add", when: "每天 08:00", task: "写一份昨日舆情简报到 简报.md" });
+		const { add, list, remove, commands, tools } = tool();
+		// Three tools, each with its own required fields (2026-11-15, eval G10).
+		expect([...tools.keys()]).toEqual(["schedule_add", "schedule_list", "schedule_remove"]);
+		const added = await add({ when: "每天 08:00", task: "写一份昨日舆情简报到 简报.md" });
 		expect(added.isError).toBeUndefined();
 		expect(added.content[0].text).toContain("已添加定时任务");
 		expect(added.content[0].text).toContain("每天 08:00");
 		expect(added.content[0].text).toContain(cronLine());
-		const second = await run({ action: "add", when: "0 9 * * 1", task: "周报", folder: "周报" });
+		const second = await add({ when: "0 9 * * 1", task: "周报", folder: "周报" });
 		expect(second.content[0].text).not.toContain("crontab");
 		expect(loadJobs(agentDir).map((j) => j.folder)).toEqual([agentDir, join(agentDir, "周报")]);
-		const list = await run({ action: "list" });
-		expect(list.content[0].text.split("\n")).toHaveLength(2);
-		expect(list.content[0].text).toContain("cron 0 9 * * 1");
+		const listed = await list({});
+		expect(listed.content[0].text.split("\n")).toHaveLength(2);
+		expect(listed.content[0].text).toContain("cron 0 9 * * 1");
 		const id = loadJobs(agentDir)[0].id;
-		expect((await run({ action: "remove", id })).content[0].text).toContain("已删除定时任务");
+		expect((await remove({ id })).content[0].text).toContain("已删除定时任务");
 		expect(loadJobs(agentDir)).toHaveLength(1);
-		expect((await run({ action: "remove", id: "zzz" })).isError).toBe(true);
-		expect((await run({ action: "add", when: "明天", task: "x" })).content[0].text).toContain("看不懂时间");
-		expect((await run({ action: "add", when: "每天 08:00", task: " " })).content[0].text).toContain(
-			"add 需要 task 参数",
-		);
+		expect((await remove({ id: "zzz" })).isError).toBe(true);
+		expect((await add({ when: "明天", task: "x" })).content[0].text).toContain("看不懂时间");
+		expect((await add({ when: "每天 08:00", task: " " })).content[0].text).toContain("add 需要 task 参数");
 		// The command lists through the interface.
 		const shown: string[] = [];
 		await commands.get("schedule")?.handler("", { ui: { notify: (text: string) => shown.push(text) } });

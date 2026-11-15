@@ -71,7 +71,7 @@ JiaWriter 启动时把 `JW_KEY` 和 `ANYSEARCH_KEY` 读进内存，随即从自�
 | `topic_open`、`material_add`（写作、检索工具包） | 建立主题文件夹，记录带来源的案例和数据 |
 | `draft_restore`（写作工具包） | 列出稿件保存过的版本，恢复其中一个 |
 | `todo_write` | 三步以上的工作记任务清单，常驻在输入框上方（Ctrl+T 隐藏） |
-| `schedule_task`（定时工具包） | 定时任务：按“每天 08:00”“工作日 08:30”“每周一 09:00”“每月1日 09:00”或 cron 五段，到点在指定文件夹里运行一条请求；程序开着时每分钟检查，关着时由系统 cron 运行 `jiawriter schedule run` |
+| `schedule_add`、`schedule_list`、`schedule_remove`（定时工具包） | 定时任务：按“每天 08:00”“工作日 08:30”“每周一 09:00”“每月1日 09:00”或 cron 五段，到点在指定文件夹里运行一条请求；程序开着时每分钟检查，关着时由系统 cron 运行 `jiawriter schedule run` |
 | `delegate` | 把一个独立的子任务交给新开的 JiaWriter 进程在自己的上下文里完成，返回它的回复；可并行多个，子任务不能再派 |
 
 ## 命令

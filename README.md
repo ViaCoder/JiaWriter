@@ -71,7 +71,7 @@ Run `/jw` inside JiaWriter to see each variable's value in effect, where it come
 | `topic_open`, `material_add` (writing and research toolkits) | Open a topic folder; record cases and data with their sources |
 | `draft_restore` (writing toolkit) | List a draft's saved versions and bring one back |
 | `todo_write` | The task list of work with three or more steps, shown above the input (Ctrl+T hides it) |
-| `schedule_task` (schedule toolkit) | Scheduled tasks: a request run in a folder at set times (每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields); checked every minute while the program is open, and run by `jiawriter schedule run` from the system's cron when it is closed |
+| `schedule_add`, `schedule_list`, `schedule_remove` (schedule toolkit) | Scheduled tasks: a request run in a folder at set times (每天 08:00, 工作日 08:30, 每周一 09:00, 每月1日 09:00, or five cron fields); checked every minute while the program is open, and run by `jiawriter schedule run` from the system's cron when it is closed |
 | `delegate` | Hand a self-contained subtask to a fresh JiaWriter process with its own context and get its reply back; several may run at once, and a subtask cannot delegate further |
 
 ## Commands

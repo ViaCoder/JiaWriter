@@ -108,7 +108,13 @@ export const TOOLKITS: Readonly<Record<ToolkitId, Toolkit>> = {
 		skills: [],
 	},
 	computer: { id: "computer", tools: ["computer"], stages: [], rules: [], skills: [] },
-	schedule: { id: "schedule", tools: ["schedule_task"], stages: [], rules: [], skills: [] },
+	schedule: {
+		id: "schedule",
+		tools: ["schedule_add", "schedule_list", "schedule_remove"],
+		stages: [],
+		rules: [],
+		skills: [],
+	},
 };
 
 /** The core rule that tells the model of the toolkits (stage 0). */

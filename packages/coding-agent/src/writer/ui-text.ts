@@ -299,7 +299,9 @@ const WORKING_ZH: Readonly<Record<string, string>> = {
 	browser: "正在操作浏览器",
 	computer: "正在操作桌面",
 	delegate: "子任务进行中",
-	schedule_task: "正在处理定时任务",
+	schedule_add: "正在添加定时任务",
+	schedule_list: "正在列出定时任务",
+	schedule_remove: "正在删除定时任务",
 	toolkit: "正在打开工具包",
 };
 const WORKING_EN: Readonly<Record<string, string>> = {
