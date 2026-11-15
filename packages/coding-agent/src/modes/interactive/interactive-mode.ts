@@ -139,6 +139,7 @@ import { checkForNewPiVersion, type LatestPiRelease } from "../../utils/version-
 import { backgroundAll } from "../../writer/background.ts";
 // JiaWriter: interface text in the chosen language.
 import { brandText } from "../../writer/brand.ts";
+import { orderCommands } from "../../writer/command-order.ts";
 // JiaWriter: the "Jia" logo for release packages.
 import { brandWordmarkLines, brandWordmarkText, jiaHeader, jiaWordmark, showsJiaLogo } from "../../writer/logo.ts";
 // The work mode Shift+Tab cycles.
@@ -837,8 +838,9 @@ export class InteractiveMode {
 			}
 		}
 
+		// JiaWriter: the writer's commands lead the / menu; the rest keep their order.
 		return new CombinedAutocompleteProvider(
-			[...slashCommands, ...templateCommands, ...extensionCommands, ...skillCommandList],
+			orderCommands([...slashCommands, ...templateCommands, ...extensionCommands, ...skillCommandList]),
 			this.sessionManager.getCwd(),
 			this.fdPath,
 		);
