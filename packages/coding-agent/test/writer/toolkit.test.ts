@@ -93,6 +93,10 @@ describe("detectToolkits", () => {
 		"把这个文件夹里的文件按类型分到子文件夹里",
 		"看看 说明.md 写了什么",
 		"今天星期几",
+		// Code and chores are not documents (2026-11-15).
+		"帮我写一个 Python 脚本，把 CSV 转成 JSON",
+		"写个函数算平均数",
+		"把下面三句话整理成一段话写进 说明.md",
 	])("opens nothing for %s", (prompt) => {
 		expect(detectToolkits(prompt)).toEqual([]);
 	});

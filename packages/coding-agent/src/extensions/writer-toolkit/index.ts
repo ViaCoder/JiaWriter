@@ -54,13 +54,15 @@ export default function writerToolkitExtension(pi: ExtensionAPI): void {
 		parameters: Type.Object({ name: StringEnum(TOOLKIT_IDS) }),
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const already = openToolkits(pi.getActiveTools()).includes(params.name);
-			const text = open(params.name, ctx);
+			// Open already: one line, not the text again (it is in the conversation).
+			if (openToolkits(pi.getActiveTools()).includes(params.name))
+				return {
+					content: [{ type: "text", text: t("toolkit.already", { name: params.name }) }],
+					details: { toolkit: params.name, opened: false },
+				};
 			return {
-				content: [
-					{ type: "text", text: already ? `${t("toolkit.already", { name: params.name })}\n${text}` : text },
-				],
-				details: { toolkit: params.name, opened: !already },
+				content: [{ type: "text", text: open(params.name, ctx) }],
+				details: { toolkit: params.name, opened: true },
 			};
 		},
 	});

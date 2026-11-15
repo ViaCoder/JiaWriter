@@ -155,7 +155,7 @@ export function toolkitText(id: ToolkitId, opts: { skills: readonly OfferedSkill
 
 /** Genres a request names when it asks for a document. */
 const GENRES =
-	"通知|报告|讲话|发言|致辞|演讲|方案|总结|简报|请示|批复|函|纪要|汇报|文章|论文|综述|摘要|稿|公文|意见|计划|规划|新闻|通报|决定|公告|启事|倡议|贺信|感谢信|申请|解读|评论|社论|序言|前言|后记|教案|课件|标书|合同|协议|章程|细则|办法|规定|条例";
+	"通知|报告|讲话|发言|致辞|演讲|方案|总结|简报|请示|批复|函(?!数)|纪要|汇报|文章|论文|综述|摘要|稿|公文|意见|计划|规划|新闻|通报|决定|公告|启事|倡议|贺信|感谢信|申请|解读|评论|社论|序言|前言|后记|教案|课件|标书|合同|协议|章程|细则|办法|规定|条例";
 
 /**
  * The toolkits a request plainly asks for, by its words alone, in priority order: writing when it asks to write a
@@ -168,9 +168,8 @@ export function detectToolkits(prompt: string): ToolkitId[] {
 	const found: ToolkitId[] = [];
 	if (
 		new RegExp(`(写|撰写|起草|拟|草拟|改写|润色|扩写|缩写|续写|修改|完善)[^。！？\\n]{0,14}(${GENRES})`).test(text) ||
-		/写一(篇|份|段|个|则|封|版|稿)/.test(text) ||
-		/(帮我|请|给我)(写|起草|拟)/.test(text) ||
-		/\b(write|draft) (a|an|the|me)\b/i.test(text)
+		/写一(篇|份|段|则|封|版|稿)/.test(text) ||
+		/\b(write|draft) (a|an|the) (document|report|notice|speech|article|letter|essay|paper|memo)\b/i.test(text)
 	)
 		found.push("writing");
 	if (
