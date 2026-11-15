@@ -189,7 +189,7 @@ def program():
     return ["node", "--import", "file://" + os.path.join(coding, "src", "experimental", "source-resolver.ts"), os.path.join(coding, "src", "cli.ts")]
 
 
-def run(api, port, rounds=(("-p", "开始"),)):
+def run(api, port, rounds=(("-p", "检索最新资料"),)):
     """Runs of the program in one home; gives the last output, the archive by folder, the log, and each run's requests."""
     tmp = tempfile.mkdtemp(prefix="jw-main-")
     each_run = []
@@ -258,7 +258,7 @@ def main():
     ]
     endpoint_on[0] = True
 
-    out, found, log_text, runs = run("anthropic-messages", port, (("-p", "开始"), ("-p", "第二个对话"), ("-c", "-p", "继续")))
+    out, found, log_text, runs = run("anthropic-messages", port, (("-p", "检索最新资料"), ("-p", "再检索一次最新资料"), ("-c", "-p", "继续")))
     opening, second_chat, resumed = runs
     calls = second_chat + [{}, {}, {}, {}]
     last = json.dumps(calls[3].get("messages"), ensure_ascii=False)

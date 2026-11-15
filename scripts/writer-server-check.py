@@ -179,7 +179,7 @@ def main():
     else:
         coding = os.path.join(ROOT, "packages", "coding-agent")
         program = ["node", "--import", "file://" + os.path.join(coding, "src", "experimental", "source-resolver.ts"), os.path.join(coding, "src", "cli.ts")]
-    out = subprocess.run(program + ["-p", "开始"], cwd=tmp, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
+    out = subprocess.run(program + ["-p", "检索最新资料"], cwd=tmp, env=env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=120)
     # Topic files by folder.
     found = {"检索": "", "网页": ""}
     counts = {"检索": 0, "网页": 0}

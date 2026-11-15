@@ -47,6 +47,12 @@ export function openToolkit(
 	opts: { hasUI: boolean; skills?: readonly OfferedSkill[] },
 ): OpenOutcome {
 	const kit = TOOLKITS[id];
+	// JW_BROWSER=off and JW_COMPUTER=off keep those tools out, as before the toolkits.
+	const off =
+		(id === "browser" && process.env.JW_BROWSER === "off") ||
+		(id === "computer" && process.env.JW_COMPUTER === "off");
+	if (off)
+		return { opened: false, text: `Toolkit ${id} is turned off in this installation (JW_${id.toUpperCase()}=off).` };
 	const active = pi.getActiveTools();
 	const opened = !kit.tools.every((tool) => active.includes(tool));
 	if (opened) pi.setActiveTools([...new Set([...active, ...kit.tools])]);

@@ -234,7 +234,10 @@ def drive(steps, env, mode, **setup):
         setattr(script, name, value)
     current[0] = script
     run_env = {**env, "JW_PERMISSION": mode}
-    out = subprocess.run(program() + ["-p", "开始"], cwd=env["HOME"], env=run_env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
+    # The request names the work, so the program opens the toolkit the steps need (P25, 2026-11-15): the desktop for
+    # computer steps, else the browser.
+    prompt = "打开桌面应用看看" if any(isinstance(s, dict) and s.get("_tool") == "computer" for s in steps) else "打开网站看看"
+    out = subprocess.run(program() + ["-p", prompt], cwd=env["HOME"], env=run_env, stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=180)
     return out, script
 
 
