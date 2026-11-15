@@ -64,6 +64,11 @@ describe("salvageSource", () => {
 			url: "https://a.example/4",
 			focus: "民航法修订，见 ）：施行日期",
 		});
+		// A candidate line copied whole, date and all (2026-11-16: a run pasted "url（2026-01-07）" into focus).
+		expect(salvageSource({ focus: "https://a.example/7（2026-01-07） 我国低空经济的挑战" })).toEqual({
+			url: "https://a.example/7",
+			focus: "（2026-01-07） 我国低空经济的挑战",
+		});
 		expect(salvageSource({ focus: "没有地址" })).toEqual({ focus: "没有地址" });
 		expect(sourceItems([{ focus: "见 https://a.example/5" }, "https://a.example/6"])).toEqual([
 			{ url: "https://a.example/5", focus: "见" },

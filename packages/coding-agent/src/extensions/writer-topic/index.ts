@@ -76,7 +76,7 @@ export function sourceItems(given: readonly unknown[]): SourceItem[] {
 /** Names a model gives the address under, besides url (2026-11-15: GLM wrote it inside focus nine times in a run). */
 const URL_ALIASES = ["link", "source", "address", "href", "来源", "网址", "链接"] as const;
 /** An address inside a text. */
-const URL_IN_TEXT = /https?:\/\/[^\s"'）)，。；,;]+/;
+const URL_IN_TEXT = /https?:\/\/[^\s"'（）()，。；、,;]+/;
 
 /** An item with its address where the program reads it: from an alias key, or lifted out of focus or section. */
 export function salvageSource(item: SourceItem): SourceItem {
@@ -209,6 +209,9 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 			const lines: string[] = [];
 			// A source the topic does not hold is an error, so the model gives another; an empty extraction is not.
 			let error = false;
+			// Facts recorded by this call: a call that recorded some is not a failure, whatever else went wrong
+			// (2026-11-16: a batch of four sources recorded seven facts and was counted as a failure by the loop guard).
+			let recorded = 0;
 			for (const [i, given] of items.entries()) {
 				// No source named: the page read last (2026-11-14: GLM names only what to take from the page it just read).
 				const named = given.url?.trim() || given.file?.trim() ? given : { ...given, url: lastPageUrl(dir) };
@@ -258,6 +261,7 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 				} else {
 					const result = addMaterials(dir, kept);
 					lines.push(t("topic.extracted", { source: name, count: result.written.length }));
+					recorded += result.written.length;
 					// The facts as recorded, for the model to see what the source gave.
 					for (const n of result.written) {
 						const fact = kept[n - 1];
@@ -271,7 +275,7 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 			const total = materialCount(dir);
 			lines.push(t("topic.materialTotal", { file: MATERIAL_FILE, total }));
 			const text = lines.join("\n");
-			return error
+			return error && recorded === 0
 				? { content: [{ type: "text", text }], details: { topicDir: dir, total }, isError: true }
 				: { content: [{ type: "text", text }], details: { topicDir: dir, total } };
 		},
