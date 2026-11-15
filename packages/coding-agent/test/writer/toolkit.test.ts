@@ -199,6 +199,20 @@ describe("the extension", () => {
 		expect(start("再写一份通知")).toBeUndefined();
 	});
 
+	it("gives a toolkit's text once even when an allowlist keeps one of its tools out", () => {
+		// A pi that registers no schedule_remove: the schedule toolkit can never be open by its tools alone.
+		const { pi, handlers } = load(["read"]);
+		const setAll = pi.setActiveTools;
+		pi.setActiveTools = (names: string[]) => setAll(names.filter((n) => n !== "schedule_remove"));
+		const start = () =>
+			handlers.get("before_agent_start")?.({ messageType: "user", prompt: "每天 08:00 整理一下日志" }, ctx) as
+				| { message: { content: string } }
+				| undefined;
+		expect(start()?.message.content).toContain("Toolkit schedule is open");
+		expect(pi.active).toContain("schedule_add");
+		expect(start()).toBeUndefined();
+	});
+
 	it("gives the open toolkits' texts again after compaction", () => {
 		const { handlers } = load(["read", ...TOOLKITS.research.tools]);
 		expect(handlers.get("before_agent_start")?.({ messageType: "user", prompt: "继续" }, ctx)).toBeUndefined();

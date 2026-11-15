@@ -31,16 +31,22 @@ export function toolkitName(id: ToolkitId): string {
 export default function writerToolkitExtension(pi: ExtensionAPI): void {
 	// Whether the open toolkits' texts have to be given again (after compaction, the summary may have lost them).
 	let resend = false;
+	// Toolkits whose text this session was given (a toolkit some tool of which an allowlist left out never counts as
+	// open by its tools alone, and its text must still come once, not with every request).
+	const given = new Set<ToolkitId>();
 	pi.on("session_compact", () => {
 		resend = true;
+		given.clear();
 	});
 	pi.on("session_start", () => {
 		resend = false;
+		given.clear();
 	});
 
 	/** Open one and tell the user, when it was closed; the text for the model. */
 	function open(id: ToolkitId, ctx: Pick<ExtensionContext, "hasUI" | "ui">): string {
 		const out = openToolkit(pi, id, { hasUI: ctx.hasUI, skills: offeredSkills() });
+		given.add(id);
 		if (out.opened && ctx.hasUI) ctx.ui.notify(t("toolkit.opened", { name: toolkitName(id) }), "info");
 		return out.text;
 	}
@@ -78,7 +84,7 @@ export default function writerToolkitExtension(pi: ExtensionAPI): void {
 		}
 		if (event.messageType === "user") {
 			for (const id of detectToolkits(event.prompt)) {
-				if (openToolkits(pi.getActiveTools()).includes(id)) continue;
+				if (given.has(id) || openToolkits(pi.getActiveTools()).includes(id)) continue;
 				texts.push(open(id, ctx));
 			}
 		}

@@ -54,8 +54,11 @@ export function openToolkit(
 	if (off)
 		return { opened: false, text: `Toolkit ${id} is turned off in this installation (JW_${id.toUpperCase()}=off).` };
 	const active = pi.getActiveTools();
-	const opened = !kit.tools.every((tool) => active.includes(tool));
-	if (opened) pi.setActiveTools([...new Set([...active, ...kit.tools])]);
+	// Closed when some tool of it is not active yet; a tool that is not registered (an allowlist left it out) cannot
+	// join, so the toolkit counts as open once the active set has all it can take.
+	const missing = kit.tools.filter((tool) => !active.includes(tool));
+	if (missing.length > 0) pi.setActiveTools([...new Set([...active, ...kit.tools])]);
+	const opened = missing.length > 0 && pi.getActiveTools().length > active.length;
 	// The stage text comes with the toolkit, so the tool's first success does not bring it again.
 	const given = givenStages();
 	for (const stage of kit.stages) given.add(stage);
