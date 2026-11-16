@@ -191,7 +191,8 @@ describe("bash in the background", () => {
 		expect(stopTask(task.id)).toBe(true);
 		expect(await until(() => task.endedAt !== undefined)).toBe(true);
 		expect(task.exitCode).toBe(130);
-		rmSync(cwd, { recursive: true, force: true });
+		// On Windows the stopped shell's child may hold the folder a moment longer (CI 2026-11-17: EBUSY on rmdir).
+		rmSync(cwd, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
 	});
 });
 
