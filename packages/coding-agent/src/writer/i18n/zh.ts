@@ -65,6 +65,7 @@ export const zh = {
 		"同一素材用了不止一处：{figures}。全文每个案例和数据只用一次，留在最能说明问题的那段，别处换用没用过的材料或删去。",
 	"style.asciiQuotes": '{count} 处中文用了英文引号 "……"：改成中文引号“……”。',
 	"style.headings": "标题编号不符：一级标题用“一、”，二级用“（一）”，一般只用两级：",
+	"style.plainHeadings": "小标题写成了普通行，要加 Markdown 标题记号（导出时才成为标题）：",
 	"style.listMarkers": "不用段内序号 {markers}：需要分条时用标题编号，否则写成连贯的句子。",
 	"style.placeholders": "不要留待核实、待补的标记：材料里有的写上，没有的删去这一处（{marks}）。",
 	"style.citation":

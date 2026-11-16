@@ -47,6 +47,28 @@ export function headingIssues(text: string): NumberingIssue[] {
 	return issues;
 }
 
+/**
+ * Headings written as plain lines: a short numbered line (（一）政策框架, 二、主要问题) or a bare 参考文献 label with no
+ * heading marks (l12, 2026-11-17: every （一） line and the reference label were plain, so the export made them
+ * paragraphs and the heading check never saw them). The words are kept; the marks and the level come from the number.
+ */
+export function plainHeadings(text: string): NumberingIssue[] {
+	const issues: NumberingIssue[] = [];
+	let code = false;
+	for (const raw of text.split("\n")) {
+		const line = raw.trim();
+		if (/^```/.test(line)) code = !code;
+		if (code || line === "" || /^[#>\-*+]/.test(line) || /^\d+[.)]/.test(line)) continue;
+		if (/^(?:参考文献|References)$/i.test(line)) {
+			issues.push({ quote: line, form: `## ${line}` });
+			continue;
+		}
+		const m = new RegExp(`^(（${ZH}）|${ZH}、)([^。！？；：，,]{1,30})$`).exec(line);
+		if (m) issues.push({ quote: line, form: `${m[1].startsWith("（") ? "###" : "##"} ${line}` });
+	}
+	return issues;
+}
+
 /** Ordinal list markers inside the text: 一是, 二要, 其一, each at the start of a sentence or clause (主要做法，一是). */
 export function listMarkers(text: string): string[] {
 	const found = text.matchAll(new RegExp(`(?:^|[。；：，,！？\\n])\\s*((?:${ZH})(?:是|要)|其${ZH}[，,、])`, "g"));

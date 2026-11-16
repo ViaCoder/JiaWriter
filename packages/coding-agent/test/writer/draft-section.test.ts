@@ -87,6 +87,9 @@ describe("outlinePart / headingOf / outlineTitle", () => {
 		expect(headingOf("引言", "")).toBe("");
 		expect(outlineTitle(OUTLINE)).toBe("低空经济发展研究报告");
 		expect(outlineTitle("# 报告\n")).toBe("报告");
+		// The outline's own name is not the document's (l12, 2026-11-17: the draft was titled 《…》提纲).
+		expect(outlineTitle("# 《我市社区养老服务发展情况与对策建议》提纲\n")).toBe("我市社区养老服务发展情况与对策建议");
+		expect(outlineTitle("# 大纲：调研报告 大纲")).toBe("调研报告");
 		expect(outlineTitle("没有标题")).toBe("");
 	});
 });

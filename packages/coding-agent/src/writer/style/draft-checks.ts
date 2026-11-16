@@ -15,7 +15,7 @@ import type { StyleRegister } from "./check.ts";
 // Citation form.
 import { citationIssues, formatCitationIssues, incompleteReferences, numberedCitations } from "./citation.ts";
 // Heading numbers and in-text ordinals.
-import { headingIssues, listMarkers } from "./numbering.ts";
+import { headingIssues, listMarkers, plainHeadings } from "./numbering.ts";
 // Paragraph shape and repeated material.
 import { evidenceFirst, repeatedFigures, unsupportedAnalysis } from "./shape.ts";
 
@@ -122,6 +122,19 @@ export const DRAFT_CHECKS: readonly DraftCheck[] = [
 			if (found.length === 0) return NONE;
 			return {
 				fail: [`${t("style.headings")}\n${found.map((h) => `- “${h.quote}” → ${h.form}`).join("\n")}`],
+				note: [],
+			};
+		},
+	},
+	{
+		// Headings written as plain lines (l12, 2026-11-17): the export makes paragraphs of them.
+		id: "plain-headings",
+		when: DOCUMENTS,
+		run: (text) => {
+			const found = plainHeadings(text);
+			if (found.length === 0) return NONE;
+			return {
+				fail: [`${t("style.plainHeadings")}\n${found.map((h) => `- “${h.quote}” → ${h.form}`).join("\n")}`],
 				note: [],
 			};
 		},

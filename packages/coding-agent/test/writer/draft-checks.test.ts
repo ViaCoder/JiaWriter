@@ -31,6 +31,7 @@ describe("runDraftChecks", () => {
 		expect(DRAFT_CHECKS.map((c) => c.id)).toEqual([
 			"citation",
 			"headings",
+			"plain-headings",
 			"list-markers",
 			"closing-section",
 			"placeholders",

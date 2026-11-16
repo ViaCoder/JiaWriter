@@ -1,6 +1,48 @@
 // Numbering in documents (src/writer/style/numbering.ts): 一、 then （一）, no 一是/一要 (the user, 2026-11-08).
 import { describe, expect, it } from "vitest";
-import { headingIssues, listMarkers } from "../../src/writer/style/numbering.ts";
+import { headingIssues, listMarkers, plainHeadings } from "../../src/writer/style/numbering.ts";
+
+describe("plainHeadings", () => {
+	it("finds numbered lines and a bare references label written without heading marks (l12, 2026-11-17)", () => {
+		const text = [
+			"# 报告",
+			"",
+			"## 一、发展现状",
+			"",
+			"国家政策框架已经建立。",
+			"",
+			"（一）政策框架",
+			"",
+			"中央文件构成顶层设计。",
+			"",
+			"二、主要问题",
+			"",
+			"参考文献",
+			"",
+			"[1] 某文件，2025年1月3日。",
+		].join("\n");
+		expect(plainHeadings(text)).toEqual([
+			{ quote: "（一）政策框架", form: "### （一）政策框架" },
+			{ quote: "二、主要问题", form: "## 二、主要问题" },
+			{ quote: "参考文献", form: "## 参考文献" },
+		]);
+	});
+
+	it("leaves sentences, headings with marks, list items and long lines alone", () => {
+		const text = [
+			"### （一）政策框架",
+			"（一）政策框架已经建立，各地陆续出台配套文件。",
+			"一、二、三级网络覆盖全市。",
+			"- 一、要点",
+			"1. 参考文献见后",
+			"（二）" + "字".repeat(31),
+			"```",
+			"（三）代码里的行",
+			"```",
+		].join("\n");
+		expect(plainHeadings(text)).toEqual([]);
+	});
+});
 
 describe("headingIssues", () => {
 	it("passes headings numbered for their level, and the title", () => {

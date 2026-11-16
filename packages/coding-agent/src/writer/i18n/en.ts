@@ -74,6 +74,8 @@ export const en: Record<MessageKey, string> = {
 		"The same material appears more than once: {figures}. Use each case and figure once, where it proves most; elsewhere use unused material or cut it.",
 	"style.asciiQuotes": '{count} Chinese phrases in English quotes "…": use Chinese quotes “…”.',
 	"style.headings": "Heading numbers off: level 1 is 一、, level 2 （一）, usually two levels only:",
+	"style.plainHeadings":
+		"Headings written as plain lines; give them Markdown heading marks (the export makes headings only from those):",
 	"style.listMarkers":
 		"No in-text ordinals {markers}: use numbered headings where items are needed, else plain sentences.",
 	"style.placeholders":

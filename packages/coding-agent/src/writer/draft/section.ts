@@ -354,5 +354,11 @@ export function markOutline(outline: string, line: string): string {
 /** The document's title from its outline's first heading (# 大纲：X, or # X). */
 export function outlineTitle(outline: string): string {
 	const m = /^#\s*(.+)$/m.exec(outline);
-	return m ? m[1].replace(/^大纲[：:]\s*/, "").trim() : "";
+	if (!m) return "";
+	// "# 《X》提纲" names the outline, not the document (l12, 2026-11-17: the draft's title came out as 《…》提纲).
+	const title = m[1]
+		.replace(/^大纲[：:]\s*/, "")
+		.replace(/\s*(?:提纲|大纲)\s*$/, "")
+		.trim();
+	return title.replace(/^《(.+)》$/, "$1").trim();
 }
