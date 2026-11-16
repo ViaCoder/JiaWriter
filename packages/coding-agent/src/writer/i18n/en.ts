@@ -118,7 +118,7 @@ export const en: Record<MessageKey, string> = {
 	"style.round":
 		"Automatic check: the draft still has problems; revise it by the report below (round {round} of {max}).",
 	// Clean result.
-	"style.clean": "Check passed: no hits.",
+	"style.clean": "No hits.",
 	// What to do with the hits.
 	"style.advice":
 		"Only positions are reported; the text is left as it was. Judge each hit, and edit only the passages that need it.",
@@ -161,7 +161,7 @@ export const en: Record<MessageKey, string> = {
 	"read.english":
 		"{words} English words in {sentences} sentences, Flesch reading ease {score}; {longWords} words of 4 or more syllables.",
 	// Clean result.
-	"read.clean": "Check passed: no rare characters or long sentences.",
+	"read.clean": "No rare characters or long sentences.",
 	// What to do with the findings.
 	"read.advice":
 		"Keep names of people, places and organizations and quotations as they are; replace other rare characters with common ones and split long sentences.",

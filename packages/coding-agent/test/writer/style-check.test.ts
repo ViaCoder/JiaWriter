@@ -282,7 +282,7 @@ describe("formatStyleReport", () => {
 		// Heading and verdict.
 		expect(text).toContain("AI-style check (packs: core-zh, core-en)");
 		// Clean line.
-		expect(text).toContain("Check passed: no hits.");
+		expect(text).toContain("No hits.");
 	});
 	it("lists at most MAX_LISTED hits", () => {
 		// More hits than the listing limit.

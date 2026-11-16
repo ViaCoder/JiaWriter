@@ -111,6 +111,6 @@ describe("readabilityCheck and formatReadability", () => {
 		// English summary and verdict.
 		expect(text).toContain("6 English words in 1 sentences");
 		// Verdict.
-		expect(text).toContain("Check passed: no rare characters or long sentences.");
+		expect(text).toContain("No rare characters or long sentences.");
 	});
 });

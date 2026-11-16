@@ -36,11 +36,11 @@ describe("t", () => {
 		// English from the environment.
 		vi.stubEnv("JW_LANG", "en");
 		// English text.
-		expect(t("style.clean")).toBe("Check passed: no hits.");
+		expect(t("style.clean")).toBe("No hits.");
 		// Chinese from the environment.
 		vi.stubEnv("JW_LANG", "zh");
 		// Chinese text.
-		expect(t("style.clean")).toBe("检查通过：没有命中。");
+		expect(t("style.clean")).toBe("没有命中。");
 	});
 });
 

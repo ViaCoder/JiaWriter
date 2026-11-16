@@ -102,7 +102,7 @@ export const zh = {
 	"style.cutResume": "上一条回复超出输出长度被截断，没有完成。请接着做刚才那一步，不要重复已经完成的内容。",
 	"style.round": "自动检查：草稿还有问题，请按下面的报告修改（第 {round}/{max} 轮）。",
 	// Clean result.
-	"style.clean": "检查通过：没有命中。",
+	"style.clean": "没有命中。",
 	// What to do with the hits.
 	"style.advice": "以上只标出位置，原文保持原样。请逐条判断，用 edit 只改需要改的片段。",
 	// word_count heading.
@@ -140,7 +140,7 @@ export const zh = {
 	// English summary.
 	"read.english": "英文 {words} 词，{sentences} 句，Flesch 易读度 {score}；4 个音节及以上的长词 {longWords} 个。",
 	// Clean result.
-	"read.clean": "检查通过：没有生僻字和长句。",
+	"read.clean": "没有生僻字和长句。",
 	// What to do with the findings.
 	"read.advice": "人名、地名、机构名和引文保持原样；其余生僻字换成常用字，长句拆成短句。",
 	// search_web heading.
