@@ -39,6 +39,7 @@ JiaWriter 是一个通用写作 agent，在终端里运行。它读取参考资�
 | `JW_VERIFY_WAIT` | 遇到人机验证时等你处理的最长时间（秒，0–300，0 表示不等） | `180` |
 | `JW_SEARCH_PAGES` | 浏览器检索每个引擎看几页结果（3–5） | `3` |
 | `JW_AUTO_EXPORT` | 设为 `off` 时，每轮结束不再自动导出 docx | 开启 |
+| `JW_CONTEXT_TRIM` | 设为 `off` 时，三轮之前的大段检索、网页和文件读取结果不再从对话里收起（收起后只留一行文件路径，原文仍在主题文件夹） | 开启 |
 | `ANYSEARCH_KEY` | AnySearch 的 key | 不设则匿名调用 |
 | `JW_SF` | search_fetch 程序的路径 | 在约定位置查找 |
 | `PROMPT_ADD` | 追加人设的文本文件路径，例如 `PROMPT_ADD='~/Downloads/glm.txt'`；内容接在人设之后，和人设在同一个 `<system_prompt>` 标签里 | 不追加 |

@@ -39,6 +39,7 @@ The model is configured with environment variables. OpenAI Responses, OpenAI Cha
 | `JW_VERIFY_WAIT` | Longest wait for you to clear a human check (seconds, 0–300; 0: no wait) | `180` |
 | `JW_SEARCH_PAGES` | Results pages per engine for the browser backend (3–5) | `3` |
 | `JW_AUTO_EXPORT` | `off` stops the automatic docx export at the end of each run | on |
+| `JW_CONTEXT_TRIM` | `off` keeps large search, page and file-read results in the conversation after three turns (folded, only a line with the file's path remains; the text stays in the topic folder) | on |
 | `ANYSEARCH_KEY` | AnySearch key | anonymous when unset |
 | `JW_SF` | Path of the search_fetch program | standard places |
 | `PROMPT_ADD` | Text file added to the persona, for example `PROMPT_ADD='~/Downloads/glm.txt'`; its text follows the persona inside the same `<system_prompt>` tag | none |
