@@ -78,6 +78,33 @@ describe("citationIssues: outlet before the date, and in brackets", () => {
 	});
 });
 
+// 2026-11-16, a research report: 《法治日报》2026年7月15日报道 four times in brackets, none flagged.
+describe("citationIssues: the outlet in book-title marks before the date", () => {
+	it("puts the date first and keeps a document's own word", () => {
+		expect(
+			citationIssues(
+				"三级网络作出专业指导（《法治日报》2026年7月15日报道）。覆盖470余万老年人（《工人日报》2026年7月4日报道）。",
+			).map((f) => [f.quote, f.form]),
+		).toEqual([
+			["《法治日报》2026年7月15日报道", "2026年7月15日《法治日报》报道"],
+			["《工人日报》2026年7月4日报道", "2026年7月4日《工人日报》报道"],
+		]);
+		expect(citationIssues("《中国发展网》3月5日称，服务超过23万人次。")).toEqual([
+			{ quote: "《中国发展网》3月5日", form: "YYYY年3月5日《中国发展网》报道" },
+		]);
+		expect(citationIssues("《情况通报》2026年7月1日印发后，各区落实。").map((f) => f.form)).toEqual([
+			"2026年7月1日《情况通报》印发",
+		]);
+		// The user's form, a law that took effect on a day, and a report named without a date stay.
+		for (const text of [
+			"2026年7月15日《法治日报》报道，三级网络有了指引。",
+			"《北京市养老服务条例》自2026年7月1日起施行。",
+			"据2026年7月31日《2025年度国家老龄事业发展公报》，老年人口32338万人。",
+		])
+			expect(citationIssues(text)).toEqual([]);
+	});
+});
+
 describe("citationIssues: a bracketed source with no date", () => {
 	it("asks for the date in the user's form", () => {
 		expect(citationIssues("产销1649万辆（来源：央广网援引中汽协）。").map((f) => f.form)).toEqual([

@@ -85,6 +85,19 @@ export function citationIssues(text: string): CitationIssue[] {
 		const date = FULL_DATE.test(m[2]) ? m[2] : `YYYY年${m[2]}`;
 		found.push([m.index ?? 0, { quote: m[0], form: `${date}《${m[1]}》${m[3] ? "报道" : ""}` }]);
 	}
+	// The outlet in book-title marks before the date: 《法治日报》2026年7月15日报道 (2026-11-16, a research report wrote
+	// four of these in brackets; the bracket rule below takes an outlet without marks). A document's name that ends like
+	// an outlet's (《情况通报》2026年7月1日印发) keeps its own word, since a file is also cited date first.
+	for (const m of text.matchAll(
+		new RegExp(
+			`《(${OUTLET})》[，,、\\s]*((?:\\d{4}年)?\\d{1,2}月\\d{1,2}日)[，,、\\s]*(报道|刊文|刊发|消息|电|发布|印发)?`,
+			"g",
+		),
+	)) {
+		if (GENERIC.test(m[1])) continue;
+		const date = FULL_DATE.test(m[2]) ? m[2] : `YYYY年${m[2]}`;
+		found.push([m.index ?? 0, { quote: m[0].trim(), form: `${date}《${m[1]}》${m[3] ?? "报道"}` }]);
+	}
 	// The outlet and date in brackets after the fact: （路透社，11月6日）.
 	const bracket = new RegExp(
 		`[（(]\\s*(?:来源[:：]\\s*)?(${OUTLET})[，,、\\s]*((?:\\d{4}年)?\\d{1,2}月\\d{1,2}日)\\s*[）)]`,
