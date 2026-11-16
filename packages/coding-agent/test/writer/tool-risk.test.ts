@@ -4,7 +4,14 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import writerPermissionExtension from "../../src/extensions/writer-permission/index.ts";
-import { bashRisk, inDirCommand, insideDir, toolRequest, withoutHeredocs } from "../../src/writer/tool-risk.ts";
+import {
+	bashRisk,
+	inDirCommand,
+	insideDir,
+	splitParts,
+	toolRequest,
+	withoutHeredocs,
+} from "../../src/writer/tool-risk.ts";
 
 describe("bashRisk", () => {
 	it("lets reading commands read", () => {
@@ -74,6 +81,22 @@ describe("bashRisk: folders and here-documents (2026-11-17, a long report run wi
 		expect(bashRisk("bash << EOF\nrm -rf x\nEOF")).toBe("act");
 		expect(bashRisk("cat << EOF > /etc/motd\nhi\nEOF")).toBe("act");
 		expect(inDirCommand("cat << EOF > /etc/motd\nhi\nEOF", "/work")).toBe(false);
+	});
+	it("splits a command line outside quotes only (W1, 2026-11-17: a | inside a grep pattern made an unknown command)", () => {
+		expect(splitParts('ls 样例 2>/dev/null; grep -rn -l "会议通知\\|开会通知" 参考/')).toEqual([
+			"ls 样例 2>/dev/null",
+			' grep -rn -l "会议通知\\|开会通知" 参考/',
+		]);
+		expect(bashRisk('ls 样例 2>/dev/null; grep -rn -l "会议通知\\|开会通知" 参考/ 2>/dev/null')).toBe("read");
+		expect(bashRisk("grep -E 'a|b;c' 稿件.md | head")).toBe("read");
+		expect(bashRisk("echo 'x && y'")).toBe("read");
+		// Separators outside quotes still split, and the dangerous part is still found.
+		expect(splitParts("a && b || c | d\ne")).toEqual(["a ", " b ", " c ", " d", "e"]);
+		expect(bashRisk("ls; rm -rf 旧稿")).toBe("high");
+		expect(bashRisk('echo "done" | tee 日志.txt')).toBe("act");
+		// A quote that never closes fails closed: the rest is one part, and still judged.
+		expect(bashRisk("echo 'x; rm -rf 旧稿")).toBe("read");
+		expect(inDirCommand('mkdir -p 备份 && cp "说明 1.md" 备份/', "/work")).toBe(true);
 	});
 });
 

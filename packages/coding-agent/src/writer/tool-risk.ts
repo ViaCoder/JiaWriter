@@ -75,6 +75,42 @@ export function withoutHeredocs(command: string): string {
 	return out.join("\n");
 }
 
+/**
+ * The simple commands of a command line: split at ; && || | and new lines that stand outside quotes (2026-11-17, W1:
+ * `ls 样例; grep -rl "会议通知\|开会通知" 参考/` was refused with nobody to ask, since the | inside the grep pattern
+ * made 开会通知" a command of its own, unknown and so an action).
+ */
+export function splitParts(command: string): string[] {
+	const parts: string[] = [];
+	let part = "";
+	let quote: string | undefined;
+	for (let i = 0; i < command.length; i++) {
+		const c = command[i];
+		if (quote) {
+			// Inside quotes everything is text; a backslash in double quotes keeps the next character.
+			if (c === quote) quote = undefined;
+			else if (c === "\\" && quote === '"' && i + 1 < command.length) {
+				part += c + command[++i];
+				continue;
+			}
+			part += c;
+			continue;
+		}
+		if (c === "'" || c === '"') {
+			quote = c;
+			part += c;
+		} else if (c === "\\" && i + 1 < command.length) {
+			part += c + command[++i];
+		} else if (c === ";" || c === "|" || c === "\n" || (c === "&" && command[i + 1] === "&")) {
+			if (c !== "\n" && command[i + 1] === c) i++;
+			parts.push(part);
+			part = "";
+		} else part += c;
+	}
+	parts.push(part);
+	return parts;
+}
+
 /** Commands that delete, move, change rights, run as another user, or stop processes and machines. */
 const HIGH_COMMANDS = new Set([
 	"rm",
@@ -195,7 +231,7 @@ export function bashRisk(given: string): Risk {
 	if (/\$\(|`/.test(command)) risk = higher(risk, "act");
 	// A download piped into a shell runs code from the network.
 	if (/\b(curl|wget)\b[^|]*\|\s*(sudo\s+)?(ba|z|da)?sh\b/.test(command)) return "high";
-	for (const part of command.split(/;|&&|\|\||\||\n/)) risk = higher(risk, partRisk(part));
+	for (const part of splitParts(command)) risk = higher(risk, partRisk(part));
 	return risk;
 }
 
@@ -224,7 +260,7 @@ export function inDirCommand(given: string, cwd: string): boolean {
 		if (m[1] !== "/dev/null" && (/^["']?[~$]/.test(m[1]) || !insideDir(m[1].replace(/^["']|["']$/g, ""), cwd)))
 			return false;
 	// Every part a reading command or an in-folder file command.
-	for (const raw of command.split(/;|&&|\|\||\||\n/)) {
+	for (const raw of splitParts(command)) {
 		const part = raw.replace(/(?:^|[^0-9&>])>{1,2}\s*[^\s&|;]+/g, " ");
 		if (partRisk(part) === "read") continue;
 		const words = part.trim().split(/\s+/).filter(Boolean);
