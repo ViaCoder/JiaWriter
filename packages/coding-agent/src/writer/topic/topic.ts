@@ -324,6 +324,8 @@ export interface CandidateSource {
 	url: string;
 	title: string;
 	date: string;
+	// The result's summary lines, for matching an item that named no source.
+	snippet: string;
 }
 
 /**
@@ -334,14 +336,19 @@ export interface CandidateSource {
 export function candidateSources(dir: string, limit = 8): CandidateSource[] {
 	const searches = readIndex(dir).filter((e) => e.kind === "search");
 	// The titles and dates by address, from every search file (an address can turn up in several searches).
-	const byUrl = new Map<string, { title: string; date: string }>();
+	const byUrl = new Map<string, { title: string; date: string; snippet: string }>();
 	for (const entry of searches) {
 		try {
 			const lines = readFileSync(join(dir, entry.file), "utf-8").split("\n");
 			for (let i = 0; i + 1 < lines.length; i++) {
 				const title = /^\d+\.\s+(.*\S)\s*$/.exec(lines[i]);
 				const where = /^\s+(\S+?)(?:（(\d{4}-\d{2}-\d{2})?）)?\s*$/.exec(lines[i + 1]);
-				if (title && where && !byUrl.has(where[1])) byUrl.set(where[1], { title: title[1], date: where[2] ?? "" });
+				if (!title || !where || byUrl.has(where[1])) continue;
+				// The summary: the indented lines after the address, up to the next numbered result.
+				const snippet: string[] = [];
+				for (let j = i + 2; j < lines.length && /^\s+\S/.test(lines[j]) && !/^\d+\./.test(lines[j]); j++)
+					snippet.push(lines[j].trim());
+				byUrl.set(where[1], { title: title[1], date: where[2] ?? "", snippet: snippet.join(" ") });
 			}
 		} catch {
 			// A missing file: addresses alone.
@@ -353,11 +360,43 @@ export function candidateSources(dir: string, limit = 8): CandidateSource[] {
 		for (const url of entry.urls ?? []) {
 			if (seen.has(url)) continue;
 			seen.add(url);
-			out.push({ url, title: byUrl.get(url)?.title ?? "", date: byUrl.get(url)?.date ?? "" });
+			const known = byUrl.get(url);
+			out.push({ url, title: known?.title ?? "", date: known?.date ?? "", snippet: known?.snippet ?? "" });
 			if (out.length >= limit) return out;
 		}
 	}
 	return out;
+}
+
+/** The character pairs of a text's Chinese and digits, for a rough overlap between two texts. */
+function bigrams(text: string): Set<string> {
+	const chars = text.replace(/[^\u4e00-\u9fff0-9]/g, "");
+	const out = new Set<string>();
+	for (let i = 0; i + 1 < chars.length; i++) out.add(chars.slice(i, i + 2));
+	return out;
+}
+
+/**
+ * The candidate an item that named no source most likely means, by the overlap between what the item asks for and
+ * each result's title and summary (2026-11-16: GLM sent items with section and focus alone eight times in a run,
+ * whatever the error said). Undefined when nothing overlaps enough.
+ */
+export function pickSource(
+	wanted: string,
+	candidates: readonly CandidateSource[],
+	least = 0.08,
+): CandidateSource | undefined {
+	const want = bigrams(wanted);
+	if (want.size === 0) return undefined;
+	let best: { score: number; candidate: CandidateSource } | undefined;
+	for (const candidate of candidates) {
+		const have = bigrams(`${candidate.title} ${candidate.snippet}`);
+		let shared = 0;
+		for (const pair of want) if (have.has(pair)) shared++;
+		const score = shared / want.size;
+		if (score >= least && (!best || score > best.score)) best = { score, candidate };
+	}
+	return best?.candidate;
 }
 
 /** Fields a material must have, by kind. */

@@ -40,6 +40,7 @@ import {
 	materialCount,
 	materialUrls,
 	openTopic,
+	pickSource,
 	sourceOf,
 	sourceProblem,
 	sourceTextOf,
@@ -144,7 +145,9 @@ function restore(ctx: ExtensionContext): void {
 }
 
 /** The candidate addresses as lines for the model: url, then title and date when known. */
-export function candidatesText(list: readonly { url: string; title: string; date: string }[]): string {
+export function candidatesText(
+	list: readonly { url: string; title: string; date: string; snippet?: string }[],
+): string {
 	if (list.length === 0) return "";
 	const lines = list.map((c) => `- ${c.url}${c.title ? ` ${c.title}` : ""}${c.date ? `（${c.date}）` : ""}`);
 	return t("topic.candidates", { list: lines.join("\n") });
@@ -252,8 +255,16 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 			const jobs: Job[] = [];
 			const perItem: string[][] = items.map(() => []);
 			for (const [i, given] of items.entries()) {
-				// No source named: the page read last (2026-11-14: GLM names only what to take from the page it just read).
-				const named = given.url?.trim() || given.file?.trim() ? given : { ...given, url: lastPageUrl(dir) };
+				// No source named: the page read last (2026-11-14: GLM names only what to take from the page it just read),
+				// else the search result whose title and summary best match what is asked for (2026-11-16).
+				let named = given.url?.trim() || given.file?.trim() ? given : { ...given, url: lastPageUrl(dir) };
+				if (!named.url?.trim() && !named.file?.trim()) {
+					const picked = pickSource(`${given.section ?? ""} ${given.focus ?? ""}`, candidateSources(dir, 40));
+					if (picked) {
+						named = { ...given, url: picked.url };
+						perItem[i].push(t("topic.sourcePicked", { n: i + 1, url: picked.url, title: picked.title }));
+					}
+				}
 				const item = asFileSource(named as Material);
 				const name = item.file?.trim() ? `《${item.file.trim()}》` : (item.url?.trim() ?? "");
 				// No source: the error names the addresses the topic's searches hold, so the next call can copy one

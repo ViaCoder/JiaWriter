@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { candidatesText, joinFragments, salvageSource, sourceItems } from "../../src/extensions/writer-topic/index.ts";
-import { candidateSources } from "../../src/writer/topic/topic.ts";
+import { candidateSources, pickSource } from "../../src/writer/topic/topic.ts";
 
 let dir: string;
 beforeEach(() => {
@@ -33,16 +33,18 @@ describe("candidateSources", () => {
 				`${JSON.stringify({ n: 2, kind: "search", file: "检索/002-案例.md", title: "案例", urls: ["https://b.example/9", "https://a.example/1"] })}\n`,
 		);
 		expect(candidateSources(dir)).toEqual([
-			{ url: "https://b.example/9", title: "云南红河配送", date: "2026-11-01" },
-			{ url: "https://a.example/1", title: "低空经济飞得稳", date: "2026-04-22" },
-			{ url: "https://a.example/2", title: "无日期的一条", date: "" },
+			{ url: "https://b.example/9", title: "云南红河配送", date: "2026-11-01", snippet: "摘要" },
+			{ url: "https://a.example/1", title: "低空经济飞得稳", date: "2026-04-22", snippet: "摘要" },
+			{ url: "https://a.example/2", title: "无日期的一条", date: "", snippet: "摘要" },
 		]);
 		expect(candidateSources(dir, 1)).toHaveLength(1);
 		expect(candidateSources(join(dir, "none"))).toEqual([]);
 	});
 	it("is written as lines the model can copy, or nothing when there are none", () => {
 		expect(candidatesText([])).toBe("");
-		const text = candidatesText([{ url: "https://b.example/9", title: "云南红河配送", date: "2026-11-01" }]);
+		const text = candidatesText([
+			{ url: "https://b.example/9", title: "云南红河配送", date: "2026-11-01", snippet: "" },
+		]);
 		expect(text.startsWith("可选来源")).toBe(true);
 		expect(text).toContain("- https://b.example/9 云南红河配送（2026-11-01）");
 	});
@@ -95,5 +97,33 @@ describe("joinFragments and the string items", () => {
 				.sort(() => 0) as never,
 		);
 		expect(joinFragments(["not json", "either"])).toEqual(["not json", "either"]);
+	});
+});
+
+describe("pickSource", () => {
+	const candidates = [
+		{
+			url: "https://a.example/1",
+			title: "吾老·新街养老服务街区：9家服务单位",
+			date: "2026-02-11",
+			snippet: "北京西城区新街口街道，10分钟养老助餐服务圈，服务超23万人次",
+		},
+		{
+			url: "https://a.example/2",
+			title: "低空经济飞得稳",
+			date: "2026-04-22",
+			snippet: "国家发展改革委明确5方面重点工作",
+		},
+	];
+	it("picks the result whose title and summary overlap what the item asks for, and nothing when none does", () => {
+		expect(
+			pickSource(
+				"现状：各地做法 北京西城区新街口街道吾老·新街养老服务街区：9家服务单位、10分钟养老助餐服务圈",
+				candidates,
+			)?.url,
+		).toBe("https://a.example/1");
+		expect(pickSource("国家发展改革委 低空经济 重点工作", candidates)?.url).toBe("https://a.example/2");
+		expect(pickSource("完全无关的一句话关于海洋", candidates)).toBeUndefined();
+		expect(pickSource("", candidates)).toBeUndefined();
 	});
 });

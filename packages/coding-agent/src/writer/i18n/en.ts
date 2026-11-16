@@ -321,6 +321,8 @@ export const en: Record<MessageKey, string> = {
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
 	"topic.missingFields": "missing {fields}",
 	"topic.missingPage": "no page for {file}",
+	"topic.sourcePicked":
+		"Item {n} named no source; {url} ({title}) was chosen by its content; if that is wrong, name the url and record again",
 	"topic.candidates": "Addresses to choose from (copy one as the url):\n{list}",
 	"topic.missingSource":
 		"no source: give each item a url (a search result or page of this topic, as the results write it), or file and page; no page has been read in this topic yet, so it cannot be left out",

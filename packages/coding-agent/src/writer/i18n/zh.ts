@@ -294,6 +294,7 @@ export const zh = {
 	"topic.archiveFailed": "归档失败（{reason}），本次结果没有保存到主题文件夹。",
 	"topic.missingFields": "缺少 {fields}",
 	"topic.missingPage": "《{file}》缺少页码",
+	"topic.sourcePicked": "第{n}条没写来源，按内容选用了 {url}（{title}）；不对就把 url 写明再记一次",
 	"topic.candidates": "可选来源（照抄其中一个 url）：\n{list}",
 	"topic.missingSource":
 		"缺少来源：每条写 url（本主题检索结果或已读网页的地址，照结果里的写），或 file 加 page；本主题还没读过网页，不能省略",
