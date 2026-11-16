@@ -302,7 +302,8 @@ describe("draftCheck", () => {
 		const flagged = "这不是一个技术问题，而是一个管理问题。";
 		expect(draftCheck(`# 临江市人民政府办公室关于做好防汛工作的通知\n\n${flagged}`).text).toContain("gongwen-zh");
 		expect(draftCheck(`# 故乡的秋天\n\n${flagged}`).text).not.toContain("gongwen-zh");
-		expect(draftCheck("# 故乡的秋天\n\n秋天来了。").text).toBe("AI 腔检查通过。");
+		// A clean draft gets no line at all (2026-11-16: "检查通过" was echoed to the user and flagged).
+		expect(draftCheck("# 故乡的秋天\n\n秋天来了。").text).toBe("");
 	});
 });
 

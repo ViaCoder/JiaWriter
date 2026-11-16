@@ -57,7 +57,6 @@ export const en: Record<MessageKey, string> = {
 	// The semantic review's findings.
 	"style.evidenceFirst":
 		"Note: {count} paragraphs open with specifics. In analysis, state the judgment first in a few general sentences, then the case or data that proves it; paragraphs that are not analysis need no change:",
-	"style.passShort": "AI-style check passed.",
 	"style.longSentences": "{count} sentences over {limit} characters; split them: {heads}.",
 	"style.uncitedRefs":
 		"Reference entries not cited in the text (the text must name the outlet or the title): {entries}. Cite each where its fact is used, in the form YYYY年MM月DD日《outlet》报道, or remove it.",

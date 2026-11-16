@@ -50,7 +50,6 @@ export const zh = {
 	// Program checks of the automatic round.
 	"style.evidenceFirst":
 		"提示：{count} 段一开头就是具体数据或事例。分析段先用几句话写出这段的判断（不出现具体的人、事、数），再给证明它的案例或数据；不是分析的段落不必改：",
-	"style.passShort": "AI 腔检查通过。",
 	"style.longSentences": "{count} 句超过 {limit} 字，拆开：{heads}。",
 	"style.uncitedRefs":
 		"参考文献有条目在正文里没有引用（正文里要出现它的媒体名或标题）：{entries}。在用到它的事实处写明“××年××月××日《媒体》报道”，或删去这一条。",

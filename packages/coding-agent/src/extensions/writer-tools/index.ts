@@ -131,14 +131,14 @@ export function draftCheck(text: string): { clean: boolean; mustFix: boolean; te
 	});
 	// The program's other checks, one table (writer/style/draft-checks.ts).
 	const found = runDraftChecks(text, register);
-	// A clean report is one line: the full measures each time were noise the model reread after every edit.
-	const styleText = styleClean(report) ? t("style.passShort") : formatStyleReport(report);
-	const lines = [...found.fail, ...found.note].map((line) => `\n${line}`).join("");
+	// A clean report says nothing: the model needs only the problems (2026-11-16: told "AI 腔检查通过", it reported
+	// "检查通过" to the user in 10 of 16 flagged replies, and the reply check then asked for the reply again).
+	const styleText = styleClean(report) ? "" : formatStyleReport(report);
 	// clean: nothing to show; mustFix: something a careful human writer would not leave, which asks for another round.
 	return {
 		clean: styleClean(report) && found.fail.length === 0,
 		mustFix: styleMustFix(report) || found.fail.length > 0,
-		text: `${styleText}${lines}`,
+		text: [styleText, ...found.fail, ...found.note].filter(Boolean).join("\n"),
 	};
 }
 
@@ -531,7 +531,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		const length = target
 			? t("style.lengthNowTarget", { chars, target, tolerance })
 			: t("style.lengthNow", { chars });
-		const text = [draftCheck(draft).text, length, ...finishedChecks(draft)].join("\n");
+		const text = [draftCheck(draft).text, length, ...finishedChecks(draft)].filter(Boolean).join("\n");
 		return { content: [...event.content, { type: "text", text: first ? `${text}\n${STYLE_REVIEW}` : text }] };
 	});
 	// When a reply ends, each draft it wrote gets the rules and one separate semantic review; while either finds
@@ -576,7 +576,9 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			const revision = old.trim() !== "";
 			const changed = revision ? changedParagraphs(old, text) : [];
 			const check = draftCheck(text);
-			const checkLines = revision ? freshLines(draftCheck(old).text.split("\n"), check.text.split("\n")) : [];
+			const checkLines = revision
+				? freshLines(draftCheck(old).text.split("\n").filter(Boolean), check.text.split("\n").filter(Boolean))
+				: [];
 			const mustFix = revision ? check.mustFix && checkLines.length > 0 : check.mustFix;
 			// Findings that ask for facts only where there are materials to take them from; the review reads them too.
 			const materials = hasMaterials(file, ctx.cwd);
@@ -598,7 +600,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 				? `\n${t("style.reviewFound", { count: issues.length })}\n${formatReview(issues)}`
 				: "";
 			const checkText = revision ? (mustFix ? checkLines.join("\n") : "") : check.text;
-			open.push([`${file}\n${checkText}${review}`, ...ownNow, STYLE_REVIEW].join("\n"));
+			open.push([file, checkText, review.trim(), ...ownNow, STYLE_REVIEW].filter(Boolean).join("\n"));
 		}
 		if (open.length === 0) return;
 		rounds++;
