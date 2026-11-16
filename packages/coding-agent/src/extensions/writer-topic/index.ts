@@ -267,10 +267,12 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 				}
 				const item = asFileSource(named as Material);
 				const name = item.file?.trim() ? `《${item.file.trim()}》` : (item.url?.trim() ?? "");
-				// No source: the error names the addresses the topic's searches hold, so the next call can copy one
-				// (2026-11-15: a run sent nine items without a url and was told only that one was missing).
+				// No source, or an address the topic does not hold: the error names the addresses the topic's searches
+				// hold, so the next call can copy one (2026-11-15: a run sent nine items without a url and was told only
+				// that one was missing; 2026-11-16 review: an address typed from memory got the same bare answer).
 				let problem = sourceProblem(item, archived) || (name ? "" : t("topic.missingSource"));
-				if (problem && !name) problem = [problem, candidatesText(candidateSources(dir))].filter(Boolean).join("\n");
+				if (problem && !item.file?.trim())
+					problem = [problem, candidatesText(candidateSources(dir))].filter(Boolean).join("\n");
 				if (problem) {
 					perItem[i].push(t("topic.itemProblem", { n: i + 1, problem }));
 					error = true;

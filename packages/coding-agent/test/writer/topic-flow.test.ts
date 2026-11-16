@@ -163,6 +163,9 @@ describe("a writing topic", () => {
 		expect(JSON.stringify(results[3])).toContain(URL_A);
 		expect(JSON.stringify(results[3])).toContain("1 条素材里已有");
 		expect(JSON.stringify(results[0])).toContain("不在本主题");
+		// The refusal names the topic's own addresses to copy (2026-11-16: an address typed from memory got a bare answer).
+		expect(JSON.stringify(results[0])).toContain("可选来源");
+		expect(JSON.stringify(results[0])).toContain(URL_A);
 		expect(JSON.stringify(results[1])).toContain("记下 1 条");
 		expect(JSON.stringify(results[1])).toContain("- 巴黎市政府：巴黎市政府新增绿地12公顷");
 		expect(JSON.stringify(results[2])).toContain("1 条素材里已有");
