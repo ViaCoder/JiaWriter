@@ -87,12 +87,47 @@ const GIT_READ = new Set(["status", "log", "diff", "show", "rev-parse", "ls-file
 /** git subcommands that rewrite history, discard work or publish. */
 const GIT_HIGH = new Set(["push", "reset", "clean", "rebase", "filter-branch", "filter-repo"]);
 
+/** Commands that run another command named in their arguments: the risk is that command's, never lower than an action. */
+const WRAPPERS = new Set([
+	"xargs",
+	"env",
+	"nohup",
+	"nice",
+	"ionice",
+	"time",
+	"timeout",
+	"command",
+	"builtin",
+	"exec",
+	"stdbuf",
+]);
+/** Shells that run the command text after -c (`sh -c "rm -rf x"` names rm only inside the text). */
+const SHELLS = new Set(["sh", "bash", "zsh", "dash", "ksh"]);
+
 /** Order of the levels, for taking the highest. */
 const LEVEL: Readonly<Record<Risk, number>> = { read: 0, act: 1, high: 2 };
 
 /** The higher of two levels. */
 function higher(a: Risk, b: Risk): Risk {
 	return LEVEL[b] > LEVEL[a] ? b : a;
+}
+
+/** The risk of a git command from its subcommand and flags. */
+function gitRisk(args: readonly string[]): Risk {
+	const sub = args.find((a) => !a.startsWith("-")) ?? "";
+	if (GIT_HIGH.has(sub) || (sub === "branch" && args.some((a) => /^-D$|^--delete$/.test(a)))) return "high";
+	if (sub === "checkout" && args.includes("--")) return "high";
+	return GIT_READ.has(sub) || (sub === "branch" && args.length === 1) ? "read" : "act";
+}
+
+/** The risk named inside a wrapper's arguments: high when a word is a high command or git with a high subcommand. */
+function wrappedRisk(args: readonly string[]): Risk {
+	for (let i = 0; i < args.length; i++) {
+		const word = (args[i].split(/[\\/]/).pop() ?? "").toLowerCase();
+		if (HIGH_COMMANDS.has(word)) return "high";
+		if (word === "git" && gitRisk(args.slice(i + 1)) === "high") return "high";
+	}
+	return "act";
 }
 
 /** The risk of one simple command (no ; && || | inside). */
@@ -105,11 +140,17 @@ function partRisk(part: string): Risk {
 	const name = (words[0].split(/[\\/]/).pop() ?? "").toLowerCase();
 	const args = words.slice(1);
 	if (HIGH_COMMANDS.has(name)) return "high";
-	if (name === "git") {
-		const sub = args.find((a) => !a.startsWith("-")) ?? "";
-		if (GIT_HIGH.has(sub) || (sub === "branch" && args.some((a) => /^-D$|^--delete$/.test(a)))) return "high";
-		if (sub === "checkout" && args.includes("--")) return "high";
-		return GIT_READ.has(sub) || (sub === "branch" && args.length === 1) ? "read" : "act";
+	if (name === "git") return gitRisk(args);
+	// A wrapper runs what its arguments name (2026-11-16 review: `xargs rm`, `nohup rm`, `timeout 10 rm` counted as
+	// ordinary actions, since only the first word was looked at): an action at least, high when a word names a high command.
+	if (WRAPPERS.has(name)) return higher("act", wrappedRisk(args));
+	// A shell with -c runs the text after it as a command line of its own.
+	if (SHELLS.has(name) && args.includes("-c")) {
+		const text = args
+			.slice(args.indexOf("-c") + 1)
+			.join(" ")
+			.replace(/^["']|["']$/g, "");
+		return higher("act", bashRisk(text));
 	}
 	// find deletes or runs commands with these.
 	if (name === "find")
@@ -183,15 +224,16 @@ export function toolRequest(
 	if (toolName === "bash" || toolName === "powershell") {
 		const command = String(input.command ?? "");
 		const risk = bashRisk(command);
+		// A command that only creates, copies or moves files inside the folder counts as a write there (mv is high on
+		// its own, since it can move files out; inside the folder it is an ordinary action, as a write is, so that auto
+		// mode's judge decides it rather than the user being asked every time while a run with nobody to ask lets it through).
+		const inDir = risk !== "read" && inDirCommand(command, cwd);
 		return {
-			risk,
+			risk: inDir ? "act" : risk,
 			scope: `shell\n${resolve(cwd)}`,
 			title: titles.command,
 			detail: command,
-			// An ordinary command that only creates or copies files inside the folder counts as a write there.
-			// An ordinary or moving command that only creates, copies or moves files inside the folder counts as a write
-			// there (mv is high on its own, since it can move files out).
-			inDirFile: risk !== "read" && inDirCommand(command, cwd),
+			inDirFile: inDir,
 		};
 	}
 	// draft_section writes the draft at its path as write does.
