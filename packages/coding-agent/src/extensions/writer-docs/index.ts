@@ -293,16 +293,16 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 	// Reference URLs already handed to the model for testing, so each goes back only once.
 	const asked = new Set<string>();
 
-	// After every run: the drafts written or edited in it become .docx files.
-	pi.on("agent_end", async (event, ctx) => {
-		// A file written outside the writing toolkit is a file, not a draft: no export.
-		if (!autoExportEnabled(process.env) || !writingOpen(pi)) return;
-		// A run that retries or resumes is not over: the export waits for the end that counts.
-		if (runGoesOn(event.messages)) return;
-		const drafts = editedDrafts(event.messages as unknown as RunMessage[], ctx.cwd);
+	// Messages of runs that ended with more to come (a retry after an error, a resumption after compaction), kept
+	// until the run that counts: pi fires agent_end at each of these boundaries and agent_settled once at the end
+	// (2026-11-17, l11: one request exported eight times; w7 W1: a finished draft unexported when the last retry failed).
+	let held: unknown[] = [];
+	/** After a run that is over: the drafts written or edited in it (and in the runs held before it) become .docx files. */
+	const exportAfterRun = async (messages: unknown[], ctx: ExtensionContext): Promise<void> => {
+		const drafts = editedDrafts(messages as RunMessage[], ctx.cwd);
 		if (drafts.length === 0) return;
 		// URLs this session opened, including this run's.
-		const opened = sessionOpened(ctx, event.messages as unknown[]);
+		const opened = sessionOpened(ctx, messages);
 		// Export each; one failure does not stop the others. One draft is one line; several get a title line
 		// (2026-11-15: the screen showed a title and one line for one draft).
 		const lines = drafts.length > 1 ? [t("export.autoTitle")] : [];
@@ -337,5 +337,25 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 				{ triggerTurn: true },
 			);
 		}
+	};
+	pi.on("agent_end", async (event, ctx) => {
+		// A file written outside the writing toolkit is a file, not a draft: no export.
+		if (!autoExportEnabled(process.env) || !writingOpen(pi)) return;
+		const messages = (event.messages ?? []) as unknown[];
+		if (runGoesOn(messages)) {
+			held.push(...messages);
+			return;
+		}
+		const all = [...held, ...messages];
+		held = [];
+		await exportAfterRun(all, ctx);
+	});
+	// The end that counts when the last run ended with more to come and nothing came: the held runs are exported now.
+	pi.on("agent_settled", async (_event, ctx) => {
+		if (held.length === 0) return;
+		const all = held;
+		held = [];
+		if (!autoExportEnabled(process.env) || !writingOpen(pi)) return;
+		await exportAfterRun(all, ctx);
 	});
 }

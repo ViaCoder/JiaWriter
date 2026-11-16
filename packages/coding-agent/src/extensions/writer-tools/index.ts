@@ -15,7 +15,7 @@ import { Text } from "@earendil-works/pi-tui";
 // Parameter schemas.
 import { Type } from "typebox";
 // Extension API types.
-import type { ExtensionAPI } from "../../core/extensions/types.ts";
+import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
 // Upstream path resolution (cwd, ~).
 import { resolveToCwd } from "../../core/tools/path-utils.ts";
 // One form for a stopped call.
@@ -536,12 +536,16 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	});
 	// When a reply ends, each draft it wrote gets the rules and one separate semantic review; while either finds
 	// something, the program asks for another round, at most MAX_ROUNDS.
-	pi.on("agent_end", async (event, ctx) => {
-		// A run that retries after an error or resumes after compaction is not over: no check round yet.
-		if (runGoesOn(event?.messages)) return;
+	// Messages of runs that ended with more to come (a retry after an error, a resumption after compaction), kept
+	// until the run that counts: pi fires agent_end at each of these boundaries and agent_settled once at the end
+	// (2026-11-17, l11: check rounds and exports at retry boundaries; w7 W1: a finished draft left unchecked and
+	// unexported when the last retry failed).
+	let held: unknown[] = [];
+	/** The checks after a run that is over, on its messages and those of the runs held before it. */
+	const afterRun = async (messages: unknown[], ctx: ExtensionContext): Promise<void> => {
 		documentOpen = [...written].some((file) => existsSync(file) && outlineOpen(file));
 		// A reply cut off before its tool call is resumed first; the checks follow when the work is done.
-		if (cutOffWithoutCalls(event?.messages) && cutResumes < MAX_CUT_RESUMES) {
+		if (cutOffWithoutCalls(messages) && cutResumes < MAX_CUT_RESUMES) {
 			cutResumes++;
 			pi.sendMessage(
 				{ customType: "jiawriter-cut-resume", content: t("style.cutResume"), display: true },
@@ -552,7 +556,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		// The reply itself: a hard mark of machine writing is said again under the rules, once (the user, 2026-11-10:
 		// the standard "applies to everything, including intermediate outputs, summaries").
 		if (replyRounds < MAX_REPLY_ROUNDS) {
-			const reply = replyText(event?.messages);
+			const reply = replyText(messages);
 			const marks = replyMarks(reply);
 			if (marks.length > 0) {
 				replyRounds++;
@@ -615,6 +619,23 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			},
 			{ deliverAs: "followUp", triggerTurn: true },
 		);
+	};
+	pi.on("agent_end", async (event, ctx) => {
+		const messages = (event?.messages ?? []) as unknown[];
+		if (runGoesOn(messages)) {
+			held.push(...messages);
+			return;
+		}
+		const all = [...held, ...messages];
+		held = [];
+		await afterRun(all, ctx);
+	});
+	// The end that counts when the last run ended with more to come and nothing came: the held runs are checked now.
+	pi.on("agent_settled", async (_event, ctx) => {
+		if (held.length === 0) return;
+		const all = held;
+		held = [];
+		await afterRun(all, ctx);
 	});
 
 	// draft_section: one section of a long document, written by the model in a context of its own (the writing rules,

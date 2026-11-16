@@ -212,6 +212,33 @@ describe("automatic import before each run and export after it", () => {
 		expect(notes).toHaveLength(2);
 	});
 
+	it("holds a run that goes on (an error, then a retry) and exports at the run that counts or at settlement", async () => {
+		const { handlers } = load();
+		const notes: string[] = [];
+		const exported = () => notes.filter((n) => n.includes("已导出：稿件.docx")).length;
+		writeFileSync(join(cwd, "稿件.md"), "# 题\n\n文字.\n");
+		const wrote = (id: string) => ({
+			role: "assistant",
+			content: [{ type: "toolCall", id, name: "write", arguments: { path: "稿件.md" } }],
+		});
+		const failed = { role: "assistant", stopReason: "error", content: [] };
+		const stopped = { role: "assistant", stopReason: "stop", content: [] };
+		// The run writes the draft and then fails: a retry may follow, so nothing yet.
+		await handlers.get("agent_end")?.({ type: "agent_end", messages: [wrote("1"), failed] }, ctx(notes));
+		expect(exported()).toBe(0);
+		// The retry ends well: the held write is exported with it.
+		await handlers.get("agent_end")?.({ type: "agent_end", messages: [stopped] }, ctx(notes));
+		expect(exported()).toBe(1);
+		// A failure after which no retry comes: settlement exports the held run.
+		await handlers.get("agent_end")?.({ type: "agent_end", messages: [wrote("2"), failed] }, ctx(notes));
+		expect(exported()).toBe(1);
+		await handlers.get("agent_settled")?.({ type: "agent_settled", aborted: false }, ctx(notes));
+		expect(exported()).toBe(2);
+		// Nothing held: settlement does nothing.
+		await handlers.get("agent_settled")?.({ type: "agent_settled", aborted: false }, ctx(notes));
+		expect(exported()).toBe(2);
+	});
+
 	it("hands reference URLs the session has not opened to the model once, in interactive sessions only", async () => {
 		const { handlers, sent } = load();
 		const notes: string[] = [];
