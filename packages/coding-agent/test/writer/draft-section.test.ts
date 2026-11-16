@@ -10,8 +10,10 @@ import {
 	cleanSectionText,
 	headingOf,
 	isClosingLine,
+	lengthText,
 	MAX_PREVIOUS,
 	markOutline,
+	materialCapacity,
 	openTextLines,
 	outlinePart,
 	outlineTitle,
@@ -80,6 +82,8 @@ describe("outlinePart / headingOf / outlineTitle", () => {
 		expect(headingOf("开篇")).toBe("");
 		expect(headingOf("五、参考文献")).toBe("");
 		expect(headingOf("一、发展现状", "## 一、发展现状与主要进展")).toBe("一、发展现状与主要进展");
+		// An outline line written as a heading loses its marks too (l11, 2026-11-17: "## ## 一、发展现状").
+		expect(headingOf("## 一、发展现状：规模、场景、制度三条线")).toBe("一、发展现状");
 		expect(headingOf("引言", "")).toBe("");
 		expect(outlineTitle(OUTLINE)).toBe("低空经济发展研究报告");
 		expect(outlineTitle("# 报告\n")).toBe("报告");
@@ -107,6 +111,17 @@ describe("sectionInstructions / sectionRequest", () => {
 		expect(text).toContain("Open paragraphs differently");
 		expect(text).toContain("never a bare Latin surname");
 		expect(SECTION_REASONING_TOKENS).toBeLessThanOrEqual(2048);
+	});
+
+	it("tells the section how many of its materials the length holds (2026-11-17: 3,000-character reports came out at 4,200 to 5,200)", () => {
+		expect(materialCapacity(750)).toBe(6);
+		expect(materialCapacity(100)).toBe(2);
+		const few = { chars: 750, materials: ["- a", "- b", "- c"] };
+		expect(lengthText(few)).toBe("Length: about 750 characters");
+		const many = { chars: 750, materials: Array.from({ length: 17 }, (_x, i) => `- ${i}`) };
+		expect(lengthText(many)).toContain("holds about 6 of the 17 material records");
+		expect(lengthText(many)).toContain("the length rules over the materials");
+		expect(lengthText({ chars: undefined, materials: many.materials })).toBe("");
 	});
 
 	it("puts the brief, the outline, the section, its items, its materials and the latest text in the request", () => {

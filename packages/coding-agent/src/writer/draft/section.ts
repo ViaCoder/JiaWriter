@@ -145,7 +145,12 @@ export function headingOf(line: string, given?: string): string {
 			.replace(/^[一二三四五六七八九十\d]+[、.．]\s*/, "")
 			.trim();
 	if (given !== undefined) return NO_HEADING.has(bare(given)) ? "" : given.replace(/^#+\s*/, "").trim();
-	const head = line.split(/[：:]/)[0].trim();
+	// An outline line written as a heading (- [ ] ## 一、发展现状：…) loses its marks the same way (2026-11-17, l11: every
+	// section came out as "## ## 一、…" and the model spent edits taking the doubled marks out).
+	const head = line
+		.split(/[：:]/)[0]
+		.replace(/^#+\s*/, "")
+		.trim();
 	return NO_HEADING.has(bare(head)) ? "" : head;
 }
 
@@ -234,10 +239,30 @@ export function sectionRequest(input: SectionInput): string {
 		input.previous.trim()
 			? `Text so far (continue it, do not repeat it):\n${lastChars(input.previous, MAX_PREVIOUS)}`
 			: "Text so far: none, this is the first section",
-		input.chars ? `Length: about ${input.chars} characters` : "",
+		lengthText(input),
 		input.notes?.trim() ? `Further requirements: ${input.notes.trim()}` : "",
 	];
 	return parts.filter(Boolean).join("\n\n");
+}
+
+/**
+ * Characters one material record takes in the text: a judgment sentence and the case or figure that proves it. Three
+ * 3,000-character reports came out at 4,221, 4,907 and 5,244 characters (2026-11-16/17) with ten to seventeen
+ * records a section and about 90 characters spent on each, since the rules say to use every record given.
+ */
+export const CHARS_PER_MATERIAL = 120;
+
+/** How many material records a length holds. */
+export function materialCapacity(chars: number): number {
+	return Math.max(2, Math.round(chars / CHARS_PER_MATERIAL));
+}
+
+/** The length line of a request: the length, and when the materials outnumber what it holds, which to use. */
+export function lengthText(input: Pick<SectionInput, "chars" | "materials">): string {
+	if (!input.chars) return "";
+	const holds = materialCapacity(input.chars);
+	if (input.materials.length <= holds) return `Length: about ${input.chars} characters`;
+	return `Length: about ${input.chars} characters, which holds about ${holds} of the ${input.materials.length} material records. Use the ones that prove this section's judgments most directly, one per judgment, and leave the rest out: the length rules over the materials.`;
 }
 
 /** Whether the section is the document's opening: no heading, nothing written yet. */
