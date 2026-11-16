@@ -9,6 +9,8 @@ import writerAskExtension from "./writer-ask/index.ts";
 import writerBrowserExtension from "./writer-browser/index.ts";
 // JiaWriter: acting on desktop applications.
 import writerComputerExtension from "./writer-computer/index.ts";
+// JiaWriter: old large tool results fold out of the context.
+import writerContextExtension from "./writer-context/index.ts";
 import writerDelegateExtension from "./writer-delegate/index.ts";
 import writerDocsExtension from "./writer-docs/index.ts";
 // JiaWriter: the "jw" provider from JW_* environment variables.
@@ -58,6 +60,8 @@ export const builtInExtensions: InlineExtension[] = [
 	{ name: "writer-env", factory: writerEnvExtension, builtin: true },
 	// JiaWriter: the writing checks.
 	{ name: "writer-tools", factory: writerToolsExtension, builtin: true },
+	// JiaWriter: old large tool results fold out of the context.
+	{ name: "writer-context", factory: writerContextExtension, builtin: true },
 	// JiaWriter: the toolkits open before the prompts extension sees the run.
 	{ name: "writer-toolkit", factory: writerToolkitExtension, builtin: true },
 	{ name: "writer-prompts", factory: writerPromptsExtension, builtin: true },

@@ -317,6 +317,10 @@ export const en: Record<MessageKey, string> = {
 	"topic.continued": "Continuing the topic folder: {dir}. Write the outline and drafts in {dir}/稿件/.",
 	"topic.earlier": "Earlier research stays in {dir}: read it there when needed.",
 	"topic.archived": "Archived: {path}",
+	"context.trimmed":
+		"(This {tool} result is folded out of the conversation, {chars} characters.) The full text is in {path}; read it when needed.",
+	"context.trimmedRead":
+		"(This file's content is folded out of the conversation, {chars} characters.) Read {path} again when needed.",
 	"topic.archiveFailed": "Archiving failed ({reason}); this result was not saved to the topic folder.",
 	"topic.missingFields": "missing {fields}",
 	"topic.missingPage": "no page for {file}",

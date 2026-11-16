@@ -290,6 +290,8 @@ export const zh = {
 	"topic.continued": "继续使用已有的主题文件夹：{dir}。大纲和稿件写在 {dir}/稿件/。",
 	"topic.earlier": "之前的检索结果留在 {dir}，需要时用 read 读取。",
 	"topic.archived": "已归档：{path}",
+	"context.trimmed": "（{tool} 的这条结果已从对话里收起，{chars} 字）全文在 {path}，需要时用 read 打开。",
+	"context.trimmedRead": "（这个文件的内容已从对话里收起，{chars} 字）需要时再 read {path}。",
 	"topic.archiveFailed": "归档失败（{reason}），本次结果没有保存到主题文件夹。",
 	"topic.missingFields": "缺少 {fields}",
 	"topic.missingPage": "《{file}》缺少页码",
