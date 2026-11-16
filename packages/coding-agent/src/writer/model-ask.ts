@@ -27,6 +27,15 @@ export function withReviewBudget(payload: unknown, tokens = REVIEW_REASONING_TOK
 	return { ...(payload as Record<string, unknown>), reasoning: { max_tokens: tokens } };
 }
 
+/** An upstream error that passes by itself: too many requests, or a gateway that is down for the moment. */
+export const TRANSIENT_ERROR = /\b(?:429|502|503|504)\b|rate.?limit|temporarily|overloaded/i;
+
+/** The wait before the one retry of a passing error; JW_ASK_RETRY_WAIT_MS shortens it in tests. */
+export function transientWaitMs(env: NodeJS.ProcessEnv = process.env): number {
+	const given = Number(env.JW_ASK_RETRY_WAIT_MS);
+	return Number.isFinite(given) && given >= 0 ? given : 5000;
+}
+
 /** How one clean request is bounded: its reasoning tokens and its longest wait. */
 export interface AskBudget {
 	reasoningTokens: number;
@@ -64,7 +73,9 @@ export function modelAsker(
 			);
 		let reply = await ask(budget);
 		// An upstream that refuses the budget's field: once more without it, and never again in this run. Other
-		// errors are not retried (2026-11-10: a retry on any error took the next scripted reply in a compaction test).
+		// errors are not retried (2026-11-10: a retry on any error took the next scripted reply in a compaction test),
+		// except a passing one of the upstream (429, 502, 503, 504): once more after a short wait (2026-11-16: a
+		// section failed twice on "temporarily rate-limited upstream" and the loop guard then blocked the third try).
 		if (
 			reply.stopReason === "error" &&
 			budget &&
@@ -72,6 +83,9 @@ export function modelAsker(
 		) {
 			budget = false;
 			reply = await ask(false);
+		} else if (reply.stopReason === "error" && TRANSIENT_ERROR.test(reply.errorMessage ?? "")) {
+			await new Promise((resolve) => setTimeout(resolve, transientWaitMs()));
+			reply = await ask(budget);
 		}
 		if (reply.stopReason === "error" || reply.stopReason === "aborted")
 			throw new Error(reply.errorMessage ?? "review failed");
