@@ -30,6 +30,20 @@ export interface RunMessage {
 const NOT_DRAFT =
 	/(?:笔记|素材|待办|notes?|todo|readme|changelog)(?:[-_ ]?\d+)?$|^(?:大纲|提纲|计划|outline|plan)(?:[-_ ]?\d+)?$/i;
 
+/**
+ * True when the run that just ended goes on by itself: its last reply failed (a retry follows when the error passes)
+ * or stopped to call tools (compaction cut in; the loop resumes). Nothing that marks a finished run should happen
+ * then (2026-11-17, l11: one request exported its draft eight times and ran its checks at retry boundaries, since
+ * agent_end fires at each).
+ */
+export function runGoesOn(messages: readonly unknown[] | undefined): boolean {
+	// The last assistant message and how it stopped.
+	const last = [...(messages ?? [])].reverse().find((m) => (m as { role?: string }).role === "assistant") as
+		| { stopReason?: string }
+		| undefined;
+	return last?.stopReason === "error" || last?.stopReason === "toolUse";
+}
+
 /** True unless JW_AUTO_EXPORT is off, 0, false or no. */
 export function autoExportEnabled(env: NodeJS.ProcessEnv): boolean {
 	// Off switches.

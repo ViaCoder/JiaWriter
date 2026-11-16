@@ -21,7 +21,7 @@ import { resolveToCwd } from "../../core/tools/path-utils.ts";
 // One form for a stopped call.
 import { blockedText } from "../../writer/blocked.ts";
 // Which files are drafts.
-import { isDraftPath } from "../../writer/docs/auto.ts";
+import { isDraftPath, runGoesOn } from "../../writer/docs/auto.ts";
 // The imported references beside a draft.
 import { parsedFiles } from "../../writer/docs/import.ts";
 // One section written in a clean context.
@@ -537,6 +537,8 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	// When a reply ends, each draft it wrote gets the rules and one separate semantic review; while either finds
 	// something, the program asks for another round, at most MAX_ROUNDS.
 	pi.on("agent_end", async (event, ctx) => {
+		// A run that retries after an error or resumes after compaction is not over: no check round yet.
+		if (runGoesOn(event?.messages)) return;
 		documentOpen = [...written].some((file) => existsSync(file) && outlineOpen(file));
 		// A reply cut off before its tool call is resumed first; the checks follow when the work is done.
 		if (cutOffWithoutCalls(event?.messages) && cutResumes < MAX_CUT_RESUMES) {

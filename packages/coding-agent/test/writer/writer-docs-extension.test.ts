@@ -14,7 +14,7 @@ import type { ExtensionAPI, ExtensionToolContext, ToolDefinition } from "../../s
 // Extension under test.
 import writerDocsExtension, { parseExportArgs, sessionWrote } from "../../src/extensions/writer-docs/index.ts";
 // Automatic export helpers.
-import { autoExportEnabled, editedDrafts, isDraftPath } from "../../src/writer/docs/auto.ts";
+import { autoExportEnabled, editedDrafts, isDraftPath, runGoesOn } from "../../src/writer/docs/auto.ts";
 import { TOOLKITS } from "../../src/writer/toolkit/toolkits.ts";
 // Fixtures.
 import { makePdf } from "./doc-fixtures.ts";
@@ -267,6 +267,17 @@ describe("editedDrafts / isDraftPath / autoExportEnabled", () => {
 		];
 		expect(editedDrafts(msgs, cwd)).toEqual([join(cwd, "a.md")]);
 		expect(editedDrafts([...msgs, call("6", "edit", "b.md")], cwd)).toEqual([join(cwd, "b.md"), join(cwd, "a.md")]);
+	});
+	it("runGoesOn: a run whose last reply failed or stopped for tools is not over; one that stopped is", () => {
+		const reply = (stopReason: string) => ({ role: "assistant", stopReason, content: [] });
+		expect(runGoesOn([reply("stop")])).toBe(false);
+		expect(runGoesOn([reply("error")])).toBe(true);
+		expect(runGoesOn([reply("toolUse")])).toBe(true);
+		// The last assistant message counts, not an earlier one; tool results after it change nothing.
+		expect(runGoesOn([reply("error"), reply("stop"), { role: "toolResult" }])).toBe(false);
+		expect(runGoesOn([reply("length")])).toBe(false);
+		expect(runGoesOn([])).toBe(false);
+		expect(runGoesOn(undefined)).toBe(false);
 	});
 	it("accepts Markdown drafts in the working folder only", () => {
 		expect(isDraftPath(join(cwd, "报告.md"), cwd)).toBe(true);

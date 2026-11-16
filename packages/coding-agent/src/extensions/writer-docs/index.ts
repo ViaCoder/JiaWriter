@@ -27,7 +27,7 @@ import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types
 // Upstream path resolution (cwd, ~, @ prefix).
 import { resolveReadPathAsync } from "../../core/tools/path-utils.ts";
 // Automatic export.
-import { autoExportEnabled, editedDrafts, type RunMessage } from "../../writer/docs/auto.ts";
+import { autoExportEnabled, editedDrafts, type RunMessage, runGoesOn } from "../../writer/docs/auto.ts";
 // Import.
 import { formatImport, importFile, importSources, parsedFiles } from "../../writer/docs/import.ts";
 // Export.
@@ -297,6 +297,8 @@ export default function writerDocsExtension(pi: ExtensionAPI): void {
 	pi.on("agent_end", async (event, ctx) => {
 		// A file written outside the writing toolkit is a file, not a draft: no export.
 		if (!autoExportEnabled(process.env) || !writingOpen(pi)) return;
+		// A run that retries or resumes is not over: the export waits for the end that counts.
+		if (runGoesOn(event.messages)) return;
 		const drafts = editedDrafts(event.messages as unknown as RunMessage[], ctx.cwd);
 		if (drafts.length === 0) return;
 		// URLs this session opened, including this run's.
