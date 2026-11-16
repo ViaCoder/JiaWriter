@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtensionAPI } from "../../src/core/extensions/types.ts";
 import writerPermissionExtension from "../../src/extensions/writer-permission/index.ts";
-import { bashRisk, inDirCommand, insideDir, toolRequest } from "../../src/writer/tool-risk.ts";
+import { bashRisk, inDirCommand, insideDir, toolRequest, withoutHeredocs } from "../../src/writer/tool-risk.ts";
 
 describe("bashRisk", () => {
 	it("lets reading commands read", () => {
@@ -58,6 +58,22 @@ describe("bashRisk", () => {
 		// Wrappers around ordinary or reading commands are actions, never reading.
 		for (const c of ["nohup python3 run.py &", "timeout 10 ls", "xargs -n 1 echo", "sh -c 'ls -la'"])
 			expect([c, bashRisk(c)]).toEqual([c, "act"]);
+	});
+});
+
+describe("bashRisk: folders and here-documents (2026-11-17, a long report run with nobody to ask)", () => {
+	it("lets cd read, and judges a here-document by its command, not its body", () => {
+		expect(bashRisk('cd "检索" && head -20 "001-政策.md"')).toBe("read");
+		expect(bashRisk("pushd 稿件; ls; popd")).toBe("read");
+		const append =
+			"cat >> \"稿件/报告.md\" << 'EOF'\n\n## 参考文献\n\n[1] [意见，新华社，2026年4月10日](http://a.example/x)\nrm -rf /\nEOF\n";
+		expect(bashRisk(append)).toBe("act");
+		expect(inDirCommand(append, "/work")).toBe(true);
+		expect(withoutHeredocs(append)).toBe("cat >> \"稿件/报告.md\" << 'EOF'\n");
+		// A here-document fed to a shell is still what the shell is.
+		expect(bashRisk("bash << EOF\nrm -rf x\nEOF")).toBe("act");
+		expect(bashRisk("cat << EOF > /etc/motd\nhi\nEOF")).toBe("act");
+		expect(inDirCommand("cat << EOF > /etc/motd\nhi\nEOF", "/work")).toBe(false);
 	});
 });
 

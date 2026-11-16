@@ -48,7 +48,32 @@ const READ_COMMANDS = new Set([
 	"realpath",
 	"true",
 	"test",
+	// Moving between folders changes nothing (2026-11-17: `cd 检索 && head -20 文件` was refused with nobody to ask).
+	"cd",
+	"pushd",
+	"popd",
 ]);
+
+/**
+ * A command with its here-document bodies taken out: the lines between `<< EOF` (or `<<'EOF'`, `<<-EOF`) and the
+ * terminator are data, not commands (2026-11-17: `cat >> 稿件.md << 'EOF'` with reference lines was refused, since each
+ * body line was read as a command of its own).
+ */
+export function withoutHeredocs(command: string): string {
+	const lines = command.split("\n");
+	const out: string[] = [];
+	let ending: string | undefined;
+	for (const line of lines) {
+		if (ending !== undefined) {
+			if (line.replace(/^\t+/, "") === ending) ending = undefined;
+			continue;
+		}
+		const m = /<<-?\s*(?:'([^']+)'|"([^"]+)"|(\w+))/.exec(line);
+		if (m) ending = m[1] ?? m[2] ?? m[3];
+		out.push(line);
+	}
+	return out.join("\n");
+}
 
 /** Commands that delete, move, change rights, run as another user, or stop processes and machines. */
 const HIGH_COMMANDS = new Set([
@@ -161,7 +186,8 @@ function partRisk(part: string): Risk {
 }
 
 /** The risk of a whole shell command. */
-export function bashRisk(command: string): Risk {
+export function bashRisk(given: string): Risk {
+	const command = withoutHeredocs(given);
 	let risk: Risk = "read";
 	// Output into a file other than /dev/null writes.
 	if (/(^|[^0-9&>])>{1,2}\s*(?!\/dev\/null\b)[^\s&|;]/.test(command) || /\btee\b/.test(command)) risk = "act";
@@ -189,7 +215,8 @@ const IN_DIR_COMMANDS = new Set(["mkdir", "cp", "touch", "mv"]);
  * no substitution. Such a command goes through as a write in the folder does (2026-11-14, exp-p24r1 F2: with nobody
  * to ask, `mkdir -p 备份 && cp 说明.md 备份/说明.md` was refused while write of the same file would have gone on).
  */
-export function inDirCommand(command: string, cwd: string): boolean {
+export function inDirCommand(given: string, cwd: string): boolean {
+	const command = withoutHeredocs(given);
 	// Substitution runs what the tables cannot see.
 	if (/\$\(|`/.test(command)) return false;
 	// Every redirection target inside the folder.
