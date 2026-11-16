@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { candidatesText, salvageSource, sourceItems } from "../../src/extensions/writer-topic/index.ts";
+import { candidatesText, joinFragments, salvageSource, sourceItems } from "../../src/extensions/writer-topic/index.ts";
 import { candidateSources } from "../../src/writer/topic/topic.ts";
 
 let dir: string;
@@ -74,5 +74,26 @@ describe("salvageSource", () => {
 			{ url: "https://a.example/5", focus: "见" },
 			{ url: "https://a.example/6" },
 		]);
+	});
+});
+
+describe("joinFragments and the string items", () => {
+	it("joins the pieces of one JSON text into items, and reads a key-and-value piece or a bare address on its own", () => {
+		// The shape GLM sent fourteen times on 2026-11-16: a list split at its commas, with escaped quotes.
+		const pieces = [
+			'[{"}',
+			'{"focus": "地方做法", "section": "一、发展现状"',
+			'\\"url\\": \\"https://a.example/1\\"',
+			'\\"section\\": \\"一、发展现状\\"}]',
+		];
+		expect(sourceItems(pieces)).toEqual([{ focus: "地方做法", section: "一、发展现状", url: "https://a.example/1" }]);
+		expect(sourceItems(['"url": "https://a.example/2"'])).toEqual([{ url: "https://a.example/2" }]);
+		expect(sourceItems(["见 https://a.example/3（2026-01-01）"])).toEqual([{ url: "https://a.example/3" }]);
+		expect(sourceItems(["https://a.example/4", { url: "https://a.example/5" }])).toEqual(
+			[{ url: "https://a.example/5" }, { url: "https://a.example/4" }]
+				.sort((x, y) => x.url.localeCompare(y.url))
+				.sort(() => 0) as never,
+		);
+		expect(joinFragments(["not json", "either"])).toEqual(["not json", "either"]);
 	});
 });

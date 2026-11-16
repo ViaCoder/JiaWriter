@@ -59,7 +59,7 @@ interface SourceItem {
  * The items as objects: an item given as JSON text is parsed (an array of them too), any other string is an address.
  */
 export function sourceItems(given: readonly unknown[]): SourceItem[] {
-	return given.flatMap((item): SourceItem[] => {
+	return joinFragments(given).flatMap((item): SourceItem[] => {
 		if (typeof item !== "string") return item && typeof item === "object" ? [salvageSource(item as SourceItem)] : [];
 		const text = item.trim();
 		if (/^[[{]/.test(text)) {
@@ -69,8 +69,40 @@ export function sourceItems(given: readonly unknown[]): SourceItem[] {
 				return [];
 			}
 		}
-		return text ? [{ url: text }] : [];
+		// A key-and-value fragment ("url": "https://…"): as an object of its own.
+		if (/^"\w+":/.test(text)) {
+			try {
+				return sourceItems([JSON.parse(`{${text}}`)]);
+			} catch {
+				// Not JSON: the address inside it, if any.
+			}
+		}
+		const url = URL_IN_TEXT.exec(text);
+		return url ? [{ url: url[0] }] : text ? [{ url: text }] : [];
 	});
+}
+
+/**
+ * Items that arrived as pieces of one JSON text (2026-11-16: GLM sent ['[{"}', '{"focus": "…"', '\\"url\\": \\"https://…\\"',
+ * '\\"section\\": \\"…"}]'] fourteen times): the string pieces joined, unescaped and parsed as one list; else as given.
+ */
+export function joinFragments(given: readonly unknown[]): unknown[] {
+	const strings = given.filter((x): x is string => typeof x === "string");
+	if (strings.length < 2) return [...given];
+	const joined = strings
+		.join(",")
+		.replace(/\\"/g, '"')
+		.replace(/^\[\{"\},/, "[")
+		.replace(/,\{"\}/g, "")
+		.trim();
+	const text = joined.startsWith("[") ? joined : `[${joined}]`;
+	try {
+		const parsed = JSON.parse(text) as unknown;
+		if (Array.isArray(parsed)) return [...given.filter((x) => typeof x !== "string"), ...parsed];
+	} catch {
+		// Not one JSON text: each piece on its own.
+	}
+	return [...given];
 }
 
 /** Extraction requests of one material_add call run at a time. */
