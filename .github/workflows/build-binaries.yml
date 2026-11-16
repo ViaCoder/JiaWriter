@@ -138,7 +138,7 @@ jobs:
       matrix:
         runner:
           - ubuntu-latest
-          - macos-latest
+          - macos-15
           - windows-latest
     permissions:
       actions: read
