@@ -73,6 +73,9 @@ export function sourceItems(given: readonly unknown[]): SourceItem[] {
 	});
 }
 
+/** Extraction requests of one material_add call run at a time. */
+const EXTRACT_PARALLEL = 3;
+
 /** Names a model gives the address under, besides url (2026-11-15: GLM wrote it inside focus nine times in a run). */
 const URL_ALIASES = ["link", "source", "address", "href", "来源", "网址", "链接"] as const;
 /** An address inside a text. */
@@ -212,6 +215,10 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 			// Facts recorded by this call: a call that recorded some is not a failure, whatever else went wrong
 			// (2026-11-16: a batch of four sources recorded seven facts and was counted as a failure by the loop guard).
 			let recorded = 0;
+			// First pass, in order: each item's source resolved and its text read, or its problem noted.
+			type Job = { i: number; given: SourceItem; item: Material; name: string; text: string };
+			const jobs: Job[] = [];
+			const perItem: string[][] = items.map(() => []);
 			for (const [i, given] of items.entries()) {
 				// No source named: the page read last (2026-11-14: GLM names only what to take from the page it just read).
 				const named = given.url?.trim() || given.file?.trim() ? given : { ...given, url: lastPageUrl(dir) };
@@ -222,24 +229,46 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 				let problem = sourceProblem(item, archived) || (name ? "" : t("topic.missingSource"));
 				if (problem && !name) problem = [problem, candidatesText(candidateSources(dir))].filter(Boolean).join("\n");
 				if (problem) {
-					lines.push(t("topic.itemProblem", { n: i + 1, problem }));
+					perItem[i].push(t("topic.itemProblem", { n: i + 1, problem }));
 					error = true;
 					continue;
 				}
 				const text = sourceTextOf(dir, item);
 				if (!text?.trim()) {
-					lines.push(t("topic.itemProblem", { n: i + 1, problem: t("topic.sourceUnreadable", { file: name }) }));
+					perItem[i].push(
+						t("topic.itemProblem", { n: i + 1, problem: t("topic.sourceUnreadable", { file: name }) }),
+					);
 					error = true;
 					continue;
 				}
-				// The request of its own: the source's text and what is needed, nothing of the conversation.
-				let reply: string;
-				try {
-					reply = await ask(extractInstructions(), extractRequest(text, given.focus ?? "", given.section ?? ""));
-				} catch (e) {
-					lines.push(
-						t("topic.extractFailed", { source: name, reason: e instanceof Error ? e.message : String(e) }),
-					);
+				jobs.push({ i, given, item, name, text });
+			}
+			// Second pass: the extraction requests, a few at a time (2026-11-16: 27 sequential extractions were most
+			// of a 30-minute report). Each request is the source's text and what is needed, nothing of the conversation.
+			const replies = new Map<number, string | Error>();
+			let next = 0;
+			const worker = async () => {
+				while (next < jobs.length) {
+					const job = jobs[next++];
+					try {
+						replies.set(
+							job.i,
+							await ask(
+								extractInstructions(),
+								extractRequest(job.text, job.given.focus ?? "", job.given.section ?? ""),
+							),
+						);
+					} catch (e) {
+						replies.set(job.i, e instanceof Error ? e : new Error(String(e)));
+					}
+				}
+			};
+			await Promise.all(Array.from({ length: Math.min(EXTRACT_PARALLEL, jobs.length) }, worker));
+			// Third pass, in order: the facts checked against their sources and written down.
+			for (const { i, given, item, name, text } of jobs) {
+				const reply = replies.get(i);
+				if (reply === undefined || reply instanceof Error) {
+					perItem[i].push(t("topic.extractFailed", { source: name, reason: reply?.message ?? "no reply" }));
 					error = true;
 					continue;
 				}
@@ -254,24 +283,26 @@ export default function writerTopicExtension(pi: ExtensionAPI, complete: Complet
 					}
 					const time =
 						fact.time && source && !timeInSource(fact.time, source.text, source.date) ? undefined : fact.time;
-					return [{ ...fact, time, url: item.url, file: item.file, page: item.page, section: item.section }];
+					return [{ ...fact, time, url: item.url, file: item.file, page: item.page, section: given.section }];
 				});
 				if (kept.length === 0) {
-					lines.push(t("topic.extractNone", { source: name }));
+					perItem[i].push(t("topic.extractNone", { source: name }));
 				} else {
 					const result = addMaterials(dir, kept);
-					lines.push(t("topic.extracted", { source: name, count: result.written.length }));
+					perItem[i].push(t("topic.extracted", { source: name, count: result.written.length }));
 					recorded += result.written.length;
 					// The facts as recorded, for the model to see what the source gave.
 					for (const n of result.written) {
 						const fact = kept[n - 1];
-						lines.push(`- ${fact.kind === "case" ? `${fact.subject}：` : ""}${fact.fact}`);
+						perItem[i].push(`- ${fact.kind === "case" ? `${fact.subject}：` : ""}${fact.fact}`);
 					}
-					if (result.skipped > 0) lines.push(t("topic.duplicates", { count: result.skipped }));
-					lines.push(...result.problems);
+					if (result.skipped > 0) perItem[i].push(t("topic.duplicates", { count: result.skipped }));
+					perItem[i].push(...result.problems);
 				}
-				if (dropped.length > 0) lines.push(t("topic.factsDropped", { count: dropped.length, why: dropped[0] }));
+				if (dropped.length > 0)
+					perItem[i].push(t("topic.factsDropped", { count: dropped.length, why: dropped[0] }));
 			}
+			lines.push(...perItem.flat());
 			const total = materialCount(dir);
 			lines.push(t("topic.materialTotal", { file: MATERIAL_FILE, total }));
 			const text = lines.join("\n");
