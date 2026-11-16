@@ -191,6 +191,8 @@ export interface FuzzyMatchResult {
 export interface Edit {
 	oldText: string;
 	newText: string;
+	/** Replace every occurrence instead of requiring a unique one. */
+	all?: boolean;
 }
 
 export interface AppliedEditsResult {
@@ -264,11 +266,11 @@ function getNotFoundError(path: string, editIndex: number, totalEdits: number): 
 function getDuplicateError(path: string, editIndex: number, totalEdits: number, occurrences: number): Error {
 	if (totalEdits === 1) {
 		return new Error(
-			`Found ${occurrences} occurrences of the text in ${path}. The text must be unique. Please provide more context to make it unique.`,
+			`Found ${occurrences} occurrences of the text in ${path}. The text must be unique. Please provide more context to make it unique, or set all: true to replace every occurrence.`,
 		);
 	}
 	return new Error(
-		`Found ${occurrences} occurrences of edits[${editIndex}] in ${path}. Each oldText must be unique. Please provide more context to make it unique.`,
+		`Found ${occurrences} occurrences of edits[${editIndex}] in ${path}. Each oldText must be unique. Please provide more context to make it unique, or set all: true on that edit to replace every occurrence.`,
 	);
 }
 
@@ -305,6 +307,7 @@ export function applyEditsToNormalizedContent(
 	const normalizedEdits = edits.map((edit) => ({
 		oldText: normalizeToLF(edit.oldText),
 		newText: normalizeToLF(edit.newText),
+		all: edit.all === true,
 	}));
 
 	for (let i = 0; i < normalizedEdits.length; i++) {
@@ -326,6 +329,18 @@ export function applyEditsToNormalizedContent(
 		}
 
 		const occurrences = countOccurrences(replacementBaseContent, edit.oldText);
+		if (occurrences > 1 && edit.all) {
+			// Every occurrence, in the space the match was found in (the fuzzy-normalized text when any edit needed it).
+			const needle = usedFuzzyMatch ? normalizeForFuzzyMatch(edit.oldText) : edit.oldText;
+			for (
+				let at = replacementBaseContent.indexOf(needle);
+				at !== -1;
+				at = replacementBaseContent.indexOf(needle, at + needle.length)
+			) {
+				matchedEdits.push({ editIndex: i, matchIndex: at, matchLength: needle.length, newText: edit.newText });
+			}
+			continue;
+		}
 		if (occurrences > 1) {
 			throw getDuplicateError(path, i, normalizedEdits.length, occurrences);
 		}
