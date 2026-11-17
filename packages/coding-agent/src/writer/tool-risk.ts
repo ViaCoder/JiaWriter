@@ -205,13 +205,25 @@ function wrappedRisk(args: readonly string[]): Risk {
 	return "act";
 }
 
+/**
+ * The command without its leading VAR=value assignments, whose values may be quoted and hold spaces (2026-11-17, l14:
+ * `f='…/检索/001-低空经济政策 2026 最新.md'; grep 保险 "$f"` was refused with nobody to ask, since the words after the
+ * first space of the path were read as the command).
+ */
+function withoutAssignments(text: string): string {
+	const assignment = /^[A-Za-z_]\w*=(?:'[^']*'|"(?:\\.|[^"\\])*"|[^\s'"]+)*\s*/;
+	let rest = text;
+	for (let m = assignment.exec(rest); m && m[0].length > 0; m = assignment.exec(rest)) rest = rest.slice(m[0].length);
+	return rest;
+}
+
 /** The risk of one simple command (no ; && || | inside). */
 function partRisk(part: string): Risk {
-	// Words, without leading VAR=value assignments.
-	const words = part.trim().split(/\s+/).filter(Boolean);
+	let rest = part.trim();
 	// Block words run nothing: what follows them is the command.
-	while (words.length > 0 && KEYWORDS_BEFORE.has(words[0])) words.shift();
-	while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) words.shift();
+	for (let m = /^(\S+)\s*/.exec(rest); m && KEYWORDS_BEFORE.has(m[1]); m = /^(\S+)\s*/.exec(rest))
+		rest = rest.slice(m[0].length);
+	const words = withoutAssignments(rest).split(/\s+/).filter(Boolean);
 	if (words.length === 0) return "read";
 	if (words.length === 1 && KEYWORDS_ALONE.has(words[0])) return "read";
 	// A loop or case header names what to go over, not a command.
@@ -238,6 +250,9 @@ function partRisk(part: string): Risk {
 		return args.some((a) => /^-(delete|exec|execdir|ok|okdir|fprint|fprintf|fls)$/.test(a)) ? "high" : "read";
 	// sed edits in place with -i.
 	if (name === "sed") return args.some((a) => /^-[a-zA-Z]*i/.test(a) || a.startsWith("--in-place")) ? "act" : "read";
+	// awk reads unless its program runs commands (output into a file is caught by the redirection rule; 2026-11-17, l14:
+	// `awk 'NR==8' 文件 | grep -o …` was refused with nobody to ask).
+	if (name === "awk" || name === "gawk" || name === "mawk") return /system\s*\(/.test(part) ? "act" : "read";
 	// A short sleep waits for a rate limit; a long one stalls the run and is asked about.
 	if (name === "sleep") {
 		const m = /^(\d+(?:\.\d+)?)(s?)$/.exec(args[0] ?? "");
@@ -288,8 +303,7 @@ export function inDirCommand(given: string, cwd: string): boolean {
 	for (const raw of splitParts(command)) {
 		const part = raw.replace(/(?:^|[^0-9&>])>{1,2}\s*[^\s&|;]+/g, " ");
 		if (partRisk(part) === "read") continue;
-		const words = part.trim().split(/\s+/).filter(Boolean);
-		while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) words.shift();
+		const words = withoutAssignments(part.trim()).split(/\s+/).filter(Boolean);
 		const name = (words[0]?.split(/[\\/]/).pop() ?? "").toLowerCase();
 		if (!IN_DIR_COMMANDS.has(name)) return false;
 		const paths = words.slice(1).filter((w) => !w.startsWith("-"));

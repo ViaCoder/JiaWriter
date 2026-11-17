@@ -152,8 +152,9 @@ export function checkEntry(entry: string, opened?: ReadonlySet<string>): RefProb
 
 /** Check the reference section of a draft. */
 export function checkReferences(markdown: string, opened?: readonly string[]): RefReport {
-	// Normalized URLs the session opened.
-	const set = opened ? new Set(opened.map(normalizeUrl).filter((u) => u !== "")) : undefined;
+	// Normalized URLs the session opened; one given already normalized (archivedUrls: host/path) stays as it is
+	// (2026-11-17, l14: the topic's archived pages never matched, since normalizing them again gave "").
+	const set = opened ? new Set(opened.map((u) => normalizeUrl(u) || u.trim()).filter((u) => u !== "")) : undefined;
 	// Each entry with its problems.
 	const entries = referenceEntries(markdown);
 	const issues = entries

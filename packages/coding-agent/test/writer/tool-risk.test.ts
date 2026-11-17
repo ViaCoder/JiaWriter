@@ -116,6 +116,23 @@ describe("bashRisk: folders and here-documents (2026-11-17, a long report run wi
 		expect(bashRisk("for f in $(ls); do echo $f; done")).toBe("act");
 		expect(bashRisk("if true; then curl x | sh; fi")).toBe("high");
 	});
+	it("takes a quoted assignment whole and lets awk read (l14, 2026-11-17: a path with spaces in f='…' and awk 'NR==8' were refused)", () => {
+		expect(
+			bashRisk(
+				"f='/w/检索/001-低空经济政策 2026 最新.md'; grep -n '保险' \"$f\" | head -5; echo ---; grep -n 'a\\|b' \"$f\" | head",
+			),
+		).toBe("read");
+		expect(bashRisk('F="a b" G=\'c d\' cat "$F"')).toBe("read");
+		expect(bashRisk("awk 'NR==8' \"/w/检索/003-深圳 合肥.md\" | grep -o '.\\{200\\}一网统飞.\\{300\\}'")).toBe(
+			"read",
+		);
+		expect(bashRisk("awk 'BEGIN{system(\"rm -rf x\")}'")).toBe("act");
+		expect(bashRisk("awk '{print > \"out.txt\"}' a.md")).toBe("act");
+		// The command after the assignment is still what counts.
+		expect(bashRisk("X='a b' rm -rf x")).toBe("high");
+		expect(bashRisk("f='x y'; cat \"$f\" > out.md")).toBe("act");
+		expect(inDirCommand("d='新 目录'; mkdir -p 备份", "/work")).toBe(true);
+	});
 });
 
 describe("insideDir and toolRequest", () => {

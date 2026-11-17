@@ -72,6 +72,11 @@ describe("checkReferences / unopenedUrls", () => {
 		expect([report.entries, report.issues.map((i) => i.problems)]).toEqual([3, [["opened"], ["opened"]]]);
 		expect(unopenedUrls(report)).toEqual(["https://example.com/a"]);
 	});
+	it("takes opened URLs given already normalized, as the topic's archive gives them (l14, 2026-11-17)", () => {
+		const md = "## 参考文献\n\n1. [某报告，2026年](https://www.example.com/a/)\n";
+		expect(checkReferences(md, ["example.com/a"]).issues).toEqual([]);
+		expect(checkReferences(md, ["example.com/other"]).issues.map((i) => i.problems)).toEqual([["opened"]]);
+	});
 });
 
 describe("openedUrls", () => {
