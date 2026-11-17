@@ -119,7 +119,8 @@ def main():
     try:
         # Each step: what to type, how long to read, what must appear.
         steps = [
-            (None, 12, ["中断", "命令", "按 "]),
+            # The plain first screen (2026-11-17): the welcome box names the model and the folder, the footer the shortcuts key.
+            (None, 12, ["模型", "文件夹", "快捷键"]),
             ("/jw", 3, ["JiaWriter 配置（只读", "JW_KEY", "未设置", "按任意键关闭"]),
             ("q", 2, []),
             ("/skills", 3, ["写作 skill（4 个）", "公文写作", "内置"]),
