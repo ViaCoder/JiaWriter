@@ -521,10 +521,6 @@ export class InteractiveMode {
 	private workingLabel(): string {
 		return uiText(`${this.defaultWorkingMessage} ({key} to interrupt)`, { key: keyText("app.interrupt") });
 	}
-	// JiaWriter: in the interface language.
-	private readonly defaultHiddenThinkingLabel = uiText("Thinking...");
-	private hiddenThinkingLabel = this.defaultHiddenThinkingLabel;
-
 	private lastSigintTime = 0;
 	private lastEscapeTime = 0;
 	private changelogMarkdown: string | undefined = undefined;
@@ -2501,19 +2497,6 @@ export class InteractiveMode {
 		this.ui.requestRender();
 	}
 
-	private setHiddenThinkingLabel(label?: string): void {
-		this.hiddenThinkingLabel = label ?? this.defaultHiddenThinkingLabel;
-		for (const child of this.chatContainer.children) {
-			if (child instanceof AssistantMessageComponent) {
-				child.setHiddenThinkingLabel(this.hiddenThinkingLabel);
-			}
-		}
-		if (this.streamingComponent) {
-			this.streamingComponent.setHiddenThinkingLabel(this.hiddenThinkingLabel);
-		}
-		this.ui.requestRender();
-	}
-
 	/**
 	 * Set an extension widget (string array or custom component).
 	 */
@@ -2599,7 +2582,6 @@ export class InteractiveMode {
 				uiText(`${this.defaultWorkingMessage} ({key} to interrupt)`, { key: keyText("app.interrupt") }),
 			);
 		}
-		this.setHiddenThinkingLabel();
 	}
 
 	// Maximum total widget lines to prevent viewport overflow
@@ -2767,7 +2749,8 @@ export class InteractiveMode {
 			},
 			setWorkingVisible: (visible) => this.setWorkingVisible(visible),
 			setWorkingIndicator: (options) => this.setWorkingIndicator(options),
-			setHiddenThinkingLabel: (label) => this.setHiddenThinkingLabel(label),
+			// JiaWriter (2026-11-17): a hidden thinking block draws no line, so there is no label to set.
+			setHiddenThinkingLabel: () => {},
 			setWidget: (key, content, options) => this.setExtensionWidget(key, content, options),
 			setFooter: (factory) => this.setExtensionFooter(factory),
 			setHeader: (factory) => this.setExtensionHeader(factory),
@@ -3623,7 +3606,6 @@ export class InteractiveMode {
 						undefined,
 						this.hideThinkingBlock,
 						this.getMarkdownThemeWithSettings(),
-						this.hiddenThinkingLabel,
 						this.outputPad,
 						this.getMarkdownTransformers(),
 					);
@@ -4101,6 +4083,8 @@ export class InteractiveMode {
 							this.chatContainer.addChild(userComponent);
 						}
 					} else {
+						// JiaWriter: the blank row above the user's words (the message draws none itself).
+						this.chatContainer.addChild(new Spacer(1));
 						const userComponent = new UserMessageComponent(
 							textContent,
 							this.getMarkdownThemeWithSettings(),
@@ -4120,7 +4104,6 @@ export class InteractiveMode {
 					message,
 					this.hideThinkingBlock,
 					this.getMarkdownThemeWithSettings(),
-					this.hiddenThinkingLabel,
 					this.outputPad,
 					this.getMarkdownTransformers(),
 				);

@@ -75,7 +75,8 @@ const TOKEN_FAMILIES: Record<ThemeToken, FamilyName> = {
 	toolErrorBg: "red",
 
 	text: "neutral",
-	userMessageText: "neutral",
+	// JiaWriter: the user's words are drawn in a warm colour on the plain background, with no band.
+	userMessageText: "orange",
 	customMessageText: "neutral",
 	toolTitle: "neutral",
 	syntaxOperator: "neutral",
@@ -293,7 +294,7 @@ const RULES: Rule[] = [
 	...each(PANELS, ["background"], "panel"),
 	{ token: "text", on: ["background"], level: "text" },
 	{ token: "text", on: ["selectedBg"], level: "textOnPanel" },
-	{ token: "userMessageText", on: ["userMessageBg"], level: "textOnPanel" },
+	{ token: "userMessageText", on: ["background"], level: "readable" },
 	{ token: "toolTitle", on: TOOL_PANELS, level: "textOnPanel" },
 	...each(["accent", "success", "error", "warning"], ["background", "selectedBg", ...TOOL_PANELS], "readable"),
 	{ token: "muted", on: ["background", "selectedBg", "customMessageBg", ...TOOL_PANELS], level: "readable" },
@@ -344,7 +345,7 @@ const READABLE_FLOOR: Record<ThemeAppearance, Level> = { dark: "readable", light
 const FOREGROUND_LEVEL: Level = "emphasis";
 
 /** Text-level tokens that take the terminal's foreground. */
-const FOREGROUND_TOKENS: ThemeColor[] = ["text", "userMessageText", "toolTitle"];
+const FOREGROUND_TOKENS: ThemeColor[] = ["text", "toolTitle"];
 
 /** WCAG 2 contrast ratio that body text must reach on the surfaces it is drawn on. */
 const TEXT_MINIMUM_WCAG_CONTRAST = 4.5;

@@ -39,21 +39,18 @@ export class UserMessageComponent extends Container {
 
 	private rebuild(): void {
 		this.clear();
-		// The Markdown pads and colors its own background: a Box around it would keep a second full-width copy of every
-		// line, with identical output. JiaWriter (2026-11-15): the words stand behind > inside the band, so the user's
-		// turn is told from the reply at a glance.
-		const band = (line: string) => theme.bg("userMessageBg", line);
+		// JiaWriter (2026-11-17, after Kimi Code): the user's words stand behind > in their own colour, with no background
+		// band; the colour alone tells the user's turn from the reply. The marker is bold, the words are not. The blank
+		// row above comes from the chat (a Spacer), the one below from the reply, so the message itself has no padding.
+		const color = (content: string) => theme.fg("userMessageText", content);
 		this.addChild(
 			new Prefixed(
 				new Markdown(
 					this.text,
 					0,
-					1,
+					0,
 					this.markdownTheme,
-					{
-						color: (content: string) => theme.fg("userMessageText", content),
-						bgColor: band,
-					},
+					{ color },
 					{
 						preserveOrderedListMarkers: true,
 						preserveBackslashEscapes: true,
@@ -61,10 +58,8 @@ export class UserMessageComponent extends Container {
 					},
 				),
 				{
-					marker: () => band(`${" ".repeat(this.outputPad)}${theme.fg("accent", theme.bold("> "))}`),
+					marker: () => `${" ".repeat(this.outputPad)}${color(theme.bold("> "))}`,
 					indent: this.outputPad + 2,
-					band: (line) => band(`${line}`),
-					keepLeading: true,
 				},
 			),
 		);

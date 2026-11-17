@@ -20,7 +20,6 @@ export const UI_ZH: Readonly<Record<string, string>> = {
 	Yes: "是",
 	No: "否",
 	// The folded reasoning, an interrupted reply, and the way back to the end of the history.
-	"Thinking...": "思考过程已折叠",
 	"Operation aborted": "已中断",
 	"Aborted after {count} retry attempt": "已中断（此前重试 {count} 次）",
 	"Aborted after {count} retry attempts": "已中断（此前重试 {count} 次）",

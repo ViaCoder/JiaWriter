@@ -1,5 +1,4 @@
 import type { AssistantMessage } from "@earendil-works/pi-ai";
-import type { TuiMouseEvent } from "@earendil-works/pi-tui";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 // JiaWriter shows Chinese by default; these tests check the upstream component in English.
@@ -79,11 +78,13 @@ describe("AssistantMessageComponent", () => {
 		);
 		const rendered = component.render(80).join("\n");
 
-		expect(rendered).toContain("Thinking...");
+		// JiaWriter: hidden thinking leaves no line at all.
+		expect(rendered).not.toContain("Thinking...");
+		expect(rendered).not.toContain("private reasoning");
 		expect(rendered).toContain("Response was truncated before completion.");
 	});
 
-	test("coalesces adjacent thinking blocks into one hidden thinking label", () => {
+	test("draws nothing for hidden thinking blocks", () => {
 		initTheme("dark");
 
 		const component = new AssistantMessageComponent(
@@ -97,43 +98,11 @@ describe("AssistantMessageComponent", () => {
 		);
 		const rendered = stripAnsi(component.render(80).join("\n"));
 
-		expect(rendered.match(/Thinking\.\.\./g)).toHaveLength(1);
+		expect(rendered).not.toContain("Thinking...");
+		expect(rendered).not.toContain("first thought");
 		expect(rendered).toContain("answer");
-	});
-
-	test("collapses individual thinking runs when clicked", () => {
-		initTheme("dark");
-		const component = new AssistantMessageComponent(
-			createAssistantMessage([
-				{ type: "thinking", thinking: "first reasoning" },
-				{ type: "text", text: "answer" },
-				{ type: "thinking", thinking: "second reasoning" },
-			]),
-		);
-		const width = 80;
-		const lines = component.render(width);
-		const firstThinkingRow = lines.findIndex((line) => stripAnsi(line).includes("first reasoning"));
-		expect(firstThinkingRow).toBeGreaterThanOrEqual(0);
-		const event: TuiMouseEvent = {
-			type: "click",
-			button: "left",
-			x: 1,
-			y: firstThinkingRow,
-			screenX: 1,
-			screenY: firstThinkingRow,
-			width,
-			height: lines.length,
-			shift: false,
-			alt: false,
-			ctrl: false,
-			clickCount: 1,
-		};
-		expect(component.handleMouse(event)?.handled).toBe(true);
-
-		const collapsed = stripAnsi(component.render(width).join("\n"));
-		expect(collapsed).not.toContain("first reasoning");
-		expect(collapsed).toContain("Thinking...");
-		expect(collapsed).toContain("second reasoning");
+		// The first line is the reply itself, with no blank row kept for the hidden thinking.
+		expect(rendered.trim().startsWith("● answer")).toBe(true);
 	});
 
 	test("uses configured output padding for text and thinking", () => {
@@ -146,7 +115,6 @@ describe("AssistantMessageComponent", () => {
 			]),
 			false,
 			undefined,
-			"Thinking...",
 			1,
 		);
 		const lines = component.render(80).map((line) => stripAnsi(line));
@@ -165,7 +133,7 @@ describe("AssistantMessageComponent", () => {
 		initTheme("dark");
 		const calls: string[] = [];
 		const message = createAssistantMessage([{ type: "text", text: "The result is $x^2$." }]);
-		const component = new AssistantMessageComponent(message, false, undefined, "Thinking...", 1, [
+		const component = new AssistantMessageComponent(message, false, undefined, 1, [
 			(markdown, context) => {
 				calls.push("formula");
 				expect(context).toEqual({ messageType: "assistant", isStreaming: false, availableWidth: 78 });
@@ -185,7 +153,7 @@ describe("AssistantMessageComponent", () => {
 		initTheme("dark");
 		const streamingStates: boolean[] = [];
 		const message = createAssistantMessage([{ type: "text", text: "partial" }]);
-		const component = new AssistantMessageComponent(undefined, false, undefined, "Thinking...", 1, [
+		const component = new AssistantMessageComponent(undefined, false, undefined, 1, [
 			(markdown, context) => {
 				streamingStates.push(context.isStreaming);
 				return context.isStreaming ? markdown : `${markdown} transformed`;
@@ -207,7 +175,6 @@ describe("AssistantMessageComponent", () => {
 			createAssistantMessage([{ type: "text", text: "answer" }]),
 			false,
 			undefined,
-			"Thinking...",
 			1,
 			[
 				(markdown, context) => {
@@ -231,7 +198,6 @@ describe("AssistantMessageComponent", () => {
 			createAssistantMessage([{ type: "text", text: "still visible" }]),
 			false,
 			undefined,
-			"Thinking...",
 			1,
 			[
 				(markdown) => {
@@ -259,7 +225,7 @@ describe("AssistantMessageComponent", () => {
 			{ type: "text", text: "answer" },
 			{ type: "thinking", thinking: "reasoning" },
 		]);
-		const component = new AssistantMessageComponent(message, false, undefined, "Thinking...", 1, [
+		const component = new AssistantMessageComponent(message, false, undefined, 1, [
 			(markdown, { messageType }) => {
 				return `${messageType}:${markdown}`;
 			},
