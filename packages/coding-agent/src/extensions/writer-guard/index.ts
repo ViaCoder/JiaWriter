@@ -23,6 +23,8 @@ import {
 	newGuard,
 	recordResult,
 } from "../../writer/loop-guard.ts";
+// Upstream failures that pass by themselves.
+import { isTransientText } from "../../writer/transient.ts";
 
 /** Blocked calls after the guard's stop before the run ends. */
 export const AFTER_STOP_CALLS = 3;
@@ -103,8 +105,10 @@ export default function writerGuardExtension(pi: ExtensionAPI): void {
 		return { block: true, reason: blockedText({ why, next: stop ? "stop" : "change" }) };
 	});
 
-	// After a call: its outcome counts.
+	// After a call: its outcome counts; a passing failure of the upstream (429, timeout) is not the call's own.
 	pi.on("tool_result", (event) => {
-		recordResult(guard, callKey(event.toolName, event.input), event.isError, event.toolName);
+		const text = event.content.flatMap((c) => (c.type === "text" ? [c.text] : [])).join("\n");
+		const transient = event.isError && isTransientText(text);
+		recordResult(guard, callKey(event.toolName, event.input), event.isError, event.toolName, transient);
 	});
 }

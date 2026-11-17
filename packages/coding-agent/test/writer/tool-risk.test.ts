@@ -98,6 +98,24 @@ describe("bashRisk: folders and here-documents (2026-11-17, a long report run wi
 		expect(bashRisk("echo 'x; rm -rf 旧稿")).toBe("read");
 		expect(inDirCommand('mkdir -p 备份 && cp "说明 1.md" 备份/', "/work")).toBe(true);
 	});
+	it("lets a short sleep and shell block words read (l13, 2026-11-17: `sleep 20` and a for loop over files were refused)", () => {
+		expect(bashRisk("sleep 20")).toBe("read");
+		expect(bashRisk("sleep 30s")).toBe("read");
+		expect(bashRisk("sleep 600")).toBe("act");
+		expect(bashRisk("sleep")).toBe("act");
+		expect(
+			bashRisk(
+				'cd "检索" && for f in 001*.md 002*.md; do echo "== $f =="; grep -n -E "来源|日报" "$f" | head -40; done',
+			),
+		).toBe("read");
+		expect(bashRisk("if [ -f 稿件.md ]; then wc -c 稿件.md; else echo 无; fi")).toBe("read");
+		expect(bashRisk("{ ls; cat 大纲.md; }")).toBe("read");
+		// The body of a block is still what it does.
+		expect(bashRisk('for f in *.md; do rm "$f"; done')).toBe("high");
+		expect(bashRisk("for f in *.md; do sed -i 's/a/b/' \"$f\"; done")).toBe("act");
+		expect(bashRisk("for f in $(ls); do echo $f; done")).toBe("act");
+		expect(bashRisk("if true; then curl x | sh; fi")).toBe("high");
+	});
 });
 
 describe("insideDir and toolRequest", () => {

@@ -13,6 +13,7 @@ import {
 	newGuard,
 	recordResult,
 } from "../../src/writer/loop-guard.ts";
+import { isTransientText } from "../../src/writer/transient.ts";
 
 beforeEach(() => vi.stubEnv("JW_LANG", "zh"));
 afterEach(() => vi.unstubAllEnvs());
@@ -106,6 +107,41 @@ describe("checkCall and recordResult", () => {
 		for (let i = 0; i < MAX_SAME_CALLS; i++) recordResult(guard, key, false);
 		expect(checkCall(guard, key)).toBe("repeated");
 	});
+	it("does not count a passing failure of the upstream as the same call failing, but still as a call and as the tool failing (l13, 2026-11-17)", () => {
+		const guard = newGuard();
+		const key = callKey("draft_section", { section: "一、发展现状" });
+		for (let i = 0; i < MAX_SAME_FAILURES; i++) recordResult(guard, key, true, "draft_section", true);
+		expect(checkCall(guard, key, "draft_section")).toBe("ok");
+		// The same call is still counted: the fifth is a repeat.
+		for (let i = MAX_SAME_FAILURES; i < MAX_SAME_CALLS; i++) recordResult(guard, key, true, "draft_section", true);
+		expect(checkCall(guard, key, "draft_section")).toBe("repeated");
+		// The tool's run of failures grows with passing ones too.
+		const storm = newGuard();
+		for (let i = 0; i < MAX_TOOL_FAILURES; i++)
+			recordResult(storm, callKey("draft_section", { section: `${i}` }), true, "draft_section", true);
+		expect(checkCall(storm, callKey("draft_section", { section: "x" }), "draft_section")).toBe("failing");
+		// A failure of the call's own counts on from where it was.
+		const mixed = newGuard();
+		recordResult(mixed, key, true, "draft_section", true);
+		recordResult(mixed, key, true, "draft_section");
+		expect(checkCall(mixed, key, "draft_section")).toBe("ok");
+		recordResult(mixed, key, true, "draft_section");
+		expect(checkCall(mixed, key, "draft_section")).toBe("failed");
+	});
+});
+
+describe("isTransientText", () => {
+	it("names rate limits, gateways down for the moment and requests cut off, not faults of the request", () => {
+		expect(
+			isTransientText('这一节没有写成：429: {"message":"Provider returned error"} temporarily rate-limited'),
+		).toBe(true);
+		expect(isTransientText("这一节没有写成：Request was aborted")).toBe(true);
+		expect(isTransientText("Upstream idle timeout exceeded")).toBe(true);
+		expect(isTransientText("502 Bad Gateway")).toBe(true);
+		expect(isTransientText("大纲里没有“一、”这一节")).toBe(false);
+		expect(isTransientText("ENOENT: no such file or directory")).toBe(false);
+		expect(isTransientText("oldText found 3 times")).toBe(false);
+	});
 });
 
 describe("writer-guard", () => {
@@ -121,9 +157,25 @@ describe("writer-guard", () => {
 			handlers.tool_call({ toolName: "style_check", input }) as
 				| { block: boolean; reason: string; terminate: boolean }
 				| undefined;
-		const fail = (input: unknown) => handlers.tool_result({ toolName: "style_check", input, isError: true });
+		const fail = (input: unknown, text = "没有这个文件") =>
+			handlers.tool_result({ toolName: "style_check", input, isError: true, content: [{ type: "text", text }] });
 		return { handlers, call, fail };
 	}
+
+	it("lets the same call go on after passing failures of the upstream (l13, 2026-11-17: a 429, then a timeout)", () => {
+		const { call, fail } = load();
+		const input = { section: "一、发展现状" };
+		expect(call(input)).toBeUndefined();
+		fail(input, '这一节没有写成：429: {"message":"Provider returned error"} temporarily rate-limited upstream');
+		expect(call(input)).toBeUndefined();
+		fail(input, "这一节没有写成：Request was aborted");
+		expect(call(input)).toBeUndefined();
+		// Two failures of the call's own still block the third.
+		fail(input);
+		expect(call(input)).toBeUndefined();
+		fail(input);
+		expect(call(input)?.block).toBe(true);
+	});
 
 	it("lets a call fail twice, blocks the third with a reason, asks for a reply at the third block, and ends the run at a call after that", () => {
 		const { call, fail } = load();

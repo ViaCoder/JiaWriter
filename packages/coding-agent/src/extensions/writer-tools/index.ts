@@ -58,6 +58,8 @@ import {
 } from "../../writer/model-ask.ts";
 // The semantic review line.
 import { STYLE_REVIEW } from "../../writer/prompts/manuals.ts";
+// Upstream failures that pass by themselves.
+import { isTransientText } from "../../writer/transient.ts";
 
 export { type AskBudget, type Complete, modelAsker, REVIEW_REASONING_TOKENS, REVIEW_TIMEOUT_MS, withReviewBudget };
 
@@ -710,7 +712,11 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 			try {
 				reply = await ask(sectionInstructions(), request);
 			} catch (error) {
-				return fail(t("draft.failed", { reason: error instanceof Error ? error.message : String(error) }));
+				const reason = error instanceof Error ? error.message : String(error);
+				// A failure of the upstream, not of the section: the model is told to wait and call again (2026-11-17, l13:
+				// after a 429 and a timeout the model gave the draft up and tried to write it by hand).
+				const again = isTransientText(reason) ? `\n${t("draft.transient")}` : "";
+				return fail(`${t("draft.failed", { reason })}${again}`);
 			}
 			const text = cleanSectionText(reply, heading);
 			if (!text.trim()) return fail(t("draft.failed", { reason: "empty reply" }));

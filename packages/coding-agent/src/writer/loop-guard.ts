@@ -96,14 +96,19 @@ export function checkCall(guard: LoopGuard, key: string, tool = ""): "ok" | "fai
 	return "ok";
 }
 
-/** Count a call's outcome; a change that worked starts every count again (a check after an edit reads a new text). */
-export function recordResult(guard: LoopGuard, key: string, isError: boolean, tool = ""): void {
+/**
+ * Count a call's outcome; a change that worked starts every count again (a check after an edit reads a new text). A
+ * failure of the upstream (transient: a rate limit, a timeout) is not the call's own: it does not count towards the
+ * same call failing in a row, since the call was never answered, but it does count as a call made and as a failure of
+ * the tool (2026-11-17, l13: draft_section was blocked after a 429 and a timeout, with the upstream back minutes later).
+ */
+export function recordResult(guard: LoopGuard, key: string, isError: boolean, tool = "", transient = false): void {
 	const record = guard.calls.get(key) ?? { count: 0, failures: 0 };
 	// The other calls start again; this one keeps its count, so the same change made over and over is still a loop.
 	if (!isError && CHANGING_TOOLS.has(tool)) guard.calls.clear();
 	record.count++;
-	// Failures in a row: a success in between starts them again.
-	record.failures = isError ? record.failures + 1 : 0;
+	// Failures in a row: a success in between starts them again; a passing failure leaves them as they were.
+	record.failures = isError ? (transient ? record.failures : record.failures + 1) : 0;
 	guard.calls.set(key, record);
 	// The tool's own run of failures, with any arguments.
 	if (tool) guard.failing.set(tool, isError ? (guard.failing.get(tool) ?? 0) + 1 : 0);

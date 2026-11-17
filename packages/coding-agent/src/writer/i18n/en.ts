@@ -356,6 +356,8 @@ export const en: Record<MessageKey, string> = {
 		"A document has no closing section: remove “{heading}”; the text ends with its last substantive section.",
 	"draft.written": "Wrote “{heading}”: {chars} characters; {path} now holds {total}; the outline line is ticked.",
 	"draft.failed": "The section was not written: {reason}",
+	"draft.transient":
+		"The upstream failed for the moment (a rate limit or no answer), not the section: wait a little (sleep 30) and call again with the same arguments.",
 	"draft.noModel": "No model is available to write the section",
 	"draft.budget":
 		"The document asks for about {target} characters; {remaining} sections are still open, with about {left} characters left for them.",

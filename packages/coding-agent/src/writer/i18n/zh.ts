@@ -319,6 +319,8 @@ export const zh = {
 	"style.closingSection": "文档不设结语：删去“{heading}”这一节，正文到最后一个实质章节为止。",
 	"draft.written": "已写入“{heading}”，本节 {chars} 字，{path} 正文共 {total} 字；大纲里这一节已标记。",
 	"draft.failed": "这一节没有写成：{reason}",
+	"draft.transient":
+		"这是上游暂时的故障（限流或没有响应），不是这一节的问题：等一会儿（sleep 30）再用同样的参数调一次。",
 	"draft.noModel": "当前没有可用的模型，写不了这一节",
 	"draft.budget": "全文要求约 {target} 字，还有 {remaining} 节没写，共约 {left} 字可用。",
 	"rewind.pick": "回退到哪条消息之前？",

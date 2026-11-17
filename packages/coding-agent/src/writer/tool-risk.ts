@@ -48,11 +48,25 @@ const READ_COMMANDS = new Set([
 	"realpath",
 	"true",
 	"test",
+	"[",
+	"[[",
 	// Moving between folders changes nothing (2026-11-17: `cd 检索 && head -20 文件` was refused with nobody to ask).
 	"cd",
 	"pushd",
 	"popd",
 ]);
+
+/** Longest sleep that counts as reading: a wait for a rate limit, not a stall (2026-11-17, l13: `sleep 20` was refused). */
+const SLEEP_READ_SECONDS = 300;
+
+/**
+ * Shell words that stand before a command and run nothing themselves: the command after them is judged (2026-11-17, l13:
+ * `for f in *.md; do echo "== $f =="; grep -n 来源 "$f"; done` was refused with nobody to ask, since `for` and `do echo`
+ * were unknown commands).
+ */
+const KEYWORDS_BEFORE = new Set(["do", "then", "else", "elif", "if", "while", "until", "!", "{"]);
+/** Shell words that close a block and run nothing. */
+const KEYWORDS_ALONE = new Set(["done", "fi", "esac", "}", ";;"]);
 
 /**
  * A command with its here-document bodies taken out: the lines between `<< EOF` (or `<<'EOF'`, `<<-EOF`) and the
@@ -195,8 +209,14 @@ function wrappedRisk(args: readonly string[]): Risk {
 function partRisk(part: string): Risk {
 	// Words, without leading VAR=value assignments.
 	const words = part.trim().split(/\s+/).filter(Boolean);
+	// Block words run nothing: what follows them is the command.
+	while (words.length > 0 && KEYWORDS_BEFORE.has(words[0])) words.shift();
 	while (words.length > 0 && /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[0])) words.shift();
 	if (words.length === 0) return "read";
+	if (words.length === 1 && KEYWORDS_ALONE.has(words[0])) return "read";
+	// A loop or case header names what to go over, not a command.
+	if (/^for\s+[A-Za-z_]\w*(\s+in\b.*)?$/s.test(words.join(" ")) || (words[0] === "case" && words.at(-1) === "in"))
+		return "read";
 	// The command's bare name: no path, lower case (PowerShell names are case-blind).
 	const name = (words[0].split(/[\\/]/).pop() ?? "").toLowerCase();
 	const args = words.slice(1);
@@ -218,6 +238,11 @@ function partRisk(part: string): Risk {
 		return args.some((a) => /^-(delete|exec|execdir|ok|okdir|fprint|fprintf|fls)$/.test(a)) ? "high" : "read";
 	// sed edits in place with -i.
 	if (name === "sed") return args.some((a) => /^-[a-zA-Z]*i/.test(a) || a.startsWith("--in-place")) ? "act" : "read";
+	// A short sleep waits for a rate limit; a long one stalls the run and is asked about.
+	if (name === "sleep") {
+		const m = /^(\d+(?:\.\d+)?)(s?)$/.exec(args[0] ?? "");
+		return m && Number(m[1]) <= SLEEP_READ_SECONDS ? "read" : "act";
+	}
 	return READ_COMMANDS.has(name) ? "read" : "act";
 }
 

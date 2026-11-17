@@ -937,6 +937,20 @@ describe("draft_section", () => {
 		const failed = await tool(new Error("network down")).run({ path, section: "一、现状" });
 		expect(failed.isError).toBe(true);
 		expect(failed.content[0].text).toContain("network down");
+		expect(failed.content[0].text).not.toContain("等一会儿");
+		expect(existsSync(join(cwd, path))).toBe(false);
+	});
+
+	it("tells the model to wait and call again when the upstream failed for the moment (l13, 2026-11-17)", async () => {
+		vi.stubEnv("JW_ASK_RETRY_WAIT_MS", "0");
+		const path = topic();
+		const { run, asked } = tool(new Error("429: z-ai/glm-5.3-flash is temporarily rate-limited upstream"));
+		const failed = await run({ path, section: "一、现状" });
+		expect(failed.isError).toBe(true);
+		expect(failed.content[0].text).toContain("429");
+		expect(failed.content[0].text).toContain("等一会儿（sleep 30）再用同样的参数调一次");
+		// Asked twice (the one retry of model-ask), and nothing written.
+		expect(asked).toHaveLength(2);
 		expect(existsSync(join(cwd, path))).toBe(false);
 	});
 });

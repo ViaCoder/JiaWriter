@@ -10,6 +10,10 @@ import { type Api, completeSimple, type Model } from "@earendil-works/pi-ai/comp
 import type { ExtensionContext } from "../core/extensions/types.ts";
 // The review switch (JW_REVIEW=off).
 import { reviewEnabled } from "./style/review.ts";
+// Upstream errors that pass by themselves.
+import { TRANSIENT_ERROR } from "./transient.ts";
+
+export { TRANSIENT_ERROR };
 
 /** How one request reaches a model: completeSimple, or a stand-in in tests. */
 export type Complete = typeof completeSimple;
@@ -26,9 +30,6 @@ export function withReviewBudget(payload: unknown, tokens = REVIEW_REASONING_TOK
 	if (!payload || typeof payload !== "object") return payload;
 	return { ...(payload as Record<string, unknown>), reasoning: { max_tokens: tokens } };
 }
-
-/** An upstream error that passes by itself: too many requests, or a gateway that is down for the moment. */
-export const TRANSIENT_ERROR = /\b(?:429|502|503|504)\b|rate.?limit|temporarily|overloaded/i;
 
 /** The wait before the one retry of a passing error; JW_ASK_RETRY_WAIT_MS shortens it in tests. */
 export function transientWaitMs(env: NodeJS.ProcessEnv = process.env): number {
