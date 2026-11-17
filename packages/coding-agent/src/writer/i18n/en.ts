@@ -103,6 +103,7 @@ export const en: Record<MessageKey, string> = {
 	"style.lengthNow": "Length: {chars} characters in the body.",
 	"style.lengthNowTarget":
 		"Length: {chars} characters in the body, about {target} asked (within {tolerance}% is fine).",
+	"style.sameAsLast": "The other {count} check lines are as in the last check and are not listed again.",
 	"style.reviewFound": "The semantic review found {count}:",
 	// Where facts come from in a revision.
 	"style.materials":

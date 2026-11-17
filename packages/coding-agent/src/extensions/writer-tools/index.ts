@@ -481,6 +481,9 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	// brought in only (2026-11-09: asked to change a date, a run also cut a phrase of the notice the user had kept,
 	// because the review read the whole notice again).
 	const before = new Map<string, string>();
+	// The check lines each draft's last write or edit in this message got: a later one lists only what is new
+	// (2026-11-17, l14: thirteen edits each carried the same 300-character note the model had chosen to leave).
+	const lastCheck = new Map<string, string[]>();
 	let rounds = 0;
 	// Cut-off replies resumed since the user's last message.
 	let cutResumes = 0;
@@ -494,6 +497,7 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 	pi.on("input", (event) => {
 		written.clear();
 		before.clear();
+		lastCheck.clear();
 		rounds = 0;
 		cutResumes = 0;
 		replyRounds = 0;
@@ -533,7 +537,19 @@ export default function writerToolsExtension(pi: ExtensionAPI, complete: Complet
 		const length = target
 			? t("style.lengthNowTarget", { chars, target, tolerance })
 			: t("style.lengthNow", { chars });
-		const text = [draftCheck(draft).text, length, ...finishedChecks(draft)].filter(Boolean).join("\n");
+		const checks = [draftCheck(draft).text, ...finishedChecks(draft)]
+			.filter(Boolean)
+			.join("\n")
+			.split("\n")
+			.filter(Boolean);
+		const previous = lastCheck.get(file);
+		lastCheck.set(file, checks);
+		// The first check of the draft in full; a later one with its new lines only, the rest counted.
+		const fresh = previous ? freshLines(previous, checks) : checks;
+		const same = checks.length - fresh.length;
+		const text = [...fresh, length, same > 0 ? t("style.sameAsLast", { count: same }) : ""]
+			.filter(Boolean)
+			.join("\n");
 		return { content: [...event.content, { type: "text", text: first ? `${text}\n${STYLE_REVIEW}` : text }] };
 	});
 	// When a reply ends, each draft it wrote gets the rules and one separate semantic review; while either finds

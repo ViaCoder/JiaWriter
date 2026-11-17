@@ -540,6 +540,25 @@ describe("the automatic check of each draft", () => {
 		expect(wrote("稿2.md", VAGUE_REPORT, true)).toBeUndefined();
 	});
 
+	it("lists only the new check lines after a later edit, and counts the rest (l14, 2026-11-17)", () => {
+		const { handlers, wrote } = started();
+		const first = wrote("稿.md", VAGUE_REPORT)?.content[1]?.text ?? "";
+		const firstLines = first.split("\n").filter((l) => l && !l.startsWith("篇幅") && l !== STYLE_REVIEW);
+		expect(firstLines.length).toBeGreaterThan(1);
+		// The same draft again: nothing new, the lines counted, the length still given.
+		const again = wrote("稿.md", VAGUE_REPORT)?.content[1]?.text ?? "";
+		expect(again).not.toContain(firstLines[0]);
+		expect(again).toContain(`其余 ${firstLines.length} 行检查结果与上次相同`);
+		expect(again).toContain("篇幅");
+		// A new fault appears alone, the old ones counted.
+		const marked = wrote("稿.md", `${VAGUE_REPORT}\n\n具体数据待核实。`)?.content[1]?.text ?? "";
+		expect(marked).toContain("待核实");
+		expect(marked).not.toContain(firstLines[0]);
+		// A new message from the user starts with the full check again.
+		handlers.input({ text: "再改" }, { cwd });
+		expect(wrote("稿.md", VAGUE_REPORT)?.content[1]?.text).toContain(firstLines[0]);
+	});
+
 	it("asks once to restate a reply that carries a hard mark of machine writing, and lets a clean one pass", async () => {
 		const { handlers, sent } = started();
 		const marked = [
