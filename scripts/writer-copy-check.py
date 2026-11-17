@@ -126,7 +126,7 @@ def main():
     results = []
     check = lambda name, ok: results.append((name, bool(ok)))
     try:
-        read_until(fd, "命令", 20)
+        read_until(fd, "快捷键", 20)
         os.write(fd, "写一行".encode("utf-8"))
         read_until(fd, "", 0.5)
         os.write(fd, b"\r")

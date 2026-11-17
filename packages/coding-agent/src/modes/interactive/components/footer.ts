@@ -329,13 +329,10 @@ export class FooterComponent implements Component {
 		const remainder = statsLine.slice(statsLeft.length); // padding + rightSide
 		const dimRemainder = theme.fg("dim", remainder);
 
-		// JiaWriter: the folder on the stats line's right, after the model, when it fits; a line of its own only when
-		// it does not (2026-11-17: a lone "~" above the status line read as a stray character).
-		const folded = `${rightSide} ${theme.fg("dim", "•")} ${pwd}`;
-		const fits = statsLeftWidth + minPadding + visibleWidth(folded) <= width;
-		const lines = fits
-			? [dimStatsLeft + theme.fg("dim", " ".repeat(width - statsLeftWidth - visibleWidth(folded)) + folded)]
-			: [truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "...")), dimStatsLeft + dimRemainder];
+		// JiaWriter: the folder line says what it is (2026-11-17: a lone "~" above the status line read as a stray
+		// character). The footer keeps its two lines: with one, the first mouse selection of a session copied nothing.
+		const pwdLine = truncateToWidth(theme.fg("dim", `${uiText("Folder")} ${pwd}`), width, theme.fg("dim", "..."));
+		const lines = [pwdLine, dimStatsLeft + dimRemainder];
 
 		// Add extension statuses on a single line, sorted by key alphabetically
 		const extensionStatuses = this.footerData.getExtensionStatuses();

@@ -216,7 +216,7 @@ def main():
     check = lambda name, ok: results.append((name, bool(ok)))
     debug = "--debug" in sys.argv
     try:
-        read_until(fd, "命令", 20)
+        read_until(fd, "快捷键", 20)
         # The draft, then the edit.
         send(fd, "写稿")
         read_until(fd, "完成了", 20)

@@ -130,7 +130,7 @@ def main():
     results = []
     check = lambda name, ok: results.append((name, bool(ok)))
     try:
-        read_until(fd, "命令", None, 20)
+        read_until(fd, "快捷键", None, 20)
         # Write: the early, the middle and the late lines, each before the call has ended.
         os.write(fd, "写稿".encode("utf-8"))
         read_until(fd, "", None, 0.5)

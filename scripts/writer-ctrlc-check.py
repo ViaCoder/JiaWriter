@@ -112,7 +112,7 @@ def main():
     check = lambda name, ok: results.append((name, bool(ok)))
     finished = False
     try:
-        read_until(fd, "命令", 20)
+        read_until(fd, "快捷键", 20)
         # One press interrupts a reply in progress.
         os.write(fd, "写点东西".encode("utf-8"))
         read_until(fd, "", 0.5)

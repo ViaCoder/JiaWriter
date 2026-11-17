@@ -129,7 +129,7 @@ def main():
     results = []
     check = lambda name, ok: results.append((name, bool(ok)))
     try:
-        read_until(fd, "命令", 20)
+        read_until(fd, "快捷键", 20)
         # Esc: the queue goes out, the draft stays.
         type_line(fd, "慢问题一")
         read_until(fd, "慢慢写", 15)

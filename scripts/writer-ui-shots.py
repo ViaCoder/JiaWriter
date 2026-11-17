@@ -212,7 +212,7 @@ def main():
     cap = Capture(fd)
     shots = []
     try:
-        cap.wait("命令", 20)
+        cap.wait("快捷键", 20)
         time.sleep(1.5)
         shots.append(("1-start", picture(cap.snapshot(), out, "1-start")))
         # The question, typed and sent.
