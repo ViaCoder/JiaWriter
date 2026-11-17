@@ -225,6 +225,8 @@ describe("requestedLength / sectionBudget / openTextLines", () => {
 		expect(requestedLength("三千五字左右")).toBe(3500);
 		expect(requestedLength("约一万二千字")).toBe(12000);
 		expect(requestedLength("约一万字")).toBe(10000);
+		expect(requestedLength("约一千零五十字")).toBe(1050);
+		expect(requestedLength("两千零八字左右")).toBe(2008);
 		expect(requestedLength("五十字左右")).toBeUndefined();
 		expect(requestedLength(OUTLINE)).toBe(1500);
 	});

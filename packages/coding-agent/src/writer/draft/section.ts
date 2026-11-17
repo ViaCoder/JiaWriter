@@ -123,6 +123,11 @@ export function chineseNumber(text: string): number | undefined {
 	let digit: number | undefined;
 	let lastUnit = 0;
 	for (const ch of text) {
+		// 零 marks a skipped place, and the digit after it is a full one: 一千零五十 is 1,050, 两千零八 is 2,008.
+		if (ch === "零") {
+			lastUnit = 0;
+			continue;
+		}
 		if (ch in CN_DIGIT) {
 			if (digit !== undefined) return undefined;
 			digit = CN_DIGIT[ch];
