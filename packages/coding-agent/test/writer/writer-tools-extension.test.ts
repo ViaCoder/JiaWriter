@@ -45,6 +45,7 @@ import writerToolsExtension, {
 } from "../../src/extensions/writer-tools/index.ts";
 // The semantic review line the automatic check ends with.
 import { SECTION_REASONING_TOKENS } from "../../src/writer/draft/section.ts";
+import { t } from "../../src/writer/i18n/index.ts";
 import { STYLE_REVIEW } from "../../src/writer/prompts/manuals.ts";
 import { TOOLKITS } from "../../src/writer/toolkit/toolkits.ts";
 
@@ -763,10 +764,13 @@ describe("shownRound", () => {
 		const content = [
 			"自动检查：草稿还有问题（第 1/2 轮）。",
 			"",
+			t("style.materials"),
+			"",
 			"稿件/报告.md",
 			"篇幅 759 字，要求约 1200 字",
 			STYLE_REVIEW,
 		].join("\n");
+		// The rule on materials, for the model, is left out too (2026-11-17).
 		expect(shownRound(content)).toBe(
 			"自动检查：草稿还有问题（第 1/2 轮）。\n\n稿件/报告.md\n篇幅 759 字，要求约 1200 字",
 		);

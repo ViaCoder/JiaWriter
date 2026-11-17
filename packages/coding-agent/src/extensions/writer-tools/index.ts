@@ -447,9 +447,10 @@ export function ownFindings(
  * prompt text (2026-11-10: the reread instructions showed in English under a Chinese report).
  */
 export function shownRound(content: string): string {
+	// The standing rule on materials is for the model too (2026-11-17: the box showed it above every report).
 	return content
 		.split("\n")
-		.filter((line) => line !== STYLE_REVIEW)
+		.filter((line) => line !== STYLE_REVIEW && line !== t("style.materials"))
 		.join("\n")
 		.replace(/\n{3,}/g, "\n\n")
 		.trim();
