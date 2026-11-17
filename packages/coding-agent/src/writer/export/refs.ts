@@ -132,6 +132,23 @@ export function uncitedReferences(markdown: string, body: string): { n: number; 
 	});
 }
 
+/** A segment that is only a date. */
+const DATE_ONLY = /^\d{4}[年\-./]\d{1,2}(?:[月\-./]\d{1,2}日?)?$|^\d{4}年$/;
+/** Words an outlet's name is followed by when it stands in for a title. */
+const OUTLET_SUFFIX = /(?:的)?(?:报道|消息|新闻|文章|报告|稿件|刊文|公告|通稿)$/;
+
+/**
+ * True when some comma-separated part of the entry's text names what the source says, not only who said it and when
+ * (2026-11-17, W10: with no article titles in the materials, a brief wrote [新华社报道，新华社，2026年10月20日]).
+ */
+function hasDescriptiveTitle(text: string): boolean {
+	return text
+		.replace(/^\s*(?:[-*+]|\d{1,3}[.)．、]|\[\d{1,3}\]|［\d{1,3}］)\s*/, "")
+		.split(/[，,\s]+/)
+		.map((s) => s.replace(/[《》[\]「」“”"]+/g, "").replace(OUTLET_SUFFIX, ""))
+		.some((s) => s.length >= 3 && !DATE_ONLY.test(s) && !OUTLET_WORD.test(s));
+}
+
 /** The problems of one entry; `opened` (normalized URLs) is undefined when the session is not known. */
 export function checkEntry(entry: string, opened?: ReadonlySet<string>): RefProblem[] {
 	// URLs of the entry, the usable ones normalized, and the text that names it.
@@ -145,7 +162,7 @@ export function checkEntry(entry: string, opened?: ReadonlySet<string>): RefProb
 	const letters = (title.match(/[\p{L}\p{N}]/gu) ?? []).length;
 	const problems: RefProblem[] = [];
 	if (good.length === 0) problems.push("url");
-	if (letters < 4 || GENERIC.test(title)) problems.push("title");
+	if (letters < 4 || GENERIC.test(title) || !hasDescriptiveTitle(text)) problems.push("title");
 	if (opened && good.length > 0 && !good.some((u) => opened.has(u))) problems.push("opened");
 	return problems;
 }

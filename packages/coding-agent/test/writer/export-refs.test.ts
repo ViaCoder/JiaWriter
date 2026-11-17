@@ -67,13 +67,22 @@ describe("checkReferences / unopenedUrls", () => {
 	it("checks every entry and lists the URLs still to open, once each", () => {
 		// Two entries with the same unopened URL, one fine.
 		const md =
-			"## 参考文献\n\n1. [某报告，2026年](https://example.com/a)\n2. [另一份报告，2026年](https://example.com/a)\n3. [第三份报告，2026年](https://example.com/b)\n";
+			"## 参考文献\n\n1. [某县养老服务调研报告，2026年](https://example.com/a)\n2. [另一份报告，2026年](https://example.com/a)\n3. [第三份报告，2026年](https://example.com/b)\n";
 		const report = checkReferences(md, ["https://example.com/b"]);
 		expect([report.entries, report.issues.map((i) => i.problems)]).toEqual([3, [["opened"], ["opened"]]]);
 		expect(unopenedUrls(report)).toEqual(["https://example.com/a"]);
 	});
+	it("wants a title that says what the source says, not the outlet's name again (W10, 2026-11-17)", () => {
+		const entry = (text: string) => `1. [${text}](https://news.example/d)`;
+		expect(checkEntry(entry("新华社报道，新华社，2026年10月20日"))).toEqual(["title"]);
+		expect(checkEntry(entry("人民日报，2026年11月2日"))).toEqual(["title"]);
+		expect(checkEntry("3. 经济日报 2026-11-08 https://news.example/f")).toEqual(["title"]);
+		expect(checkEntry(entry("民政部等部门印发居家社区养老服务提质三年行动方案，新华社，2026年10月20日"))).toEqual([]);
+		expect(checkEntry(entry("2026年政府工作报告，中国政府网，2026年3月5日"))).toEqual([]);
+		expect(checkEntry(entry("Oil falls as Trump downplays escalation, Reuters, 2026-11-10"))).toEqual([]);
+	});
 	it("takes opened URLs given already normalized, as the topic's archive gives them (l14, 2026-11-17)", () => {
-		const md = "## 参考文献\n\n1. [某报告，2026年](https://www.example.com/a/)\n";
+		const md = "## 参考文献\n\n1. [某县养老服务调研报告，2026年](https://www.example.com/a/)\n";
 		expect(checkReferences(md, ["example.com/a"]).issues).toEqual([]);
 		expect(checkReferences(md, ["example.com/other"]).issues.map((i) => i.problems)).toEqual([["opened"]]);
 	});
