@@ -17,7 +17,10 @@ export const SETTINGS_DEFAULTS = {
 	},
 	retry: {
 		enabled: true,
-		maxRetries: 3,
+		// JiaWriter: five tries with doubling waits (2, 4, 8, 16, 32 s, about a minute in all) instead of pi's three
+		// (14 s): on 2026-11-17 the upstream's rate-limit bursts lasted one or two minutes, and runs that gave up after
+		// 14 s had nothing to show, while the same requests went through a minute later.
+		maxRetries: 5,
 		baseDelayMs: 2000,
 		maxAgentDelayMs: DEFAULT_MAX_AGENT_RETRY_DELAY_MS,
 		provider: {

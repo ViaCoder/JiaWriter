@@ -85,8 +85,62 @@ function compact(text: string): string {
 
 /** The length a text asks for (约1500字, 1500字左右), if any: a user's message or an outline's head. */
 export function requestedLength(text: string): number | undefined {
-	const found = /约\s*(\d{3,6})\s*字|(\d{3,6})\s*字左右/.exec(text);
-	return found ? Number(found[1] ?? found[2]) : undefined;
+	const found =
+		/约\s*(\d[\d,]{2,6}|[一二两三四五六七八九十百千万零]{2,8})\s*字|(\d[\d,]{2,6}|[一二两三四五六七八九十百千万零]{2,8})\s*字左右/.exec(
+			text,
+		);
+	if (!found) return undefined;
+	const given = found[1] ?? found[2];
+	const n = /^\d/.test(given) ? Number(given.replace(/,/g, "")) : chineseNumber(given);
+	return n !== undefined && n >= 100 && n <= 999999 ? n : undefined;
+}
+
+/** Digits of a number written in Chinese. */
+const CN_DIGIT: Readonly<Record<string, number>> = {
+	零: 0,
+	一: 1,
+	二: 2,
+	两: 2,
+	三: 3,
+	四: 4,
+	五: 5,
+	六: 6,
+	七: 7,
+	八: 8,
+	九: 9,
+};
+/** Units of a number written in Chinese. */
+const CN_UNIT: Readonly<Record<string, number>> = { 十: 10, 百: 100, 千: 1000 };
+
+/**
+ * A number written in Chinese: 三百, 八百, 一千五百, 两千, 一万二千, and the spoken 三千五 (3,500); undefined when the
+ * text is not one (2026-11-17: 三百字左右, 八百字左右 and 一千字左右 in requests never set a length target, since only
+ * Arabic digits were read).
+ */
+export function chineseNumber(text: string): number | undefined {
+	let total = 0;
+	let section = 0;
+	let digit: number | undefined;
+	let lastUnit = 0;
+	for (const ch of text) {
+		if (ch in CN_DIGIT) {
+			if (digit !== undefined) return undefined;
+			digit = CN_DIGIT[ch];
+		} else if (ch in CN_UNIT) {
+			section += (digit ?? 1) * CN_UNIT[ch];
+			lastUnit = CN_UNIT[ch];
+			digit = undefined;
+		} else if (ch === "万") {
+			total += (section + (digit ?? 1)) * 10000;
+			section = 0;
+			digit = undefined;
+			lastUnit = 10000;
+		} else return undefined;
+	}
+	// A digit after a unit with nothing following is the next unit down: 三千五 is 3,500.
+	if (digit !== undefined) section += lastUnit >= 100 ? digit * (lastUnit / 10) : digit;
+	const n = total + section;
+	return n > 0 ? n : undefined;
 }
 
 /** Parts of an outline that carry no text of their own. */

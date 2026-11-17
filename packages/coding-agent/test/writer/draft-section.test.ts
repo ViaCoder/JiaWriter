@@ -213,7 +213,19 @@ describe("requestedLength / sectionBudget / openTextLines", () => {
 	it("reads the length asked for, in a message or an outline's head", () => {
 		expect(requestedLength("写一篇约1500字的调研报告")).toBe(1500);
 		expect(requestedLength("3000字左右")).toBe(3000);
+		expect(requestedLength("约3,000字")).toBe(3000);
 		expect(requestedLength("写一篇调研报告")).toBeUndefined();
+		// Chinese numerals (2026-11-17: 三百字左右 and 八百字左右 in the writing set never set a target).
+		expect(requestedLength("写一个三百字左右的通知")).toBe(300);
+		expect(requestedLength("写一篇八百字左右的讲话稿")).toBe(800);
+		expect(requestedLength("一千字左右的工作方案")).toBe(1000);
+		expect(requestedLength("约一千五百字")).toBe(1500);
+		expect(requestedLength("两千字左右")).toBe(2000);
+		expect(requestedLength("三千五百字左右")).toBe(3500);
+		expect(requestedLength("三千五字左右")).toBe(3500);
+		expect(requestedLength("约一万二千字")).toBe(12000);
+		expect(requestedLength("约一万字")).toBe(10000);
+		expect(requestedLength("五十字左右")).toBeUndefined();
 		expect(requestedLength(OUTLINE)).toBe(1500);
 	});
 
