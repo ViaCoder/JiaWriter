@@ -47,11 +47,13 @@ describe("pictureHash", () => {
 		expect(pictureHash("a")).toBe(pictureHash("a"));
 		expect(pictureHash("a")).not.toBe(pictureHash("b"));
 	});
-	it("hashes a 1 MB picture in under 20 ms", () => {
+	it("hashes a 1 MB picture in well under a second", () => {
+		// Guards against a hash that is slow or worse than linear, not the speed of one machine: a shared CI runner
+		// (macos-15-intel, 2026-11-17) took 70 ms where a desktop takes 5, so the bound is generous.
 		const data = "x".repeat(1024 * 1024);
 		const started = performance.now();
 		pictureHash(data);
-		expect(performance.now() - started).toBeLessThan(20);
+		expect(performance.now() - started).toBeLessThan(500);
 	});
 });
 
