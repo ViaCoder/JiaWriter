@@ -19,8 +19,9 @@ export interface WelcomeContent {
 	subtitle: string;
 	// The rows below, each a label and a value.
 	rows: { label: string; value: string }[];
-	// A closing line of hints, already coloured.
-	hints: string;
+	// A closing line of hints, already coloured; none for a plain box (the user, 2026-11-17: the first screen simple,
+	// with no help inside it).
+	hints?: string;
 }
 
 /** Widest the box grows; narrower terminals get the width they have. */
@@ -62,8 +63,7 @@ export class WelcomeBox implements Component {
 			...c.rows.map((r) =>
 				line(`${theme.fg("muted", r.label)}${" ".repeat(labelWidth - visibleWidth(r.label))}  ${r.value}`),
 			),
-			line(""),
-			line(c.hints),
+			...(c.hints ? [line(""), line(c.hints)] : []),
 			`${pad}${edge(`╰${"─".repeat(outer - 2)}╯`)}`,
 		];
 		return lines;

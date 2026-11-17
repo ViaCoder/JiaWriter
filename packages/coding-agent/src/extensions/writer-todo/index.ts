@@ -107,6 +107,9 @@ export default function writerTodoExtension(pi: ExtensionAPI): void {
 			];
 			return new Text(lines.join("\n"), 0, 0);
 		},
+		// The result says to the model what the list above already shows the user: no row for it (2026-11-17: every
+		// update drew the list and then "任务清单已更新：完成 0/3，进行中：…" under it).
+		renderResult: () => ({ render: () => [], invalidate: () => undefined }),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			todos = cleanTodos(params.todos);
 			show(ctx);

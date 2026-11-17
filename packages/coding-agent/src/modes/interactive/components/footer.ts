@@ -256,6 +256,9 @@ export class FooterComponent implements Component {
 		if (areExperimentalFeaturesEnabled()) {
 			statsParts.push(`${theme.fg("dim", "•")} ${theme.bold(theme.fg("warning", "xp"))}`);
 		}
+		// Where the help is, as Claude Code's footer says "? for shortcuts" (2026-11-17: the first screen carries no
+		// help lines any more).
+		statsParts.push(`${theme.fg("dim", "·")} ? ${uiText("shortcuts")}`);
 
 		let statsLeft = statsParts.join(" ");
 
@@ -326,8 +329,13 @@ export class FooterComponent implements Component {
 		const remainder = statsLine.slice(statsLeft.length); // padding + rightSide
 		const dimRemainder = theme.fg("dim", remainder);
 
-		const pwdLine = truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "..."));
-		const lines = [pwdLine, dimStatsLeft + dimRemainder];
+		// JiaWriter: the folder on the stats line's right, after the model, when it fits; a line of its own only when
+		// it does not (2026-11-17: a lone "~" above the status line read as a stray character).
+		const folded = `${rightSide} ${theme.fg("dim", "•")} ${pwd}`;
+		const fits = statsLeftWidth + minPadding + visibleWidth(folded) <= width;
+		const lines = fits
+			? [dimStatsLeft + theme.fg("dim", " ".repeat(width - statsLeftWidth - visibleWidth(folded)) + folded)]
+			: [truncateToWidth(theme.fg("dim", pwd), width, theme.fg("dim", "...")), dimStatsLeft + dimRemainder];
 
 		// Add extension statuses on a single line, sorted by key alphabetically
 		const extensionStatuses = this.footerData.getExtensionStatuses();

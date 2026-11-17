@@ -140,6 +140,9 @@ export function formatToolDuration(ms: number): string {
 	});
 }
 
+/** A call done within this many milliseconds shows no time. */
+const QUICK_TOOL_MS = 2000;
+
 /** Renderer state of {@link startToolTimer} and {@link toolTimerText}, kept in `ToolRenderContext.state`. */
 interface ToolTimerState {
 	startedAt?: number;
@@ -174,11 +177,15 @@ export function toolTimerText(context: ToolRenderContext<ToolTimerState>, isPart
 		}
 	}
 	// A final result's recorded duration wins: it is monotonic and survives reloads. The renderer's own clock is the
-	// fallback for live progress and for results stored without one.
+	// fallback for live progress and for results stored without one. JiaWriter: a quick call shows no time at all
+	// (2026-11-17: every ls and grep row ended in 用时 0.0 秒).
 	if (!isPartial && context.durationMs !== undefined)
-		return uiText("Took {time}", { time: formatToolDuration(context.durationMs) });
+		return context.durationMs < QUICK_TOOL_MS
+			? undefined
+			: uiText("Took {time}", { time: formatToolDuration(context.durationMs) });
 	if (state.startedAt === undefined) return undefined;
 	const endTime = state.endedAt ?? Date.now();
+	if (!isPartial && endTime - state.startedAt < QUICK_TOOL_MS) return undefined;
 	return uiText(isPartial ? "Elapsed {time}" : "Took {time}", { time: formatToolDuration(endTime - state.startedAt) });
 }
 

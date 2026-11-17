@@ -172,14 +172,14 @@ export function formatWaConfig(
 	platform: NodeJS.Platform,
 	lang?: WriterLang,
 ): string[] {
-	// Aligned rows of a group.
-	const block = (rows: ConfigRow[]) => {
-		const nameW = Math.max(...rows.map((r) => r.name.length));
-		const valueW = Math.max(...rows.map((r) => width(r.value)));
-		return rows.map(
-			(r) => `  ${r.name.padEnd(nameW)}  ${r.value}${" ".repeat(valueW - width(r.value))}  ${r.source}`,
-		);
-	};
+	// The groups share their column widths, so the page reads as one table (2026-11-17: the two groups' columns
+	// sat at different offsets).
+	const model = modelRows(env, state, lang);
+	const other = otherRows(env, lang);
+	const nameW = Math.max(...[...model, ...other].map((r) => r.name.length));
+	const valueW = Math.max(...[...model, ...other].map((r) => width(r.value)));
+	const block = (rows: ConfigRow[]) =>
+		rows.map((r) => `  ${r.name.padEnd(nameW)}  ${r.value}${" ".repeat(valueW - width(r.value))}  ${r.source}`);
 	// The configuration problem, when there is one.
 	const problem =
 		state.kind === "error" ? [t("jw.problem", {}, lang), ...state.message.split("\n").map((l) => `  ${l}`), ""] : [];
@@ -188,10 +188,10 @@ export function formatWaConfig(
 		"",
 		...problem,
 		t("jw.groupModel", {}, lang),
-		...block(modelRows(env, state, lang)),
+		...block(model),
 		"",
 		t("jw.groupOther", {}, lang),
-		...block(otherRows(env, lang)),
+		...block(other),
 		"",
 		t(platform === "win32" ? "jw.groupSetupWin" : "jw.groupSetup", {}, lang),
 		...setupCommands(env, platform, lang).map((l) => `  ${l}`),

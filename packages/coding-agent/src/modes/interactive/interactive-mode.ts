@@ -278,6 +278,12 @@ class ExpandableText extends ThemedText implements Expandable {
 class BuiltInHeader extends ExpandableText {
 	onLogoClick: ((column: number, row: number) => void) | undefined;
 
+	// JiaWriter: with nothing to say (the plain first screen), the header takes no line at all.
+	override render(width: number): string[] {
+		const lines = super.render(width);
+		return lines.every((l) => visibleWidth(l) === 0) ? [] : lines;
+	}
+
 	handleMouse(event: TuiMouseEvent): TuiMouseEventResult | undefined {
 		if (event.type !== "click" || event.y > 1 || event.x < 1 || event.x > 4 || !this.onLogoClick) return undefined;
 		this.onLogoClick(event.screenX - event.x + 1, event.screenY - event.y);
@@ -511,6 +517,10 @@ export class InteractiveMode {
 	private workingVisible = true;
 	private workingIndicatorOptions: WorkingIndicatorOptions | undefined = undefined;
 	private readonly defaultWorkingMessage = "Working";
+	/** The working line with its interrupt key, as Claude Code shows "esc to interrupt" (2026-11-17). */
+	private workingLabel(): string {
+		return uiText(`${this.defaultWorkingMessage} ({key} to interrupt)`, { key: keyText("app.interrupt") });
+	}
 	// JiaWriter: in the interface language.
 	private readonly defaultHiddenThinkingLabel = uiText("Thinking...");
 	private hiddenThinkingLabel = this.defaultHiddenThinkingLabel;
@@ -1118,14 +1128,6 @@ export class InteractiveMode {
 					"dim",
 					uiText("Pi can explain its own features and look up its docs. Ask it how to use or extend Pi."),
 				);
-			// JiaWriter: the commands a new user needs, for the welcome box.
-			const welcomeHints = () =>
-				[
-					`${theme.fg("accent", "/write")} ${uiText("write a document")}`,
-					`${theme.fg("accent", "/research")} ${uiText("look into a question")}`,
-					`${theme.fg("accent", "/")} ${uiText("all commands")}`,
-					`${theme.fg("accent", "?")} ${uiText("shortcuts")}`,
-				].join(theme.fg("dim", "  ·  "));
 			// JiaWriter: the model and the folder, as Claude Code's welcome box shows them (2026-11-14: the screen showed
 			// neither until the first reply's footer).
 			const context = () =>
@@ -1136,12 +1138,14 @@ export class InteractiveMode {
 						cwd: formatCwdForFooter(process.cwd(), os.homedir()),
 					}),
 				);
-			// JiaWriter (2026-11-15): a release package opens with a welcome box (name, model, folder, the first commands)
-			// instead of the pixel logo; the key hints stay below it, expanded with Ctrl+O. The source tree keeps pi's.
+			// JiaWriter (2026-11-15): a release package opens with a welcome box (name, model, folder) instead of the
+			// pixel logo. The first screen carries no help lines (the user, 2026-11-17: simple, no help inside); the key
+			// hints appear with Ctrl+O, and the footer says where the shortcuts are. The source tree keeps pi's.
 			const header = jia
 				? new BuiltInHeader(
-						() => `${compactInstructions()}\n${compactOnboarding()}`,
-						() => `${expandedInstructions()}\n\n${onboarding()}`,
+						() => "",
+						() =>
+							`${compactInstructions()}\n${compactOnboarding()}\n\n${expandedInstructions()}\n\n${onboarding()}`,
 						this.getStartupExpansionState(),
 						1,
 						0,
@@ -1169,7 +1173,6 @@ export class InteractiveMode {
 							{ label: uiText("Model"), value: this.session.model?.id ?? "-" },
 							{ label: uiText("Folder"), value: formatCwdForFooter(process.cwd(), os.homedir()) },
 						],
-						hints: welcomeHints(),
 					})),
 				);
 				this.headerContainer.addChild(new Spacer(1));
@@ -2470,7 +2473,7 @@ export class InteractiveMode {
 		this.showStatusIndicator(
 			new WorkingStatusIndicator(
 				this.ui,
-				this.workingMessage ?? uiText(this.defaultWorkingMessage),
+				this.workingMessage ?? this.workingLabel(),
 				this.workingIndicatorOptions,
 				colorFn,
 			),
@@ -2759,7 +2762,7 @@ export class InteractiveMode {
 			setWorkingMessage: (message) => {
 				this.workingMessage = message;
 				if (this.activeStatusIndicator?.kind === "working") {
-					this.activeStatusIndicator.setMessage(message ?? uiText(this.defaultWorkingMessage));
+					this.activeStatusIndicator.setMessage(message ?? this.workingLabel());
 				}
 			},
 			setWorkingVisible: (visible) => this.setWorkingVisible(visible),
@@ -3760,7 +3763,7 @@ export class InteractiveMode {
 				}
 				// JiaWriter: back to the plain working line once no tool runs.
 				if (this.pendingTools.size === 0 && !this.workingMessage && this.activeStatusIndicator?.kind === "working")
-					this.activeStatusIndicator.setMessage(uiText(this.defaultWorkingMessage));
+					this.activeStatusIndicator.setMessage(this.workingLabel());
 				break;
 			}
 

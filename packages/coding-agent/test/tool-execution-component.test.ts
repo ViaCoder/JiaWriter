@@ -266,7 +266,9 @@ describe("ToolExecutionComponent parity", () => {
 		component.invalidate();
 		expect(stripAnsi(component.render(120).join("\n"))).toBe(completed);
 		expect(running).toContain(`Elapsed ${formatted}`);
-		expect(completed).toContain(`Took ${formatted}`);
+		// JiaWriter: a call done within two seconds shows no time once it is final.
+		if (ms < 2_000) expect(completed).not.toContain("Took");
+		else expect(completed).toContain(`Took ${formatted}`);
 	});
 
 	// #10549
