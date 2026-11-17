@@ -27,6 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ANSI = re.compile(r"\x1b\[[0-9;?<>=]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1b[@-Z\\-_]")
 # Ctrl+C as a terminal sends it in raw mode.
 CTRL_C = b"\x03"
+ESC = b"\x1b"
 # Set when the client drops the slow stream.
 dropped = threading.Event()
 
@@ -132,8 +133,19 @@ def main():
         os.write(fd, CTRL_C)
         screen = read_until(fd, "再按一次", 3)
         check("第一次清空输入并提示退出方法", "再按一次" in screen)
-        read_until(fd, "", 2.3)
+        # The hint stands on the footer's first line and goes when the window ends: the folder line comes back.
+        screen = read_until(fd, "文件夹", 2.5)
+        check("到期撤回提示，底栏恢复文件夹行", "文件夹" in screen)
         check("超过 2 秒不算第二次", not exited(pid, fd, 0.2))
+        # Esc twice clears a draft: the first press shows the hint, the second clears and takes it back.
+        os.write(fd, "再写一段".encode("utf-8"))
+        read_until(fd, "", 0.5)
+        os.write(fd, ESC)
+        screen = read_until(fd, "清空输入", 3)
+        check("有草稿时第一次 Esc 提示再按一次清空", "清空输入" in screen)
+        os.write(fd, ESC)
+        screen = read_until(fd, "文件夹", 3)
+        check("第二次 Esc 清空并撤回提示", "文件夹" in screen and not exited(pid, fd, 0.2))
         # Empty input: a hint, then out, with a person's pause in between.
         os.write(fd, CTRL_C)
         # The same hint may already stand on the screen, so nothing need be redrawn.

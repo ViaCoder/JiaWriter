@@ -477,8 +477,11 @@ export interface InteractiveModeOptions {
 	terminal?: Terminal;
 }
 
-/** How long a second Ctrl+C counts as the second press (ms); long enough to read the hint first. */
-const CTRL_C_EXIT_WINDOW_MS = 2000;
+/**
+ * JiaWriter: how long the second press of a two-press key (Ctrl+C to exit, Esc to clear or rewind) counts (ms); long
+ * enough to read the hint, which is taken back when the window ends.
+ */
+const DOUBLE_PRESS_WINDOW_MS = 2000;
 
 export class InteractiveMode {
 	private runtimeHost: AgentSessionRuntime;
@@ -521,8 +524,8 @@ export class InteractiveMode {
 	private workingLabel(): string {
 		return uiText(`${this.defaultWorkingMessage} ({key} to interrupt)`, { key: keyText("app.interrupt") });
 	}
-	private lastSigintTime = 0;
-	private lastEscapeTime = 0;
+	/** The first press of a two-press key: what it was for, and the timer that takes its hint back. */
+	private doublePress: { action: string; timer: ReturnType<typeof setTimeout> } | undefined;
 	private changelogMarkdown: string | undefined = undefined;
 	private startupNoticesShown = false;
 	private anthropicSubscriptionWarningShown = false;
@@ -3148,28 +3151,31 @@ export class InteractiveMode {
 				this.updateEditorBorderColor();
 			} else if (this.editor.getText().trim()) {
 				// JiaWriter, as Claude Code: Esc twice clears the input and keeps it in the history for Up.
-				const now = Date.now();
-				if (now - this.lastEscapeTime < 500) {
+				if (
+					this.secondPress(
+						"clear",
+						uiText("Press {key} again to clear the input", { key: keyText("app.interrupt") }),
+					)
+				) {
 					this.editor.addToHistory?.(this.editor.getText());
 					this.editor.setText("");
-					this.lastEscapeTime = 0;
-				} else {
-					this.lastEscapeTime = now;
 				}
 			} else if (!this.editor.getText().trim()) {
 				// Double-escape with empty editor triggers /tree, /fork, or nothing based on setting
 				const action = this.settingsManager.getDoubleEscapeAction();
 				if (action !== "none") {
-					const now = Date.now();
-					if (now - this.lastEscapeTime < 500) {
+					const hint = uiText(
+						action === "tree"
+							? "Press {key} again to open the session tree"
+							: "Press {key} again to pick a message to rewind to",
+						{ key: keyText("app.interrupt") },
+					);
+					if (this.secondPress(action, hint)) {
 						if (action === "tree") {
 							this.showTreeSelector();
 						} else {
 							this.showUserMessageSelector();
 						}
-						this.lastEscapeTime = 0;
-					} else {
-						this.lastEscapeTime = now;
 					}
 				}
 			}
@@ -4404,17 +4410,44 @@ export class InteractiveMode {
 			// The escape handler of the moment knows what is running; a press right after must not exit.
 			this.defaultEditor.onEscape?.();
 			if (session.isCompacting) session.abortCompaction();
-			this.lastSigintTime = 0;
+			this.disarmDoublePress();
 			return;
 		}
-		const now = Date.now();
-		if (now - this.lastSigintTime < CTRL_C_EXIT_WINDOW_MS) {
+		if (this.secondPress("exit", uiText("Press {key} again to exit", { key: keyText("app.clear") }))) {
 			void this.shutdown();
 			return;
 		}
 		this.clearEditor();
-		this.lastSigintTime = now;
-		this.showStatus(uiText("Press {key} again to exit", { key: keyText("app.clear") }));
+	}
+
+	/**
+	 * Whether this press is the second press of `action` inside the window. A first press shows `hint` on the footer
+	 * (as Claude Code shows "Esc again to clear" under the input) and arms the window; when it ends, or when another
+	 * two-press key is pressed, the hint is taken back, so it never outlives the press it describes.
+	 */
+	private secondPress(action: string, hint: string): boolean {
+		if (this.doublePress?.action === action) {
+			this.disarmDoublePress();
+			return true;
+		}
+		this.disarmDoublePress();
+		this.footer.setNotice(hint);
+		this.footer.invalidate();
+		this.ui.requestRender();
+		const timer = setTimeout(() => this.disarmDoublePress(), DOUBLE_PRESS_WINDOW_MS);
+		this.doublePress = { action, timer };
+		return false;
+	}
+
+	/** Ends the window of a first press and takes its hint off the footer. */
+	private disarmDoublePress(): void {
+		const armed = this.doublePress;
+		if (!armed) return;
+		clearTimeout(armed.timer);
+		this.doublePress = undefined;
+		this.footer.setNotice();
+		this.footer.invalidate();
+		this.ui.requestRender();
 	}
 
 	private handleCtrlD(): void {

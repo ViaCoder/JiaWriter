@@ -76,6 +76,9 @@ export class FooterComponent implements Component {
 	private session: AgentSession;
 	private footerData: ReadonlyFooterDataProvider;
 	private sessionStats?: SessionStats;
+	// JiaWriter: a short notice ("press again to exit") shown in place of the folder line while it lasts, as Claude
+	// Code shows such hints under the input and takes them back after a moment.
+	private notice: string | undefined;
 
 	constructor(session: AgentSession, footerData: ReadonlyFooterDataProvider) {
 		this.session = session;
@@ -92,6 +95,11 @@ export class FooterComponent implements Component {
 
 	setAutoCompactEnabled(enabled: boolean): void {
 		this.autoCompactEnabled = enabled;
+	}
+
+	/** Shows a notice on the first footer line until it is cleared with no text. */
+	setNotice(text?: string): void {
+		this.notice = text;
 	}
 
 	/**
@@ -331,8 +339,10 @@ export class FooterComponent implements Component {
 
 		// JiaWriter: the folder line says what it is (2026-11-17: a lone "~" above the status line read as a stray
 		// character). The footer keeps its two lines: with one, the first mouse selection of a session copied nothing.
-		const pwdLine = truncateToWidth(theme.fg("dim", `${uiText("Folder")} ${pwd}`), width, theme.fg("dim", "..."));
-		const lines = [pwdLine, dimStatsLeft + dimRemainder];
+		const firstLine = this.notice
+			? truncateToWidth(theme.fg("warning", this.notice), width, theme.fg("dim", "..."))
+			: truncateToWidth(theme.fg("dim", `${uiText("Folder")} ${pwd}`), width, theme.fg("dim", "..."));
+		const lines = [firstLine, dimStatsLeft + dimRemainder];
 
 		// Add extension statuses on a single line, sorted by key alphabetically
 		const extensionStatuses = this.footerData.getExtensionStatuses();

@@ -136,6 +136,22 @@ describe("FooterComponent width handling", () => {
 		}
 	});
 
+	it("shows a notice in place of the folder line until it is cleared", () => {
+		// JiaWriter: a "press again" hint takes the first line, as Claude Code shows hints under the input.
+		const session = createSession({ sessionName: "" });
+		const footer = new FooterComponent(session, createFooterData(1));
+		expect(stripAnsi(footer.render(80)[0])).toContain("/tmp/project");
+
+		footer.setNotice("再按一次 Ctrl+C 退出");
+		const lines = footer.render(80);
+		expect(lines).toHaveLength(2);
+		expect(stripAnsi(lines[0]).trim()).toBe("再按一次 Ctrl+C 退出");
+		expect(stripAnsi(lines[0])).not.toContain("/tmp/project");
+
+		footer.setNotice();
+		expect(stripAnsi(footer.render(80)[0])).toContain("/tmp/project");
+	});
+
 	it("keeps stats line within width for wide model and provider names", () => {
 		const width = 60;
 		const session = createSession({
