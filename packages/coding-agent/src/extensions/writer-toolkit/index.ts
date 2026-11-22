@@ -9,6 +9,8 @@
 // Schema helpers.
 import { StringEnum } from "@earendil-works/pi-ai/utils/typebox-helpers";
 // Schemas.
+// The one line drawn for the tool.
+import { Text } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
 // Extension API types.
 import type { ExtensionAPI, ExtensionContext } from "../../core/extensions/types.ts";
@@ -43,11 +45,11 @@ export default function writerToolkitExtension(pi: ExtensionAPI): void {
 		given.clear();
 	});
 
-	/** Open one and tell the user, when it was closed; the text for the model. */
-	function open(id: ToolkitId, ctx: Pick<ExtensionContext, "hasUI" | "ui">): string {
+	/** Open one and, when asked, tell the user it was opened; the text for the model. */
+	function open(id: ToolkitId, ctx: Pick<ExtensionContext, "hasUI" | "ui">, tell = true): string {
 		const out = openToolkit(pi, id, { hasUI: ctx.hasUI, skills: offeredSkills() });
 		given.add(id);
-		if (out.opened && ctx.hasUI) ctx.ui.notify(t("toolkit.opened", { name: toolkitName(id) }), "info");
+		if (tell && out.opened && ctx.hasUI) ctx.ui.notify(t("toolkit.opened", { name: toolkitName(id) }), "info");
 		return out.text;
 	}
 
@@ -59,6 +61,12 @@ export default function writerToolkitExtension(pi: ExtensionAPI): void {
 			"Opens a toolkit, whose tools and rules then join this conversation. Toolkits: writing (documents, 公文, reports, articles: topic, materials, outline, sections, checks, export), research (web search and pages, with sources recorded), office (import or export Word, Excel, PowerPoint, PDF), browser (web pages in the user's Chrome) and computer (desktop applications). Open one before the first step that needs it; it stays open",
 		parameters: Type.Object({ name: StringEnum(TOOLKIT_IDS) }),
 		annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+		// One Chinese line for the user; the result is the model's (English rules and the tool list), not shown
+		// (2026-11-22: the chat showed "Toolkit browser is open; these tools are available now: …" and its rules, then
+		// the notice "已打开浏览器工具。" again).
+		renderCall: (args, theme) =>
+			new Text(theme.fg("dim", t("toolkit.opened", { name: toolkitName(args.name as ToolkitId) })), 0, 0),
+		renderResult: () => ({ render: () => [], invalidate: () => undefined }),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			// Open already: one line, not the text again (it is in the conversation).
 			if (openToolkits(pi.getActiveTools()).includes(params.name))
@@ -67,7 +75,7 @@ export default function writerToolkitExtension(pi: ExtensionAPI): void {
 					details: { toolkit: params.name, opened: false },
 				};
 			return {
-				content: [{ type: "text", text: open(params.name, ctx) }],
+				content: [{ type: "text", text: open(params.name, ctx, false) }],
 				details: { toolkit: params.name, opened: true },
 			};
 		},

@@ -150,6 +150,7 @@ import {
 	cacheStatusText,
 	compactionErrorText,
 	MAC_OPTION_NOTE,
+	managedToolText,
 	uiText,
 	workingText,
 } from "../../writer/ui-text.ts";
@@ -3934,7 +3935,9 @@ export class InteractiveMode {
 			this.chatContainer.addChild(new Spacer(1));
 			this.managedToolStatusStarted = true;
 		}
-		const message = status.type === "warning" ? `Warning: ${status.message}` : status.message;
+		// JiaWriter: in the interface language, like every other warning.
+		const text = managedToolText(status.message);
+		const message = status.type === "warning" ? uiText("Warning: {message}", { message: text }) : text;
 		const color = status.type === "warning" ? "warning" : "dim";
 		this.chatContainer.addChild(new ThemedText(() => theme.fg(color, message), 1, 0));
 		this.lastStatusSpacer = undefined;

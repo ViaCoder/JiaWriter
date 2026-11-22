@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Functions under test.
 import { currentLang, savedLang, setUiLang, t, uiSettingsPath } from "../../src/writer/i18n/index.ts";
-import { abortedText, cacheStatusText, UI_ZH, uiText } from "../../src/writer/ui-text.ts";
+import { abortedText, cacheStatusText, managedToolText, UI_ZH, uiText } from "../../src/writer/ui-text.ts";
 
 // Agent folder of each test.
 let agent = "";
@@ -99,5 +99,25 @@ describe("cacheStatusText", () => {
 		expect(cacheStatusText("Warming cache (x -> warm)")).toBe("正在预热（x -> warm）");
 		vi.stubEnv("JW_LANG", "en");
 		expect(cacheStatusText("Inactive (cache lifetime unavailable)")).toBe("Inactive (cache lifetime unavailable)");
+	});
+});
+
+// 2026-11-22: a fresh install without fd showed the managed tools' warning in English.
+describe("managedToolText", () => {
+	it("says the fd and rg status lines in Chinese, keeping names, paths and reasons, and leaves English alone", () => {
+		expect(managedToolText("fd not found. Offline mode enabled, skipping download.")).toBe(
+			"没有找到 fd；离线模式下不自动下载。",
+		);
+		expect(managedToolText("rg not found. Install with: pkg install ripgrep")).toBe(
+			"没有找到 rg，请用 pkg install ripgrep 安装。",
+		);
+		expect(managedToolText("fd not found. Downloading...")).toBe("没有找到 fd，正在下载…");
+		expect(managedToolText("rg installed to /home/u/.jiawriter/bin/rg")).toBe(
+			"rg 已安装到 /home/u/.jiawriter/bin/rg",
+		);
+		expect(managedToolText("Failed to download fd: 404")).toBe("fd 下载失败：404");
+		expect(managedToolText("something else")).toBe("something else");
+		vi.stubEnv("JW_LANG", "en");
+		expect(managedToolText("fd not found. Downloading...")).toBe("fd not found. Downloading...");
 	});
 });

@@ -584,6 +584,20 @@ export function uiText(text: string, vars: Readonly<Record<string, string>> = {}
 	return brandText(chosen.replace(/\{(\w+)\}/g, (whole, name: string) => vars[name] ?? whole));
 }
 
+/**
+ * The managed tools' status lines (fd, rg) in the interface language (2026-11-22: a fresh install without fd showed
+ * "Warning: fd not found. Offline mode enabled, skipping download." in English).
+ */
+export function managedToolText(message: string): string {
+	if (currentLang() !== "zh") return message;
+	return message
+		.replace(/^(\S+) not found\. Offline mode enabled, skipping download\.$/, "没有找到 $1；离线模式下不自动下载。")
+		.replace(/^(\S+) not found\. Install with: (.+)$/, "没有找到 $1，请用 $2 安装。")
+		.replace(/^(\S+) not found\. Downloading\.\.\.$/, "没有找到 $1，正在下载…")
+		.replace(/^(\S+) installed to (.+)$/, "$1 已安装到 $2")
+		.replace(/^Failed to download (\S+): (.+)$/, "$1 下载失败：$2");
+}
+
 /** The line of an interrupted reply, with the retries before it (2026-11-09: the screen showed "Operation aborted"). */
 export function abortedText(retryAttempt: number): string {
 	if (retryAttempt <= 0) return uiText("Operation aborted");

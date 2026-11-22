@@ -478,6 +478,13 @@ describe("foregroundRefused", () => {
 		);
 		expect(foregroundRefused(reply({ refusal: { code: "foreground_unavailable" } }))).toBe(true);
 		expect(foregroundRefused(reply({ code: "foreground_unavailable" }, { failed: true }))).toBe(true);
+		// A GTK4 control without on-screen bounds (2026-11-22): the accessibility action in the background still works.
+		expect(
+			foregroundRefused(
+				reply({}, { failed: true, text: "click: element [2] (pid 9) element_bounds_unavailable: no bounds" }),
+			),
+		).toBe(true);
+		expect(foregroundRefused(reply({ code: "element_bounds_unavailable" }, { failed: true }))).toBe(true);
 		expect(foregroundRefused(reply({}, { failed: true, text: "element not found" }))).toBe(false);
 		expect(foregroundRefused(reply({ effect: "confirmed" }))).toBe(false);
 	});

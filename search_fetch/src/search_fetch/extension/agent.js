@@ -102,7 +102,9 @@ async function allFrames(page) {
   const out = [];
   for (const sessionId of ["", ...page.sessions.keys()]) {
     const send = senderFor(page.tabId, sessionId);
-    const target = sessionId ? page.sessions.get(sessionId).targetId : "";
+    // A frame's session can go between the listing and here (Google's result pages add and drop frames).
+    const target = sessionId ? page.sessions.get(sessionId)?.targetId : "";
+    if (target === undefined) continue;
     try {
       const { frameTree } = await send("Page.getFrameTree");
       for (const frameId of localFrames(frameTree)) out.push({ target, frameId, send });
@@ -203,7 +205,11 @@ async function frameOffset(page, target) {
     const { model } = await parent("DOM.getBoxModel", { backendNodeId });
     at.x += model.content[0];
     at.y += model.content[1];
-    current = entry.parent ? page.sessions.get(entry.parent).targetId : "";
+    // An owner frame that went away leaves the offset unknown: say so, rather than fail on its missing session
+    // (2026-11-22: a click on a Google result page failed with "Cannot read properties of undefined (reading 'targetId')").
+    const owner = entry.parent ? page.sessions.get(entry.parent) : null;
+    if (entry.parent && !owner) throw new Error("the frame went away; read the page again");
+    current = owner ? owner.targetId : "";
   }
   return at;
 }

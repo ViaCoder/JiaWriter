@@ -190,11 +190,18 @@ export function typingPieces(text: string): string[] {
 	);
 }
 
-/** True when the driver could not bring the window forward (no window manager to activate it, for one). */
+/**
+ * Driver answers that only the foreground way failed: the window could not come forward (no window manager to
+ * activate it), or the control has no on-screen bounds to aim at (GTK4 on Linux reports none; 2026-11-22). The
+ * background way, through the accessibility action, still works for both.
+ */
+const FOREGROUND_ONLY_FAILURES = ["foreground_unavailable", "element_bounds_unavailable"];
+
+/** True when the driver could do this only in the background. */
 export function foregroundRefused(reply: DriverReply): boolean {
 	const refusal = reply.structured.refusal as { code?: string } | undefined;
 	const code = String(refusal?.code ?? reply.structured.code ?? "");
-	return code === "foreground_unavailable" || /^foreground_unavailable\b/.test(reply.text);
+	return FOREGROUND_ONLY_FAILURES.some((f) => code === f || reply.text.startsWith(f) || reply.text.includes(`${f}:`));
 }
 
 /** An action as a person gives it, in the foreground; where the window cannot come forward, the same in the background. */

@@ -8,6 +8,7 @@ import type { ExtensionAPI, ToolDefinition } from "../../src/core/extensions/typ
 // The extension.
 import writerToolkitExtension, { TOOLKIT_MESSAGE } from "../../src/extensions/writer-toolkit/index.ts";
 // The stage-0 rules, which must name no toolkit tool.
+import { t } from "../../src/writer/i18n/index.ts";
 import { CORE_RULES } from "../../src/writer/prompts/core.ts";
 // The stages given so far.
 import { givenStages } from "../../src/writer/prompts/stages.ts";
@@ -189,6 +190,18 @@ describe("the extension", () => {
 		expect(r.content[0].text).toContain("Toolkit research is open");
 		expect(openToolkits(pi.active)).toEqual(["research"]);
 		expect((await run("research")).details.opened).toBe(false);
+	});
+
+	it("draws one Chinese line for its call and nothing for its result, and sends no notice of its own", async () => {
+		const { tools } = load();
+		const tool = tools.get("toolkit") as ToolDefinition;
+		notices.length = 0;
+		await tool.execute("c", { name: "browser" }, undefined, undefined, ctx as never);
+		expect(notices).toEqual([]);
+		const plain = { fg: (_c: string, text: string) => text } as never;
+		const call = tool.renderCall?.({ name: "browser" } as never, plain, {} as never);
+		expect(call?.render(80).join("")).toContain(t("toolkit.opened", { name: t("toolkit.name.browser") }));
+		expect(tool.renderResult?.({} as never, {} as never, plain, {} as never).render(80)).toEqual([]);
 	});
 
 	it("opens the toolkit a request plainly asks for, before the run, in a hidden message, once", () => {
