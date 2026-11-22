@@ -144,7 +144,7 @@ export default function writerComputerExtension(pi: ExtensionAPI): void {
 		label: "Computer",
 		description:
 			"Acts on desktop applications through their accessibility tree, in the background.\n\nUsage:\n" +
-			" - windows lists windows; read takes a pid and window and numbers the controls as [2]; ref is that number\n" +
+			" - windows lists windows; read takes a pid and window and numbers the controls as [2]; ref is that number, and click and type need it\n" +
 			" - Each result is JSON: `next` says who goes on; stop when it is user\n" +
 			" - look is a last resort and needs a reason",
 		// Declared only while the computer toolkit is open (writer/toolkit).

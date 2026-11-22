@@ -42,6 +42,9 @@ export interface ComputerState {
 	window?: number;
 	// The window's name, which is what permission is asked for.
 	app: string;
+	// Application names by process, from the last window list (2026-11-22: a GTK4 window has no frame title, and the
+	// question read "允许在「1010059」执行 type 吗？"; a process number also changes every run, so it made a poor scope).
+	names: Map<number, string>;
 	// The driver's name for the last read: the model says rows, the program makes them tokens.
 	snapshot: string;
 	// Row → role and name, from the last read.
@@ -60,6 +63,10 @@ export interface ComputerDeps extends LookDeps {
 
 /** The driver's word for a token from an older read. */
 const STALE_TOKEN = "stale_element_token";
+/** Driver refusals the model can mend itself (a wrong or missing row), unlike refusals that need the user. */
+const MODEL_REFUSALS = new Set(["invalid_element_token"]);
+/** Roles of controls that take text, as AT-SPI, UI Automation and Accessibility name them. */
+const TEXT_ROLE = /\b(text|entry|edit|editbar|document|combo box|search)\b/i;
 /** Most characters of a tree. */
 const MAX_TREE = 12_000;
 /** Most elements read. */
@@ -71,7 +78,7 @@ const TERMINALS =
 
 /** A session with nothing chosen. */
 export function newComputerState(): ComputerState {
-	return { app: "", snapshot: "", labels: new Map(), ocrTried: new Set() };
+	return { app: "", names: new Map(), snapshot: "", labels: new Map(), ocrTried: new Set() };
 }
 
 /** How far this application may be acted on. */
@@ -108,8 +115,9 @@ export function replyOutcome(action: string, reply: DriverReply): Outcome {
 	const { structured } = reply;
 	const route = String(structured.route ?? action);
 	const refusal = structured.refusal as { code?: string } | undefined;
-	// The driver refused rather than take over: that is for the user, never for a retry.
-	if (refusal?.code) return outcome("refused", route, "user", refusal.code);
+	// A wrong row is the model's to mend; any other refusal (the driver would not take over) is for the user.
+	if (refusal?.code)
+		return outcome("refused", route, MODEL_REFUSALS.has(refusal.code) ? "model" : "user", refusal.code);
 	if (reply.failed)
 		return outcome("failed", route, "model", String(structured.code ?? "error"), {
 			message: reply.text.slice(0, 300),
@@ -132,8 +140,10 @@ export async function readWindow(driver: DriverClient, deps: ComputerDeps, since
 	const tree = String(reply.structured.tree_markdown ?? reply.text);
 	state.snapshot = String(reply.structured.snapshot_id ?? state.snapshot);
 	if (!since) state.labels = treeLabels(tree);
-	const title = /frame = "([^"]*)"/.exec(tree)?.[1];
-	if (title) state.app = title;
+	// The window's own title, or the application row when there is no frame line (GTK4 on Linux); a name from the
+	// window list wins, since permission is asked per name and a title changes with the document.
+	const title = /frame = "([^"]*)"/.exec(tree)?.[1] ?? /^\s*- \[0\] (?:application|window) "([^"]*)"/m.exec(tree)?.[1];
+	if (title && !state.names.has(state.pid ?? -1)) state.app = title;
 	if (Number(reply.structured.element_count ?? 1) === 0) return outcome("unverifiable", "read", "user", "no-tree");
 	return outcome("confirmed", "read", "model", "", {
 		lines: tree.slice(0, MAX_TREE),
@@ -185,11 +195,15 @@ export async function typeInto(driver: DriverClient, deps: ComputerDeps, input: 
 	return settled(driver, deps, "type", await driver.call("type_text", { ...target, text: input.text ?? "" }));
 }
 
-/** List the windows there are, with nothing of the hundreds of background processes. */
-export async function listWindows(driver: DriverClient): Promise<Outcome> {
+/** List the windows there are, with nothing of the hundreds of background processes; remembers each process's name. */
+export async function listWindows(driver: DriverClient, state?: ComputerState): Promise<Outcome> {
 	const reply = await driver.call("list_windows", { on_screen_only: true });
 	if (reply.failed) return replyOutcome("windows", reply);
 	const windows = (reply.structured.windows ?? []) as Record<string, unknown>[];
+	for (const w of windows) {
+		const name = String(w.app_name ?? w.app ?? w.title ?? "");
+		if (typeof w.pid === "number" && name) state?.names.set(w.pid, name);
+	}
 	return outcome("confirmed", "windows", "model", "", {
 		windows: windows.map((w) => ({ pid: w.pid, window: w.window_id, app: w.app_name ?? w.app, title: w.title })),
 	});
@@ -200,6 +214,16 @@ export function tierRefusal(input: ComputerInput, tier: AppTier): string {
 	if (tier === "read" && ["click", "type", "key", "scroll"].includes(input.action)) return "browser-use-browser-tool";
 	if (tier === "click" && ["type", "key"].includes(input.action)) return "terminal-use-shell";
 	return "";
+}
+
+/**
+ * The row to type into when the model named none: the one control in the last read that takes text, when there is
+ * exactly one (2026-11-22: a real run typed with no row, the driver answered invalid_element_token and the model gave
+ * up). Undefined when there are none or several, or nothing was read.
+ */
+export function onlyTextRow(state: ComputerState): string | undefined {
+	const rows = [...state.labels].filter(([, l]) => TEXT_ROLE.test(l.role) && !isSecretField(l.role, "", l.name));
+	return rows.length === 1 ? rows[0][0] : undefined;
 }
 
 /** One action, whatever comes of it. */
@@ -215,6 +239,12 @@ export function normalizeComputerInput(input: ComputerInput): ComputerInput {
 
 export async function runComputer(given: ComputerInput, deps: ComputerDeps): Promise<Outcome> {
 	const input = normalizeComputerInput(given);
+	// Typing with no row goes to the only text control there is; any other click or typing needs its row.
+	if (input.action === "type" && !input.ref) input.ref = onlyTextRow(deps.state);
+	if ((input.action === "type" || input.action === "click") && !input.ref)
+		return outcome("refused", input.action, "model", "no-ref", {
+			message: 'Read the window, then pass ref: the number of the control in the read, e.g. ref "2" for [2].',
+		});
 	const { state, breaker } = deps;
 	const { action } = input;
 	const key = `${action}\n${state.pid}\n${input.ref ?? input.name ?? ""}`;
@@ -222,7 +252,9 @@ export async function runComputer(given: ComputerInput, deps: ComputerDeps): Pro
 		if (!breaker.allows(key)) return outcome("refused", action, "user", "tried-twice");
 		const driver = await deps.driver();
 		if (!driver) return outcome("failed", action, "user", "not-installed");
-		if (action === "windows") return await listWindows(driver);
+		if (action === "windows") return await listWindows(driver, state);
+		// Another process: its name from the window list, or nothing until a read finds one.
+		if (input.pid !== undefined && input.pid !== state.pid) state.app = state.names.get(input.pid) ?? "";
 		if (input.pid !== undefined) state.pid = input.pid;
 		if (input.window !== undefined) state.window = input.window;
 		// Every action but launch is on one known window: the driver is never asked without one.

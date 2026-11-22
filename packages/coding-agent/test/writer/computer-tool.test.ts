@@ -8,6 +8,7 @@ import {
 	needsValueRoute,
 	newComputerState,
 	normalizeComputerInput,
+	onlyTextRow,
 	readWindow,
 	replyOutcome,
 	runComputer,
@@ -358,5 +359,62 @@ describe("normalizeComputerInput", () => {
 			action: "type",
 			ref: "0",
 		});
+	});
+});
+
+// 2026-11-22, from a real run on a GTK4 editor: the question named a process number, and typing with no row failed.
+describe("names and rows", () => {
+	const GTK4 =
+		'- [0] application "New Document (Draft) - Text Editor" [actions=[]]\n    - [1] generic ""\n      - [2] text box "" [actions=[]]\n    - [3] button "Open" [actions=[click]]\n';
+	it("listWindows remembers each process's application name", async () => {
+		const { client, deps } = fake({
+			list_windows: reply({ windows: [{ pid: 5, window_id: 9, app_name: "gnome-text-editor", title: "Doc" }] }),
+		});
+		await listWindows(client, deps.state);
+		expect(deps.state.names.get(5)).toBe("gnome-text-editor");
+	});
+	it("asks permission by that name, not by the process number, and keeps it after a read", async () => {
+		const { deps, asked } = fake({
+			list_windows: reply({ windows: [{ pid: 5, window_id: 9, app_name: "gnome-text-editor", title: "Doc" }] }),
+			get_window_state: reply({ tree_markdown: GTK4, snapshot_id: "s1", element_count: 4 }),
+		});
+		await runComputer({ action: "windows" }, deps);
+		await runComputer({ action: "read", pid: 5, window: 9 }, deps);
+		await runComputer({ action: "type", text: "Hello" }, deps);
+		expect(asked.map((a) => (a as { title?: string }).title)).toEqual([
+			"read@gnome-text-editor",
+			"type@gnome-text-editor",
+		]);
+		expect(deps.state.app).toBe("gnome-text-editor");
+	});
+	it("readWindow takes the title from the application row when there is no frame line", async () => {
+		const { client, deps } = fake({
+			get_window_state: reply({ tree_markdown: GTK4, snapshot_id: "s1", element_count: 4 }),
+		});
+		await readWindow(client, deps);
+		expect(deps.state.app).toBe("New Document (Draft) - Text Editor");
+	});
+	it("onlyTextRow finds the one control that takes text, never a password field", async () => {
+		const { deps } = await reading();
+		expect(onlyTextRow(deps.state)).toBe("0");
+		deps.state.labels.set("7", { role: "entry", name: "备注" });
+		expect(onlyTextRow(deps.state)).toBeUndefined();
+		expect(onlyTextRow(newComputerState())).toBeUndefined();
+	});
+	it("types into the only text control when no row is named, and asks for a row otherwise", async () => {
+		const { deps, calls } = await reading();
+		await runComputer({ action: "type", text: "Hello" }, deps);
+		expect(calls[0]).toEqual(["set_value", expect.objectContaining({ element_token: "s1:0", value: "Hello" })]);
+		calls.length = 0;
+		deps.state.labels.set("7", { role: "entry", name: "备注" });
+		expect(await runComputer({ action: "type", text: "x" }, deps)).toMatchObject({ reason: "no-ref", next: "model" });
+		expect(await runComputer({ action: "click" }, deps)).toMatchObject({ reason: "no-ref", next: "model" });
+		expect(calls.length).toBe(0);
+	});
+	it("gives a wrong row back to the model, other refusals to the user", () => {
+		expect(replyOutcome("type", reply({ refusal: { code: "invalid_element_token" } }))).toMatchObject({
+			next: "model",
+		});
+		expect(replyOutcome("type", reply({ refusal: { code: "foreground_required" } }))).toMatchObject({ next: "user" });
 	});
 });
