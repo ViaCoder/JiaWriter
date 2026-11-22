@@ -1,7 +1,8 @@
 /**
  * The agent's `computer` tool: a fixed set of actions on one window, through the protocol in writer/protocol.ts. The
- * driver has many more tools; the model reaches only these. Delivery stays in the background: a refusal from the
- * driver goes to the user, and the program never takes the foreground on its own.
+ * driver has many more tools; the model reaches only these. It works any application as a person would (2026-11-22,
+ * the user: "allow it operator browser and other all software, and should make all operator like human"): the window
+ * comes to the front and gets real input, and typing goes word by word with a person's uneven pauses.
  */
 
 // Looking, as on a page.
@@ -18,9 +19,6 @@ export const COMPUTER_ACTIONS = ["windows", "launch", "read", "click", "type", "
 
 /** One of the actions. */
 export type ComputerAction = (typeof COMPUTER_ACTIONS)[number];
-
-/** How far an application may be acted on: browsers by the browser tool, terminals by shell tools. */
-export type AppTier = "full" | "read" | "click";
 
 /** The model's request. */
 export interface ComputerInput {
@@ -59,6 +57,8 @@ export interface ComputerDeps extends LookDeps {
 	breaker: Breaker;
 	state: ComputerState;
 	ask(action: string, scope: string): string;
+	// A pause between typed words (ms); tests pass one that does not wait.
+	pause?(ms: number): Promise<void>;
 }
 
 /** The driver's word for a token from an older read. */
@@ -71,20 +71,16 @@ const TEXT_ROLE = /\b(text|entry|edit|editbar|document|combo box|search)\b/i;
 const MAX_TREE = 12_000;
 /** Most elements read. */
 const MAX_ELEMENTS = 400;
-/** Applications driven through their own tools. */
-const BROWSERS = /chrome|chromium|firefox|safari|edge|brave|opera|arc\b|浏览器/i;
-const TERMINALS =
-	/terminal|iterm|konsole|alacritty|kitty|wezterm|powershell|cmd\.exe|visual studio code|\bvs ?code\b|jetbrains|intellij|pycharm|终端/i;
+/** Input as a person gives it: the window comes to the front and gets real clicks and keys. */
+const FOREGROUND = { delivery_mode: "foreground" } as const;
+/** A person's pause between typed words, low and high (ms). */
+const WORD_PAUSE_MS = [70, 190] as const;
+/** Beyond this many words, typing goes a few words at a time, so a long text does not take minutes. */
+const WORDS_ONE_BY_ONE = 80;
 
 /** A session with nothing chosen. */
 export function newComputerState(): ComputerState {
 	return { app: "", names: new Map(), snapshot: "", labels: new Map(), ocrTried: new Set() };
-}
-
-/** How far this application may be acted on. */
-export function appTier(name: string): AppTier {
-	if (BROWSERS.test(name)) return "read";
-	return TERMINALS.test(name) ? "click" : "full";
 }
 
 /** Row → role and name, from a tree's lines such as `- [2] push button "确定"`. */
@@ -184,15 +180,57 @@ export async function settled(
 	return result;
 }
 
-/** Put text into a field: by value when it can, since keys lose anything but ASCII. */
+/** The pieces typed one call each: words with their spaces, a few words together when the text is long. */
+export function typingPieces(text: string): string[] {
+	const words = text.match(/\S+\s*|\s+/g) ?? [];
+	if (words.length <= WORDS_ONE_BY_ONE) return words;
+	const size = Math.ceil(words.length / WORDS_ONE_BY_ONE);
+	return Array.from({ length: Math.ceil(words.length / size) }, (_, i) =>
+		words.slice(i * size, (i + 1) * size).join(""),
+	);
+}
+
+/** True when the driver could not bring the window forward (no window manager to activate it, for one). */
+export function foregroundRefused(reply: DriverReply): boolean {
+	const refusal = reply.structured.refusal as { code?: string } | undefined;
+	const code = String(refusal?.code ?? reply.structured.code ?? "");
+	return code === "foreground_unavailable" || /^foreground_unavailable\b/.test(reply.text);
+}
+
+/** An action as a person gives it, in the foreground; where the window cannot come forward, the same in the background. */
+export async function act(driver: DriverClient, tool: string, args: Record<string, unknown>): Promise<DriverReply> {
+	const reply = await driver.call(tool, { ...args, ...FOREGROUND });
+	return foregroundRefused(reply) ? driver.call(tool, args) : reply;
+}
+
+/** Real waiting. */
+const realPause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
+/**
+ * Put text into a field as a person types it: the first word goes into the named field (which takes the focus there),
+ * the rest as real keys into that focus, word by word with uneven pauses. Text that keys would cut short (anything
+ * beyond ASCII, such as Chinese, which a person enters through an input method) is written whole by value.
+ */
 export async function typeInto(driver: DriverClient, deps: ComputerDeps, input: ComputerInput): Promise<Outcome> {
 	const { state } = deps;
+	const text = input.text ?? "";
 	const target = { pid: state.pid, window_id: state.window, element_token: tokenOf(state, input.ref) };
-	const set = await driver.call("set_value", { ...target, value: input.text ?? "" });
-	if (set.structured.refusal) return replyOutcome("type", set);
-	if (!set.failed) return settled(driver, deps, "type", set);
-	if (needsValueRoute(input.text ?? "")) return outcome("refused", "type", "user", "cannot-type-text");
-	return settled(driver, deps, "type", await driver.call("type_text", { ...target, text: input.text ?? "" }));
+	if (needsValueRoute(text)) {
+		const set = await act(driver, "set_value", { ...target, value: text });
+		if (set.structured.refusal) return replyOutcome("type", set);
+		return set.failed ? outcome("refused", "type", "user", "cannot-type-text") : settled(driver, deps, "type", set);
+	}
+	const pieces = typingPieces(text);
+	let last = await act(driver, "type_text", { ...target, text: pieces[0] ?? "" });
+	if (last.failed || last.structured.refusal) return replyOutcome("type", last);
+	const pause = deps.pause ?? realPause;
+	for (const piece of pieces.slice(1)) {
+		const [low, high] = WORD_PAUSE_MS;
+		await pause(low + Math.random() * (high - low));
+		last = await act(driver, "type_text", { pid: state.pid, window_id: state.window, text: piece });
+		if (last.failed || last.structured.refusal) return replyOutcome("type", last);
+	}
+	return settled(driver, deps, "type", last);
 }
 
 /** List the windows there are, with nothing of the hundreds of background processes; remembers each process's name. */
@@ -207,13 +245,6 @@ export async function listWindows(driver: DriverClient, state?: ComputerState): 
 	return outcome("confirmed", "windows", "model", "", {
 		windows: windows.map((w) => ({ pid: w.pid, window: w.window_id, app: w.app_name ?? w.app, title: w.title })),
 	});
-}
-
-/** The permission an action needs, and whether the application's tier lets it through. */
-export function tierRefusal(input: ComputerInput, tier: AppTier): string {
-	if (tier === "read" && ["click", "type", "key", "scroll"].includes(input.action)) return "browser-use-browser-tool";
-	if (tier === "click" && ["type", "key"].includes(input.action)) return "terminal-use-shell";
-	return "";
 }
 
 /**
@@ -261,8 +292,6 @@ export async function runComputer(given: ComputerInput, deps: ComputerDeps): Pro
 		if (action !== "launch" && (state.pid === undefined || state.window === undefined))
 			return outcome("refused", action, "model", "no-window");
 		const scope = input.name ?? (state.app || String(state.pid));
-		const refused = tierRefusal(input, appTier(scope));
-		if (refused) return outcome("refused", action, "user", refused);
 		const label = state.labels.get(input.ref ?? "");
 		if (action === "type" && isSecretField(label?.role ?? "", "", label?.name ?? ""))
 			return outcome("refused", "type", "user", "password-field");
@@ -292,7 +321,7 @@ export async function runComputer(given: ComputerInput, deps: ComputerDeps): Pro
 						driver,
 						deps,
 						action,
-						await driver.call("click", { ...target, element_token: tokenOf(state, ref) }),
+						await act(driver, "click", { ...target, element_token: tokenOf(state, ref) }),
 					);
 		let result: Outcome;
 		if (action === "read") result = await readWindow(driver, deps);
@@ -307,13 +336,13 @@ export async function runComputer(given: ComputerInput, deps: ComputerDeps): Pro
 				result = row ? await onRow(row) : outcome("failed", action, "model", "stale-ref");
 			}
 		} else if (action === "key")
-			result = await settled(driver, deps, action, await driver.call("press_key", { ...target, key: input.key }));
+			result = await settled(driver, deps, action, await act(driver, "press_key", { ...target, key: input.key }));
 		else if (action === "scroll")
 			result = await settled(
 				driver,
 				deps,
 				action,
-				await driver.call("scroll", { ...target, direction: input.direction ?? "down", amount: input.amount ?? 3 }),
+				await act(driver, "scroll", { ...target, direction: input.direction ?? "down", amount: input.amount ?? 3 }),
 			);
 		else {
 			const shot = await driver.call("get_window_state", {

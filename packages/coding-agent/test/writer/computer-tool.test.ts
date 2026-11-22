@@ -2,8 +2,9 @@
 import { describe, expect, it } from "vitest";
 import type { DriverClient, DriverReply } from "../../src/writer/computer/client.ts";
 import {
-	appTier,
+	act,
 	type ComputerDeps,
+	foregroundRefused,
 	listWindows,
 	needsValueRoute,
 	newComputerState,
@@ -15,10 +16,10 @@ import {
 	SETTLE_READS,
 	sameRow,
 	settled,
-	tierRefusal,
 	tokenOf,
 	treeLabels,
 	typeInto,
+	typingPieces,
 } from "../../src/writer/computer/tool.ts";
 import type { PermissionRefusal } from "../../src/writer/permission.ts";
 import { createBreaker } from "../../src/writer/protocol.ts";
@@ -58,6 +59,7 @@ function fake(answers: Record<string, DriverReply | Error> = {}, refusal: Permis
 		breaker: createBreaker(),
 		state: newComputerState(),
 		ask: (action, scope) => `${action}@${scope}`,
+		pause: async () => undefined,
 		vision: {
 			edge: 1024,
 			ledger: createImageLedger({ turn: 1, session: 5 }),
@@ -76,20 +78,6 @@ async function reading(answers: Record<string, DriverReply | Error> = {}) {
 	made.asked.length = 0;
 	return made;
 }
-
-describe("appTier and tierRefusal", () => {
-	it("leaves browsers to the browser tool and terminals to the shell", () => {
-		expect(appTier("Google Chrome")).toBe("read");
-		expect(appTier("iTerm2")).toBe("click");
-		expect(appTier("Visual Studio Code")).toBe("click");
-		expect(appTier("计算器")).toBe("full");
-		expect(tierRefusal({ action: "click" }, "read")).toBe("browser-use-browser-tool");
-		expect(tierRefusal({ action: "read" }, "read")).toBe("");
-		expect(tierRefusal({ action: "type" }, "click")).toBe("terminal-use-shell");
-		expect(tierRefusal({ action: "click" }, "click")).toBe("");
-		expect(tierRefusal({ action: "type" }, "full")).toBe("");
-	});
-});
 
 describe("treeLabels", () => {
 	it("gives each row's token, role and name", () => {
@@ -217,10 +205,13 @@ describe("settled, when the change shows a moment later", () => {
 });
 
 describe("typeInto", () => {
-	it("writes by value first", async () => {
+	it("writes Chinese whole by value, in the foreground", async () => {
 		const { client, deps, calls } = fake();
 		await typeInto(client, deps, { action: "type", ref: "0", text: "虚拟桌面文字" });
-		expect(calls[0]).toEqual(["set_value", expect.objectContaining({ value: "虚拟桌面文字" })]);
+		expect(calls[0]).toEqual([
+			"set_value",
+			expect.objectContaining({ value: "虚拟桌面文字", delivery_mode: "foreground" }),
+		]);
 	});
 	it("never falls back to keys for text keys would cut short", async () => {
 		const { client, deps, calls } = fake({ set_value: reply({}, { failed: true }) });
@@ -230,10 +221,38 @@ describe("typeInto", () => {
 		});
 		expect(calls.some(([tool]) => tool === "type_text")).toBe(false);
 	});
-	it("falls back to keys for ASCII", async () => {
-		const { client, deps, calls } = fake({ set_value: reply({}, { failed: true }) });
-		await typeInto(client, deps, { action: "type", ref: "0", text: "abc" });
-		expect(calls.at(-1)?.[0]).toBe("type_text");
+	it("types ASCII as a person does: the first word into the field, the rest as keys into the focus", async () => {
+		const { client, deps, calls } = fake();
+		const pauses: number[] = [];
+		deps.pause = async (ms) => {
+			pauses.push(ms);
+		};
+		await typeInto(client, deps, { action: "type", ref: "0", text: "Hello big world" });
+		const typed = calls.filter(([tool]) => tool === "type_text").map(([, args]) => args);
+		expect(typed.map((a) => a.text)).toEqual(["Hello ", "big ", "world"]);
+		expect(typed[0].element_token).toBe(":0");
+		expect(typed.slice(1).every((a) => a.element_token === undefined)).toBe(true);
+		expect(typed.every((a) => a.delivery_mode === "foreground")).toBe(true);
+		expect(pauses.length).toBe(2);
+		expect(pauses.every((ms) => ms >= 70 && ms <= 190)).toBe(true);
+	});
+	it("stops at the first word the driver refuses", async () => {
+		const { client, deps } = fake({ type_text: reply({ refusal: { code: "foreground_unavailable" } }) });
+		expect(await typeInto(client, deps, { action: "type", ref: "0", text: "a b" })).toMatchObject({
+			effect: "refused",
+			next: "user",
+		});
+	});
+});
+
+describe("typingPieces", () => {
+	it("goes word by word, and a few words at a time for a long text, losing nothing", () => {
+		expect(typingPieces("Hello  big world")).toEqual(["Hello  ", "big ", "world"]);
+		const long = Array.from({ length: 200 }, (_, i) => `w${i}`).join(" ");
+		const pieces = typingPieces(long);
+		expect(pieces.length).toBeLessThanOrEqual(80);
+		expect(pieces.join("")).toBe(long);
+		expect(typingPieces("")).toEqual([]);
 	});
 });
 
@@ -278,13 +297,16 @@ describe("runComputer", () => {
 		});
 		expect(calls.length).toBe(0);
 	});
-	it("holds browsers to reading", async () => {
-		const { deps } = await reading();
-		deps.state.app = "Google Chrome";
-		expect(await runComputer({ action: "click", ref: "0" }, deps)).toMatchObject({
-			reason: "browser-use-browser-tool",
-			next: "user",
-		});
+	it("acts on browsers and terminals like any other application, in the foreground", async () => {
+		const { deps, calls } = await reading();
+		for (const app of ["Google Chrome", "gnome-terminal"]) {
+			deps.state.app = app;
+			await runComputer({ action: "click", ref: "0" }, deps);
+		}
+		expect(calls.filter(([tool]) => tool === "click").map(([, a]) => a.delivery_mode)).toEqual([
+			"foreground",
+			"foreground",
+		]);
 	});
 	it("runs key, scroll and launch through their tools", async () => {
 		const { deps, calls } = await reading();
@@ -292,7 +314,8 @@ describe("runComputer", () => {
 		await runComputer({ action: "scroll", direction: "up" }, deps);
 		await runComputer({ action: "launch", name: "gedit" }, deps);
 		expect(calls.map(([tool]) => tool)).toEqual(["press_key", "scroll", "launch_app"]);
-		expect(JSON.stringify(calls)).not.toContain("delivery_mode");
+		// Keys and scrolling as a person gives them; launching has no window to bring forward.
+		expect(calls.map(([, a]) => a.delivery_mode)).toEqual(["foreground", "foreground", undefined]);
 	});
 	it("sends the driver its token, built from the row", async () => {
 		const { deps, calls } = await reading();
@@ -404,7 +427,7 @@ describe("names and rows", () => {
 	it("types into the only text control when no row is named, and asks for a row otherwise", async () => {
 		const { deps, calls } = await reading();
 		await runComputer({ action: "type", text: "Hello" }, deps);
-		expect(calls[0]).toEqual(["set_value", expect.objectContaining({ element_token: "s1:0", value: "Hello" })]);
+		expect(calls[0]).toEqual(["type_text", expect.objectContaining({ element_token: "s1:0", text: "Hello" })]);
 		calls.length = 0;
 		deps.state.labels.set("7", { role: "entry", name: "备注" });
 		expect(await runComputer({ action: "type", text: "x" }, deps)).toMatchObject({ reason: "no-ref", next: "model" });
@@ -416,5 +439,46 @@ describe("names and rows", () => {
 			next: "model",
 		});
 		expect(replyOutcome("type", reply({ refusal: { code: "foreground_required" } }))).toMatchObject({ next: "user" });
+	});
+});
+
+describe("act", () => {
+	it("acts in the foreground, and in the background where the window cannot come forward", async () => {
+		const sent: Record<string, unknown>[] = [];
+		const client: DriverClient = {
+			call: async (_tool, args) => {
+				sent.push(args);
+				return args.delivery_mode === "foreground"
+					? reply({}, { failed: true, text: "foreground_unavailable: window 0x1 did not become active" })
+					: reply({ effect: "confirmed" });
+			},
+			close: () => undefined,
+		};
+		expect(await act(client, "click", { element_token: "s1:0" })).toMatchObject({
+			structured: { effect: "confirmed" },
+		});
+		expect(sent.map((a) => a.delivery_mode)).toEqual(["foreground", undefined]);
+		sent.length = 0;
+		const fine: DriverClient = {
+			call: async (_t, args) => {
+				sent.push(args);
+				return reply({ effect: "confirmed" });
+			},
+			close: () => undefined,
+		};
+		await act(fine, "press_key", { key: "Return" });
+		expect(sent.length).toBe(1);
+	});
+});
+
+describe("foregroundRefused", () => {
+	it("knows the driver's no-foreground answer, in its text or its code, and nothing else", () => {
+		expect(foregroundRefused(reply({}, { failed: true, text: "foreground_unavailable: no active window" }))).toBe(
+			true,
+		);
+		expect(foregroundRefused(reply({ refusal: { code: "foreground_unavailable" } }))).toBe(true);
+		expect(foregroundRefused(reply({ code: "foreground_unavailable" }, { failed: true }))).toBe(true);
+		expect(foregroundRefused(reply({}, { failed: true, text: "element not found" }))).toBe(false);
+		expect(foregroundRefused(reply({ effect: "confirmed" }))).toBe(false);
 	});
 });
