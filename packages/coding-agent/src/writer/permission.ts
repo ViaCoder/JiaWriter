@@ -50,9 +50,12 @@ export interface PermissionUi {
 /** Why an action was stopped; empty means it may go on. */
 export type PermissionRefusal = "" | "declined" | "no-user";
 
-/** Labels of controls that send, delete or pay: a click on one cannot be taken back. */
+/**
+ * Labels of controls that send, delete or pay: a click on one cannot be taken back. Traditional forms too (2026-11-22:
+ * the user sells from Taiwan, where buttons read 送出, 發送, 刪除, 購買, 結帳).
+ */
 const HIGH_RISK_LABEL =
-	/提交|发送|发布|删除|移除|清空|支付|付款|购买|下单|转账|\b(?:submit|send|post|publish|delete|remove|pay|buy|purchase|order|checkout|transfer)\b/i;
+	/提交|送出|发送|發送|发布|發布|發佈|删除|刪除|移除|清空|支付|付款|购买|購買|下单|下單|转账|轉帳|结账|結帳|結賬|\b(?:submit|send|post|publish|delete|remove|pay|buy|purchase|order|checkout|transfer)\b/i;
 
 /** A mode from text, or undefined when it is none. */
 export function parsePermissionMode(value: string | undefined): PermissionMode | undefined {

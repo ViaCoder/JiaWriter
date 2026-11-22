@@ -139,9 +139,8 @@ describe("InteractiveMode.showManagedToolStatus", () => {
 		showManagedToolStatus.call(fakeThis, { type: "warning", message: "rg failed" });
 
 		expect(fakeThis.chatContainer.children).toHaveLength(4);
-		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toBe(
-			"fd downloading\n rg downloading\n Warning: rg failed",
-		);
+		// JiaWriter: the warning label in the interface language (Chinese by default), like every other warning.
+		expect(normalizeRenderedOutput(fakeThis.chatContainer)).toBe("fd downloading\n rg downloading\n 警告：rg failed");
 	});
 });
 

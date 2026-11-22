@@ -33,6 +33,7 @@ const FILES = [
 	"packages/coding-agent/src/writer/loop-guard.ts",
 	"packages/coding-agent/src/extensions/writer-guard/index.ts",
 	"packages/coding-agent/src/writer/tool-input.ts",
+	"packages/coding-agent/src/writer/tool-lines.ts",
 	"search_fetch/src/search_fetch/extension/agent.js",
 ];
 

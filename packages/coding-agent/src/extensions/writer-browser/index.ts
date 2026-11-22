@@ -25,6 +25,8 @@ import type { MessageKey } from "../../writer/i18n/zh.ts";
 import { createPermissionGate } from "../../writer/permission.ts";
 // The shape of every result.
 import { createBreaker, type Outcome, outcomeText } from "../../writer/protocol.ts";
+// The rows drawn for each action.
+import { actionRenderers } from "../../writer/tool-lines.ts";
 // Looking at a page.
 import { sessionVision } from "../writer-vision/index.ts";
 
@@ -112,6 +114,8 @@ export default function writerBrowserExtension(pi: ExtensionAPI): void {
 			y: Type.Optional(Type.Number()),
 			capture: Type.Optional(Type.String({ description: "point: the capture's id" })),
 		}),
+		// One line each in the chat; the model's JSON and trees in the detailed view (Ctrl+O).
+		...actionRenderers("browser"),
 		executionMode: "sequential",
 		async execute(_id, params, _signal, _update, ctx) {
 			used = true;

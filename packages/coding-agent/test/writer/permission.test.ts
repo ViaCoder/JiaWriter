@@ -111,6 +111,10 @@ describe("riskOfLabel", () => {
 		for (const label of ["提交", "立即支付", "Delete file", "SEND", "Check out"]) {
 			expect(riskOfLabel(label)).toBe(label === "Check out" ? "act" : "high");
 		}
+		// Traditional forms, as on Taiwanese sites and stores.
+		for (const label of ["送出", "發送訊息", "刪除商品", "立即購買", "前往結帳", "Send reply"])
+			expect(riskOfLabel(label)).toBe("high");
+		expect(riskOfLabel("儲存變更")).toBe("act");
 		expect(riskOfLabel("下一页")).toBe("act");
 		expect(riskOfLabel("Posts")).toBe("act");
 	});

@@ -30,6 +30,8 @@ import { ocrCommand, ocrHelperDir, onPath } from "../../writer/ocr.ts";
 import { createPermissionGate, permissionMode } from "../../writer/permission.ts";
 // The shape of every result.
 import { createBreaker } from "../../writer/protocol.ts";
+// The rows drawn for each action.
+import { actionRenderers } from "../../writer/tool-lines.ts";
 // What is known of the upstream.
 import { readSupport } from "../../writer/vision.ts";
 import { provenId } from "../../writer/websearch/main-search.ts";
@@ -161,6 +163,8 @@ export default function writerComputerExtension(pi: ExtensionAPI): void {
 			amount: Type.Optional(Type.Number()),
 			reason: Type.Optional(Type.String({ description: "look: why the tree is not enough" })),
 		}),
+		// One line each in the chat; the model's JSON and trees in the detailed view (Ctrl+O).
+		...actionRenderers("computer"),
 		executionMode: "sequential",
 		async execute(_id, params, _signal, _update, ctx) {
 			const result = await runComputer(params as ComputerInput, {
