@@ -33,7 +33,9 @@ function load(replies: Record<string, Reply> = {}, options: { front?: boolean; t
 		}),
 		"Page.createIsolatedWorld": () => ({ executionContextId: 5 }),
 		"DOM.resolveNode": () => ({ object: { objectId: "o" } }),
-		"Runtime.callFunctionOn": () => ({ result: { value: { native: true, focused: true, href: "", blank: false } } }),
+		"Runtime.callFunctionOn": () => ({
+			result: { value: { key: "Enter", field: false, focused: true, href: "", blank: false } },
+		}),
 		"Page.getLayoutMetrics": () => ({
 			cssLayoutViewport: { clientWidth: 800, clientHeight: 600 },
 			cssVisualViewport: { pageY: 0 },
@@ -77,7 +79,7 @@ function load(replies: Record<string, Reply> = {}, options: { front?: boolean; t
 		tabInfo: async () => ({ tab: 1, url: "u", title: "t", timedOut: false }),
 		inFront: async () => options.front ?? false,
 		clickHere: async () => sent.push(["click", undefined]),
-		pressKey: async () => sent.push(["Enter", undefined]),
+		pressKey: async (_send: unknown, name: string) => sent.push([name, undefined]),
 		axRole: (n: { role?: { value: string } }) => n.role?.value ?? "",
 		axName: (n: { name?: { value: string } }) => n.name?.value ?? "",
 		axProp: (n: { properties?: { name: string; value: { value: unknown } }[] }, name: string) =>
@@ -518,15 +520,35 @@ describe("activateNode", () => {
 	});
 
 	it("uses the element's click on a block that takes no Enter", async () => {
-		const made = load({ "Runtime.callFunctionOn": () => ({ result: { value: { native: false, focused: true } } }) });
+		const made = load({
+			"Runtime.callFunctionOn": () => ({ result: { value: { key: "", field: false, focused: true } } }),
+		});
 		expect(await call(made.api.activateNode, pageOf(made), hit(made), at)).toBe("script");
+		expect(made.count("Enter")).toBe(0);
+	});
+
+	it("only focuses a text field: Enter there would submit its form", async () => {
+		const made = load({
+			"Runtime.callFunctionOn": () => ({ result: { value: { key: "", field: true, focused: true } } }),
+		});
+		expect(await call(made.api.activateNode, pageOf(made), hit(made), at)).toBe("focus");
+		expect(made.count("Enter")).toBe(0);
+		expect(made.count("click")).toBe(0);
+	});
+
+	it("uses Space on a check box, which takes no Enter", async () => {
+		const made = load({
+			"Runtime.callFunctionOn": () => ({ result: { value: { key: "Space", field: false, focused: true } } }),
+		});
+		expect(await call(made.api.activateNode, pageOf(made), hit(made), at)).toBe("keyboard");
+		expect(made.count("Space")).toBe(1);
 		expect(made.count("Enter")).toBe(0);
 	});
 
 	it("opens a new-tab link here, because a new tab raises the window", async () => {
 		const made = load({
 			"Runtime.callFunctionOn": () => ({
-				result: { value: { native: true, focused: true, blank: true, href: "https://a.example.com/" } },
+				result: { value: { key: "Enter", focused: true, blank: true, href: "https://a.example.com/" } },
 			}),
 		});
 		expect(await call(made.api.activateNode, pageOf(made), hit(made), at)).toBe("link");

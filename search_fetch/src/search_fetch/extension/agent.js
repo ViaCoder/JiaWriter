@@ -265,13 +265,18 @@ async function pointerTo(page, x, y) {
   mouse.set(page.tabId, { x: Math.round(x), y: Math.round(y) });
 }
 
-// Focus the node without a mouse press, and say what it is.
+// Focus the node without a mouse press, and say what it is: the key that works it (Enter for links and buttons, Space
+// for check boxes), or a field, which focusing has already clicked: Enter in a text field submits its form
+// (2026-11-23: "clicking" a product title field behind the terminal saved the empty form).
 const FOCUS_FN = `function () {
   const el = this.nodeType === 1 ? this : this.parentElement;
   if (!el) return null;
   el.focus({ preventScroll: true });
   const root = el.getRootNode();
-  return { native: el.matches("a[href],button,summary,input,select,textarea"), focused: (root.activeElement || document.activeElement) === el, href: el.tagName === "A" ? el.href : "", blank: el.tagName === "A" && (el.target === "_blank" || el.target === "_new") };
+  const key = el.matches("a[href],button,summary,input[type=button],input[type=submit],input[type=reset],input[type=image]") ? "Enter"
+    : el.matches("input[type=checkbox],input[type=radio]") ? "Space" : "";
+  const field = !key && (el.matches("input,select,textarea") || el.isContentEditable);
+  return { key, field, focused: (root.activeElement || document.activeElement) === el, href: el.tagName === "A" ? el.href : "", blank: el.tagName === "A" && (el.target === "_blank" || el.target === "_new") };
 }`;
 
 // Activate a node, never raising the window: a mouse click when it is in front, else keyboard or the node's click.
@@ -287,9 +292,11 @@ async function activateNode(page, hit, at) {
     await chrome.tabs.update(page.tabId, { url: f.href });
     return "link";
   }
-  // Only native controls answer Enter.
-  if (f && f.focused && f.native) {
-    await untilDialog(page, pressKey(page.send, "Enter"));
+  // A field: focused is clicked; a key would type into it or submit its form.
+  if (f && f.focused && f.field) return "focus";
+  // Links, buttons and check boxes answer their key.
+  if (f && f.focused && f.key) {
+    await untilDialog(page, pressKey(page.send, f.key));
     return "keyboard";
   }
   // A block with a click handler.
