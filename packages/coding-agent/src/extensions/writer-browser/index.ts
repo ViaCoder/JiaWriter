@@ -14,7 +14,7 @@ import { getAgentDir } from "../../config.ts";
 // Extension API types.
 import type { ExtensionAPI } from "../../core/extensions/types.ts";
 // The tool itself.
-import { BROWSER_ACTIONS, type BrowserInput, newBrowserState, runBrowser } from "../../writer/browser/agent.ts";
+import { BROWSER_ACTIONS, type BrowserInput, newBrowserState, pause, runBrowser } from "../../writer/browser/agent.ts";
 // The extension's bridge.
 import { bridgeAddress, bridgeCall } from "../../writer/browser/bridge.ts";
 // Output messages.
@@ -96,14 +96,18 @@ export default function writerBrowserExtension(pi: ExtensionAPI): void {
 			url: Type.Optional(Type.String()),
 			ref: Type.Optional(Type.String({ description: "A reference from the last read" })),
 			to: Type.Optional(Type.String({ description: "drag: the reference to drop on" })),
-			text: Type.Optional(Type.String({ description: "type: the string; wait: the words to wait for" })),
+			text: Type.Optional(
+				Type.String({
+					description: "type: the string; wait: the words to wait for (without them, until the page changes)",
+				}),
+			),
 			query: Type.Optional(Type.String({ description: "find: the words to look for" })),
 			key: Type.Optional(Type.String({ description: "Enter, Escape, Tab or Space" })),
 			option: Type.Optional(Type.String({ description: "select: the option's text" })),
 			code: Type.Optional(Type.String({ description: "eval: the JavaScript" })),
 			files: Type.Optional(Type.Array(Type.String(), { description: "upload: absolute file paths" })),
 			dy: Type.Optional(Type.Number({ description: "scroll: pixels down" })),
-			seconds: Type.Optional(Type.Number({ description: "wait: at most 15" })),
+			seconds: Type.Optional(Type.Number({ description: "wait: at most 300" })),
 			clear: Type.Optional(Type.Boolean({ description: "type: replace what is there" })),
 			enter: Type.Optional(Type.Boolean({ description: "type: press Enter after" })),
 			all: Type.Optional(Type.Boolean({ description: "read: the page's words too" })),
@@ -117,7 +121,7 @@ export default function writerBrowserExtension(pi: ExtensionAPI): void {
 		// One line each in the chat; the model's JSON and trees in the detailed view (Ctrl+O).
 		...actionRenderers("browser"),
 		executionMode: "sequential",
-		async execute(_id, params, _signal, _update, ctx) {
+		async execute(_id, params, signal, _update, ctx) {
 			used = true;
 			const result = await runBrowser(params as BrowserInput, {
 				call: (op, args, ms) => bridgeCall(address, op, args, ms),
@@ -125,7 +129,7 @@ export default function writerBrowserExtension(pi: ExtensionAPI): void {
 				breaker,
 				state,
 				run,
-				sleep: (ms) => new Promise((done) => setTimeout(done, ms)),
+				sleep: (ms) => pause(ms, signal),
 				ask: (action, scope) =>
 					t(action === "look" ? "browserTool.askLook" : "browserTool.ask", { action, site: scope }),
 				vision: sessionVision(pi, ctx),

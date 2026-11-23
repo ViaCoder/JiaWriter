@@ -12,6 +12,7 @@ import {
 	normalizeBrowserInput,
 	pageOp,
 	pageOutcome,
+	pause,
 	pointAt,
 	readTab,
 	refCandidates,
@@ -351,12 +352,58 @@ describe("pageOutcome", () => {
 });
 
 describe("waitOn", () => {
-	it("waits the time asked, never past the limit", async () => {
+	it("waits the time asked, never past the limit, with no page to watch", async () => {
 		const { deps } = fake();
 		const waits: number[] = [];
 		deps.sleep = async (ms) => void waits.push(ms);
 		await waitOn(deps, { action: "wait", seconds: 999 });
-		expect(waits).toEqual([15000]);
+		expect(waits).toEqual([300000]);
+	});
+	it("without words, watches the page and ends when its words change", async () => {
+		let reads = 0;
+		const { deps } = fake();
+		deps.state.tab = 7;
+		deps.call = async () => ({ lines: ++reads < 4 ? "All caught up" : "New message from Ava" });
+		expect(await waitOn(deps, { action: "wait", seconds: 300 })).toMatchObject({
+			effect: "confirmed",
+			data: { changed: true },
+		});
+		expect(reads).toBe(4);
+	});
+	it("without words and without a change, says so when the time is up", async () => {
+		const { deps } = fake();
+		deps.state.tab = 7;
+		deps.call = async () => ({ lines: "All caught up" });
+		expect(await waitOn(deps, { action: "wait", seconds: 3 })).toMatchObject({
+			effect: "confirmed",
+			data: { changed: false },
+		});
+	});
+	it("with words, ends when they appear and says when they never did", async () => {
+		const { deps } = fake();
+		deps.state.tab = 7;
+		let reads = 0;
+		deps.call = async () => ({ lines: ++reads < 3 ? "loading" : "Order placed" });
+		expect(await waitOn(deps, { action: "wait", text: "Order placed", seconds: 10 })).toMatchObject({
+			effect: "confirmed",
+		});
+		deps.call = async () => ({ lines: "loading" });
+		expect(await waitOn(deps, { action: "wait", text: "Order placed", seconds: 2 })).toMatchObject({
+			reason: "not-seen",
+		});
+	});
+});
+
+describe("pause", () => {
+	it("waits the time, and ends at once with an error when the user presses Esc", async () => {
+		await expect(pause(5)).resolves.toBeUndefined();
+		const esc = new AbortController();
+		const started = Date.now();
+		const waiting = pause(60_000, esc.signal);
+		esc.abort();
+		await expect(waiting).rejects.toThrow("aborted");
+		expect(Date.now() - started).toBeLessThan(1000);
+		await expect(pause(5, esc.signal)).rejects.toThrow("aborted");
 	});
 });
 

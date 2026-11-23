@@ -123,14 +123,32 @@ export interface BrowserDeps {
 	vision: BrowserVision;
 }
 
-/** Longest wait the model may ask for (s). */
-const MAX_WAIT_S = 15;
+/** Longest wait the model may ask for (s): long enough to watch a page while the user is away without a call every few
+ * seconds (2026-11-23, the user: "monitor in background, then if detect then reply"); Esc ends it at once. */
+const MAX_WAIT_S = 300;
 /** Most candidates find gives back. */
 const MAX_FOUND = 20;
 /** Load wait of an action (ms). */
 const LOAD_MS = 10_000;
 /** Time an operation may take (ms). */
 const CALL_MS = 40_000;
+
+/** Wait ms milliseconds; an aborted signal (Esc) ends the wait at once with an error. */
+export function pause(ms: number, signal?: AbortSignal): Promise<void> {
+	return new Promise((done, fail) => {
+		if (signal?.aborted) return fail(new Error("aborted"));
+		const timer = setTimeout(() => {
+			signal?.removeEventListener("abort", stop);
+			done();
+		}, ms);
+		// The user pressed Esc: stop waiting.
+		const stop = () => {
+			clearTimeout(timer);
+			fail(new Error("aborted"));
+		};
+		signal?.addEventListener("abort", stop, { once: true });
+	});
+}
 
 /** A session with nothing open. */
 export function newBrowserState(): BrowserState {
@@ -309,18 +327,30 @@ export function pageOutcome(input: BrowserInput, reply: PageReply, key: string, 
 	return outcome("unverifiable", route, "model", "no-change", data);
 }
 
-/** Wait for words to appear, or for a time. */
+/**
+ * Wait for words to appear; without words, for the page's words to change (a new message, a status) or the time to
+ * pass. The change ends the wait early (2026-11-23: watching an inbox, the model waited without words and answered a
+ * message five minutes after it came).
+ */
 export async function waitOn(deps: BrowserDeps, input: BrowserInput): Promise<Outcome> {
 	const seconds = Math.min(Math.max(input.seconds ?? 2, 0), MAX_WAIT_S);
-	if (!input.text) {
+	// No page to watch: only the time.
+	if (!input.text && deps.state.tab === undefined) {
 		await deps.sleep(seconds * 1000);
 		return outcome("confirmed", "wait", "model");
 	}
-	for (let waited = 0; waited <= seconds; waited++) {
-		const page = (await deps.call("page_read", { tab: deps.state.tab, text: true }, CALL_MS)) as { lines: string };
-		if (page.lines.includes(input.text)) return outcome("confirmed", "wait", "model");
+	// The page's words, once a second.
+	const read = async () =>
+		((await deps.call("page_read", { tab: deps.state.tab, text: true }, CALL_MS)) as { lines: string }).lines;
+	const before = input.text ? "" : await read();
+	const seen = (lines: string) => (input.text ? lines.includes(input.text) : lines !== before);
+	if (input.text && seen(await read())) return outcome("confirmed", "wait", "model");
+	for (let waited = 0; waited < seconds; waited++) {
 		await deps.sleep(1000);
+		if (seen(await read()))
+			return outcome("confirmed", "wait", "model", "", input.text ? undefined : { changed: true });
 	}
+	if (!input.text) return outcome("confirmed", "wait", "model", "", { changed: false });
 	return outcome("unverifiable", "wait", "model", "not-seen");
 }
 

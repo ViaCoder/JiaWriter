@@ -88,7 +88,9 @@ describe("budgets", () => {
 		// 3900 since 2026-11-15: Claude Code's phrasing (numbered order of work, full sentences).
 		expect(size(WRITING_MANUAL)).toBeLessThanOrEqual(3900);
 		expect(size(RESEARCH_MANUAL)).toBeLessThanOrEqual(900);
-		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(800);
+		// 900 since 2026-11-23: watching a page while the user is away (the model said it could not), and going ahead
+		// without asking when the user said so.
+		expect(size(BROWSER_MANUAL)).toBeLessThanOrEqual(900);
 		expect(size(COMPUTER_MANUAL)).toBeLessThanOrEqual(800);
 		// 400 since 2026-11-14: material_add extracts the facts of a source in a request of its own, and the manual says
 		// how a source is given and that the list it returns is read first.
