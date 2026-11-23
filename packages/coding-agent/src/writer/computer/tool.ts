@@ -73,10 +73,14 @@ const MAX_TREE = 12_000;
 const MAX_ELEMENTS = 400;
 /** Input as a person gives it: the window comes to the front and gets real clicks and keys. */
 const FOREGROUND = { delivery_mode: "foreground" } as const;
-/** A person's pause between typed words, low and high (ms). */
-const WORD_PAUSE_MS = [70, 190] as const;
 /** Beyond this many words, typing goes a few words at a time, so a long text does not take minutes. */
 const WORDS_ONE_BY_ONE = 80;
+/** Up to this many characters, text is typed key by key, as a person types a short entry. */
+const KEY_BY_KEY = 40;
+/** Text an input method enters (Chinese) grows into the field in at most this many writes. */
+const MOST_COMMITS = 60;
+/** Characters an input method commits: CJK ideographs, kana, hangul, full-width forms and CJK punctuation. */
+const CJK = "\\u2E80-\\u9FFF\\uAC00-\\uD7AF\\uF900-\\uFAFF\\uFF00-\\uFFEF";
 
 /** A session with nothing chosen. */
 export function newComputerState(): ComputerState {
@@ -180,14 +184,37 @@ export async function settled(
 	return result;
 }
 
-/** The pieces typed one call each: words with their spaces, a few words together when the text is long. */
+/**
+ * The pieces typed one call each, as a person types (2026-11-23, the user: "all input ... should both more like real
+ * human"): a short text key by key; a longer one word by word with its spaces, a few words together when it is long.
+ */
 export function typingPieces(text: string): string[] {
+	if (text.length <= KEY_BY_KEY) return [...text];
 	const words = text.match(/\S+\s*|\s+/g) ?? [];
 	if (words.length <= WORDS_ONE_BY_ONE) return words;
 	const size = Math.ceil(words.length / WORDS_ONE_BY_ONE);
 	return Array.from({ length: Math.ceil(words.length / size) }, (_, i) =>
 		words.slice(i * size, (i + 1) * size).join(""),
 	);
+}
+
+/** The pause after a typed piece (ms): a fast typist's between keys, a little more between words, longer after a
+ * sentence or a line, and now and then a moment of thought. */
+export function pauseFor(piece: string, keyByKey: boolean, random: () => number = Math.random): number {
+	const thought = random() < 0.04 ? 300 + random() * 500 : 0;
+	if (keyByKey) return 60 + random() * 100 + thought;
+	if (/[.!?。！？]\s*$|\n$/.test(piece)) return 250 + random() * 350 + thought;
+	return 70 + random() * 120 + thought;
+}
+
+/**
+ * What a field holds after each input-method commit of a text: CJK runs come up to four characters at a time, other
+ * words with their spaces, grouped so that a long text takes at most MOST_COMMITS writes; the last is the whole text.
+ */
+export function commitPrefixes(text: string): string[] {
+	const parts = text.match(new RegExp(`[${CJK}]{1,4}|[^\\s${CJK}]+\\s*|\\s+`, "gu")) ?? [];
+	const size = Math.ceil(parts.length / MOST_COMMITS);
+	return Array.from({ length: Math.ceil(parts.length / size) }, (_, i) => parts.slice(0, (i + 1) * size).join(""));
 }
 
 /**
@@ -214,26 +241,34 @@ export async function act(driver: DriverClient, tool: string, args: Record<strin
 const realPause = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
 /**
- * Put text into a field as a person types it: the first word goes into the named field (which takes the focus there),
- * the rest as real keys into that focus, word by word with uneven pauses. Text that keys would cut short (anything
- * beyond ASCII, such as Chinese, which a person enters through an input method) is written whole by value.
+ * Put text into a field as a person types it: the first piece goes into the named field (which takes the focus there),
+ * the rest as real keys into that focus, key by key or word by word with uneven pauses. Text that keys would cut short
+ * (anything beyond ASCII, such as Chinese, which a person enters through an input method) grows in by value, a few
+ * characters per commit.
  */
 export async function typeInto(driver: DriverClient, deps: ComputerDeps, input: ComputerInput): Promise<Outcome> {
 	const { state } = deps;
 	const text = input.text ?? "";
 	const target = { pid: state.pid, window_id: state.window, element_token: tokenOf(state, input.ref) };
+	const pause = deps.pause ?? realPause;
 	if (needsValueRoute(text)) {
-		const set = await act(driver, "set_value", { ...target, value: text });
+		const commits = commitPrefixes(text);
+		let set = await act(driver, "set_value", { ...target, value: commits[0] });
+		for (const value of commits.slice(1)) {
+			if (set.structured.refusal || set.failed) break;
+			// An input method's commits come a moment apart.
+			await pause(150 + Math.random() * 250);
+			set = await act(driver, "set_value", { ...target, value });
+		}
 		if (set.structured.refusal) return replyOutcome("type", set);
 		return set.failed ? outcome("refused", "type", "user", "cannot-type-text") : settled(driver, deps, "type", set);
 	}
 	const pieces = typingPieces(text);
+	const keyByKey = pieces.length === [...text].length;
 	let last = await act(driver, "type_text", { ...target, text: pieces[0] ?? "" });
 	if (last.failed || last.structured.refusal) return replyOutcome("type", last);
-	const pause = deps.pause ?? realPause;
-	for (const piece of pieces.slice(1)) {
-		const [low, high] = WORD_PAUSE_MS;
-		await pause(low + Math.random() * (high - low));
+	for (const [i, piece] of pieces.slice(1).entries()) {
+		await pause(pauseFor(pieces[i], keyByKey));
 		last = await act(driver, "type_text", { pid: state.pid, window_id: state.window, text: piece });
 		if (last.failed || last.structured.refusal) return replyOutcome("type", last);
 	}

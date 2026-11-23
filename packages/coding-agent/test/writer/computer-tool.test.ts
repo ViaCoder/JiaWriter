@@ -4,12 +4,14 @@ import type { DriverClient, DriverReply } from "../../src/writer/computer/client
 import {
 	act,
 	type ComputerDeps,
+	commitPrefixes,
 	foregroundRefused,
 	listWindows,
 	needsValueRoute,
 	newComputerState,
 	normalizeComputerInput,
 	onlyTextRow,
+	pauseFor,
 	readWindow,
 	replyOutcome,
 	runComputer,
@@ -205,13 +207,13 @@ describe("settled, when the change shows a moment later", () => {
 });
 
 describe("typeInto", () => {
-	it("writes Chinese whole by value, in the foreground", async () => {
+	it("writes Chinese as an input method commits it, growing by value in the foreground", async () => {
 		const { client, deps, calls } = fake();
+		deps.pause = async () => undefined;
 		await typeInto(client, deps, { action: "type", ref: "0", text: "虚拟桌面文字" });
-		expect(calls[0]).toEqual([
-			"set_value",
-			expect.objectContaining({ value: "虚拟桌面文字", delivery_mode: "foreground" }),
-		]);
+		const values = calls.filter(([tool]) => tool === "set_value").map(([, args]) => args);
+		expect(values.map((a) => a.value)).toEqual(["虚拟桌面", "虚拟桌面文字"]);
+		expect(values.every((a) => a.delivery_mode === "foreground")).toBe(true);
 	});
 	it("never falls back to keys for text keys would cut short", async () => {
 		const { client, deps, calls } = fake({ set_value: reply({}, { failed: true }) });
@@ -221,20 +223,29 @@ describe("typeInto", () => {
 		});
 		expect(calls.some(([tool]) => tool === "type_text")).toBe(false);
 	});
-	it("types ASCII as a person does: the first word into the field, the rest as keys into the focus", async () => {
+	it("types a short entry key by key: the first key into the field, the rest into the focus", async () => {
 		const { client, deps, calls } = fake();
 		const pauses: number[] = [];
 		deps.pause = async (ms) => {
 			pauses.push(ms);
 		};
-		await typeInto(client, deps, { action: "type", ref: "0", text: "Hello big world" });
+		await typeInto(client, deps, { action: "type", ref: "0", text: "Hi you" });
 		const typed = calls.filter(([tool]) => tool === "type_text").map(([, args]) => args);
-		expect(typed.map((a) => a.text)).toEqual(["Hello ", "big ", "world"]);
+		expect(typed.map((a) => a.text)).toEqual(["H", "i", " ", "y", "o", "u"]);
 		expect(typed[0].element_token).toBe(":0");
 		expect(typed.slice(1).every((a) => a.element_token === undefined)).toBe(true);
 		expect(typed.every((a) => a.delivery_mode === "foreground")).toBe(true);
-		expect(pauses.length).toBe(2);
-		expect(pauses.every((ms) => ms >= 70 && ms <= 190)).toBe(true);
+		expect(pauses.length).toBe(5);
+		expect(pauses.every((ms) => ms >= 60 && ms <= 960)).toBe(true);
+	});
+	it("types a longer text word by word", async () => {
+		const { client, deps, calls } = fake();
+		deps.pause = async () => undefined;
+		const text = "These headphones connect to two devices at once.";
+		await typeInto(client, deps, { action: "type", ref: "0", text });
+		const typed = calls.filter(([tool]) => tool === "type_text").map(([, args]) => String(args.text));
+		expect(typed.slice(0, 2)).toEqual(["These ", "headphones "]);
+		expect(typed.join("")).toBe(text);
 	});
 	it("stops at the first word the driver refuses", async () => {
 		const { client, deps } = fake({ type_text: reply({ refusal: { code: "foreground_unavailable" } }) });
@@ -246,13 +257,42 @@ describe("typeInto", () => {
 });
 
 describe("typingPieces", () => {
-	it("goes word by word, and a few words at a time for a long text, losing nothing", () => {
-		expect(typingPieces("Hello  big world")).toEqual(["Hello  ", "big ", "world"]);
+	it("goes key by key for a short entry, word by word, and a few words at a time for a long text, losing nothing", () => {
+		expect(typingPieces("Hi  you")).toEqual(["H", "i", " ", " ", "y", "o", "u"]);
+		const sentence = "Hello  big world, this sentence is long enough";
+		expect(typingPieces(sentence).slice(0, 3)).toEqual(["Hello  ", "big ", "world, "]);
 		const long = Array.from({ length: 200 }, (_, i) => `w${i}`).join(" ");
 		const pieces = typingPieces(long);
 		expect(pieces.length).toBeLessThanOrEqual(80);
 		expect(pieces.join("")).toBe(long);
 		expect(typingPieces("")).toEqual([]);
+	});
+});
+
+describe("pauseFor", () => {
+	it("pauses as a typist does: short between keys, more between words, longest after a sentence", () => {
+		const low = () => 0.5;
+		expect(pauseFor("a", true, low)).toBe(110);
+		expect(pauseFor("word ", false, low)).toBe(130);
+		expect(pauseFor("done. ", false, low)).toBe(425);
+		// Now and then a moment of thought on top.
+		expect(pauseFor("a", true, () => 0)).toBe(360);
+	});
+});
+
+describe("commitPrefixes", () => {
+	it("grows Chinese four characters at a time and other words whole, ending with the whole text", () => {
+		expect(commitPrefixes("你好 Lumio 耳机很好用")).toEqual([
+			"你好",
+			"你好 ",
+			"你好 Lumio ",
+			"你好 Lumio 耳机很好",
+			"你好 Lumio 耳机很好用",
+		]);
+		const long = "很".repeat(1000);
+		const steps = commitPrefixes(long);
+		expect(steps.length).toBeLessThanOrEqual(60);
+		expect(steps.at(-1)).toBe(long);
 	});
 });
 
@@ -427,7 +467,7 @@ describe("names and rows", () => {
 	it("types into the only text control when no row is named, and asks for a row otherwise", async () => {
 		const { deps, calls } = await reading();
 		await runComputer({ action: "type", text: "Hello" }, deps);
-		expect(calls[0]).toEqual(["type_text", expect.objectContaining({ element_token: "s1:0", text: "Hello" })]);
+		expect(calls[0]).toEqual(["type_text", expect.objectContaining({ element_token: "s1:0", text: "H" })]);
 		calls.length = 0;
 		deps.state.labels.set("7", { role: "entry", name: "备注" });
 		expect(await runComputer({ action: "type", text: "x" }, deps)).toMatchObject({ reason: "no-ref", next: "model" });

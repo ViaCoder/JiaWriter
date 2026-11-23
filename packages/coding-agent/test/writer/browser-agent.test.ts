@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
 	type BrowserDeps,
 	type BrowserInput,
+	callTime,
 	capturePage,
 	evalIn,
 	labelsOf,
@@ -391,6 +392,13 @@ describe("waitOn", () => {
 		expect(await waitOn(deps, { action: "wait", text: "Order placed", seconds: 2 })).toMatchObject({
 			reason: "not-seen",
 		});
+	});
+});
+
+describe("callTime", () => {
+	it("gives typing time for each character, and other actions the usual limit", () => {
+		expect(callTime({ action: "click", ref: "e1" })).toBe(40_000);
+		expect(callTime({ action: "type", ref: "e1", text: "x".repeat(1000) })).toBe(120_000);
 	});
 });
 

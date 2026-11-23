@@ -487,6 +487,12 @@ export async function pointAt(input: BrowserInput, deps: BrowserDeps): Promise<O
 	return pageOutcome(input, reply, `point\n${capture.id}`, deps.breaker);
 }
 
+/** Time an operation may take (ms): typing goes at a person's pace (the extension's typeLikePerson, 2026-11-23), so a
+ * long text gets 80 ms a character on top. */
+export function callTime(input: BrowserInput): number {
+	return input.action === "type" ? CALL_MS + [...(input.text ?? "")].length * 80 : CALL_MS;
+}
+
 /** One action, whatever comes of it. */
 /** Actions that act on one control and need its reference. */
 const REF_ACTIONS: ReadonlySet<string> = new Set(["click", "hover", "type", "select", "drag", "upload"]);
@@ -579,7 +585,7 @@ export async function runBrowser(given: BrowserInput, deps: BrowserDeps): Promis
 		const reply = (await deps.call(
 			op,
 			{ tab: state.tab, ...args, load_ms: LOAD_MS, run: deps.run },
-			CALL_MS,
+			callTime(input),
 		)) as PageReply;
 		if (reply.newTab) state.tab = reply.newTab;
 		// Another address: the references read on the old page are no longer the page's.

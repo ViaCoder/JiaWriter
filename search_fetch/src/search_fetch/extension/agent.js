@@ -259,10 +259,60 @@ function untilDialog(page, input) {
   return Promise.race([input.catch((e) => { if (!page.dialog) throw e; }), page.opened]);
 }
 
-// Pointer to a point in one step.
+// Pointer to a point as a hand moves it: a curved, eased stroke from where it was (moveMouse, background.js), not a
+// jump (2026-11-23, the user: "all input ... should both more like real human").
 async function pointerTo(page, x, y) {
-  await page.send("Input.dispatchMouseEvent", { type: "mouseMoved", x, y });
-  mouse.set(page.tabId, { x: Math.round(x), y: Math.round(y) });
+  await moveMouse(page.send, page.tabId, x, y);
+}
+
+// Text up to this long is typed key by key; longer text a word at a time.
+const KEY_BY_KEY = 40;
+// Characters an input method commits: CJK ideographs, kana, hangul, full-width forms and CJK punctuation.
+const CJK = "\\u2E80-\\u9FFF\\uAC00-\\uD7AF\\uF900-\\uFAFF\\uFF00-\\uFFEF";
+
+// The pieces a person types a text in: short text key by key; longer text a word at a time with its spaces, as a
+// fast typist's rhythm, so that a long description takes seconds rather than minutes; CJK runs in commits of up to
+// four characters, as from an input method; each line break a piece of its own. Joined, the pieces are the text.
+function typingPieces(text) {
+  if ([...text].length <= KEY_BY_KEY) return [...text];
+  const pieces = [];
+  const word = new RegExp(`[${CJK}]+|[^\\s${CJK}]+[^\\S\\n]*|\\n|[^\\S\\n]+`, "g");
+  for (const part of text.match(word) || []) {
+    if (new RegExp(`^[${CJK}]`).test(part)) {
+      const chars = [...part];
+      for (let i = 0; i < chars.length; i += 4) pieces.push(chars.slice(i, i + 4).join(""));
+    } else pieces.push(part);
+  }
+  return pieces;
+}
+
+// The pause after a piece (ms): between keys a fast typist's, between words a little more, longer at the end of a
+// sentence or a line, and now and then a moment of thought.
+function pauseAfter(piece, keyByKey) {
+  const thought = Math.random() < 0.04 ? rand(300, 800) : 0;
+  if (keyByKey) return rand(60, 160) + thought;
+  if (/[.!?。！？]\s*$|\n$/.test(piece)) return rand(250, 600) + thought;
+  return rand(70, 190) + thought;
+}
+
+// One piece: a printable ASCII character as a real key press, anything else as one committed piece of text.
+async function typePiece(send, piece) {
+  if (/^[\x20-\x7e]$/.test(piece)) {
+    const f = keyFields(piece);
+    await send("Input.dispatchKeyEvent", { type: "keyDown", text: piece, unmodifiedText: piece, ...f });
+    await sleep(rand(30, 90));
+    await send("Input.dispatchKeyEvent", { type: "keyUp", ...f });
+  } else await send("Input.insertText", { text: piece });
+}
+
+// Type text into the focused field as a person does (typingPieces, pauseAfter).
+async function typeLikePerson(send, text) {
+  const pieces = typingPieces(text);
+  const keyByKey = pieces.length === [...text].length;
+  for (let i = 0; i < pieces.length; i++) {
+    await typePiece(send, pieces[i]);
+    if (i < pieces.length - 1) await sleep(pauseAfter(pieces[i], keyByKey));
+  }
 }
 
 // Focus the node without a mouse press, and say what it is: the key that works it (Enter for links and buttons, Space
@@ -403,11 +453,11 @@ Object.assign(OPS, {
       const f = await onNode(hit, FOCUS_FN);
       if (!f || !f.focused) return { refused: true, reason: "not-focusable" };
       if (msg.clear) await onNode(hit, "function () { if (this.select) this.select(); else document.execCommand('selectAll'); }");
-      await page.send("Input.insertText", { text: String(msg.text ?? "") });
+      await typeLikePerson(page.send, String(msg.text ?? ""));
       if (msg.enter) await untilDialog(page, pressKey(page.send, "Enter"));
-      if (page.dialog) return { route: "insert", holds: true };
+      if (page.dialog) return { route: "keys", holds: true };
       const shown = await onNode(hit, "function () { return String(this.value ?? this.innerText ?? ''); }").catch(() => "");
-      return { route: "insert", holds: shown.includes(String(msg.text ?? "")) };
+      return { route: "keys", holds: shown.includes(String(msg.text ?? "")) };
     }, false, msg.enter ? NAV_WAIT : 0);
   },
   // Choose in a native select by its visible text or value. {tab, ref, option}.

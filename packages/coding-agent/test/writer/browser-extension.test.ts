@@ -11,7 +11,7 @@ const SOURCE = readFileSync(
 );
 /** The file's functions, handed out at its end. */
 const NAMES =
-	"ownTab senderFor withPage letGo localFrames allFrames nodeLine readTree emptyPageKind senderOf resolveRef frameOffset nodeCentre onNode wheelPage viewState untilChanged untilDialog pointerTo activateNode afterAction onRef pageRefs heldDialogs";
+	"ownTab senderFor withPage letGo localFrames allFrames nodeLine readTree emptyPageKind senderOf resolveRef frameOffset nodeCentre onNode wheelPage viewState untilChanged untilDialog pointerTo typingPieces pauseAfter typePiece typeLikePerson activateNode afterAction onRef pageRefs heldDialogs";
 
 type Fn = (...args: never[]) => Promise<never>;
 type Reply = (params: Record<string, unknown>, session?: string) => unknown;
@@ -80,6 +80,11 @@ function load(replies: Record<string, Reply> = {}, options: { front?: boolean; t
 		inFront: async () => options.front ?? false,
 		clickHere: async () => sent.push(["click", undefined]),
 		pressKey: async (_send: unknown, name: string) => sent.push([name, undefined]),
+		// A hand's stroke is many events in background.js; here one marker.
+		moveMouse: async () => sent.push(["move", undefined]),
+		keyFields: (ch: string) => ({ key: ch }),
+		rand: (lo: number, hi: number) => lo + Math.random() * (hi - lo),
+		RegExp,
 		axRole: (n: { role?: { value: string } }) => n.role?.value ?? "",
 		axName: (n: { name?: { value: string } }) => n.name?.value ?? "",
 		axProp: (n: { properties?: { name: string; value: { value: unknown } }[] }, name: string) =>
@@ -495,10 +500,55 @@ describe("untilDialog", () => {
 });
 
 describe("pointerTo", () => {
-	it("moves once, and remembers where", async () => {
+	it("moves the pointer as a hand does, not in one jump", async () => {
 		const made = load();
 		await call(made.api.pointerTo, pageOf(made), 10.4, 20.6);
-		expect(made.count("Input.dispatchMouseEvent")).toBe(1);
+		expect(made.count("move")).toBe(1);
+		expect(made.count("Input.dispatchMouseEvent")).toBe(0);
+	});
+});
+
+describe("typingPieces", () => {
+	const pieces = (text: string) => (load().api.typingPieces as unknown as (t: string) => string[])(text);
+	it("types short text key by key", () => {
+		expect(pieces("hello 你好")).toEqual(["h", "e", "l", "l", "o", " ", "你", "好"]);
+	});
+	it("types long text a word at a time, CJK in commits of up to four, each line break alone", () => {
+		const text = `Hybrid noise cancelling, 40 hours of battery.\n第二行是一段比较长的中文说明文字 and more`;
+		const got = pieces(text);
+		expect(got.join("")).toBe(text);
+		expect(got.slice(0, 3)).toEqual(["Hybrid ", "noise ", "cancelling, "]);
+		expect(got).toContain("\n");
+		expect(got.filter((p) => /[\u4e00-\u9fff]/.test(p)).every((p) => [...p].length <= 4)).toBe(true);
+	});
+});
+
+describe("pauseAfter", () => {
+	const pause = (piece: string, keys: boolean) =>
+		(load().api.pauseAfter as unknown as (p: string, k: boolean) => number)(piece, keys);
+	it("pauses as a typist does: short between keys, longer between words, longest after a sentence", () => {
+		for (let i = 0; i < 50; i++) {
+			expect(pause("a", true)).toBeGreaterThanOrEqual(60);
+			expect(pause("a", true)).toBeLessThanOrEqual(960);
+			expect(pause("word ", false)).toBeGreaterThanOrEqual(70);
+			expect(pause("done. ", false)).toBeGreaterThanOrEqual(250);
+		}
+	});
+});
+
+describe("typePiece and typeLikePerson", () => {
+	it("presses a real key for an ASCII character and commits anything else whole", async () => {
+		const made = load();
+		await call(made.api.typePiece, pageOf(made).send, "a");
+		expect(made.count("Input.dispatchKeyEvent")).toBe(2);
+		await call(made.api.typePiece, pageOf(made).send, "耳机");
+		expect(made.count("Input.insertText")).toBe(1);
+	});
+	it("types every piece of the text", async () => {
+		const made = load();
+		await call(made.api.typeLikePerson, pageOf(made).send, "Hi 你好");
+		expect(made.count("Input.dispatchKeyEvent")).toBe(6);
+		expect(made.count("Input.insertText")).toBe(2);
 	});
 });
 
@@ -723,7 +773,7 @@ describe("OPS", () => {
 		expect(await call(OPS.page_field, { tab: 1, ref: "e9" })).toEqual({ missing: true });
 	});
 
-	it("page_type inserts the whole string at once, and reads it back", async () => {
+	it("page_type types the text as a person does, and reads it back", async () => {
 		let texts = 0;
 		const made = ready({
 			"Input.insertText": () => {
@@ -735,10 +785,11 @@ describe("OPS", () => {
 			}),
 		});
 		expect(await call(made.OPS.page_type, { tab: 1, ref: "e1", text: "这段文字" })).toMatchObject({
-			route: "insert",
+			route: "keys",
 			holds: true,
 		});
-		expect(texts).toBe(1);
+		// Short text goes character by character: four commits.
+		expect(texts).toBe(4);
 	});
 
 	it("page_type refuses a target that takes no focus", async () => {
